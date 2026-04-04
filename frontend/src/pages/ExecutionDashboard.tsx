@@ -6,8 +6,11 @@ import { useProjectWebSocket } from "../lib/ws";
 import { formatStatus } from "../lib/statusLabels";
 import type { Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
+import TaskCard from "../components/plan/TaskCard";
 import AgentPoolPanel from "../components/agents/AgentPoolPanel";
 import type { AgentInstance } from "../components/agents/AgentStatusBadge";
+
+type PlanViewMode = "graph" | "list";
 
 const REPO_STATUS_STYLES: Record<string, string> = {
   ready: "border-success/40 bg-success/10 text-success",
@@ -32,6 +35,7 @@ export default function ExecutionDashboard() {
   const [repoStatuses, setRepoStatuses] = useState<Record<string, Repository["status"]>>({});
   const [agentInstances, setAgentInstances] = useState<AgentInstance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [planView, setPlanView] = useState<PlanViewMode>("graph");
 
   useEffect(() => {
     if (!projectId) return;
@@ -202,17 +206,75 @@ export default function ExecutionDashboard() {
                 </Button>
               </div>
             ) : (
-              <Card className="h-full">
-                <CardHeader className="text-sm font-medium text-default-500 pb-0">
-                  Task Dependency Graph
+              <Card className="h-full flex flex-col">
+                <CardHeader className="flex items-center justify-between pb-0 shrink-0">
+                  <span className="text-sm font-medium text-default-500">
+                    Task Dependency Plan
+                  </span>
+
+                  {/* Graph / List toggle */}
+                  <div
+                    role="tablist"
+                    aria-label="Plan view"
+                    className="flex rounded-lg bg-default-100 p-0.5 gap-0.5"
+                  >
+                    {(["graph", "list"] as PlanViewMode[]).map((v) => (
+                      <button
+                        key={v}
+                        role="tab"
+                        aria-selected={planView === v}
+                        onClick={() => setPlanView(v)}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          planView === v
+                            ? "bg-content1 text-foreground shadow-sm"
+                            : "text-default-400 hover:text-foreground"
+                        }`}
+                      >
+                        {v === "graph" ? (
+                          <>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" />
+                              <line x1="12" y1="7" x2="5.5" y2="17.5" /><line x1="12" y1="7" x2="18.5" y2="17.5" />
+                            </svg>
+                            Graph
+                          </>
+                        ) : (
+                          <>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                              <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                            </svg>
+                            List
+                          </>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </CardHeader>
-                <CardBody className="p-2 overflow-hidden">
-                  <PlanDAG
-                    tasks={tasks}
-                    agentProfiles={agentProfiles}
-                    repositories={repositories}
-                    height={undefined}
-                  />
+
+                <CardBody className="p-2 flex-1 overflow-hidden">
+                  {planView === "graph" ? (
+                    <PlanDAG
+                      tasks={tasks}
+                      agentProfiles={agentProfiles}
+                      repositories={repositories}
+                      height={undefined}
+                    />
+                  ) : (
+                    <div className="h-full overflow-y-auto p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
+                      {[...tasks]
+                        .sort((a, b) => a.execution_order - b.execution_order)
+                        .map((t) => (
+                          <TaskCard
+                            key={t.id}
+                            task={t}
+                            profile={agentProfiles.find((p) => p.id === t.agent_profile_id)}
+                            repositories={repositories}
+                            showResult
+                          />
+                        ))}
+                    </div>
+                  )}
                 </CardBody>
               </Card>
             )}

@@ -453,7 +453,7 @@ export default function PlanningChat() {
         aria-label="Execution plan"
       >
         {plan && (
-          <div className="h-full overflow-y-auto">
+          <div className="h-full overflow-hidden flex flex-col">
             <PlanSidebar
               plan={plan}
               tasks={tasks}
