@@ -72,6 +72,7 @@ export default function AgentProfiles() {
     try {
       await deleteAgentProfile(deleteTarget.id);
       setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      onDeleteOpenChange();
     } finally {
       setDeletingId(null);
       setDeleteTarget(null);

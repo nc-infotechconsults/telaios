@@ -46,10 +46,7 @@ export default function ConfirmModal({
               <Button
                 color="danger"
                 isLoading={isLoading}
-                onPress={() => {
-                  onConfirm();
-                  onClose();
-                }}
+                onPress={onConfirm}
               >
                 {confirmLabel}
               </Button>

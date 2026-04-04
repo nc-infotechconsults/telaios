@@ -36,9 +36,10 @@ export default function Layout() {
                     isActive ? "text-primary" : "text-foreground/60 hover:text-foreground"
                   }`
                 }
-                aria-current={undefined}
               >
-                {item.label}
+                {({ isActive }) => (
+                  <span aria-current={isActive ? "page" : undefined}>{item.label}</span>
+                )}
               </NavLink>
             </NavbarItem>
           ))}

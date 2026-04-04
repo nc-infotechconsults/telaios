@@ -72,6 +72,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
     try {
       await deleteRepository(projectId, deleteTarget.id);
       onChange(repositories.filter((r) => r.id !== deleteTarget.id));
+      onDeleteOpenChange();
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
