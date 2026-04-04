@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sweai
+      POSTGRES_USER: sweai
+      POSTGRES_PASSWORD: sweai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sweai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  data-api:
+    build: ./data-api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://sweai:sweai@postgres:5432/sweai
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data-api:/app
+      - /app/node_modules
+
+  agent-service:
+    build: ./agent-service
+    ports:
+      - "8000:8000"
+    environment:
+      DATA_API_URL: http://data-api:3000
+      REDIS_URL: redis://redis:6379
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PORT: 8000
+    depends_on:
+      redis:
+        condition: service_healthy
+      data-api:
+        condition: service_started
+    volumes:
+      - ./agent-service:/app
+      - /app/node_modules
+      - agent_workspaces:/workspaces
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_DATA_API_URL: http://localhost:3000
+      VITE_AGENT_SERVICE_URL: http://localhost:8000
+      INTERNAL_DATA_API_URL: http://data-api:3000
+      INTERNAL_AGENT_SERVICE_URL: http://agent-service:8000
+    depends_on:
+      - data-api
+      - agent-service
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  agent_workspaces:
