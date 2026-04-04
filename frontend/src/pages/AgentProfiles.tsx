@@ -15,6 +15,7 @@ import {
 import { getAgentProfiles, deleteAgentProfile } from "../lib/api";
 import type { AgentProfile } from "../types";
 import AgentProfileForm from "../components/agents/AgentProfileForm";
+import ConfirmModal from "../components/common/ConfirmModal";
 
 const TYPE_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" | "success"> = {
   langgraph: "primary",
@@ -34,7 +35,9 @@ export default function AgentProfiles() {
   const [editing, setEditing] = useState<AgentProfile | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AgentProfile | null>(null);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
 
   const load = () => {
     setLoading(true);
@@ -58,14 +61,20 @@ export default function AgentProfiles() {
     onOpen();
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete agent profile "${name}"? This cannot be undone.`)) return;
-    setDeletingId(id);
+  const handleDelete = async (profile: AgentProfile) => {
+    setDeleteTarget(profile);
+    onDeleteOpen();
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
     try {
-      await deleteAgentProfile(id);
-      setProfiles((prev) => prev.filter((p) => p.id !== id));
+      await deleteAgentProfile(deleteTarget.id);
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
     } finally {
       setDeletingId(null);
+      setDeleteTarget(null);
     }
   };
 
@@ -159,6 +168,7 @@ export default function AgentProfiles() {
                     size="sm"
                     variant="light"
                     className="flex-1"
+                    aria-label={`Edit ${p.name}`}
                     onPress={() => handleEdit(p)}
                   >
                     Edit
@@ -168,8 +178,9 @@ export default function AgentProfiles() {
                     variant="light"
                     color="danger"
                     className="flex-1"
+                    aria-label={`Delete ${p.name}`}
                     isLoading={deletingId === p.id}
-                    onPress={() => handleDelete(p.id, p.name)}
+                    onPress={() => handleDelete(p)}
                   >
                     Delete
                   </Button>
@@ -204,6 +215,16 @@ export default function AgentProfiles() {
           )}
         </ModalContent>
       </Modal>
+
+      <ConfirmModal
+        isOpen={isDeleteOpen}
+        onOpenChange={onDeleteOpenChange}
+        title="Delete Agent Profile"
+        message={`Delete "${deleteTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        isLoading={!!deletingId}
+      />
     </div>
   );
 }

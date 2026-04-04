@@ -7,6 +7,8 @@ import {
   ModalContent,
   ModalHeader,
   ModalBody,
+  ModalFooter,
+  Textarea,
   useDisclosure,
   Spinner,
 } from "@heroui/react";
@@ -19,6 +21,7 @@ import {
   getAgentProfiles,
 } from "../lib/api";
 import { useProjectWebSocket } from "../lib/ws";
+import { formatStatus } from "../lib/statusLabels";
 import type { Message, Plan, Task, Repository, AgentProfile, WsEvent } from "../types";
 import RepositorySetup from "../components/plan/RepositorySetup";
 import PlanSidebar from "../components/plan/PlanSidebar";
@@ -42,8 +45,10 @@ export default function PlanningChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
+  const [changesNote, setChangesNote] = useState("");
 
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
+  const { isOpen: isChangesOpen, onOpen: onChangesOpen, onOpenChange: onChangesOpenChange } = useDisclosure();
 
   useEffect(() => {
     if (!projectId) return;
@@ -125,7 +130,17 @@ export default function PlanningChat() {
 
   const handleRequestChanges = () => {
     onConfirmOpenChange();
-    setTimeout(() => handleSend("Please revise the plan based on the following feedback:"), 100);
+    onChangesOpen();
+  };
+
+  const handleSubmitChanges = () => {
+    const feedback = changesNote.trim();
+    onChangesOpenChange();
+    const message = feedback
+      ? `Please revise the plan. Here is my feedback:\n${feedback}`
+      : "Please revise the plan based on our conversation.";
+    setTimeout(() => handleSend(message), 100);
+    setChangesNote("");
   };
 
   if (loading) {
@@ -144,11 +159,12 @@ export default function PlanningChat() {
         <div className="flex items-center gap-3 px-5 py-3 border-b border-divider shrink-0">
           <button
             onClick={() => navigate("/")}
+            aria-label="Back to projects list"
             className="text-default-400 hover:text-foreground transition-colors text-sm"
           >
             ← Projects
           </button>
-          <span className="text-default-300">/</span>
+          <span className="text-default-300" aria-hidden="true">/</span>
           <h1 className="font-semibold truncate">{projectName || "Loading…"}</h1>
 
           {plan?.status && (
@@ -161,7 +177,7 @@ export default function PlanningChat() {
                   : "warning"
               }
             >
-              {plan.status}
+              {formatStatus(plan.status)}
             </Chip>
           )}
 
@@ -179,11 +195,15 @@ export default function PlanningChat() {
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div className="flex border-b border-divider shrink-0 px-1">
+        {/* Tab bar — accessible tablist */}
+        <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
           {(["chat", "repos"] as ActiveTab[]).map((tab) => (
             <button
               key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
+              aria-controls={`tabpanel-${tab}`}
+              id={`tab-${tab}`}
               onClick={() => setActiveTab(tab)}
               className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab
@@ -198,30 +218,38 @@ export default function PlanningChat() {
 
         {/* Tab content */}
         <div className="flex-1 overflow-hidden">
-          {activeTab === "chat" && (
-            <div className="flex flex-col h-full">
-              <div className="flex-1 overflow-y-auto px-5 py-4">
-                <ChatWindow
-                  messages={messages}
-                  streamingText={streamingText}
-                  isStreaming={isStreaming}
-                />
-              </div>
-              <div className="border-t border-divider px-5 py-3 shrink-0">
-                <ChatInput onSend={handleSend} disabled={isStreaming} />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "repos" && (
-            <div className="h-full overflow-y-auto px-5 py-4">
-              <RepositorySetup
-                projectId={projectId ?? ""}
-                repositories={repositories}
-                onChange={setRepositories}
+          <div
+            id="tabpanel-chat"
+            role="tabpanel"
+            aria-labelledby="tab-chat"
+            hidden={activeTab !== "chat"}
+            className="flex flex-col h-full"
+          >
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <ChatWindow
+                messages={messages}
+                streamingText={streamingText}
+                isStreaming={isStreaming}
               />
             </div>
-          )}
+            <div className="border-t border-divider px-5 py-3 shrink-0">
+              <ChatInput onSend={handleSend} disabled={isStreaming} />
+            </div>
+          </div>
+
+          <div
+            id="tabpanel-repos"
+            role="tabpanel"
+            aria-labelledby="tab-repos"
+            hidden={activeTab !== "repos"}
+            className="h-full overflow-y-auto px-5 py-4"
+          >
+            <RepositorySetup
+              projectId={projectId ?? ""}
+              repositories={repositories}
+              onChange={setRepositories}
+            />
+          </div>
         </div>
       </div>
 
@@ -230,6 +258,7 @@ export default function PlanningChat() {
         className={`flex flex-col transition-all duration-300 ${
           plan ? "w-80 shrink-0" : "w-0 overflow-hidden"
         }`}
+        aria-label="Execution plan"
       >
         {plan && (
           <div className="h-full overflow-y-auto">
@@ -261,6 +290,39 @@ export default function PlanningChat() {
                   />
                 )}
               </ModalBody>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Request changes modal */}
+      <Modal isOpen={isChangesOpen} onOpenChange={onChangesOpenChange} size="md">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Request Plan Changes</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-500 mb-2">
+                  Describe what you'd like changed in the plan. Your feedback will be sent to the planning agent.
+                </p>
+                <Textarea
+                  autoFocus
+                  label="Feedback"
+                  placeholder="e.g. Split task 3 into two smaller tasks, and add a review step at the end…"
+                  value={changesNote}
+                  onValueChange={setChangesNote}
+                  minRows={3}
+                  maxRows={8}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button color="primary" onPress={handleSubmitChanges}>
+                  Send Feedback
+                </Button>
+              </ModalFooter>
             </>
           )}
         </ModalContent>

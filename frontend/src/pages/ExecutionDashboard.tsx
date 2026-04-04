@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardBody, CardHeader, Chip, Button, Spinner } from "@heroui/react";
 import { getPlan, getTasks, getRepositories, getAgentProfiles } from "../lib/api";
 import { useProjectWebSocket } from "../lib/ws";
+import { formatStatus } from "../lib/statusLabels";
 import type { Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
 import AgentPoolPanel from "../components/agents/AgentPoolPanel";
@@ -127,6 +128,7 @@ export default function ExecutionDashboard() {
       <div className="flex items-center gap-4 px-6 py-3 border-b border-divider shrink-0">
         <button
           onClick={() => navigate(`/projects/${projectId}`)}
+          aria-label="Back to planning chat"
           className="text-default-400 hover:text-foreground transition-colors text-sm"
         >
           ← Planning
@@ -137,13 +139,20 @@ export default function ExecutionDashboard() {
         <div className="flex items-center gap-2 ml-auto">
           <Chip size="sm" color="success" variant="flat">{done}/{total} done</Chip>
           {inProgress > 0 && <Chip size="sm" color="warning" variant="flat">{inProgress} running</Chip>}
-          {failed > 0 && <Chip size="sm" color="danger" variant="flat">{failed} failed</Chip>}
+          {failed > 0 && <Chip size="sm" color="danger" variant="flat">{failed} {failed === 1 ? "failure" : "failures"}</Chip>}
         </div>
       </div>
 
       {/* Progress bar */}
       {total > 0 && (
-        <div className="h-1 bg-default-100 shrink-0">
+        <div
+          className="h-2 bg-default-100 shrink-0"
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Execution progress: ${progress}%`}
+        >
           <div
             className="h-full bg-success transition-all duration-500"
             style={{ width: `${progress}%` }}
@@ -165,9 +174,11 @@ export default function ExecutionDashboard() {
                   <div
                     key={r.id}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium ${styleClass}`}
+                    title={`${r.name}: ${formatStatus(st)}`}
                   >
-                    <span>{icon}</span>
+                    <span aria-hidden="true">{icon}</span>
                     <span>{r.name}</span>
+                    <span className="opacity-70">— {formatStatus(st)}</span>
                   </div>
                 );
               })}

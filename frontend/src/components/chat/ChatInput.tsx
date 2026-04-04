@@ -28,6 +28,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: Props) {
     <div className="flex gap-2 items-end">
       <Textarea
         className="flex-1"
+        aria-label="Message"
         placeholder={placeholder ?? "Type a message… (Enter to send, Shift+Enter for newline)"}
         value={value}
         onValueChange={setValue}
@@ -41,6 +42,7 @@ export default function ChatInput({ onSend, disabled, placeholder }: Props) {
         onPress={handleSend}
         isDisabled={!value.trim() || disabled}
         className="shrink-0 mb-0.5"
+        aria-label="Send message"
       >
         Send
       </Button>

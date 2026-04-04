@@ -25,7 +25,7 @@ export default function Layout() {
         <NavbarBrand>
           <span className="font-bold text-lg tracking-tight">⚙ SWE AI Platform</span>
         </NavbarBrand>
-        <NavbarContent className="gap-6" justify="center">
+        <NavbarContent className="gap-6" justify="center" aria-label="Main navigation">
           {NAV_ITEMS.map((item) => (
             <NavbarItem key={item.to}>
               <NavLink
@@ -36,6 +36,7 @@ export default function Layout() {
                     isActive ? "text-primary" : "text-foreground/60 hover:text-foreground"
                   }`
                 }
+                aria-current={undefined}
               >
                 {item.label}
               </NavLink>
