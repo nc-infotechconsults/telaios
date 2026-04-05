@@ -1,5 +1,7 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
+
 function BriefcaseIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -44,12 +46,28 @@ export default function Layout() {
     location.pathname.includes("/execute");
 
   return (
-    <div className="h-screen flex overflow-hidden bg-background text-foreground">
-      {/* ── Left sidebar ── */}
-      <aside
-        className="w-56 shrink-0 flex flex-col border-r border-divider bg-content1"
-        aria-label="Application sidebar"
-      >
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
+      {/* Demo mode banner */}
+      {IS_DEMO && (
+        <div
+          className="shrink-0 flex items-center justify-center gap-2 bg-warning/15 border-b border-warning/30 px-4 py-1.5 text-xs font-medium text-warning"
+          role="banner"
+          aria-label="Demo mode active"
+        >
+          <span aria-hidden="true">🎭</span>
+          <span>
+            Demo mode — all data is mocked. Run{" "}
+            <code className="font-mono bg-warning/10 px-1 rounded">npm run dev</code> to connect to the backend.
+          </span>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Left sidebar ── */}
+        <aside
+          className="w-56 shrink-0 flex flex-col border-r border-divider bg-content1"
+          aria-label="Application sidebar"
+        >
         {/* Brand */}
         <div className="flex items-center gap-2.5 px-5 h-16 border-b border-divider shrink-0">
           <span className="text-primary text-xl leading-none" aria-hidden="true">⚙</span>
@@ -106,6 +124,7 @@ export default function Layout() {
           </div>
         )}
       </main>
+      </div>
     </div>
   );
 }

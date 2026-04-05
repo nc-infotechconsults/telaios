@@ -31,302 +31,6 @@ import PlanConfirmModal from "../components/plan/PlanConfirmModal";
 
 type ActiveTab = "chat" | "repos";
 
-// ---------------------------------------------------------------------------
-// Demo / fallback data — loaded when the backend is not reachable
-// ---------------------------------------------------------------------------
-const DEMO_PROJECT_NAMES: Record<string, string> = {
-  "demo-1": "E-commerce API Refactor",
-  "demo-2": "Mobile App — Onboarding Flow",
-  "demo-3": "Data Pipeline Orchestration",
-};
-
-// Tasks for demo-2 draft plan
-const DEMO2_TASKS: Task[] = [
-  {
-    id: "d2t1",
-    plan_id: "plan-draft-2",
-    title: "Audit current drop-off funnel",
-    description: "Use Mixpanel data to pinpoint exactly where step 3 loses users and identify the top error states.",
-    type: "general",
-    status: "pending",
-    execution_order: 0,
-    repository_ids: ["r4"],
-    depends_on_task_ids: [],
-    created_at: "2026-04-01T09:10:00Z",
-    updated_at: "2026-04-01T09:10:00Z",
-  },
-  {
-    id: "d2t2",
-    plan_id: "plan-draft-2",
-    title: "Redesign step 3 with inline validation",
-    description: "Replace blocking error dialogs with inline field-level messages. Add a persistent progress bar.",
-    type: "code",
-    status: "pending",
-    execution_order: 1,
-    repository_ids: ["r4"],
-    depends_on_task_ids: ["d2t1"],
-    created_at: "2026-04-01T09:10:00Z",
-    updated_at: "2026-04-01T09:10:00Z",
-  },
-  {
-    id: "d2t3",
-    plan_id: "plan-draft-2",
-    title: "Add back-navigation with state preservation",
-    description: "Implement wizard state persisted in sessionStorage so users can go back without losing data.",
-    type: "code",
-    status: "pending",
-    execution_order: 2,
-    repository_ids: ["r4"],
-    depends_on_task_ids: ["d2t1"],
-    created_at: "2026-04-01T09:10:00Z",
-    updated_at: "2026-04-01T09:10:00Z",
-  },
-  {
-    id: "d2t4",
-    plan_id: "plan-draft-2",
-    title: "Write automated UI tests",
-    description: "Playwright tests for the full 5-step flow, including back navigation and validation error paths.",
-    type: "test",
-    status: "pending",
-    execution_order: 3,
-    repository_ids: ["r4"],
-    depends_on_task_ids: ["d2t2", "d2t3"],
-    created_at: "2026-04-01T09:10:00Z",
-    updated_at: "2026-04-01T09:10:00Z",
-  },
-];
-
-const DEMO_CHAT_ITEMS: Record<string, ChatItem[]> = {
-  "demo-1": [
-    {
-      id: "m1",
-      project_id: "demo-1",
-      role: "assistant",
-      content:
-        "Hi! I'm your planning agent. I'll help you break this project into an executable plan.\n\nCan you describe the main goals and any technical constraints I should know about?",
-      created_at: "2026-03-28T10:01:00Z",
-    } as Message,
-    {
-      id: "m2",
-      project_id: "demo-1",
-      role: "user",
-      content:
-        "We need to migrate our monolithic REST API to microservices. The main services are auth, products, orders, and payments. Zero-downtime deployment is a hard requirement.",
-      created_at: "2026-03-28T10:02:00Z",
-    } as Message,
-    {
-      id: "m3",
-      project_id: "demo-1",
-      role: "assistant",
-      content:
-        "Got it. The strangler-fig pattern is the right call here — we extract one service at a time behind the existing API gateway, reroute traffic incrementally, and decommission the monolith last.\n\nHere's the plan I've drafted. Review each task and confirm when you're ready to start execution.",
-      created_at: "2026-03-28T10:03:00Z",
-    } as Message,
-    // The plan draft card that appeared in chat at the time the plan was created
-    {
-      type: "plan-draft",
-      id: "plan-1",
-      plan: {
-        id: "plan-1",
-        project_id: "demo-1",
-        status: "executing",
-        created_at: "2026-03-28T10:04:00Z",
-        confirmed_at: "2026-03-28T10:15:00Z",
-      },
-      tasks: [], // populated from DEMO_TASKS below
-      version: 1,
-    } as PlanChatItem,
-  ],
-  "demo-2": [
-    {
-      id: "m4",
-      project_id: "demo-2",
-      role: "assistant",
-      content:
-        "Hi! I'm ready to help plan the onboarding flow redesign. What are the key problems with the current experience?",
-      created_at: "2026-04-01T09:01:00Z",
-    } as Message,
-    {
-      id: "m5",
-      project_id: "demo-2",
-      role: "user",
-      content:
-        "Users are dropping off at step 3 of 5. The error messages are confusing and there's no way to go back without losing progress.",
-      created_at: "2026-04-01T09:02:00Z",
-    } as Message,
-    {
-      id: "m6",
-      project_id: "demo-2",
-      role: "assistant",
-      content:
-        "Classic drop-off pattern — blocking errors and no escape route. I've drafted a plan to fix the funnel: audit the data first, then redesign step 3 with inline validation, add back-navigation with state preservation, and finish with automated UI tests.",
-      created_at: "2026-04-01T09:09:00Z",
-    } as Message,
-    // Draft plan awaiting confirmation
-    {
-      type: "plan-draft",
-      id: "plan-draft-2",
-      plan: {
-        id: "plan-draft-2",
-        project_id: "demo-2",
-        status: "draft",
-        created_at: "2026-04-01T09:10:00Z",
-      },
-      tasks: DEMO2_TASKS,
-      version: 1,
-    } as PlanChatItem,
-  ],
-};
-
-const DEMO_REPOS: Record<string, Repository[]> = {
-  "demo-1": [
-    {
-      id: "r1",
-      project_id: "demo-1",
-      name: "api-service",
-      remote_url: "https://github.com/org/api-service.git",
-      branch: "main",
-      auth_type: "token",
-      has_credentials: true,
-      status: "ready",
-      updated_at: "2026-03-28T10:05:00Z",
-    },
-    {
-      id: "r2",
-      project_id: "demo-1",
-      name: "auth-service",
-      remote_url: "https://github.com/org/auth-service.git",
-      branch: "main",
-      auth_type: "token",
-      has_credentials: true,
-      status: "ready",
-      updated_at: "2026-03-28T10:10:00Z",
-    },
-  ],
-  "demo-2": [
-    {
-      id: "r4",
-      project_id: "demo-2",
-      name: "mobile-app",
-      remote_url: "https://github.com/org/mobile-app.git",
-      branch: "main",
-      auth_type: "token",
-      has_credentials: true,
-      status: "ready",
-      updated_at: "2026-04-01T09:00:00Z",
-    },
-  ],
-  "demo-3": [
-    {
-      id: "r3",
-      project_id: "demo-3",
-      name: "data-pipeline",
-      remote_url: "https://github.com/org/data-pipeline.git",
-      branch: "main",
-      auth_type: "none",
-      has_credentials: false,
-      status: "ready",
-      updated_at: "2026-03-16T09:00:00Z",
-    },
-  ],
-};
-
-const DEMO_PLANS: Record<string, Plan[]> = {
-  "demo-1": [
-    {
-      id: "plan-1",
-      project_id: "demo-1",
-      status: "executing",
-      created_at: "2026-03-28T10:04:00Z",
-      confirmed_at: "2026-03-28T10:15:00Z",
-    },
-  ],
-  "demo-2": [
-    {
-      id: "plan-draft-2",
-      project_id: "demo-2",
-      status: "draft",
-      created_at: "2026-04-01T09:10:00Z",
-    },
-  ],
-};
-
-const DEMO_TASKS: Record<string, Task[]> = {
-  "demo-1": [
-    {
-      id: "t1",
-      plan_id: "plan-1",
-      title: "Extract Auth Service",
-      description:
-        "Move authentication logic into a standalone service with its own database schema and JWT token management.",
-      type: "code",
-      status: "done",
-      execution_order: 0,
-      repository_ids: ["r2"],
-      depends_on_task_ids: [],
-      created_at: "2026-03-28T10:04:00Z",
-      updated_at: "2026-03-28T11:00:00Z",
-    },
-    {
-      id: "t2",
-      plan_id: "plan-1",
-      title: "Extract Product Catalog Service",
-      description:
-        "Isolate product listing, search, and inventory into a dedicated service backed by PostgreSQL.",
-      type: "code",
-      status: "done",
-      execution_order: 1,
-      repository_ids: ["r1"],
-      depends_on_task_ids: [],
-      created_at: "2026-03-28T10:04:00Z",
-      updated_at: "2026-03-28T13:30:00Z",
-    },
-    {
-      id: "t3",
-      plan_id: "plan-1",
-      title: "Extract Order Management Service",
-      description:
-        "Split order creation, status tracking, and fulfillment into its own microservice with an event-driven API.",
-      type: "code",
-      status: "in_progress",
-      execution_order: 2,
-      repository_ids: ["r1"],
-      depends_on_task_ids: ["t1", "t2"],
-      created_at: "2026-03-28T10:04:00Z",
-      updated_at: "2026-03-29T08:00:00Z",
-    },
-    {
-      id: "t4",
-      plan_id: "plan-1",
-      title: "Integration & Regression Tests",
-      description:
-        "Write end-to-end tests covering the auth → product → order flow using the new service boundaries.",
-      type: "test",
-      status: "pending",
-      execution_order: 3,
-      repository_ids: ["r1", "r2"],
-      depends_on_task_ids: ["t2", "t3"],
-      created_at: "2026-03-28T10:04:00Z",
-      updated_at: "2026-03-28T10:04:00Z",
-    },
-    {
-      id: "t5",
-      plan_id: "plan-1",
-      title: "Traffic Cutover & Decommission Monolith",
-      description:
-        "Gradually reroute 100% of traffic through the new gateway, monitor error rates, and remove legacy code.",
-      type: "general",
-      status: "pending",
-      execution_order: 4,
-      repository_ids: ["r1"],
-      depends_on_task_ids: ["t4"],
-      created_at: "2026-03-28T10:04:00Z",
-      updated_at: "2026-03-28T10:04:00Z",
-    },
-  ],
-};
-// ---------------------------------------------------------------------------
-
 export default function PlanningChat() {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -389,7 +93,6 @@ export default function PlanningChat() {
         if (proj) setProjectName(proj.name);
         setRepositories(repos);
         setAgentProfiles(profiles);
-        setChatItems(msgs);
 
         // Load tasks for each plan
         const taskResults = await Promise.all(
@@ -403,6 +106,18 @@ export default function PlanningChat() {
         setPlans(allPlans);
         setPlanTasks(allPlanTasks);
 
+        // Reconstruct inline PlanChatItems for any draft plans so they appear in the
+        // chat stream after a page reload (or when loaded from demo data).
+        const draftPlans = allPlans.filter((p) => p.status === "draft");
+        const draftPlanItems: PlanChatItem[] = draftPlans.map((p, i) => ({
+          type: "plan-draft" as const,
+          id: p.id,
+          plan: p,
+          tasks: allPlanTasks[p.id] ?? [],
+          version: i + 1,
+        }));
+        setChatItems([...msgs, ...draftPlanItems]);
+
         // Set active plan to latest confirmed/executing
         const confirmed = allPlans.filter(
           (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
@@ -414,49 +129,7 @@ export default function PlanningChat() {
         if (draft) setCurrentDraftPlanId(draft.id);
       })
       .catch((error: unknown) => {
-        // Only fall back to demo data for network/unreachable errors (no response from server).
-        // For HTTP errors (401/403/500 etc.) log and show an empty state instead.
-        const hasResponse =
-          typeof error === "object" &&
-          error !== null &&
-          "response" in error &&
-          (error as { response: unknown }).response != null;
-
-        if (hasResponse) {
-          console.error("Failed to load project data from backend", error);
-          return;
-        }
-
-        // Backend not reachable — load demo data
-        setProjectName(DEMO_PROJECT_NAMES[projectId] ?? "Demo Project");
-        setRepositories(DEMO_REPOS[projectId] ?? []);
-
-        const demoPlans = DEMO_PLANS[projectId] ?? [];
-        const taskMap: Record<string, Task[]> = {};
-        demoPlans.forEach((p) => {
-          taskMap[p.id] = DEMO_TASKS[projectId] ?? (p.id === "plan-draft-2" ? DEMO2_TASKS : []);
-        });
-
-        setPlans(demoPlans);
-        setPlanTasks(taskMap);
-
-        // Populate task lists inside plan-draft chat items
-        const rawItems = DEMO_CHAT_ITEMS[projectId] ?? [];
-        const populatedItems = rawItems.map((item) => {
-          if ("type" in item && item.type === "plan-draft") {
-            return { ...item, tasks: taskMap[item.id] ?? item.tasks };
-          }
-          return item;
-        });
-        setChatItems(populatedItems);
-
-        const confirmed = demoPlans.filter(
-          (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
-        );
-        if (confirmed.length > 0) setActivePlanId(confirmed[confirmed.length - 1].id);
-
-        const draft = demoPlans.find((p) => p.status === "draft");
-        if (draft) setCurrentDraftPlanId(draft.id);
+        console.error("Failed to load project data", error);
       })
       .finally(() => setLoading(false));
   }, [projectId]);
