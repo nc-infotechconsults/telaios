@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Chip, Divider, Modal, ModalContent, ModalBody, useDisclosure } from "@heroui/react";
+import {
+  Chip,
+  Divider,
+  Modal,
+  ModalContent,
+  ModalBody,
+  ModalHeader,
+  useDisclosure,
+} from "@heroui/react";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";
 import PlanDAG from "./PlanDAG";
@@ -12,6 +20,13 @@ const STATUS_COLOR: Record<Task["status"], "default" | "primary" | "warning" | "
   failed: "danger",
 };
 
+const TYPE_COLOR: Record<Task["type"], "default" | "primary" | "secondary" | "warning"> = {
+  code: "primary",
+  test: "secondary",
+  review: "warning",
+  general: "default",
+};
+
 const DRIVER_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" | "success"> = {
   langgraph: "primary",
   opencode: "secondary",
@@ -21,9 +36,7 @@ const DRIVER_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" |
 type ViewMode = "list" | "graph";
 
 interface Props {
-  /** All confirmed/executing plans for this project. */
   plans: Plan[];
-  /** ID of the plan currently shown. */
   activePlanId: string;
   onPlanChange: (planId: string) => void;
   tasks: Task[];
@@ -40,17 +53,31 @@ export default function PlanSidebar({
   repositories = [],
 }: Props) {
   const [view, setView] = useState<ViewMode>("list");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
   const { isOpen: isGraphOpen, onOpen: onGraphOpen, onOpenChange: onGraphOpenChange } = useDisclosure();
+  const { isOpen: isDetailOpen, onOpen: onDetailOpen, onOpenChange: onDetailOpenChange } = useDisclosure();
 
   const activePlan = plans.find((p) => p.id === activePlanId);
   const sorted = [...tasks].sort((a, b) => a.execution_order - b.execution_order);
+
+  function openDetail(task: Task) {
+    setSelectedTask(task);
+    onDetailOpen();
+  }
+
+  const selProfile = selectedTask ? agentProfiles.find((p) => p.id === selectedTask.agent_profile_id) : undefined;
+  const selRepos = selectedTask
+    ? (selectedTask.repository_ids ?? [])
+        .map((rid) => repositories.find((r) => r.id === rid))
+        .filter(Boolean) as Repository[]
+    : [];
 
   return (
     <div className="flex flex-col h-full">
       {/* ── Header ── */}
       <div className="px-4 pt-4 pb-3 shrink-0 space-y-3">
 
-        {/* Plan picker — only shown when there are multiple plans */}
         {plans.length > 1 && (
           <div className="flex flex-wrap gap-1" role="group" aria-label="Plan versions">
             {plans.map((p, i) => (
@@ -70,7 +97,6 @@ export default function PlanSidebar({
           </div>
         )}
 
-        {/* Plan title + status */}
         <div className="flex items-center justify-between">
           <span className="font-semibold text-sm">
             {plans.length === 1 ? "Execution Plan" : `Plan v${plans.findIndex((p) => p.id === activePlanId) + 1}`}
@@ -80,7 +106,9 @@ export default function PlanSidebar({
               size="sm"
               variant="flat"
               color={
-                activePlan.status === "confirmed" || activePlan.status === "executing" || activePlan.status === "completed"
+                activePlan.status === "confirmed" ||
+                activePlan.status === "executing" ||
+                activePlan.status === "completed"
                   ? "success"
                   : "warning"
               }
@@ -90,13 +118,9 @@ export default function PlanSidebar({
           )}
         </div>
 
-        {/* List / Graph toggle + graph expand */}
+        {/* List / Graph toggle */}
         <div className="flex items-center gap-1">
-          <div
-            role="group"
-            aria-label="Plan view"
-            className="flex flex-1 rounded-lg bg-default-100 p-0.5 gap-0.5"
-          >
+          <div role="group" aria-label="Plan view" className="flex flex-1 rounded-lg bg-default-100 p-0.5 gap-0.5">
             {(["list", "graph"] as ViewMode[]).map((v) => (
               <button
                 key={v}
@@ -129,7 +153,6 @@ export default function PlanSidebar({
             ))}
           </div>
 
-          {/* Full-screen expand — only useful in graph view */}
           {view === "graph" && (
             <button
               onClick={onGraphOpen}
@@ -147,69 +170,103 @@ export default function PlanSidebar({
         <Divider />
       </div>
 
-      {/* ── Content ── */}
+      {/* ── List view ── */}
       {view === "list" ? (
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           {sorted.length === 0 ? (
             <p className="text-sm text-default-400 text-center py-4">No tasks yet.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col">
               {sorted.map((t, i) => {
                 const profile = agentProfiles.find((p) => p.id === t.agent_profile_id);
                 const taskRepos = (t.repository_ids ?? [])
                   .map((rid) => repositories.find((r) => r.id === rid))
                   .filter(Boolean) as Repository[];
+                const depTasks = (t.depends_on_task_ids ?? [])
+                  .map((id) => sorted.find((s) => s.id === id))
+                  .filter(Boolean) as Task[];
+                const unlocksTasks = sorted.filter((s) =>
+                  (s.depends_on_task_ids ?? []).includes(t.id)
+                );
 
                 return (
-                  <div
-                    key={t.id}
-                    className="p-3 rounded-xl bg-default-50 space-y-1.5 border border-divider"
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <span className="text-xs font-semibold leading-tight">
-                        {i + 1}. {t.title}
-                      </span>
-                      <Chip size="sm" color={STATUS_COLOR[t.status]} variant="flat" className="shrink-0">
-                        {formatStatus(t.status)}
-                      </Chip>
-                    </div>
+                  <div key={t.id}>
+                    {/* Connector line between items */}
+                    {i > 0 && (
+                      <div className="flex justify-center h-4">
+                        <div className="w-px bg-divider" />
+                      </div>
+                    )}
 
-                    <div className="flex flex-wrap gap-1">
-                      <Chip size="sm" variant="bordered">{t.type}</Chip>
-                      {profile && (
-                        <>
-                          <Chip size="sm" color={DRIVER_COLOR[profile.agent_type]} variant="flat">
-                            {profile.agent_type}
-                          </Chip>
-                          <Chip
-                            size="sm"
-                            color="secondary"
-                            variant="bordered"
-                            className="max-w-[120px] truncate"
-                            title={profile.name}
-                          >
-                            {profile.name}
-                          </Chip>
-                        </>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => openDetail(t)}
+                      className="w-full text-left p-3 rounded-xl bg-default-50 border border-divider hover:bg-default-100 hover:border-primary/40 transition-all group space-y-2"
+                    >
+                      {/* Title + status */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <span className="shrink-0 w-5 h-5 rounded-full bg-default-200 text-default-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                            {i + 1}
+                          </span>
+                          <span className="text-xs font-semibold leading-snug group-hover:text-primary transition-colors">
+                            {t.title}
+                          </span>
+                        </div>
+                        <Chip size="sm" color={STATUS_COLOR[t.status]} variant="flat" className="shrink-0">
+                          {formatStatus(t.status)}
+                        </Chip>
+                      </div>
 
-                    {taskRepos.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
+                      {/* Type + agent + repo badges */}
+                      <div className="flex flex-wrap gap-1 pl-7">
+                        <Chip size="sm" color={TYPE_COLOR[t.type]} variant="bordered">{t.type}</Chip>
+                        {profile && (
+                          <>
+                            <Chip size="sm" color={DRIVER_COLOR[profile.agent_type]} variant="flat">
+                              {profile.agent_type}
+                            </Chip>
+                            <Chip size="sm" variant="bordered" className="max-w-[110px] truncate" title={profile.name}>
+                              {profile.name}
+                            </Chip>
+                          </>
+                        )}
                         {taskRepos.map((r) => (
                           <Chip key={r.id} size="sm" variant="bordered" color="primary">
                             📁 {r.name}
                           </Chip>
                         ))}
                       </div>
-                    )}
 
-                    {(t.depends_on_task_ids ?? []).length > 0 && (
-                      <p className="text-[10px] text-default-400">
-                        ⛓ depends on {t.depends_on_task_ids!.length} task
-                        {t.depends_on_task_ids!.length > 1 ? "s" : ""}
-                      </p>
-                    )}
+                      {/* Dependencies */}
+                      {depTasks.length > 0 && (
+                        <div className="pl-7 flex flex-wrap items-center gap-1">
+                          <span className="text-[10px] text-default-400 shrink-0">⛓ needs:</span>
+                          {depTasks.map((dep) => (
+                            <span
+                              key={dep.id}
+                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-default-200 text-default-600"
+                            >
+                              {dep.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Unlocks */}
+                      {unlocksTasks.length > 0 && (
+                        <div className="pl-7 flex flex-wrap items-center gap-1">
+                          <span className="text-[10px] text-default-400 shrink-0">↗ unlocks:</span>
+                          {unlocksTasks.map((dep) => (
+                            <span
+                              key={dep.id}
+                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-default-200 text-default-600"
+                            >
+                              {dep.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
                   </div>
                 );
               })}
@@ -217,6 +274,7 @@ export default function PlanSidebar({
           )}
         </div>
       ) : (
+        /* ── Graph view ── */
         <div className="flex-1 overflow-hidden">
           {sorted.length === 0 ? (
             <p className="text-sm text-default-400 text-center py-8 px-4">No tasks yet.</p>
@@ -226,6 +284,7 @@ export default function PlanSidebar({
               agentProfiles={agentProfiles}
               repositories={repositories}
               height={undefined}
+              onTaskClick={openDetail}
             />
           )}
         </div>
@@ -258,13 +317,135 @@ export default function PlanSidebar({
                   agentProfiles={agentProfiles}
                   repositories={repositories}
                   height={undefined}
+                  onTaskClick={openDetail}
                 />
               </ModalBody>
             </>
           )}
         </ModalContent>
       </Modal>
+
+      {/* ── Task detail modal ── */}
+      <Modal isOpen={isDetailOpen} onOpenChange={onDetailOpenChange} size="lg" scrollBehavior="inside">
+        <ModalContent>
+          {() =>
+            selectedTask && (
+              <>
+                <ModalHeader className="flex items-center gap-3 pb-2">
+                  <span className="flex-1 text-base font-semibold leading-snug">{selectedTask.title}</span>
+                  <Chip size="sm" color={STATUS_COLOR[selectedTask.status]} variant="flat" className="shrink-0">
+                    {formatStatus(selectedTask.status)}
+                  </Chip>
+                </ModalHeader>
+                <ModalBody className="pb-6 space-y-4">
+
+                  {selectedTask.description && (
+                    <p className="text-sm text-default-600 leading-relaxed">{selectedTask.description}</p>
+                  )}
+
+                  <Divider />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1 uppercase tracking-wide">Type</p>
+                      <Chip size="sm" color={TYPE_COLOR[selectedTask.type]} variant="bordered">
+                        {selectedTask.type}
+                      </Chip>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1 uppercase tracking-wide">Execution order</p>
+                      <span className="text-sm font-mono text-foreground">#{selectedTask.execution_order}</span>
+                    </div>
+                  </div>
+
+                  {selProfile && (
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Agent</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Chip size="sm" color={DRIVER_COLOR[selProfile.agent_type]} variant="flat">
+                          {selProfile.agent_type}
+                        </Chip>
+                        <Chip size="sm" variant="bordered">{selProfile.name}</Chip>
+                      </div>
+                    </div>
+                  )}
+
+                  {selRepos.length > 0 && (
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Repositories</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selRepos.map((r) => (
+                          <Chip key={r.id} size="sm" variant="bordered" color="primary">📁 {r.name}</Chip>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedTask.depends_on_task_ids ?? []).length > 0 && (
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Depends on</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTask.depends_on_task_ids!.map((depId) => {
+                          const dep = sorted.find((t) => t.id === depId);
+                          return dep ? (
+                            <button
+                              key={depId}
+                              onClick={() => setSelectedTask(dep)}
+                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-default-700 transition-colors"
+                            >
+                              ⛓ {dep.title}
+                            </button>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {(() => {
+                    const unlocks = sorted.filter((t) =>
+                      (t.depends_on_task_ids ?? []).includes(selectedTask.id)
+                    );
+                    return unlocks.length > 0 ? (
+                      <div>
+                        <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Unlocks</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {unlocks.map((dep) => (
+                            <button
+                              key={dep.id}
+                              onClick={() => setSelectedTask(dep)}
+                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-default-700 transition-colors"
+                            >
+                              ↗ {dep.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {selectedTask.result && (
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Result</p>
+                      <p className="text-xs text-default-600 bg-default-50 rounded-lg p-3 leading-relaxed">
+                        {selectedTask.result}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedTask.assigned_instance_id && (
+                    <div>
+                      <p className="text-[11px] text-default-400 mb-1 uppercase tracking-wide">Agent instance</p>
+                      <code className="text-xs bg-default-100 px-2 py-0.5 rounded">
+                        {selectedTask.assigned_instance_id}
+                      </code>
+                    </div>
+                  )}
+                </ModalBody>
+              </>
+            )
+          }
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
-

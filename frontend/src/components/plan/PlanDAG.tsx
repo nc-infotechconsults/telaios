@@ -47,7 +47,7 @@ function TaskNode({ data }: NodeProps) {
 
   return (
     <div
-      className="rounded-lg p-2 min-w-[180px] max-w-[220px] shadow-lg text-xs"
+      className="rounded-lg p-2 min-w-[180px] max-w-[220px] shadow-lg text-xs cursor-pointer hover:brightness-110 transition-all"
       style={{
         background: STATUS_BG[task.status],
         border: `2px solid ${STATUS_BORDER[task.status]}`,
@@ -56,36 +56,27 @@ function TaskNode({ data }: NodeProps) {
     >
       <Handle type="target" position={Position.Top} style={{ background: STATUS_BORDER[task.status] }} />
 
-      {/* Task title */}
       <div className="font-semibold leading-tight mb-1 truncate" title={task.title}>
         {task.title}
       </div>
 
-      {/* Type chip */}
       <div className="flex flex-wrap gap-1 mb-1">
         <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">
           {task.type} · {task.status.replace("_", " ")}
         </span>
       </div>
 
-      {/* Agent profile + driver badges */}
       {profile && (
         <div className="flex flex-wrap gap-1 mb-1">
-          <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${DRIVER_BADGE[profile.agent_type]}`}
-          >
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${DRIVER_BADGE[profile.agent_type]}`}>
             {profile.agent_type}
           </span>
-          <span
-            className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 truncate max-w-[120px]"
-            title={profile.name}
-          >
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 truncate max-w-[120px]" title={profile.name}>
             {profile.name}
           </span>
         </div>
       )}
 
-      {/* Repo badges */}
       {repos.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {repos.map((r) => (
@@ -103,34 +94,68 @@ function TaskNode({ data }: NodeProps) {
 
 const nodeTypes = { task: TaskNode };
 
+/** Assign a DAG level to each task: level = max(dep levels) + 1 */
+function computeLevels(tasks: Task[]): Map<string, number> {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const memo = new Map<string, number>();
+
+  function level(id: string): number {
+    if (memo.has(id)) return memo.get(id)!;
+    const t = byId.get(id);
+    const deps = t?.depends_on_task_ids ?? [];
+    const l = deps.length === 0 ? 0 : Math.max(...deps.map(level)) + 1;
+    memo.set(id, l);
+    return l;
+  }
+
+  tasks.forEach((t) => level(t.id));
+  return memo;
+}
+
 interface Props {
   tasks: Task[];
   agentProfiles: AgentProfile[];
   repositories: Repository[];
   height?: number;
+  onTaskClick?: (task: Task) => void;
 }
 
-export default function PlanDAG({ tasks, agentProfiles, repositories, height = 500 }: Props) {
-  const { nodes, edges } = useMemo(() => {
-    const cols = 4;
-    const cellW = 260;
-    const cellH = 170;
+const NODE_W = 224;
+const NODE_H = 130;
+const GAP_X = 48;
+const GAP_Y = 72;
 
-    const nodes: Node[] = tasks.map((t, i) => {
+export default function PlanDAG({ tasks, agentProfiles, repositories, height = 500, onTaskClick }: Props) {
+  const { nodes, edges } = useMemo(() => {
+    const levelMap = computeLevels(tasks);
+
+    // Group tasks by level
+    const byLevel = new Map<number, Task[]>();
+    for (const task of tasks) {
+      const l = levelMap.get(task.id) ?? 0;
+      if (!byLevel.has(l)) byLevel.set(l, []);
+      byLevel.get(l)!.push(task);
+    }
+
+    // Width of the widest level (used to centre narrower levels)
+    const maxRowW = Math.max(
+      ...Array.from(byLevel.values()).map((row) => row.length * NODE_W + (row.length - 1) * GAP_X)
+    );
+
+    const nodes: Node[] = tasks.map((t) => {
+      const lvl = levelMap.get(t.id) ?? 0;
+      const row = byLevel.get(lvl)!;
+      const col = row.indexOf(t);
+      const rowW = row.length * NODE_W + (row.length - 1) * GAP_X;
+      const x = (maxRowW - rowW) / 2 + col * (NODE_W + GAP_X) + 20;
+      const y = lvl * (NODE_H + GAP_Y) + 20;
+
       const profile = agentProfiles.find((p) => p.id === t.agent_profile_id);
       const repos = (t.repository_ids ?? [])
         .map((rid) => repositories.find((r) => r.id === rid))
         .filter(Boolean) as Repository[];
 
-      return {
-        id: t.id,
-        type: "task",
-        position: {
-          x: (i % cols) * cellW + 20,
-          y: Math.floor(i / cols) * cellH + 20,
-        },
-        data: { task: t, profile, repos },
-      };
+      return { id: t.id, type: "task", position: { x, y }, data: { task: t, profile, repos } };
     });
 
     const edges: Edge[] = tasks.flatMap((t) =>
@@ -153,6 +178,10 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onNodeClick={(_, node) => {
+          const task = tasks.find((t) => t.id === node.id);
+          if (task) onTaskClick?.(task);
+        }}
         fitView
         proOptions={{ hideAttribution: true }}
       >
