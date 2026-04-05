@@ -77,7 +77,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
+    <div className="w-full space-y-4">
       <h1 className="text-2xl font-bold">Settings</h1>
 
       <Card>

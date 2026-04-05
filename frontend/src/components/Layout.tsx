@@ -45,6 +45,8 @@ export default function Layout() {
     location.pathname.includes("/projects/") ||
     location.pathname.includes("/execute");
 
+  const isSettings = location.pathname.startsWith("/settings");
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
       {/* Demo mode banner */}
@@ -119,7 +121,7 @@ export default function Layout() {
         {isFullHeight ? (
           <Outlet />
         ) : (
-          <div className="max-w-6xl mx-auto px-8 py-8">
+          <div className={`${isSettings ? "w-full px-8 py-8" : "max-w-6xl mx-auto px-8 py-8"}`}>
             <Outlet />
           </div>
         )}
