@@ -9,7 +9,7 @@ import {
   CardBody,
   useDisclosure,
 } from "@heroui/react";
-import { createRepository, deleteRepository } from "../../lib/api";
+import { createRepository, updateRepository, deleteRepository } from "../../lib/api";
 import type { Repository } from "../../types";
 import ConfirmModal from "../common/ConfirmModal";
 
@@ -19,11 +19,18 @@ interface Props {
   onChange: (repos: Repository[]) => void;
 }
 
-const EMPTY_FORM = {
+type FormState = {
+  name: string;
+  remote_url: string;
+  branch: string;
+  auth_type: Repository["auth_type"];
+};
+
+const EMPTY_FORM: FormState = {
   name: "",
   remote_url: "",
   branch: "main",
-  auth_type: "none" as Repository["auth_type"],
+  auth_type: "none",
 };
 
 const STATUS_COLOR: Record<Repository["status"], "default" | "warning" | "success" | "danger"> = {
@@ -34,8 +41,10 @@ const STATUS_COLOR: Record<Repository["status"], "default" | "warning" | "succes
 };
 
 export default function RepositorySetup({ projectId, repositories, onChange }: Props) {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [token, setToken] = useState("");
+  // null = add mode, string = id of repo being edited
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Repository | null>(null);
@@ -44,18 +53,50 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
 
   const isFormValid = form.name.trim() && form.remote_url.trim();
 
-  const handleAdd = async () => {
+  function openAdd() {
+    setForm(EMPTY_FORM);
+    setToken("");
+    setEditingId(null);
+    setShowForm(true);
+  }
+
+  function openEdit(repo: Repository) {
+    setForm({
+      name: repo.name,
+      remote_url: repo.remote_url,
+      branch: repo.branch ?? "main",
+      auth_type: repo.auth_type,
+    });
+    setToken("");
+    setEditingId(repo.id);
+    setShowForm(true);
+  }
+
+  function cancelForm() {
+    setShowForm(false);
+    setForm(EMPTY_FORM);
+    setToken("");
+    setEditingId(null);
+  }
+
+  const handleSave = async () => {
     if (!isFormValid) return;
     setSaving(true);
     try {
-      const created = await createRepository(projectId, {
+      const payload: Partial<Repository> & { credentials?: string } = {
         ...form,
         ...(token ? { credentials: token } : {}),
-      });
-      onChange([...repositories, created]);
-      setForm(EMPTY_FORM);
-      setToken("");
-      setShowForm(false);
+      };
+
+      if (editingId) {
+        const updated = await updateRepository(projectId, editingId, payload);
+        onChange(repositories.map((r) => (r.id === editingId ? updated : r)));
+      } else {
+        const created = await createRepository(projectId, payload);
+        onChange([...repositories, created]);
+      }
+
+      cancelForm();
     } finally {
       setSaving(false);
     }
@@ -100,7 +141,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
               Add at least one repository so agents know where to code.
             </p>
           </div>
-          <Button size="sm" color="primary" onPress={() => setShowForm(true)}>
+          <Button size="sm" color="primary" onPress={openAdd}>
             + Add Repository
           </Button>
         </div>
@@ -109,60 +150,84 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
       {/* Existing repos */}
       {repositories.length > 0 && (
         <div className="space-y-2">
-          {repositories.map((r) => (
-            <Card key={r.id} className="border border-divider">
-              <CardBody className="py-3 px-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">📁 {r.name}</span>
-                      <Chip size="sm" color={STATUS_COLOR[r.status]} variant="flat">
-                        {r.status}
-                      </Chip>
-                      {r.branch && (
-                        <Chip size="sm" variant="bordered" className="font-mono text-xs">
-                          {r.branch}
+          {repositories.map((r) => {
+            const isBeingEdited = editingId === r.id;
+            return (
+              <Card
+                key={r.id}
+                className={`border transition-colors ${
+                  isBeingEdited ? "border-primary/50 bg-primary/5" : "border-divider"
+                }`}
+              >
+                <CardBody className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">📁 {r.name}</span>
+                        <Chip size="sm" color={STATUS_COLOR[r.status]} variant="flat">
+                          {r.status}
                         </Chip>
+                        {r.branch && (
+                          <Chip size="sm" variant="bordered" className="font-mono text-xs">
+                            {r.branch}
+                          </Chip>
+                        )}
+                      </div>
+                      <p className="text-xs text-default-400 truncate mt-1">{r.remote_url}</p>
+                      {r.auth_type !== "none" && (
+                        <p className="text-xs text-default-300 mt-0.5">
+                          Auth: {r.auth_type === "token" ? "🔑 Token" : "🔐 SSH Key"}
+                          {r.has_credentials && (
+                            <span className="text-success ml-1">✓ credentials stored</span>
+                          )}
+                        </p>
+                      )}
+                      {r.error_message && (
+                        <p className="text-xs text-danger mt-1">⚠ {r.error_message}</p>
                       )}
                     </div>
-                    <p className="text-xs text-default-400 truncate mt-1">{r.remote_url}</p>
-                    {r.auth_type !== "none" && (
-                      <p className="text-xs text-default-300 mt-0.5">
-                        Auth: {r.auth_type === "token" ? "🔑 Token" : "🔐 SSH Key"}
-                      </p>
-                    )}
-                    {r.error_message && (
-                      <p className="text-xs text-danger mt-1">⚠ {r.error_message}</p>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="bordered"
+                        aria-label={`Edit repository ${r.name}`}
+                        isDisabled={showForm && editingId !== r.id}
+                        onPress={() => openEdit(r)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        aria-label={`Remove repository ${r.name}`}
+                        isDisabled={showForm}
+                        onPress={() => handleDelete(r)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="light"
-                    color="danger"
-                    aria-label={`Remove repository ${r.name}`}
-                    onPress={() => handleDelete(r)}
-                    className="shrink-0"
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
+                </CardBody>
+              </Card>
+            );
+          })}
 
           {!showForm && (
-            <Button size="sm" variant="bordered" onPress={() => setShowForm(true)}>
+            <Button size="sm" variant="bordered" onPress={openAdd}>
               + Add Another Repository
             </Button>
           )}
         </div>
       )}
 
-      {/* Add form */}
+      {/* Add / Edit form */}
       {showForm && (
         <Card className="border border-primary/30">
           <CardBody className="space-y-3 p-4">
-            <p className="text-sm font-medium">New Repository</p>
+            <p className="text-sm font-semibold">
+              {editingId ? `Editing: ${form.name || "repository"}` : "New Repository"}
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
               <Input
@@ -216,34 +281,21 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                 value={token}
                 onValueChange={setToken}
                 placeholder={
-                  form.auth_type === "token"
-                    ? "ghp_..."
-                    : "-----BEGIN OPENSSH PRIVATE KEY-----"
+                  form.auth_type === "token" ? "ghp_..." : "-----BEGIN OPENSSH PRIVATE KEY-----"
                 }
-                description="Stored encrypted"
+                description={
+                  editingId
+                    ? "Leave blank to keep the existing credential"
+                    : "Stored encrypted"
+                }
               />
             )}
 
             <div className="flex gap-2 pt-1">
-              <Button
-                size="sm"
-                color="primary"
-                isLoading={saving}
-                isDisabled={!isFormValid}
-                onPress={handleAdd}
-              >
-                Add Repository
+              <Button size="sm" color="primary" isLoading={saving} isDisabled={!isFormValid} onPress={handleSave}>
+                {editingId ? "Save Changes" : "Add Repository"}
               </Button>
-              <Button
-                size="sm"
-                variant="light"
-                isDisabled={saving}
-                onPress={() => {
-                  setShowForm(false);
-                  setForm(EMPTY_FORM);
-                  setToken("");
-                }}
-              >
+              <Button size="sm" variant="light" isDisabled={saving} onPress={cancelForm}>
                 Cancel
               </Button>
             </div>
