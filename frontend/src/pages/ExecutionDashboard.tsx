@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, CardBody, CardHeader, Chip, Button, Spinner } from "@heroui/react";
+import { Card, CardBody, CardHeader, Chip, Button, Spinner, useDisclosure } from "@heroui/react";
 import { getPlan, getTasks, getRepositories, getAgentProfiles } from "../lib/api";
 import { useProjectWebSocket } from "../lib/ws";
 import { formatStatus } from "../lib/statusLabels";
 import type { Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
 import TaskCard from "../components/plan/TaskCard";
+import TaskDetailModal from "../components/plan/TaskDetailModal";
 import AgentPoolPanel from "../components/agents/AgentPoolPanel";
 import type { AgentInstance } from "../components/agents/AgentStatusBadge";
 
@@ -36,6 +37,13 @@ export default function ExecutionDashboard() {
   const [agentInstances, setAgentInstances] = useState<AgentInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [planView, setPlanView] = useState<PlanViewMode>("graph");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { isOpen: isDetailOpen, onOpen: onDetailOpen, onOpenChange: onDetailOpenChange } = useDisclosure();
+
+  function openTaskDetail(task: Task) {
+    setSelectedTask(task);
+    onDetailOpen();
+  }
 
   useEffect(() => {
     if (!projectId) return;
@@ -258,19 +266,26 @@ export default function ExecutionDashboard() {
                       agentProfiles={agentProfiles}
                       repositories={repositories}
                       height={undefined}
+                      onTaskClick={openTaskDetail}
                     />
                   ) : (
                     <div className="h-full overflow-y-auto p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
                       {[...tasks]
                         .sort((a, b) => a.execution_order - b.execution_order)
                         .map((t) => (
-                          <TaskCard
+                          <button
                             key={t.id}
-                            task={t}
-                            profile={agentProfiles.find((p) => p.id === t.agent_profile_id)}
-                            repositories={repositories}
-                            showResult
-                          />
+                            type="button"
+                            onClick={() => openTaskDetail(t)}
+                            className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
+                          >
+                            <TaskCard
+                              task={t}
+                              profile={agentProfiles.find((p) => p.id === t.agent_profile_id)}
+                              repositories={repositories}
+                              showResult
+                            />
+                          </button>
                         ))}
                     </div>
                   )}
@@ -288,6 +303,17 @@ export default function ExecutionDashboard() {
           />
         </div>
       </div>
+
+      {/* Task detail modal */}
+      <TaskDetailModal
+        task={selectedTask}
+        tasks={tasks}
+        agentProfiles={agentProfiles}
+        repositories={repositories}
+        isOpen={isDetailOpen}
+        onOpenChange={onDetailOpenChange}
+        onNavigate={openTaskDetail}
+      />
     </div>
   );
 }

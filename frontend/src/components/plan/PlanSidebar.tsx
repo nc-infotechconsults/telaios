@@ -5,12 +5,12 @@ import {
   Modal,
   ModalContent,
   ModalBody,
-  ModalHeader,
   useDisclosure,
 } from "@heroui/react";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";
 import PlanDAG from "./PlanDAG";
+import TaskDetailModal from "./TaskDetailModal";
 
 const STATUS_COLOR: Record<Task["status"], "default" | "primary" | "warning" | "success" | "danger"> = {
   pending: "default",
@@ -65,13 +65,6 @@ export default function PlanSidebar({
     setSelectedTask(task);
     onDetailOpen();
   }
-
-  const selProfile = selectedTask ? agentProfiles.find((p) => p.id === selectedTask.agent_profile_id) : undefined;
-  const selRepos = selectedTask
-    ? (selectedTask.repository_ids ?? [])
-        .map((rid) => repositories.find((r) => r.id === rid))
-        .filter(Boolean) as Repository[]
-    : [];
 
   return (
     <div className="flex flex-col h-full">
@@ -333,126 +326,15 @@ export default function PlanSidebar({
       </Modal>
 
       {/* ── Task detail modal ── */}
-      <Modal isOpen={isDetailOpen} onOpenChange={onDetailOpenChange} size="lg" scrollBehavior="inside">
-        <ModalContent>
-          {() =>
-            selectedTask && (
-              <>
-                <ModalHeader className="flex items-center gap-3 pb-2">
-                  <span className="flex-1 text-base font-semibold leading-snug">{selectedTask.title}</span>
-                  <Chip size="sm" color={STATUS_COLOR[selectedTask.status]} variant="flat" className="shrink-0">
-                    {formatStatus(selectedTask.status)}
-                  </Chip>
-                </ModalHeader>
-                <ModalBody className="pb-6 space-y-4">
-
-                  {selectedTask.description && (
-                    <p className="text-sm text-default-600 leading-relaxed">{selectedTask.description}</p>
-                  )}
-
-                  <Divider />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1 uppercase tracking-wide">Type</p>
-                      <Chip size="sm" color={TYPE_COLOR[selectedTask.type]} variant="bordered">
-                        {selectedTask.type}
-                      </Chip>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1 uppercase tracking-wide">Execution order</p>
-                      <span className="text-sm font-mono text-foreground">#{selectedTask.execution_order}</span>
-                    </div>
-                  </div>
-
-                  {selProfile && (
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Agent</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Chip size="sm" color={DRIVER_COLOR[selProfile.agent_type]} variant="flat">
-                          {selProfile.agent_type}
-                        </Chip>
-                        <Chip size="sm" variant="bordered">{selProfile.name}</Chip>
-                      </div>
-                    </div>
-                  )}
-
-                  {selRepos.length > 0 && (
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Repositories</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selRepos.map((r) => (
-                          <Chip key={r.id} size="sm" variant="bordered" color="primary">📁 {r.name}</Chip>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {(selectedTask.depends_on_task_ids ?? []).length > 0 && (
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Depends on</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedTask.depends_on_task_ids!.map((depId) => {
-                          const dep = sorted.find((t) => t.id === depId);
-                          return dep ? (
-                            <button
-                              key={depId}
-                              onClick={() => setSelectedTask(dep)}
-                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-foreground transition-colors"
-                            >
-                              ⛓ {dep.title}
-                            </button>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {(() => {
-                    const unlocks = sorted.filter((t) =>
-                      (t.depends_on_task_ids ?? []).includes(selectedTask.id)
-                    );
-                    return unlocks.length > 0 ? (
-                      <div>
-                        <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Unlocks</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {unlocks.map((dep) => (
-                            <button
-                              key={dep.id}
-                              onClick={() => setSelectedTask(dep)}
-                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-foreground transition-colors"
-                            >
-                              ↗ {dep.title}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
-
-                  {selectedTask.result && (
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Result</p>
-                      <p className="text-xs text-default-600 bg-default-50 rounded-lg p-3 leading-relaxed">
-                        {selectedTask.result}
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedTask.assigned_instance_id && (
-                    <div>
-                      <p className="text-[11px] text-default-400 mb-1 uppercase tracking-wide">Agent instance</p>
-                      <code className="text-xs bg-default-100 px-2 py-0.5 rounded">
-                        {selectedTask.assigned_instance_id}
-                      </code>
-                    </div>
-                  )}
-                </ModalBody>
-              </>
-            )
-          }
-        </ModalContent>
-      </Modal>
+      <TaskDetailModal
+        task={selectedTask}
+        tasks={tasks}
+        agentProfiles={agentProfiles}
+        repositories={repositories}
+        isOpen={isDetailOpen}
+        onOpenChange={onDetailOpenChange}
+        onNavigate={(t) => setSelectedTask(t)}
+      />
     </div>
   );
 }

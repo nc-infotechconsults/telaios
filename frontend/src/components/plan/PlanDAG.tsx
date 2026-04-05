@@ -12,7 +12,6 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Chip, Divider } from "@heroui/react";
 import type { Task, AgentProfile, Repository } from "../../types";
 
 const STATUS_BG: Record<Task["status"], string> = {
@@ -31,31 +30,10 @@ const STATUS_BORDER: Record<Task["status"], string> = {
   failed: "#ef4444",
 };
 
-const STATUS_COLOR: Record<Task["status"], "default" | "primary" | "warning" | "success" | "danger"> = {
-  pending: "default",
-  ready: "primary",
-  in_progress: "warning",
-  done: "success",
-  failed: "danger",
-};
-
-const TYPE_COLOR: Record<Task["type"], "default" | "primary" | "secondary" | "warning" | "success"> = {
-  code: "primary",
-  test: "secondary",
-  review: "warning",
-  general: "default",
-};
-
 const DRIVER_LABEL: Record<AgentProfile["agent_type"], string> = {
   langgraph: "LangGraph",
   opencode: "OpenCode",
   "github-copilot": "Copilot",
-};
-
-const DRIVER_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" | "success"> = {
-  langgraph: "primary",
-  opencode: "secondary",
-  "github-copilot": "success",
 };
 
 const DRIVER_PILL: Record<AgentProfile["agent_type"], string> = {
@@ -63,10 +41,6 @@ const DRIVER_PILL: Record<AgentProfile["agent_type"], string> = {
   opencode: "bg-purple-600/20 text-purple-300 border border-purple-500/30",
   "github-copilot": "bg-green-600/20 text-green-300 border border-green-500/30",
 };
-
-function formatStatus(s: Task["status"]) {
-  return s.replace("_", " ");
-}
 
 interface TaskNodeData {
   task: Task;
@@ -156,133 +130,6 @@ function computeLevels(tasks: Task[]): Map<string, number> {
   return memo;
 }
 
-// ── Detail panel ──────────────────────────────────────────────────────────────
-
-interface DetailPanelProps {
-  task: Task;
-  tasks: Task[];
-  agentProfiles: AgentProfile[];
-  repositories: Repository[];
-  onNavigate: (task: Task) => void;
-  onClose: () => void;
-}
-
-function DetailPanel({ task, tasks, agentProfiles, repositories, onNavigate, onClose }: DetailPanelProps) {
-  const profile = agentProfiles.find((p) => p.id === task.agent_profile_id);
-  const repos = (task.repository_ids ?? [])
-    .map((rid) => repositories.find((r) => r.id === rid))
-    .filter(Boolean) as Repository[];
-  const depTasks = (task.depends_on_task_ids ?? [])
-    .map((id) => tasks.find((t) => t.id === id))
-    .filter(Boolean) as Task[];
-  const unlocksTasks = tasks.filter((t) => (t.depends_on_task_ids ?? []).includes(task.id));
-
-  return (
-    <div className="w-72 shrink-0 flex flex-col border-l border-divider bg-content1 overflow-y-auto text-foreground">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3 border-b border-divider shrink-0">
-        <div className="space-y-1 min-w-0">
-          <p className="text-sm font-semibold leading-snug">{task.title}</p>
-          <Chip size="sm" color={STATUS_COLOR[task.status]} variant="flat">
-            {formatStatus(task.status)}
-          </Chip>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close detail panel"
-          className="text-default-400 hover:text-foreground transition-colors shrink-0 mt-0.5 leading-none text-lg"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
-        {task.description && (
-          <p className="text-xs text-default-600 leading-relaxed">{task.description}</p>
-        )}
-
-        <Divider />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-[10px] text-default-400 mb-1 uppercase tracking-wide">Type</p>
-            <Chip size="sm" color={TYPE_COLOR[task.type]} variant="bordered">{task.type}</Chip>
-          </div>
-          <div>
-            <p className="text-[10px] text-default-400 mb-1 uppercase tracking-wide">Order</p>
-            <span className="text-xs font-mono text-foreground">#{task.execution_order}</span>
-          </div>
-        </div>
-
-        {/* Agent */}
-        <div>
-          <p className="text-[10px] text-default-400 mb-1.5 uppercase tracking-wide">Agent</p>
-          {profile ? (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Chip size="sm" color={DRIVER_COLOR[profile.agent_type]} variant="flat">{profile.agent_type}</Chip>
-              <Chip size="sm" variant="bordered">{profile.name}</Chip>
-            </div>
-          ) : (
-            <p className="text-xs text-default-400 italic">Unassigned</p>
-          )}
-        </div>
-
-        {/* Repos */}
-        {repos.length > 0 && (
-          <div>
-            <p className="text-[10px] text-default-400 mb-1.5 uppercase tracking-wide">Repositories</p>
-            <div className="flex flex-wrap gap-1">
-              {repos.map((r) => (
-                <Chip key={r.id} size="sm" variant="bordered" color="primary">📁 {r.name}</Chip>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Depends on */}
-        {depTasks.length > 0 && (
-          <div>
-            <p className="text-[10px] text-default-400 mb-1.5 uppercase tracking-wide">⛓ Depends on</p>
-            <div className="flex flex-wrap gap-1">
-              {depTasks.map((dep) => (
-                <button
-                  key={dep.id}
-                  type="button"
-                  onClick={() => onNavigate(dep)}
-                  className="text-[11px] px-2 py-1 rounded-lg bg-default-100 hover:bg-default-200 text-foreground transition-colors text-left"
-                >
-                  {dep.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Unlocks */}
-        {unlocksTasks.length > 0 && (
-          <div>
-            <p className="text-[10px] text-default-400 mb-1.5 uppercase tracking-wide">↗ Unlocks</p>
-            <div className="flex flex-wrap gap-1">
-              {unlocksTasks.map((dep) => (
-                <button
-                  key={dep.id}
-                  type="button"
-                  onClick={() => onNavigate(dep)}
-                  className="text-[11px] px-2 py-1 rounded-lg bg-default-100 hover:bg-default-200 text-foreground transition-colors text-left"
-                >
-                  {dep.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -300,12 +147,6 @@ const GAP_Y = 72;
 
 export default function PlanDAG({ tasks, agentProfiles, repositories, height = 500, onTaskClick }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
-
-  function handleNodeClick(task: Task) {
-    setSelectedTaskId(task.id);
-    onTaskClick?.(task);
-  }
 
   // Layout computation — does NOT depend on selectedTaskId so dragging isn't reset on selection
   const { layoutNodes, layoutEdges } = useMemo(() => {
@@ -379,40 +220,28 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
   }, [selectedTaskId, setRfNodes]);
 
   return (
-    <div className="flex h-full" style={height !== undefined ? { height } : undefined}>
-      {/* Graph */}
-      <div className="flex-1 min-w-0">
-        <ReactFlow
-          nodes={rfNodes}
-          edges={rfEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onNodeClick={(_, node) => {
-            const task = tasks.find((t) => t.id === node.id);
-            if (task) handleNodeClick(task);
-          }}
-          onPaneClick={() => setSelectedTaskId(null)}
-          nodesConnectable={false}
-          edgesFocusable={false}
-          fitView
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background />
-          <Controls />
-        </ReactFlow>
-      </div>
-
-      {/* Inline detail panel */}
-      {selectedTask && (
-        <DetailPanel
-          task={selectedTask}
-          tasks={tasks}
-          agentProfiles={agentProfiles}
-          repositories={repositories}
-          onNavigate={(t) => setSelectedTaskId(t.id)}
-          onClose={() => setSelectedTaskId(null)}
-        />
-      )}
+    <div className="h-full" style={height !== undefined ? { height } : undefined}>
+      <ReactFlow
+        nodes={rfNodes}
+        edges={rfEdges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onNodeClick={(_, node) => {
+          const task = tasks.find((t) => t.id === node.id);
+          if (task) {
+            setSelectedTaskId(task.id);
+            onTaskClick?.(task);
+          }
+        }}
+        onPaneClick={() => setSelectedTaskId(null)}
+        nodesConnectable={false}
+        edgesFocusable={false}
+        fitView
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background />
+        <Controls />
+      </ReactFlow>
     </div>
   );
 }
