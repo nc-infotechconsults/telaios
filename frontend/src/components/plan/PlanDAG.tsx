@@ -29,10 +29,16 @@ const STATUS_BORDER: Record<Task["status"], string> = {
   failed: "#ef4444",
 };
 
-const DRIVER_BADGE: Record<AgentProfile["agent_type"], string> = {
-  langgraph: "bg-blue-700 text-blue-100",
-  opencode: "bg-purple-700 text-purple-100",
-  "github-copilot": "bg-green-800 text-green-100",
+const DRIVER_LABEL: Record<AgentProfile["agent_type"], string> = {
+  langgraph: "LangGraph",
+  opencode: "OpenCode",
+  "github-copilot": "Copilot",
+};
+
+const DRIVER_PILL: Record<AgentProfile["agent_type"], string> = {
+  langgraph: "bg-blue-600/20 text-blue-300 border border-blue-500/30",
+  opencode: "bg-purple-600/20 text-purple-300 border border-purple-500/30",
+  "github-copilot": "bg-green-600/20 text-green-300 border border-green-500/30",
 };
 
 interface TaskNodeData {
@@ -47,7 +53,7 @@ function TaskNode({ data }: NodeProps) {
 
   return (
     <div
-      className="rounded-lg p-2 min-w-[180px] max-w-[220px] shadow-lg text-xs cursor-pointer hover:brightness-110 transition-all"
+      className="rounded-xl shadow-lg text-xs cursor-pointer hover:brightness-110 transition-all overflow-hidden min-w-[200px] max-w-[240px]"
       style={{
         background: STATUS_BG[task.status],
         border: `2px solid ${STATUS_BORDER[task.status]}`,
@@ -56,31 +62,45 @@ function TaskNode({ data }: NodeProps) {
     >
       <Handle type="target" position={Position.Top} style={{ background: STATUS_BORDER[task.status] }} />
 
-      <div className="font-semibold leading-tight mb-1 truncate" title={task.title}>
-        {task.title}
-      </div>
-
-      <div className="flex flex-wrap gap-1 mb-1">
-        <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">
-          {task.type} · {task.status.replace("_", " ")}
-        </span>
-      </div>
-
-      {profile && (
-        <div className="flex flex-wrap gap-1 mb-1">
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${DRIVER_BADGE[profile.agent_type]}`}>
-            {profile.agent_type}
-          </span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 truncate max-w-[120px]" title={profile.name}>
-            {profile.name}
-          </span>
+      {/* Title + type·status */}
+      <div className="px-3 pt-2.5 pb-2">
+        <div className="font-semibold leading-snug mb-1.5" title={task.title}>
+          {task.title}
         </div>
-      )}
+        <div className="flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] capitalize">{task.type}</span>
+          <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] capitalize">{task.status.replace("_", " ")}</span>
+        </div>
+      </div>
 
+      {/* Agent row — visually distinct panel */}
+      <div
+        className="px-3 py-2 flex items-center gap-2"
+        style={{ background: "rgba(0,0,0,0.25)", borderTop: "1px solid rgba(255,255,255,0.08)" }}
+      >
+        <span className="text-sm leading-none" aria-hidden="true">🤖</span>
+        {profile ? (
+          <>
+            <span className="font-medium text-[11px] flex-1 truncate" title={profile.name}>
+              {profile.name}
+            </span>
+            <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 ${DRIVER_PILL[profile.agent_type]}`}>
+              {DRIVER_LABEL[profile.agent_type]}
+            </span>
+          </>
+        ) : (
+          <span className="text-[11px] text-white/40 italic">Unassigned</span>
+        )}
+      </div>
+
+      {/* Repos */}
       {repos.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div
+          className="px-3 py-1.5 flex flex-wrap gap-1"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        >
           {repos.map((r) => (
-            <span key={r.id} className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 truncate max-w-[90px]" title={r.name}>
+            <span key={r.id} className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 truncate max-w-[100px]" title={r.name}>
               📁 {r.name}
             </span>
           ))}

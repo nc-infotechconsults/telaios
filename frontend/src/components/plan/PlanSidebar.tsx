@@ -200,10 +200,10 @@ export default function PlanSidebar({
 
                     <button
                       onClick={() => openDetail(t)}
-                      className="w-full text-left p-3 rounded-xl bg-default-50 border border-divider hover:bg-default-100 hover:border-primary/40 transition-all group space-y-2"
+                      className="w-full text-left rounded-xl bg-default-50 border border-divider hover:border-primary/40 transition-all group overflow-hidden"
                     >
                       {/* Title + status */}
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start justify-between gap-2 p-3 pb-2">
                         <div className="flex items-start gap-2 min-w-0">
                           <span className="shrink-0 w-5 h-5 rounded-full bg-default-200 text-default-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
                             {i + 1}
@@ -217,19 +217,26 @@ export default function PlanSidebar({
                         </Chip>
                       </div>
 
-                      {/* Type + agent + repo badges */}
-                      <div className="flex flex-wrap gap-1 pl-7">
-                        <Chip size="sm" color={TYPE_COLOR[t.type]} variant="bordered">{t.type}</Chip>
-                        {profile && (
+                      {/* Agent row — dedicated strip */}
+                      <div className="px-3 py-1.5 flex items-center gap-2 bg-default-100/60 border-y border-divider/60">
+                        <span className="text-sm leading-none" aria-hidden="true">🤖</span>
+                        {profile ? (
                           <>
-                            <Chip size="sm" color={DRIVER_COLOR[profile.agent_type]} variant="flat">
+                            <span className="text-[11px] font-medium text-foreground flex-1 truncate" title={profile.name}>
+                              {profile.name}
+                            </span>
+                            <Chip size="sm" color={DRIVER_COLOR[profile.agent_type]} variant="flat" className="shrink-0 text-[10px]">
                               {profile.agent_type}
                             </Chip>
-                            <Chip size="sm" variant="bordered" className="max-w-[110px] truncate" title={profile.name}>
-                              {profile.name}
-                            </Chip>
                           </>
+                        ) : (
+                          <span className="text-[11px] text-default-400 italic">Unassigned</span>
                         )}
+                      </div>
+
+                      {/* Type + repo badges */}
+                      <div className="flex flex-wrap gap-1 px-3 pt-2 pb-1 pl-10">
+                        <Chip size="sm" color={TYPE_COLOR[t.type]} variant="bordered">{t.type}</Chip>
                         {taskRepos.map((r) => (
                           <Chip key={r.id} size="sm" variant="bordered" color="primary">
                             📁 {r.name}
@@ -239,7 +246,7 @@ export default function PlanSidebar({
 
                       {/* Dependencies */}
                       {depTasks.length > 0 && (
-                        <div className="pl-7 flex flex-wrap items-center gap-1">
+                        <div className="pl-10 pr-3 pb-1 flex flex-wrap items-center gap-1">
                           <span className="text-[10px] text-default-400 shrink-0">⛓ needs:</span>
                           {depTasks.map((dep) => (
                             <span
@@ -254,7 +261,7 @@ export default function PlanSidebar({
 
                       {/* Unlocks */}
                       {unlocksTasks.length > 0 && (
-                        <div className="pl-7 flex flex-wrap items-center gap-1">
+                        <div className="pl-10 pr-3 pb-2 flex flex-wrap items-center gap-1">
                           <span className="text-[10px] text-default-400 shrink-0">↗ unlocks:</span>
                           {unlocksTasks.map((dep) => (
                             <span
