@@ -16,5 +16,8 @@
     "test": "npm run test --workspace=swe-ai-platform-tests",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "vite": "^5.4.2"
   }
 }
