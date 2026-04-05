@@ -26,7 +26,9 @@ services:
       retries: 5
 
   data-api:
-    build: ./data-api
+    build:
+      context: .
+      dockerfile: data-api/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -37,11 +39,14 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./data-api:/app
+      - ./data-api:/app/data-api
       - /app/node_modules
+      - /app/data-api/node_modules
 
   agent-service:
-    build: ./agent-service
+    build:
+      context: .
+      dockerfile: agent-service/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -55,12 +60,15 @@ services:
       data-api:
         condition: service_started
     volumes:
-      - ./agent-service:/app
+      - ./agent-service:/app/agent-service
       - /app/node_modules
+      - /app/agent-service/node_modules
       - agent_workspaces:/workspaces
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "5173:5173"
     environment:
@@ -72,8 +80,9 @@ services:
       - data-api
       - agent-service
     volumes:
-      - ./frontend:/app
+      - ./frontend:/app/frontend
       - /app/node_modules
+      - /app/frontend/node_modules
 
 volumes:
   postgres_data:
