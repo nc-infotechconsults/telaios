@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -14,9 +14,16 @@ import {
   Chip,
   Spinner,
   useDisclosure,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@heroui/react";
 import { getProjects, createProject, getRepositories } from "../lib/api";
 import type { Project, Repository } from "../types";
+import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
 
 const STATUS_COLOR: Record<Project["status"], "default" | "warning" | "success"> = {
   planning: "warning",
@@ -50,6 +57,11 @@ export default function ProjectList() {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const navigate = useNavigate();
 
+  // View mode + pagination
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(10);
+
   const fetchProjects = () => {
     setLoading(true);
     getProjects()
@@ -77,18 +89,18 @@ export default function ProjectList() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  useEffect(() => { fetchProjects(); }, []);
+
+  const pagedProjects = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return projects.slice(start, start + pageSize);
+  }, [projects, page, pageSize]);
 
   const handleCreate = async (onClose: () => void) => {
     if (!name.trim()) return;
     setCreating(true);
     try {
-      const project = await createProject({
-        name: name.trim(),
-        description: description.trim(),
-      });
+      const project = await createProject({ name: name.trim(), description: description.trim() });
       setName("");
       setDescription("");
       onClose();
@@ -99,36 +111,30 @@ export default function ProjectList() {
   };
 
   const handleModalClose = (isOpenState: boolean) => {
-    if (!isOpenState) {
-      setName("");
-      setDescription("");
-    }
+    if (!isOpenState) { setName(""); setDescription(""); }
     onOpenChange();
   };
+
+  const dateStr = (d: string) =>
+    new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
-          <p className="text-default-400 text-sm mt-1">
-            Plan and execute software tasks with AI agents
-          </p>
+          <p className="text-default-400 text-sm mt-1">Plan and execute software tasks with AI agents</p>
         </div>
-        <Button color="primary" size="md" onPress={onOpen}>
-          + New Project
-        </Button>
+        <Button color="primary" size="md" onPress={onOpen}>+ New Project</Button>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div className="flex justify-center py-16">
           <Spinner label="Loading projects…" />
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && projects.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <div className="text-6xl">🚀</div>
@@ -138,82 +144,160 @@ export default function ProjectList() {
               Create your first project to start planning tasks with AI agents.
             </p>
           </div>
-          <Button color="primary" onPress={onOpen}>
-            Create First Project
-          </Button>
+          <Button color="primary" onPress={onOpen}>Create First Project</Button>
         </div>
       )}
 
-      {/* Project grid */}
       {!loading && projects.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((p) => {
-            const repos = reposByProject[p.id] ?? [];
-            const dateStr = new Date(p.created_at).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            });
+        <>
+          <ViewModeBar
+            mode={viewMode}
+            onModeChange={setViewMode}
+            page={page}
+            pageSize={pageSize}
+            total={projects.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
 
-            return (
-              <Card
-                key={p.id}
-                isPressable
-                onPress={() => navigate(`/projects/${p.id}`)}
-                className="group cursor-pointer hover:shadow-lg transition-all border border-divider hover:border-primary/40"
-              >
-                <CardBody className="p-5 space-y-3">
-                  {/* Project name + status */}
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors line-clamp-2 flex-1">
-                      {p.name}
-                    </h3>
-                    <Chip
-                      size="sm"
-                      color={STATUS_COLOR[p.status]}
-                      variant="flat"
-                      className="shrink-0"
-                    >
-                      {STATUS_LABEL[p.status]}
-                    </Chip>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-sm text-default-500 line-clamp-2 leading-relaxed">
-                    {p.description || (
-                      <span className="italic text-default-300">No description</span>
-                    )}
-                  </p>
-
-                  {/* Repos */}
-                  {repos.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {repos.map((r) => (
-                        <Chip
-                          key={r.id}
-                          size="sm"
-                          color={REPO_STATUS_COLOR[r.status]}
-                          variant="bordered"
-                          startContent={<span>📁</span>}
-                        >
-                          {r.name}
+          {/* ── Grid ── */}
+          {viewMode === "grid" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pagedProjects.map((p) => {
+                const repos = reposByProject[p.id] ?? [];
+                return (
+                  <Card
+                    key={p.id}
+                    isPressable
+                    onPress={() => navigate(`/projects/${p.id}`)}
+                    className="group cursor-pointer hover:shadow-lg transition-all border border-divider hover:border-primary/40"
+                  >
+                    <CardBody className="p-5 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors line-clamp-2 flex-1">
+                          {p.name}
+                        </h3>
+                        <Chip size="sm" color={STATUS_COLOR[p.status]} variant="flat" className="shrink-0">
+                          {STATUS_LABEL[p.status]}
                         </Chip>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                      <p className="text-sm text-default-500 line-clamp-2 leading-relaxed">
+                        {p.description || <span className="italic text-default-300">No description</span>}
+                      </p>
+                      {repos.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {repos.map((r) => (
+                            <Chip key={r.id} size="sm" color={REPO_STATUS_COLOR[r.status]} variant="bordered" startContent={<span>📁</span>}>
+                              {r.name}
+                            </Chip>
+                          ))}
+                        </div>
+                      )}
+                      <div className="pt-1 flex items-center justify-between text-xs text-default-400 border-t border-divider">
+                        <span>{dateStr(p.created_at)}</span>
+                        {repos.length === 0 && <span className="italic">No repos linked</span>}
+                      </div>
+                    </CardBody>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
 
-                  {/* Footer */}
-                  <div className="pt-1 flex items-center justify-between text-xs text-default-400 border-t border-divider">
-                    <span>{dateStr}</span>
-                    {repos.length === 0 && (
-                      <span className="italic">No repos linked</span>
-                    )}
-                  </div>
-                </CardBody>
-              </Card>
-            );
-          })}
-        </div>
+          {/* ── List ── */}
+          {viewMode === "list" && (
+            <div className="flex flex-col divide-y divide-divider rounded-xl border border-divider overflow-hidden">
+              {pagedProjects.map((p) => {
+                const repos = reposByProject[p.id] ?? [];
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => navigate(`/projects/${p.id}`)}
+                    className="flex items-center gap-4 px-4 py-3 hover:bg-default-50 transition-colors text-left w-full group"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-sm group-hover:text-primary transition-colors truncate block">
+                        {p.name}
+                      </span>
+                      {p.description && (
+                        <span className="text-xs text-default-400 truncate block">{p.description}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {repos.length > 0 && (
+                        <span className="text-xs text-default-400">📁 {repos.length}</span>
+                      )}
+                      <span className="text-xs text-default-400">{dateStr(p.created_at)}</span>
+                      <Chip size="sm" color={STATUS_COLOR[p.status]} variant="flat">
+                        {STATUS_LABEL[p.status]}
+                      </Chip>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Table ── */}
+          {viewMode === "table" && (
+            <Table aria-label="Projects table" removeWrapper>
+              <TableHeader>
+                <TableColumn>NAME</TableColumn>
+                <TableColumn>STATUS</TableColumn>
+                <TableColumn>REPOSITORIES</TableColumn>
+                <TableColumn>CREATED</TableColumn>
+                <TableColumn>{""}</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {pagedProjects.map((p) => {
+                  const repos = reposByProject[p.id] ?? [];
+                  return (
+                    <TableRow key={p.id} className="cursor-pointer hover:bg-default-50 transition-colors">
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-sm">{p.name}</p>
+                          {p.description && (
+                            <p className="text-xs text-default-400 line-clamp-1">{p.description}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="sm" color={STATUS_COLOR[p.status]} variant="flat">
+                          {STATUS_LABEL[p.status]}
+                        </Chip>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {repos.length === 0 ? (
+                            <span className="text-xs text-default-400 italic">None</span>
+                          ) : repos.map((r) => (
+                            <Chip key={r.id} size="sm" color={REPO_STATUS_COLOR[r.status]} variant="bordered">
+                              📁 {r.name}
+                            </Chip>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-default-400">{dateStr(p.created_at)}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          color="primary"
+                          onPress={() => navigate(`/projects/${p.id}`)}
+                        >
+                          Open →
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </>
       )}
 
       {/* Create modal */}
@@ -223,9 +307,7 @@ export default function ProjectList() {
             <>
               <ModalHeader className="flex flex-col gap-1">
                 <span>New Project</span>
-                <span className="text-sm text-default-400 font-normal">
-                  Start a new AI-assisted planning session
-                </span>
+                <span className="text-sm text-default-400 font-normal">Start a new AI-assisted planning session</span>
               </ModalHeader>
               <ModalBody>
                 <Input
@@ -248,15 +330,8 @@ export default function ProjectList() {
                 />
               </ModalBody>
               <ModalFooter>
-                <Button variant="light" onPress={onClose} isDisabled={creating}>
-                  Cancel
-                </Button>
-                <Button
-                  color="primary"
-                  isLoading={creating}
-                  isDisabled={!name.trim()}
-                  onPress={() => handleCreate(onClose)}
-                >
+                <Button variant="light" onPress={onClose} isDisabled={creating}>Cancel</Button>
+                <Button color="primary" isLoading={creating} isDisabled={!name.trim()} onPress={() => handleCreate(onClose)}>
                   Create &amp; Start Planning
                 </Button>
               </ModalFooter>

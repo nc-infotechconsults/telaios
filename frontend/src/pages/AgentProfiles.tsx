@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Button,
   Card,
@@ -11,11 +11,18 @@ import {
   ModalFooter,
   Spinner,
   useDisclosure,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@heroui/react";
 import { getAgentProfiles, deleteAgentProfile } from "../lib/api";
 import type { AgentProfile } from "../types";
 import AgentProfileForm from "../components/agents/AgentProfileForm";
 import ConfirmModal from "../components/common/ConfirmModal";
+import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
 
 const TYPE_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" | "success"> = {
   langgraph: "primary",
@@ -39,32 +46,26 @@ export default function AgentProfiles() {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
 
+  // View mode + pagination
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(10);
+
   const load = () => {
     setLoading(true);
-    getAgentProfiles()
-      .then(setProfiles)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    getAgentProfiles().then(setProfiles).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
-  const handleEdit = (profile: AgentProfile) => {
-    setEditing(profile);
-    setIsNew(false);
-    onOpen();
-  };
+  const pagedProfiles = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return profiles.slice(start, start + pageSize);
+  }, [profiles, page, pageSize]);
 
-  const handleNew = () => {
-    setEditing(null);
-    setIsNew(true);
-    onOpen();
-  };
-
-  const handleDelete = async (profile: AgentProfile) => {
-    setDeleteTarget(profile);
-    onDeleteOpen();
-  };
+  const handleEdit = (profile: AgentProfile) => { setEditing(profile); setIsNew(false); onOpen(); };
+  const handleNew = () => { setEditing(null); setIsNew(true); onOpen(); };
+  const handleDelete = (profile: AgentProfile) => { setDeleteTarget(profile); onDeleteOpen(); };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -79,30 +80,21 @@ export default function AgentProfiles() {
     }
   };
 
-  const handleSaved = () => {
-    onOpenChange();
-    load();
-  };
+  const handleSaved = () => { onOpenChange(); load(); };
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Agent Profiles</h1>
-          <p className="text-default-400 text-sm mt-1">
-            Configure AI coding agents with LLM, tools, and skills
-          </p>
+          <p className="text-default-400 text-sm mt-1">Configure AI coding agents with LLM, tools, and skills</p>
         </div>
-        <Button color="primary" onPress={handleNew}>
-          + New Profile
-        </Button>
+        <Button color="primary" onPress={handleNew}>+ New Profile</Button>
       </div>
 
       {loading && (
-        <div className="flex justify-center py-16">
-          <Spinner label="Loading profiles…" />
-        </div>
+        <div className="flex justify-center py-16"><Spinner label="Loading profiles…" /></div>
       )}
 
       {!loading && profiles.length === 0 && (
@@ -112,84 +104,152 @@ export default function AgentProfiles() {
             <p className="text-xl font-semibold">No agent profiles yet</p>
             <p className="text-default-400 text-sm mt-1 max-w-sm">
               Create agent profiles to define how coding tasks are executed.
-              Each profile can use a different LLM, tools, and skills.
             </p>
           </div>
-          <Button color="primary" onPress={handleNew}>
-            Create First Profile
-          </Button>
+          <Button color="primary" onPress={handleNew}>Create First Profile</Button>
         </div>
       )}
 
       {!loading && profiles.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {profiles.map((p) => (
-            <Card key={p.id} className="border border-divider hover:border-default/60 transition-colors">
-              <CardBody className="p-5 space-y-3">
-                {/* Name + type */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-base leading-tight truncate">{p.name}</h3>
+        <>
+          <ViewModeBar
+            mode={viewMode}
+            onModeChange={setViewMode}
+            page={page}
+            pageSize={pageSize}
+            total={profiles.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+
+          {/* ── Grid ── */}
+          {viewMode === "grid" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pagedProfiles.map((p) => (
+                <Card key={p.id} className="border border-divider hover:border-default/60 transition-colors">
+                  <CardBody className="p-5 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-base leading-tight truncate">{p.name}</h3>
+                      </div>
+                      <Chip size="sm" color={TYPE_COLOR[p.agent_type]} variant="flat" className="shrink-0">
+                        {TYPE_LABEL[p.agent_type]}
+                      </Chip>
+                    </div>
+                    <p className="text-sm text-default-500 line-clamp-2 leading-relaxed">
+                      {p.description || <span className="italic text-default-300">No description</span>}
+                    </p>
+                    {p.llm_model && (
+                      <div className="flex items-center gap-1.5 text-xs text-default-400">
+                        <span>🧠</span>
+                        <span>{p.llm_provider} / {p.llm_model}</span>
+                      </div>
+                    )}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {p.mcp_servers.length > 0 && (
+                        <Chip size="sm" variant="bordered">🔌 {p.mcp_servers.length} MCP</Chip>
+                      )}
+                      {p.skills.length > 0 && (
+                        <Chip size="sm" variant="bordered">⚡ {p.skills.length} skill{p.skills.length > 1 ? "s" : ""}</Chip>
+                      )}
+                    </div>
+                    <div className="flex gap-2 pt-1 border-t border-divider">
+                      <Button size="sm" variant="light" className="flex-1" aria-label={`Edit ${p.name}`} onPress={() => handleEdit(p)}>Edit</Button>
+                      <Button size="sm" variant="light" color="danger" className="flex-1" aria-label={`Delete ${p.name}`} isLoading={deletingId === p.id} onPress={() => handleDelete(p)}>Delete</Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* ── List ── */}
+          {viewMode === "list" && (
+            <div className="flex flex-col divide-y divide-divider rounded-xl border border-divider overflow-hidden">
+              {pagedProfiles.map((p) => (
+                <div key={p.id} className="flex items-center gap-4 px-4 py-3 hover:bg-default-50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-sm block truncate">{p.name}</span>
+                    {p.description && (
+                      <span className="text-xs text-default-400 block truncate">{p.description}</span>
+                    )}
                   </div>
-                  <Chip size="sm" color={TYPE_COLOR[p.agent_type]} variant="flat" className="shrink-0">
-                    {TYPE_LABEL[p.agent_type]}
-                  </Chip>
-                </div>
-
-                {/* Description */}
-                <p className="text-sm text-default-500 line-clamp-2 leading-relaxed">
-                  {p.description || <span className="italic text-default-300">No description</span>}
-                </p>
-
-                {/* LLM info */}
-                {p.llm_model && (
-                  <div className="flex items-center gap-1.5 text-xs text-default-400">
-                    <span>🧠</span>
-                    <span>{p.llm_provider} / {p.llm_model}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {p.llm_model && (
+                      <span className="text-xs text-default-400 hidden sm:block">🧠 {p.llm_model}</span>
+                    )}
+                    {p.mcp_servers.length > 0 && (
+                      <span className="text-xs text-default-400">🔌 {p.mcp_servers.length}</span>
+                    )}
+                    {p.skills.length > 0 && (
+                      <span className="text-xs text-default-400">⚡ {p.skills.length}</span>
+                    )}
+                    <Chip size="sm" color={TYPE_COLOR[p.agent_type]} variant="flat">
+                      {TYPE_LABEL[p.agent_type]}
+                    </Chip>
+                    <Button size="sm" variant="bordered" onPress={() => handleEdit(p)}>Edit</Button>
+                    <Button size="sm" variant="light" color="danger" isLoading={deletingId === p.id} onPress={() => handleDelete(p)}>Delete</Button>
                   </div>
-                )}
-
-                {/* Badges */}
-                <div className="flex gap-1.5 flex-wrap">
-                  {p.mcp_servers.length > 0 && (
-                    <Chip size="sm" variant="bordered">
-                      🔌 {p.mcp_servers.length} MCP
-                    </Chip>
-                  )}
-                  {p.skills.length > 0 && (
-                    <Chip size="sm" variant="bordered">
-                      ⚡ {p.skills.length} skill{p.skills.length > 1 ? "s" : ""}
-                    </Chip>
-                  )}
                 </div>
+              ))}
+            </div>
+          )}
 
-                {/* Actions */}
-                <div className="flex gap-2 pt-1 border-t border-divider">
-                  <Button
-                    size="sm"
-                    variant="light"
-                    className="flex-1"
-                    aria-label={`Edit ${p.name}`}
-                    onPress={() => handleEdit(p)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="light"
-                    color="danger"
-                    className="flex-1"
-                    aria-label={`Delete ${p.name}`}
-                    isLoading={deletingId === p.id}
-                    onPress={() => handleDelete(p)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
+          {/* ── Table ── */}
+          {viewMode === "table" && (
+            <Table aria-label="Agent profiles table" removeWrapper>
+              <TableHeader>
+                <TableColumn>NAME</TableColumn>
+                <TableColumn>TYPE</TableColumn>
+                <TableColumn>LLM</TableColumn>
+                <TableColumn>TOOLS</TableColumn>
+                <TableColumn>{""}</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {pagedProfiles.map((p) => (
+                  <TableRow key={p.id} className="hover:bg-default-50 transition-colors">
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{p.name}</p>
+                        {p.description && (
+                          <p className="text-xs text-default-400 line-clamp-1">{p.description}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Chip size="sm" color={TYPE_COLOR[p.agent_type]} variant="flat">
+                        {TYPE_LABEL[p.agent_type]}
+                      </Chip>
+                    </TableCell>
+                    <TableCell>
+                      {p.llm_model ? (
+                        <span className="text-xs text-default-500">{p.llm_provider} / {p.llm_model}</span>
+                      ) : (
+                        <span className="text-xs text-default-400 italic">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {p.mcp_servers.length > 0 && (
+                          <Chip size="sm" variant="bordered">🔌 {p.mcp_servers.length} MCP</Chip>
+                        )}
+                        {p.skills.length > 0 && (
+                          <Chip size="sm" variant="bordered">⚡ {p.skills.length}</Chip>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="bordered" onPress={() => handleEdit(p)}>Edit</Button>
+                        <Button size="sm" variant="light" color="danger" isLoading={deletingId === p.id} onPress={() => handleDelete(p)}>Delete</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </>
       )}
 
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="3xl" scrollBehavior="inside">
@@ -199,17 +259,11 @@ export default function AgentProfiles() {
               <ModalHeader className="flex flex-col gap-1">
                 <span>{isNew ? "New Agent Profile" : "Edit Agent Profile"}</span>
                 <span className="text-sm text-default-400 font-normal">
-                  {isNew
-                    ? "Configure the LLM, tools, and skills for this agent"
-                    : `Editing: ${editing?.name}`}
+                  {isNew ? "Configure the LLM, tools, and skills for this agent" : `Editing: ${editing?.name}`}
                 </span>
               </ModalHeader>
               <ModalBody className="pb-2">
-                <AgentProfileForm
-                  initialData={editing ?? undefined}
-                  onSaved={handleSaved}
-                  onCancel={onClose}
-                />
+                <AgentProfileForm initialData={editing ?? undefined} onSaved={handleSaved} onCancel={onClose} />
               </ModalBody>
               <ModalFooter className="pt-0" />
             </>
