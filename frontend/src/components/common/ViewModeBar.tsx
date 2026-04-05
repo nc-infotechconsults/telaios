@@ -1,5 +1,3 @@
-import { Select, SelectItem } from "@heroui/react";
-
 export type ViewMode = "grid" | "list" | "table";
 
 const VIEWS: { mode: ViewMode; label: string; icon: string }[] = [
@@ -98,24 +96,23 @@ export default function ViewModeBar({
       </span>
 
       {/* Page size */}
-      <Select
-        size="sm"
+      <select
         aria-label="Items per page"
-        selectedKeys={[String(pageSize)]}
-        onSelectionChange={(keys) => {
-          const val = Number([...keys][0]) as PageSize;
+        value={pageSize}
+        onChange={(e) => {
+          const val = Number(e.target.value) as PageSize;
           if (PAGE_SIZES.includes(val)) {
             onPageSizeChange(val);
             onPageChange(1);
           }
         }}
-        className="w-24 shrink-0"
-        classNames={{ trigger: "h-8 min-h-8" }}
+        className="h-8 rounded-md border border-divider bg-content1 text-foreground text-xs px-2 pr-6 shrink-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
+        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
       >
         {PAGE_SIZES.map((s) => (
-          <SelectItem key={String(s)}>{s} / page</SelectItem>
+          <option key={s} value={s}>{s} / page</option>
         ))}
-      </Select>
+      </select>
 
       {/* Prev / Next */}
       <div className="flex items-center gap-1 shrink-0">
