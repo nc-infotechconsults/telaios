@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Button,
@@ -363,6 +363,17 @@ export default function PlanningChat() {
   const activeTasks = activePlanId ? (planTasks[activePlanId] ?? []) : [];
   const currentDraft = plans.find((p) => p.id === currentDraftPlanId) ?? null;
 
+  // O(1) task→plan lookup used by task_status WS events
+  const taskIdToPlanId = useMemo<Record<string, string>>(() => {
+    const index: Record<string, string> = {};
+    for (const [planId, tasks] of Object.entries(planTasks)) {
+      for (const task of tasks) {
+        index[task.id] = planId;
+      }
+    }
+    return index;
+  }, [planTasks]);
+
   useEffect(() => {
     if (!projectId) return;
     setLoading(true);
@@ -402,7 +413,20 @@ export default function PlanningChat() {
         const draft = allPlans.find((p) => p.status === "draft");
         if (draft) setCurrentDraftPlanId(draft.id);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        // Only fall back to demo data for network/unreachable errors (no response from server).
+        // For HTTP errors (401/403/500 etc.) log and show an empty state instead.
+        const hasResponse =
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          (error as { response: unknown }).response != null;
+
+        if (hasResponse) {
+          console.error("Failed to load project data from backend", error);
+          return;
+        }
+
         // Backend not reachable — load demo data
         setProjectName(DEMO_PROJECT_NAMES[projectId] ?? "Demo Project");
         setRepositories(DEMO_REPOS[projectId] ?? []);
@@ -517,20 +541,19 @@ export default function PlanningChat() {
         setActivePlanId(confirmedPlanId);
         // Don't auto-navigate — user can click "View Execution →"
       } else if (event.type === "task_status") {
-        setPlanTasks((prev) => {
-          const updated = { ...prev };
-          for (const planId of Object.keys(updated)) {
-            updated[planId] = updated[planId].map((t) =>
-              t.id === event.task_id
-                ? { ...t, status: event.status, assigned_instance_id: event.agent_instance_id }
-                : t
-            );
-          }
-          return updated;
-        });
+        const planId = taskIdToPlanId[event.task_id];
+        if (!planId) return;
+        setPlanTasks((prev) => ({
+          ...prev,
+          [planId]: (prev[planId] ?? []).map((t) =>
+            t.id === event.task_id
+              ? { ...t, status: event.status, assigned_instance_id: event.agent_instance_id }
+              : t
+          ),
+        }));
       }
     },
-    [projectId]
+    [projectId, taskIdToPlanId]
   );
 
   const { sendMessage } = useProjectWebSocket(projectId, handleWsEvent);

@@ -65,7 +65,7 @@ export default function ChatWindow({
       })}
 
       {streamingText && (
-        <div className="flex justify-start mb-3" aria-live="polite" aria-atomic="false">
+        <div className="flex justify-start mb-3">
           <div className="max-w-[80%] flex flex-col gap-1 items-start">
             <span className="text-xs text-default-400 px-1" aria-hidden="true">Planning Agent</span>
             <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm bg-default-100 whitespace-pre-wrap leading-relaxed">

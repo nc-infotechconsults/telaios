@@ -76,7 +76,8 @@ export default function Layout() {
               {({ isActive }) => (
                 <>
                   {item.icon}
-                  <span aria-current={isActive ? "page" : undefined}>{item.label}</span>
+                  <span>{item.label}</span>
+                  {isActive && <span className="sr-only">(current page)</span>}
                 </>
               )}
             </NavLink>

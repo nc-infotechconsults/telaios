@@ -141,7 +141,22 @@ export default function ProjectList() {
           setReposByProject(byProject);
         });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        // Only fall back to demo data when the backend is completely unreachable
+        // (no HTTP response). Surface real HTTP errors (401/403/500 etc.) instead.
+        const hasResponse =
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          (error as { response: unknown }).response != null;
+
+        if (hasResponse) {
+          console.error("Failed to load projects from backend", error);
+          setProjects([]);
+          setReposByProject({});
+          return;
+        }
+
         // Backend not reachable — show demo data so the UI is not empty
         setProjects(DEMO_PROJECTS);
         setReposByProject(DEMO_REPOS);

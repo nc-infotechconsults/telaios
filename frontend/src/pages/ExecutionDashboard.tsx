@@ -214,15 +214,14 @@ export default function ExecutionDashboard() {
 
                   {/* Graph / List toggle */}
                   <div
-                    role="tablist"
+                    role="group"
                     aria-label="Plan view"
                     className="flex rounded-lg bg-default-100 p-0.5 gap-0.5"
                   >
                     {(["graph", "list"] as PlanViewMode[]).map((v) => (
                       <button
                         key={v}
-                        role="tab"
-                        aria-selected={planView === v}
+                        aria-pressed={planView === v}
                         onClick={() => setPlanView(v)}
                         className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                           planView === v

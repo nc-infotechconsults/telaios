@@ -93,15 +93,14 @@ export default function PlanSidebar({
         {/* List / Graph toggle + graph expand */}
         <div className="flex items-center gap-1">
           <div
-            role="tablist"
+            role="group"
             aria-label="Plan view"
             className="flex flex-1 rounded-lg bg-default-100 p-0.5 gap-0.5"
           >
             {(["list", "graph"] as ViewMode[]).map((v) => (
               <button
                 key={v}
-                role="tab"
-                aria-selected={view === v}
+                aria-pressed={view === v}
                 onClick={() => setView(v)}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   view === v
