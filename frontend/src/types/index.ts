@@ -69,18 +69,51 @@ export interface Message {
 
 export interface McpServer {
   name: string;
-  transport: "sse" | "stdio";
-  url?: string;
+  /**
+   * `"stdio"` – local process via stdin/stdout
+   * `"streamable-http"` – remote HTTP + optional SSE streaming (per MCP spec)
+   */
+  transport: "stdio" | "streamable-http";
+  // stdio
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+  // streamable-http
+  url?: string;
+  headers?: Record<string, string>;
+}
+
+export interface JsonSchemaProperty {
+  type: string | string[];
+  description?: string;
+  enum?: (string | number | boolean)[];
+  items?: JsonSchemaProperty;
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+  default?: unknown;
+}
+
+export interface JsonSchema {
+  type: "object";
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+}
+
+export interface McpToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 export interface Skill {
   name: string;
+  title?: string;
   description: string;
-  parameters: Record<string, "string" | "number" | "boolean">;
-  outputs?: Record<string, "string" | "number" | "boolean">;
+  inputSchema: JsonSchema;
+  outputSchema?: JsonSchema;
+  annotations?: McpToolAnnotations;
   instructions: string;
 }
 

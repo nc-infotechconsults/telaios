@@ -10,18 +10,45 @@ export type AgentType = "langgraph" | "opencode" | "github-copilot";
 
 export interface McpServer {
   name: string;
-  transport: "sse" | "stdio";
-  url?: string;
+  transport: "stdio" | "streamable-http";
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+}
+
+export interface JsonSchemaProperty {
+  type: string | string[];
+  description?: string;
+  enum?: (string | number | boolean)[];
+  items?: JsonSchemaProperty;
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+  default?: unknown;
+}
+
+export interface JsonSchema {
+  type: "object";
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+}
+
+export interface McpToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 export interface Skill {
   name: string;
+  title?: string;
   description: string;
-  parameters: Record<string, "string" | "number" | "boolean">;
-  outputs?: Record<string, "string" | "number" | "boolean">;
+  inputSchema: JsonSchema;
+  outputSchema?: JsonSchema;
+  annotations?: McpToolAnnotations;
   instructions: string;
 }
 

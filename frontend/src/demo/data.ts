@@ -426,8 +426,21 @@ export const AGENT_PROFILES: AgentProfile[] = [
     skills: [
       {
         name: "code_review",
+        title: "Code Review",
         description: "Reviews code for quality, security, and style issues",
-        parameters: { file_path: "string" },
+        inputSchema: {
+          type: "object",
+          properties: {
+            file_path: { type: "string", description: "Path to the file to review." },
+            severity_threshold: {
+              type: "string",
+              description: "Minimum severity to report: info | warning | error.",
+              enum: ["info", "warning", "error"],
+            },
+          },
+          required: ["file_path"],
+        },
+        annotations: { readOnlyHint: true },
         instructions: "Analyze the file and produce a structured review with severity ratings.",
       },
     ],
@@ -451,8 +464,33 @@ export const AGENT_PROFILES: AgentProfile[] = [
     skills: [
       {
         name: "generate_tests",
+        title: "Generate Tests",
         description: "Generates unit and integration tests for a given module",
-        parameters: { module_path: "string", framework: "string" },
+        inputSchema: {
+          type: "object",
+          properties: {
+            module_path: { type: "string", description: "Path to the module under test." },
+            framework: {
+              type: "string",
+              description: "Testing framework to use.",
+              enum: ["jest", "vitest", "pytest", "mocha"],
+            },
+            coverage_target: {
+              type: "number",
+              description: "Target coverage percentage (0–100).",
+            },
+          },
+          required: ["module_path", "framework"],
+        },
+        outputSchema: {
+          type: "object",
+          properties: {
+            test_file_path: { type: "string", description: "Path to the generated test file." },
+            test_count: { type: "integer", description: "Number of test cases generated." },
+          },
+          required: ["test_file_path", "test_count"],
+        },
+        annotations: { destructiveHint: false, idempotentHint: true },
         instructions:
           "Write thorough tests covering happy paths, edge cases, and error conditions. Include setup/teardown.",
       },

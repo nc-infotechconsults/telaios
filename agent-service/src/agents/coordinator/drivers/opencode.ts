@@ -52,20 +52,24 @@ export class OpenCodeDriver implements CodingAgentDriver {
     for (const skill of this.config.skills) {
       const dir = path.join(workspaceRoot, ".skills", skill.name);
       await fs.mkdir(dir, { recursive: true });
+
+      const props = skill.inputSchema?.properties ?? {};
+      const outputs = skill.outputSchema?.properties ?? {};
+
       const frontmatter = [
         "---",
         `name: ${skill.name}`,
         `description: ${skill.description}`,
-        skill.parameters && Object.keys(skill.parameters).length > 0
-          ? "parameters:\n" +
-            Object.entries(skill.parameters)
-              .map(([k, v]) => `  ${k}: ${v}`)
+        Object.keys(props).length > 0
+          ? "inputSchema:\n" +
+            Object.entries(props)
+              .map(([k, v]) => `  ${k}: ${Array.isArray(v.type) ? v.type.join("|") : v.type}${v.description ? ` # ${v.description}` : ""}`)
               .join("\n")
           : null,
-        skill.outputs && Object.keys(skill.outputs).length > 0
-          ? "outputs:\n" +
-            Object.entries(skill.outputs)
-              .map(([k, v]) => `  ${k}: ${v}`)
+        Object.keys(outputs).length > 0
+          ? "outputSchema:\n" +
+            Object.entries(outputs)
+              .map(([k, v]) => `  ${k}: ${Array.isArray(v.type) ? v.type.join("|") : v.type}${v.description ? ` # ${v.description}` : ""}`)
               .join("\n")
           : null,
         "---",
