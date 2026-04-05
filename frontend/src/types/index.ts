@@ -94,6 +94,11 @@ export interface AgentProfile {
   llm_base_url?: string;
   has_llm_api_key?: boolean;
   has_github_token?: boolean;
+  llm_temperature?: number;
+  llm_max_tokens?: number;
+  llm_top_p?: number;
+  llm_frequency_penalty?: number;
+  llm_presence_penalty?: number;
   mcp_servers: McpServer[];
   skills: Skill[];
   created_at: string;
@@ -106,6 +111,9 @@ export interface Settings {
   llm_model: string;
   llm_base_url?: string;
   has_api_key?: boolean;
+  llm_temperature?: number;
+  llm_max_tokens?: number;
+  llm_top_p?: number;
   updated_at: string;
 }
 

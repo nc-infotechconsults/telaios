@@ -2,21 +2,12 @@ import { useEffect, useState } from "react";
 import { Button, Card, CardBody, CardHeader, Chip } from "@heroui/react";
 import { getSettings, updateSettings, testLlm } from "../lib/api";
 import type { Settings } from "../types";
-import ProviderForm from "../components/settings/ProviderForm";
-
-interface LLMConfig {
-  llm_provider: string;
-  llm_model: string;
-  llm_api_key_raw: string;
-  llm_base_url: string;
-}
+import ProviderForm, { type LLMConfig, DEFAULT_LLM_CONFIG } from "../components/settings/ProviderForm";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<LLMConfig>({
-    llm_provider: "openai",
-    llm_model: "",
+    ...DEFAULT_LLM_CONFIG,
     llm_api_key_raw: "",
-    llm_base_url: "",
   });
   const [hasApiKey, setHasApiKey] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -25,15 +16,20 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    getSettings().then((s: Partial<Settings>) => {
-      setConfig({
-        llm_provider: s.llm_provider ?? "openai",
-        llm_model: s.llm_model ?? "",
-        llm_api_key_raw: "",
-        llm_base_url: s.llm_base_url ?? "",
-      });
-      setHasApiKey(!!s.has_api_key);
-    }).catch(console.error);
+    getSettings()
+      .then((s: Partial<Settings>) => {
+        setConfig((c) => ({
+          ...c,
+          llm_provider: s.llm_provider ?? "openai",
+          llm_model: s.llm_model ?? "",
+          llm_base_url: s.llm_base_url ?? "",
+          llm_temperature: s.llm_temperature ?? 1.0,
+          llm_max_tokens: s.llm_max_tokens?.toString() ?? "",
+          llm_top_p: s.llm_top_p?.toString() ?? "",
+        }));
+        setHasApiKey(!!s.has_api_key);
+      })
+      .catch(console.error);
   }, []);
 
   const handleSave = async () => {
@@ -43,7 +39,10 @@ export default function SettingsPage() {
       const updated = await updateSettings({
         llm_provider: config.llm_provider,
         llm_model: config.llm_model,
-        llm_base_url: config.llm_base_url,
+        llm_base_url: config.llm_base_url || undefined,
+        llm_temperature: config.llm_temperature,
+        llm_max_tokens: config.llm_max_tokens ? parseInt(config.llm_max_tokens) : undefined,
+        llm_top_p: config.llm_top_p ? parseFloat(config.llm_top_p) : undefined,
         ...(config.llm_api_key_raw ? { llm_api_key_raw: config.llm_api_key_raw } : {}),
       });
       setHasApiKey(!!(updated as Partial<Settings>).has_api_key);

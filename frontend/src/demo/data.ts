@@ -401,6 +401,8 @@ export const AGENT_PROFILES: AgentProfile[] = [
     llm_model: "gpt-4o",
     has_llm_api_key: true,
     has_github_token: false,
+    llm_temperature: 0.7,
+    llm_max_tokens: 4096,
     mcp_servers: [
       {
         name: "filesystem",
@@ -430,6 +432,9 @@ export const AGENT_PROFILES: AgentProfile[] = [
     llm_model: "claude-3-5-sonnet-20241022",
     has_llm_api_key: true,
     has_github_token: false,
+    llm_temperature: 1.0,
+    llm_max_tokens: 8192,
+    llm_top_p: 0.9,
     mcp_servers: [],
     skills: [
       {
@@ -453,5 +458,8 @@ export const SETTINGS: Settings = {
   llm_model: "gpt-4o",
   llm_base_url: undefined,
   has_api_key: true,
+  llm_temperature: 1.0,
+  llm_max_tokens: undefined,
+  llm_top_p: undefined,
   updated_at: "2026-04-01T00:00:00Z",
 };

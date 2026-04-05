@@ -4,6 +4,7 @@ import {
   Input,
   Select,
   SelectItem,
+  Slider,
   Textarea,
   Divider,
   Card,
@@ -20,37 +21,48 @@ interface Props {
 
 const PROVIDERS = ["openai", "anthropic", "ollama", "vllm", "lmstudio"];
 const AGENT_TYPES: AgentProfile["agent_type"][] = ["langgraph", "opencode", "github-copilot"];
+const OPENAI_COMPAT = ["openai", "vllm", "lmstudio"];
 
 export default function AgentProfileForm({ initialData, onSaved, onCancel }: Props) {
+  // Basic
   const [name, setName] = useState(initialData?.name ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [agentType, setAgentType] = useState<AgentProfile["agent_type"]>(initialData?.agent_type ?? "langgraph");
+
+  // LLM connection
   const [llmProvider, setLlmProvider] = useState(initialData?.llm_provider ?? "openai");
   const [llmModel, setLlmModel] = useState(initialData?.llm_model ?? "");
   const [llmApiKey, setLlmApiKey] = useState("");
   const [llmBaseUrl, setLlmBaseUrl] = useState(initialData?.llm_base_url ?? "");
   const [githubToken, setGithubToken] = useState("");
+
+  // LLM parameters
+  const [temperature, setTemperature] = useState<number>(initialData?.llm_temperature ?? 1.0);
+  const [maxTokens, setMaxTokens] = useState(initialData?.llm_max_tokens?.toString() ?? "");
+  const [topP, setTopP] = useState(initialData?.llm_top_p?.toString() ?? "");
+  const [freqPenalty, setFreqPenalty] = useState(initialData?.llm_frequency_penalty?.toString() ?? "");
+  const [presPenalty, setPresPenalty] = useState(initialData?.llm_presence_penalty?.toString() ?? "");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Capabilities
   const [mcpServers, setMcpServers] = useState<McpServer[]>(initialData?.mcp_servers ?? []);
   const [skills, setSkills] = useState<Skill[]>(initialData?.skills ?? []);
   const [saving, setSaving] = useState(false);
 
   const needsBaseUrl = ["ollama", "vllm", "lmstudio"].includes(llmProvider);
+  const showPenalties = OPENAI_COMPAT.includes(llmProvider);
 
   const addMcp = () =>
     setMcpServers((prev) => [...prev, { name: "", transport: "stdio", command: "" }]);
-
   const updateMcp = (i: number, update: Partial<McpServer>) =>
     setMcpServers((prev) => prev.map((s, j) => (j === i ? { ...s, ...update } : s)));
-
   const removeMcp = (i: number) =>
     setMcpServers((prev) => prev.filter((_, j) => j !== i));
 
   const addSkill = () =>
     setSkills((prev) => [...prev, { name: "", description: "", parameters: {}, instructions: "" }]);
-
   const updateSkill = (i: number, update: Partial<Skill>) =>
     setSkills((prev) => prev.map((s, j) => (j === i ? { ...s, ...update } : s)));
-
   const removeSkill = (i: number) =>
     setSkills((prev) => prev.filter((_, j) => j !== i));
 
@@ -65,6 +77,11 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         llm_provider: llmProvider,
         llm_model: llmModel,
         llm_base_url: llmBaseUrl || undefined,
+        llm_temperature: temperature,
+        llm_max_tokens: maxTokens ? parseInt(maxTokens) : undefined,
+        llm_top_p: topP ? parseFloat(topP) : undefined,
+        llm_frequency_penalty: freqPenalty ? parseFloat(freqPenalty) : undefined,
+        llm_presence_penalty: presPenalty ? parseFloat(presPenalty) : undefined,
         mcp_servers: mcpServers,
         skills,
         ...(llmApiKey ? { llm_api_key_raw: llmApiKey } : {}),
@@ -83,7 +100,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
 
   return (
     <div className="space-y-4">
-      {/* Basic */}
+      {/* ── Basic ── */}
       <Input label="Name" value={name} onValueChange={setName} isRequired />
       <Textarea label="Description" value={description} onValueChange={setDescription} />
 
@@ -97,7 +114,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
 
       <Divider />
 
-      {/* LLM Config */}
+      {/* ── LLM Connection ── */}
       <p className="font-semibold text-sm">
         LLM Configuration
         {agentType === "github-copilot" && (
@@ -147,7 +164,96 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         </>
       )}
 
-      {/* MCP Servers */}
+      {/* ── LLM Parameters ── */}
+      <Divider />
+      <p className="font-semibold text-sm">LLM Parameters</p>
+
+      <Slider
+        label="Temperature"
+        step={0.01}
+        minValue={0}
+        maxValue={2}
+        value={temperature}
+        onChange={(v) => setTemperature(v as number)}
+        getValue={(v) => String(v)}
+        marks={[
+          { value: 0, label: "0" },
+          { value: 1, label: "1" },
+          { value: 2, label: "2" },
+        ]}
+        classNames={{ label: "text-sm" }}
+      />
+
+      <Input
+        label="Max Tokens"
+        type="number"
+        placeholder="model default"
+        description="Maximum tokens in the response. Leave blank for model default."
+        value={maxTokens}
+        min={1}
+        onValueChange={setMaxTokens}
+      />
+
+      {/* Advanced toggle */}
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((p) => !p)}
+        className="flex items-center gap-1 text-xs text-default-400 hover:text-foreground transition-colors"
+      >
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          className={`transition-transform ${showAdvanced ? "rotate-90" : ""}`}
+          aria-hidden="true"
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        Advanced sampling parameters
+      </button>
+
+      {showAdvanced && (
+        <div className="space-y-3 pl-3 border-l-2 border-divider">
+          <Input
+            label="Top P"
+            type="number"
+            placeholder="1.0"
+            description="Nucleus sampling (0–1). Alternative to temperature; avoid setting both."
+            min={0}
+            max={1}
+            step={0.01}
+            value={topP}
+            onValueChange={setTopP}
+          />
+          {showPenalties && (
+            <>
+              <Input
+                label="Frequency Penalty"
+                type="number"
+                placeholder="0"
+                description="Reduces repetition of tokens by frequency (−2 to 2)."
+                min={-2}
+                max={2}
+                step={0.01}
+                value={freqPenalty}
+                onValueChange={setFreqPenalty}
+              />
+              <Input
+                label="Presence Penalty"
+                type="number"
+                placeholder="0"
+                description="Encourages new topics by penalising tokens already used (−2 to 2)."
+                min={-2}
+                max={2}
+                step={0.01}
+                value={presPenalty}
+                onValueChange={setPresPenalty}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── MCP Servers ── */}
       <Divider />
       <div className="flex items-center justify-between">
         <p className="font-semibold text-sm">MCP Servers</p>
@@ -178,7 +284,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         </Card>
       ))}
 
-      {/* Skills */}
+      {/* ── Skills ── */}
       <Divider />
       <div className="flex items-center justify-between">
         <p className="font-semibold text-sm">Claude Skills</p>
