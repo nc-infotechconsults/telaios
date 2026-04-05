@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -6,6 +6,8 @@ import {
   MiniMap,
   Handle,
   Position,
+  useNodesState,
+  useEdgesState,
   type Node,
   type Edge,
   type NodeProps,
@@ -306,7 +308,8 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
     onTaskClick?.(task);
   }
 
-  const { nodes, edges } = useMemo(() => {
+  // Layout computation — does NOT depend on selectedTaskId so dragging isn't reset on selection
+  const { layoutNodes, layoutEdges } = useMemo(() => {
     const levelMap = computeLevels(tasks);
 
     const byLevel = new Map<number, Task[]>();
@@ -317,10 +320,11 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
     }
 
     const maxRowW = Math.max(
+      1,
       ...Array.from(byLevel.values()).map((row) => row.length * NODE_W + (row.length - 1) * GAP_X)
     );
 
-    const nodes: Node[] = tasks.map((t) => {
+    const layoutNodes: Node[] = tasks.map((t) => {
       const lvl = levelMap.get(t.id) ?? 0;
       const row = byLevel.get(lvl)!;
       const col = row.indexOf(t);
@@ -337,11 +341,11 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
         id: t.id,
         type: "task",
         position: { x, y },
-        data: { task: t, profile, repos, selected: t.id === selectedTaskId },
+        data: { task: t, profile, repos, selected: false },
       };
     });
 
-    const edges: Edge[] = tasks.flatMap((t) =>
+    const layoutEdges: Edge[] = tasks.flatMap((t) =>
       (t.depends_on_task_ids ?? []).map((depId) => ({
         id: `${depId}→${t.id}`,
         source: depId,
@@ -352,22 +356,45 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
       }))
     );
 
-    return { nodes, edges };
-  }, [tasks, agentProfiles, repositories, selectedTaskId]);
+    return { layoutNodes, layoutEdges };
+  }, [tasks, agentProfiles, repositories]);
+
+  // ReactFlow state — tracks drag positions independently from layout computation
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState(layoutNodes);
+  const [rfEdges] = useEdgesState(layoutEdges);
+
+  // Reset positions when the underlying task data changes
+  useEffect(() => {
+    setRfNodes(layoutNodes.map((n) => ({
+      ...n,
+      data: { ...n.data, selected: n.id === selectedTaskId },
+    })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutNodes]);
+
+  // Update only the selected highlight without touching positions
+  useEffect(() => {
+    setRfNodes((prev) =>
+      prev.map((n) => ({ ...n, data: { ...n.data, selected: n.id === selectedTaskId } }))
+    );
+  }, [selectedTaskId, setRfNodes]);
 
   return (
     <div className="flex h-full" style={height !== undefined ? { height } : undefined}>
       {/* Graph */}
       <div className="flex-1 min-w-0">
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={rfNodes}
+          edges={rfEdges}
           nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
           onNodeClick={(_, node) => {
             const task = tasks.find((t) => t.id === node.id);
             if (task) handleNodeClick(task);
           }}
           onPaneClick={() => setSelectedTaskId(null)}
+          nodesConnectable={false}
+          edgesFocusable={false}
           fitView
           proOptions={{ hideAttribution: true }}
         >

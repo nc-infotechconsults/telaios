@@ -1,2 +1,48 @@
 @import "tailwindcss";
 @config "../tailwind.config.cjs";
+
+/* ── ReactFlow dark mode overrides ─────────────────────────────────────────── */
+
+.dark .react-flow__controls {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.dark .react-flow__controls-button {
+  background: #27272a;
+  border-bottom-color: #3f3f46;
+  fill: #e4e4e7;
+  color: #e4e4e7;
+}
+
+.dark .react-flow__controls-button:hover {
+  background: #3f3f46;
+}
+
+.dark .react-flow__controls-button:disabled {
+  fill: #71717a;
+}
+
+.dark .react-flow__minimap {
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+}
+
+.dark .react-flow__background {
+  background-color: #09090b;
+}
+
+.dark .react-flow__background pattern circle,
+.dark .react-flow__background pattern rect {
+  fill: #3f3f46;
+}
+
+.dark .react-flow__panel {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+}
+

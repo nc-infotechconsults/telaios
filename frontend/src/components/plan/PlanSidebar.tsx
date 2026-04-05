@@ -398,7 +398,7 @@ export default function PlanSidebar({
                             <button
                               key={depId}
                               onClick={() => setSelectedTask(dep)}
-                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-default-700 transition-colors"
+                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-foreground transition-colors"
                             >
                               ⛓ {dep.title}
                             </button>
@@ -420,7 +420,7 @@ export default function PlanSidebar({
                             <button
                               key={dep.id}
                               onClick={() => setSelectedTask(dep)}
-                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-default-700 transition-colors"
+                              className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-foreground transition-colors"
                             >
                               ↗ {dep.title}
                             </button>
