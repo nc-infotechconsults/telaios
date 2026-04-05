@@ -11,6 +11,7 @@ import { Project } from "./Project";
 import { TaskRepository } from "./TaskRepository";
 
 export type RepositoryAuthType = "none" | "token" | "ssh";
+export type RepositorySourceType = "remote" | "local";
 export type RepositoryStatus =
   | "unconfigured"
   | "cloning"
@@ -32,7 +33,10 @@ export class Repository {
   @Column()
   name!: string;
 
-  @Column()
+  @Column({ default: "remote" })
+  source_type!: RepositorySourceType;
+
+  @Column({ nullable: true })
   remote_url!: string;
 
   @Column({ default: "main" })
@@ -45,7 +49,7 @@ export class Repository {
   credentials!: string;
 
   @Column({ nullable: true })
-  local_clone_path!: string;
+  local_path!: string;
 
   @Column({ default: "unconfigured" })
   status!: RepositoryStatus;

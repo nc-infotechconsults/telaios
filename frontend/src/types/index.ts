@@ -18,10 +18,12 @@ export interface Repository {
   id: string;
   project_id: string;
   name: string;
-  remote_url: string;
-  branch: string;
+  source_type: "remote" | "local";
+  remote_url?: string;
+  branch?: string;
   auth_type: "none" | "token" | "ssh";
   has_credentials: boolean;
+  local_path?: string;
   local_clone_path?: string;
   status: RepoStatus;
   error_message?: string;

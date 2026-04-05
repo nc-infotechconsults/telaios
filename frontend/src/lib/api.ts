@@ -54,10 +54,12 @@ export const createRepository = (projectId: string, data: Partial<Repository>): 
         id: `repo-${Date.now()}`,
         project_id: projectId,
         name: data.name ?? "new-repo",
-        remote_url: data.remote_url ?? "",
+        source_type: data.source_type ?? "remote",
+        remote_url: data.remote_url,
         branch: data.branch ?? "main",
         auth_type: data.auth_type ?? "none",
         has_credentials: false,
+        local_path: data.local_path,
         status: "unconfigured",
         updated_at: new Date().toISOString(),
       })
