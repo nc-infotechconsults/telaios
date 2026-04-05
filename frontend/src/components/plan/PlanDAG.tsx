@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   Handle,
   Position,
   useNodesState,
@@ -400,10 +399,6 @@ export default function PlanDAG({ tasks, agentProfiles, repositories, height = 5
         >
           <Background />
           <Controls />
-          <MiniMap
-            nodeStrokeColor={(n) => STATUS_BORDER[(n.data as TaskNodeData).task.status]}
-            nodeColor={(n) => STATUS_BG[(n.data as TaskNodeData).task.status]}
-          />
         </ReactFlow>
       </div>
 
