@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Chip, Divider } from "@heroui/react";
+import { Chip, Divider, Modal, ModalContent, ModalBody, useDisclosure } from "@heroui/react";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";
 import PlanDAG from "./PlanDAG";
@@ -21,84 +21,138 @@ const DRIVER_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" |
 type ViewMode = "list" | "graph";
 
 interface Props {
-  plan: Plan;
+  /** All confirmed/executing plans for this project. */
+  plans: Plan[];
+  /** ID of the plan currently shown. */
+  activePlanId: string;
+  onPlanChange: (planId: string) => void;
   tasks: Task[];
   agentProfiles?: AgentProfile[];
   repositories?: Repository[];
 }
 
-export default function PlanSidebar({ plan, tasks, agentProfiles = [], repositories = [] }: Props) {
+export default function PlanSidebar({
+  plans,
+  activePlanId,
+  onPlanChange,
+  tasks,
+  agentProfiles = [],
+  repositories = [],
+}: Props) {
   const [view, setView] = useState<ViewMode>("list");
+  const { isOpen: isGraphOpen, onOpen: onGraphOpen, onOpenChange: onGraphOpenChange } = useDisclosure();
+
+  const activePlan = plans.find((p) => p.id === activePlanId);
   const sorted = [...tasks].sort((a, b) => a.execution_order - b.execution_order);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="px-4 pt-4 pb-3 shrink-0 space-y-3">
+
+        {/* Plan picker — only shown when there are multiple plans */}
+        {plans.length > 1 && (
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Plan versions">
+            {plans.map((p, i) => (
+              <button
+                key={p.id}
+                aria-pressed={p.id === activePlanId}
+                onClick={() => onPlanChange(p.id)}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors border ${
+                  p.id === activePlanId
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-divider text-default-400 hover:text-foreground"
+                }`}
+              >
+                Plan v{i + 1}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Plan title + status */}
         <div className="flex items-center justify-between">
-          <span className="font-semibold text-sm">Execution Plan</span>
-          <Chip
-            size="sm"
-            variant="flat"
-            color={
-              plan.status === "confirmed" || plan.status === "executing" || plan.status === "completed"
-                ? "success"
-                : "warning"
-            }
-          >
-            {formatStatus(plan.status)}
-          </Chip>
+          <span className="font-semibold text-sm">
+            {plans.length === 1 ? "Execution Plan" : `Plan v${plans.findIndex((p) => p.id === activePlanId) + 1}`}
+          </span>
+          {activePlan && (
+            <Chip
+              size="sm"
+              variant="flat"
+              color={
+                activePlan.status === "confirmed" || activePlan.status === "executing" || activePlan.status === "completed"
+                  ? "success"
+                  : "warning"
+              }
+            >
+              {formatStatus(activePlan.status)}
+            </Chip>
+          )}
         </div>
 
-        {/* List / Graph toggle */}
-        <div
-          role="tablist"
-          aria-label="Plan view"
-          className="flex rounded-lg bg-default-100 p-0.5 gap-0.5"
-        >
-          {(["list", "graph"] as ViewMode[]).map((v) => (
+        {/* List / Graph toggle + graph expand */}
+        <div className="flex items-center gap-1">
+          <div
+            role="tablist"
+            aria-label="Plan view"
+            className="flex flex-1 rounded-lg bg-default-100 p-0.5 gap-0.5"
+          >
+            {(["list", "graph"] as ViewMode[]).map((v) => (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  view === v
+                    ? "bg-content1 text-foreground shadow-sm"
+                    : "text-default-400 hover:text-foreground"
+                }`}
+              >
+                {v === "list" ? (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                      <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                    List
+                  </>
+                ) : (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" />
+                      <line x1="12" y1="7" x2="5.5" y2="17.5" /><line x1="12" y1="7" x2="18.5" y2="17.5" />
+                    </svg>
+                    Graph
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Full-screen expand — only useful in graph view */}
+          {view === "graph" && (
             <button
-              key={v}
-              role="tab"
-              aria-selected={view === v}
-              onClick={() => setView(v)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                view === v
-                  ? "bg-content1 text-foreground shadow-sm"
-                  : "text-default-400 hover:text-foreground"
-              }`}
+              onClick={onGraphOpen}
+              aria-label="Expand graph to full screen"
+              className="p-1.5 rounded-md text-default-400 hover:text-foreground hover:bg-default-100 transition-colors"
             >
-              {v === "list" ? (
-                <>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-                    <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
-                  </svg>
-                  List
-                </>
-              ) : (
-                <>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" />
-                    <line x1="12" y1="7" x2="5.5" y2="17.5" /><line x1="12" y1="7" x2="18.5" y2="17.5" />
-                  </svg>
-                  Graph
-                </>
-              )}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
             </button>
-          ))}
+          )}
         </div>
 
         <Divider />
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       {view === "list" ? (
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           {sorted.length === 0 ? (
-            <p className="text-sm text-default-400 text-center py-4">
-              No tasks yet. Keep chatting!
-            </p>
+            <p className="text-sm text-default-400 text-center py-4">No tasks yet.</p>
           ) : (
             <div className="space-y-2">
               {sorted.map((t, i) => {
@@ -166,9 +220,7 @@ export default function PlanSidebar({ plan, tasks, agentProfiles = [], repositor
       ) : (
         <div className="flex-1 overflow-hidden">
           {sorted.length === 0 ? (
-            <p className="text-sm text-default-400 text-center py-8 px-4">
-              No tasks yet. Keep chatting!
-            </p>
+            <p className="text-sm text-default-400 text-center py-8 px-4">No tasks yet.</p>
           ) : (
             <PlanDAG
               tasks={tasks}
@@ -179,6 +231,41 @@ export default function PlanSidebar({ plan, tasks, agentProfiles = [], repositor
           )}
         </div>
       )}
+
+      {/* ── Full-screen graph modal ── */}
+      <Modal
+        isOpen={isGraphOpen}
+        onOpenChange={onGraphOpenChange}
+        size="full"
+        scrollBehavior="inside"
+        classNames={{ base: "m-0 rounded-none max-h-screen", body: "p-0 h-[calc(100vh-60px)]" }}
+      >
+        <ModalContent>
+          {() => (
+            <>
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-divider shrink-0">
+                <span className="font-semibold text-sm">
+                  {activePlan
+                    ? `Execution Plan — ${formatStatus(activePlan.status)}`
+                    : "Execution Plan"}
+                </span>
+                <span className="text-xs text-default-400 ml-1">
+                  {tasks.length} task{tasks.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <ModalBody>
+                <PlanDAG
+                  tasks={tasks}
+                  agentProfiles={agentProfiles}
+                  repositories={repositories}
+                  height={undefined}
+                />
+              </ModalBody>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
+

@@ -15,14 +15,14 @@ import {
 import {
   getProjects,
   getMessages,
-  getPlan,
+  getPlans,
   getTasks,
   getRepositories,
   getAgentProfiles,
 } from "../lib/api";
 import { useProjectWebSocket } from "../lib/ws";
 import { formatStatus } from "../lib/statusLabels";
-import type { Message, Plan, Task, Repository, AgentProfile, WsEvent } from "../types";
+import type { Message, Plan, Task, Repository, AgentProfile, WsEvent, ChatItem, PlanChatItem } from "../types";
 import RepositorySetup from "../components/plan/RepositorySetup";
 import PlanSidebar from "../components/plan/PlanSidebar";
 import ChatWindow from "../components/chat/ChatWindow";
@@ -40,7 +40,63 @@ const DEMO_PROJECT_NAMES: Record<string, string> = {
   "demo-3": "Data Pipeline Orchestration",
 };
 
-const DEMO_MESSAGES: Record<string, Message[]> = {
+// Tasks for demo-2 draft plan
+const DEMO2_TASKS: Task[] = [
+  {
+    id: "d2t1",
+    plan_id: "plan-draft-2",
+    title: "Audit current drop-off funnel",
+    description: "Use Mixpanel data to pinpoint exactly where step 3 loses users and identify the top error states.",
+    type: "general",
+    status: "pending",
+    execution_order: 0,
+    repository_ids: ["r4"],
+    depends_on_task_ids: [],
+    created_at: "2026-04-01T09:10:00Z",
+    updated_at: "2026-04-01T09:10:00Z",
+  },
+  {
+    id: "d2t2",
+    plan_id: "plan-draft-2",
+    title: "Redesign step 3 with inline validation",
+    description: "Replace blocking error dialogs with inline field-level messages. Add a persistent progress bar.",
+    type: "code",
+    status: "pending",
+    execution_order: 1,
+    repository_ids: ["r4"],
+    depends_on_task_ids: ["d2t1"],
+    created_at: "2026-04-01T09:10:00Z",
+    updated_at: "2026-04-01T09:10:00Z",
+  },
+  {
+    id: "d2t3",
+    plan_id: "plan-draft-2",
+    title: "Add back-navigation with state preservation",
+    description: "Implement wizard state persisted in sessionStorage so users can go back without losing data.",
+    type: "code",
+    status: "pending",
+    execution_order: 2,
+    repository_ids: ["r4"],
+    depends_on_task_ids: ["d2t1"],
+    created_at: "2026-04-01T09:10:00Z",
+    updated_at: "2026-04-01T09:10:00Z",
+  },
+  {
+    id: "d2t4",
+    plan_id: "plan-draft-2",
+    title: "Write automated UI tests",
+    description: "Playwright tests for the full 5-step flow, including back navigation and validation error paths.",
+    type: "test",
+    status: "pending",
+    execution_order: 3,
+    repository_ids: ["r4"],
+    depends_on_task_ids: ["d2t2", "d2t3"],
+    created_at: "2026-04-01T09:10:00Z",
+    updated_at: "2026-04-01T09:10:00Z",
+  },
+];
+
+const DEMO_CHAT_ITEMS: Record<string, ChatItem[]> = {
   "demo-1": [
     {
       id: "m1",
@@ -49,7 +105,7 @@ const DEMO_MESSAGES: Record<string, Message[]> = {
       content:
         "Hi! I'm your planning agent. I'll help you break this project into an executable plan.\n\nCan you describe the main goals and any technical constraints I should know about?",
       created_at: "2026-03-28T10:01:00Z",
-    },
+    } as Message,
     {
       id: "m2",
       project_id: "demo-1",
@@ -57,15 +113,29 @@ const DEMO_MESSAGES: Record<string, Message[]> = {
       content:
         "We need to migrate our monolithic REST API to microservices. The main services are auth, products, orders, and payments. Zero-downtime deployment is a hard requirement.",
       created_at: "2026-03-28T10:02:00Z",
-    },
+    } as Message,
     {
       id: "m3",
       project_id: "demo-1",
       role: "assistant",
       content:
-        "Got it. The strangler-fig pattern is the right call here — we extract one service at a time behind the existing API gateway, reroute traffic incrementally, and decommission the monolith last.\n\nI've drafted an execution plan with 5 tasks covering service extraction, integration tests, and the final traffic cutover. Take a look at the plan panel on the right.",
+        "Got it. The strangler-fig pattern is the right call here — we extract one service at a time behind the existing API gateway, reroute traffic incrementally, and decommission the monolith last.\n\nHere's the plan I've drafted. Review each task and confirm when you're ready to start execution.",
       created_at: "2026-03-28T10:03:00Z",
-    },
+    } as Message,
+    // The plan draft card that appeared in chat at the time the plan was created
+    {
+      type: "plan-draft",
+      id: "plan-1",
+      plan: {
+        id: "plan-1",
+        project_id: "demo-1",
+        status: "executing",
+        created_at: "2026-03-28T10:04:00Z",
+        confirmed_at: "2026-03-28T10:15:00Z",
+      },
+      tasks: [], // populated from DEMO_TASKS below
+      version: 1,
+    } as PlanChatItem,
   ],
   "demo-2": [
     {
@@ -73,9 +143,9 @@ const DEMO_MESSAGES: Record<string, Message[]> = {
       project_id: "demo-2",
       role: "assistant",
       content:
-        "Hi! I'm ready to help plan the onboarding flow redesign. What are the key problems with the current experience that we need to solve?",
+        "Hi! I'm ready to help plan the onboarding flow redesign. What are the key problems with the current experience?",
       created_at: "2026-04-01T09:01:00Z",
-    },
+    } as Message,
     {
       id: "m5",
       project_id: "demo-2",
@@ -83,7 +153,28 @@ const DEMO_MESSAGES: Record<string, Message[]> = {
       content:
         "Users are dropping off at step 3 of 5. The error messages are confusing and there's no way to go back without losing progress.",
       created_at: "2026-04-01T09:02:00Z",
-    },
+    } as Message,
+    {
+      id: "m6",
+      project_id: "demo-2",
+      role: "assistant",
+      content:
+        "Classic drop-off pattern — blocking errors and no escape route. I've drafted a plan to fix the funnel: audit the data first, then redesign step 3 with inline validation, add back-navigation with state preservation, and finish with automated UI tests.",
+      created_at: "2026-04-01T09:09:00Z",
+    } as Message,
+    // Draft plan awaiting confirmation
+    {
+      type: "plan-draft",
+      id: "plan-draft-2",
+      plan: {
+        id: "plan-draft-2",
+        project_id: "demo-2",
+        status: "draft",
+        created_at: "2026-04-01T09:10:00Z",
+      },
+      tasks: DEMO2_TASKS,
+      version: 1,
+    } as PlanChatItem,
   ],
 };
 
@@ -112,7 +203,19 @@ const DEMO_REPOS: Record<string, Repository[]> = {
       updated_at: "2026-03-28T10:10:00Z",
     },
   ],
-  "demo-2": [],
+  "demo-2": [
+    {
+      id: "r4",
+      project_id: "demo-2",
+      name: "mobile-app",
+      remote_url: "https://github.com/org/mobile-app.git",
+      branch: "main",
+      auth_type: "token",
+      has_credentials: true,
+      status: "ready",
+      updated_at: "2026-04-01T09:00:00Z",
+    },
+  ],
   "demo-3": [
     {
       id: "r3",
@@ -128,14 +231,24 @@ const DEMO_REPOS: Record<string, Repository[]> = {
   ],
 };
 
-const DEMO_PLANS: Record<string, Plan> = {
-  "demo-1": {
-    id: "plan-1",
-    project_id: "demo-1",
-    status: "executing",
-    created_at: "2026-03-28T10:04:00Z",
-    confirmed_at: "2026-03-28T10:15:00Z",
-  },
+const DEMO_PLANS: Record<string, Plan[]> = {
+  "demo-1": [
+    {
+      id: "plan-1",
+      project_id: "demo-1",
+      status: "executing",
+      created_at: "2026-03-28T10:04:00Z",
+      confirmed_at: "2026-03-28T10:15:00Z",
+    },
+  ],
+  "demo-2": [
+    {
+      id: "plan-draft-2",
+      project_id: "demo-2",
+      status: "draft",
+      created_at: "2026-04-01T09:10:00Z",
+    },
+  ],
 };
 
 const DEMO_TASKS: Record<string, Task[]> = {
@@ -218,14 +331,23 @@ export default function PlanningChat() {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Chat items: interleaved messages and inline plan-draft cards
+  const [chatItems, setChatItems] = useState<ChatItem[]>([]);
   const [streamingText, setStreamingText] = useState("");
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Plan management
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [planTasks, setPlanTasks] = useState<Record<string, Task[]>>({});
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [currentDraftPlanId, setCurrentDraftPlanId] = useState<string | null>(null);
+
+  // Plan being reviewed in the confirm modal
+  const [planBeingReviewed, setPlanBeingReviewed] = useState<{ plan: Plan; tasks: Task[] } | null>(null);
+
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [projectName, setProjectName] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
   const [changesNote, setChangesNote] = useState("");
@@ -233,37 +355,84 @@ export default function PlanningChat() {
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
   const { isOpen: isChangesOpen, onOpen: onChangesOpen, onOpenChange: onChangesOpenChange } = useDisclosure();
 
+  // Derived values
+  const confirmedPlans = plans.filter(
+    (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
+  );
+  const activePlan = plans.find((p) => p.id === activePlanId) ?? null;
+  const activeTasks = activePlanId ? (planTasks[activePlanId] ?? []) : [];
+  const currentDraft = plans.find((p) => p.id === currentDraftPlanId) ?? null;
+
   useEffect(() => {
     if (!projectId) return;
     setLoading(true);
     Promise.all([
       getProjects(),
       getMessages(projectId),
-      getPlan(projectId),
+      getPlans(projectId),
       getRepositories(projectId),
       getAgentProfiles(),
     ])
-      .then(([projects, msgs, p, repos, profiles]) => {
+      .then(async ([projects, msgs, allPlans, repos, profiles]) => {
         const proj = projects.find((x) => x.id === projectId);
         if (proj) setProjectName(proj.name);
-        setMessages(msgs);
         setRepositories(repos);
         setAgentProfiles(profiles);
-        if (p) {
-          setPlan(p);
-          if (p.tasks) setTasks(p.tasks);
-          else getTasks(p.id).then(setTasks).catch(console.error);
-        }
+        setChatItems(msgs);
+
+        // Load tasks for each plan
+        const taskResults = await Promise.all(
+          allPlans.map((p) =>
+            p.tasks ? Promise.resolve(p.tasks) : getTasks(p.id).catch(() => [] as Task[])
+          )
+        );
+        const allPlanTasks: Record<string, Task[]> = {};
+        allPlans.forEach((p, i) => { allPlanTasks[p.id] = taskResults[i]; });
+
+        setPlans(allPlans);
+        setPlanTasks(allPlanTasks);
+
+        // Set active plan to latest confirmed/executing
+        const confirmed = allPlans.filter(
+          (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
+        );
+        if (confirmed.length > 0) setActivePlanId(confirmed[confirmed.length - 1].id);
+
+        // Track current draft
+        const draft = allPlans.find((p) => p.status === "draft");
+        if (draft) setCurrentDraftPlanId(draft.id);
       })
       .catch(() => {
-        // Backend not reachable — load demo data so the UI shows a realistic view
+        // Backend not reachable — load demo data
         setProjectName(DEMO_PROJECT_NAMES[projectId] ?? "Demo Project");
-        setMessages(DEMO_MESSAGES[projectId] ?? []);
         setRepositories(DEMO_REPOS[projectId] ?? []);
-        if (DEMO_PLANS[projectId]) {
-          setPlan(DEMO_PLANS[projectId]);
-          setTasks(DEMO_TASKS[projectId] ?? []);
-        }
+
+        const demoPlans = DEMO_PLANS[projectId] ?? [];
+        const taskMap: Record<string, Task[]> = {};
+        demoPlans.forEach((p) => {
+          taskMap[p.id] = DEMO_TASKS[projectId] ?? (p.id === "plan-draft-2" ? DEMO2_TASKS : []);
+        });
+
+        setPlans(demoPlans);
+        setPlanTasks(taskMap);
+
+        // Populate task lists inside plan-draft chat items
+        const rawItems = DEMO_CHAT_ITEMS[projectId] ?? [];
+        const populatedItems = rawItems.map((item) => {
+          if ("type" in item && item.type === "plan-draft") {
+            return { ...item, tasks: taskMap[item.id] ?? item.tasks };
+          }
+          return item;
+        });
+        setChatItems(populatedItems);
+
+        const confirmed = demoPlans.filter(
+          (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
+        );
+        if (confirmed.length > 0) setActivePlanId(confirmed[confirmed.length - 1].id);
+
+        const draft = demoPlans.find((p) => p.status === "draft");
+        if (draft) setCurrentDraftPlanId(draft.id);
       })
       .finally(() => setLoading(false));
   }, [projectId]);
@@ -277,12 +446,12 @@ export default function PlanningChat() {
         setIsStreaming(false);
         setStreamingText((prev) => {
           if (prev) {
-            setMessages((m) => [
+            setChatItems((m) => [
               ...m,
               {
                 id: `stream-${Date.now()}`,
                 project_id: projectId ?? "",
-                role: "assistant",
+                role: "assistant" as const,
                 content: prev,
                 created_at: new Date().toISOString(),
               },
@@ -290,15 +459,78 @@ export default function PlanningChat() {
           }
           return "";
         });
-        setPlan(event.plan);
-        if (event.plan.tasks) setTasks(event.plan.tasks);
-        else if (event.plan.id) getTasks(event.plan.id).then(setTasks).catch(console.error);
+
+        const newPlan = event.plan;
+        const fetchedTasks = newPlan.tasks ?? [];
+
+        setPlans((prev) => {
+          const existing = prev.find((p) => p.id === newPlan.id);
+          return existing ? prev.map((p) => (p.id === newPlan.id ? newPlan : p)) : [...prev, newPlan];
+        });
+
+        if (!newPlan.tasks) {
+          getTasks(newPlan.id).then((tasks) => {
+            setPlanTasks((prev) => ({ ...prev, [newPlan.id]: tasks }));
+            setChatItems((prev) => {
+              // Update the plan card's tasks if it was already added with empty tasks
+              return prev.map((item) =>
+                "type" in item && item.type === "plan-draft" && item.id === newPlan.id
+                  ? { ...item, tasks }
+                  : item
+              );
+            });
+          }).catch(console.error);
+        } else {
+          setPlanTasks((prev) => ({ ...prev, [newPlan.id]: fetchedTasks }));
+        }
+
+        setCurrentDraftPlanId(newPlan.id);
+
+        // Count existing plan-draft items to compute version
+        setChatItems((prev) => {
+          const existingPlanItems = prev.filter((i) => "type" in i && i.type === "plan-draft");
+          const alreadyPresent = existingPlanItems.some((i) => "type" in i && i.id === newPlan.id);
+          if (alreadyPresent) return prev;
+          const planItem: PlanChatItem = {
+            type: "plan-draft",
+            id: newPlan.id,
+            plan: newPlan,
+            tasks: fetchedTasks,
+            version: existingPlanItems.length + 1,
+          };
+          return [...prev, planItem];
+        });
       } else if (event.type === "plan_confirmed") {
-        setPlan((p) => (p ? { ...p, status: "confirmed" } : p));
-        navigate(`/projects/${projectId}/execute`);
+        // Update plan status in all state locations
+        const confirmedPlanId = event.plan_id;
+        setPlans((prev) =>
+          prev.map((p) => (p.id === confirmedPlanId ? { ...p, status: "confirmed" } : p))
+        );
+        setChatItems((prev) =>
+          prev.map((item) =>
+            "type" in item && item.type === "plan-draft" && item.id === confirmedPlanId
+              ? { ...item, plan: { ...item.plan, status: "confirmed" as const } }
+              : item
+          )
+        );
+        setCurrentDraftPlanId(null);
+        setActivePlanId(confirmedPlanId);
+        // Don't auto-navigate — user can click "View Execution →"
+      } else if (event.type === "task_status") {
+        setPlanTasks((prev) => {
+          const updated = { ...prev };
+          for (const planId of Object.keys(updated)) {
+            updated[planId] = updated[planId].map((t) =>
+              t.id === event.task_id
+                ? { ...t, status: event.status, assigned_instance_id: event.agent_instance_id }
+                : t
+            );
+          }
+          return updated;
+        });
       }
     },
-    [projectId, navigate]
+    [projectId]
   );
 
   const { sendMessage } = useProjectWebSocket(projectId, handleWsEvent);
@@ -311,8 +543,18 @@ export default function PlanningChat() {
       content,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    setChatItems((prev) => [...prev, userMsg]);
     sendMessage(content);
+  };
+
+  const handlePlanAction = (planId: string, action: "confirm" | "request-changes") => {
+    const planItem = chatItems.find(
+      (item): item is PlanChatItem => "type" in item && item.type === "plan-draft" && item.id === planId
+    );
+    if (!planItem) return;
+    setPlanBeingReviewed({ plan: planItem.plan, tasks: planItem.tasks });
+    if (action === "confirm") onConfirmOpen();
+    else onChangesOpen();
   };
 
   const handleConfirmPlan = () => {
@@ -359,35 +601,51 @@ export default function PlanningChat() {
           <span className="text-default-300" aria-hidden="true">/</span>
           <h1 className="font-semibold truncate">{projectName || "Loading…"}</h1>
 
-          {plan?.status && (
+          {activePlan?.status && (
             <Chip
               size="sm"
               variant="flat"
               color={
-                plan.status === "confirmed" || plan.status === "executing" || plan.status === "completed"
+                activePlan.status === "confirmed" || activePlan.status === "executing" || activePlan.status === "completed"
                   ? "success"
                   : "warning"
               }
             >
-              {formatStatus(plan.status)}
+              {formatStatus(activePlan.status)}
             </Chip>
           )}
 
           <div className="ml-auto flex gap-2">
-            {plan?.status === "draft" && tasks.length > 0 && (
-              <Button size="sm" color="success" onPress={onConfirmOpen}>
+            {currentDraft && (
+              <Button
+                size="sm"
+                color="success"
+                onPress={() => {
+                  const item = chatItems.find(
+                    (i): i is PlanChatItem => "type" in i && i.type === "plan-draft" && i.id === currentDraft.id
+                  );
+                  if (item) {
+                    setPlanBeingReviewed({ plan: item.plan, tasks: item.tasks });
+                    onConfirmOpen();
+                  }
+                }}
+              >
                 Review &amp; Confirm Plan
               </Button>
             )}
-            {(plan?.status === "confirmed" || plan?.status === "executing") && (
-              <Button size="sm" color="primary" onPress={() => navigate(`/projects/${projectId}/execute`)}>
+            {(activePlan?.status === "confirmed" || activePlan?.status === "executing") && (
+              <Button
+                size="sm"
+                color="primary"
+                onPress={() => navigate(`/projects/${projectId}/execute`)}
+              >
                 View Execution →
               </Button>
             )}
           </div>
         </div>
 
-        {/* Tab bar — accessible tablist */}
+        {/* Tab bar */}
         <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
           {(["chat", "repos"] as ActiveTab[]).map((tab) => (
             <button
@@ -419,9 +677,12 @@ export default function PlanningChat() {
           >
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <ChatWindow
-                messages={messages}
+                items={chatItems}
                 streamingText={streamingText}
                 isStreaming={isStreaming}
+                agentProfiles={agentProfiles}
+                repositories={repositories}
+                onPlanAction={handlePlanAction}
               />
             </div>
             <div className="border-t border-divider px-5 py-3 shrink-0">
@@ -445,18 +706,20 @@ export default function PlanningChat() {
         </div>
       </div>
 
-      {/* ── Right sidebar: Plan ── */}
+      {/* ── Right sidebar: confirmed plan(s) ── */}
       <div
         className={`flex flex-col transition-all duration-300 ${
-          plan ? "w-80 shrink-0" : "w-0 overflow-hidden"
+          activePlanId && confirmedPlans.length > 0 ? "w-[400px] shrink-0" : "w-0 overflow-hidden"
         }`}
         aria-label="Execution plan"
       >
-        {plan && (
+        {activePlanId && confirmedPlans.length > 0 && (
           <div className="h-full overflow-hidden flex flex-col">
             <PlanSidebar
-              plan={plan}
-              tasks={tasks}
+              plans={confirmedPlans}
+              activePlanId={activePlanId}
+              onPlanChange={setActivePlanId}
+              tasks={activeTasks}
               agentProfiles={agentProfiles}
               repositories={repositories}
             />
@@ -464,17 +727,17 @@ export default function PlanningChat() {
         )}
       </div>
 
-      {/* Confirm modal */}
+      {/* ── Confirm plan modal ── */}
       <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmOpenChange} size="2xl" scrollBehavior="inside">
         <ModalContent>
           {() => (
             <>
               <ModalHeader>Review Execution Plan</ModalHeader>
               <ModalBody className="pb-4">
-                {plan && (
+                {planBeingReviewed && (
                   <PlanConfirmModal
-                    plan={plan}
-                    tasks={tasks}
+                    plan={planBeingReviewed.plan}
+                    tasks={planBeingReviewed.tasks}
                     agentProfiles={agentProfiles}
                     repositories={repositories}
                     onConfirm={handleConfirmPlan}
@@ -487,7 +750,7 @@ export default function PlanningChat() {
         </ModalContent>
       </Modal>
 
-      {/* Request changes modal */}
+      {/* ── Request changes modal ── */}
       <Modal isOpen={isChangesOpen} onOpenChange={onChangesOpenChange} size="md">
         <ModalContent>
           {(onClose) => (

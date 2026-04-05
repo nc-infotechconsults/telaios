@@ -109,6 +109,20 @@ export interface Settings {
   updated_at: string;
 }
 
+/** A plan-draft item that can appear inline in the chat conversation. */
+export type PlanChatItem = {
+  type: "plan-draft";
+  /** Same as plan.id — used as the React key and to dispatch actions. */
+  id: string;
+  plan: Plan;
+  tasks: Task[];
+  /** 1-based sequential version number for display (v1, v2, …). */
+  version: number;
+};
+
+/** Union of a regular chat message and an inline plan-draft card. */
+export type ChatItem = Message | PlanChatItem;
+
 // WebSocket event payloads
 export type WsEvent =
   | { type: "chat_token"; token: string }

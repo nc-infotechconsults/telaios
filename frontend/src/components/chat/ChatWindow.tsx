@@ -1,23 +1,36 @@
 import { useEffect, useRef } from "react";
-import type { Message } from "../../types";
+import type { ChatItem, AgentProfile, Repository } from "../../types";
 import MessageBubble from "./MessageBubble";
+import PlanDraftCard from "../plan/PlanDraftCard";
 
 interface Props {
-  messages: Message[];
+  items: ChatItem[];
   streamingText?: string;
   isStreaming?: boolean;
   /** When true, the component manages its own scroll container */
   selfScroll?: boolean;
+  agentProfiles?: AgentProfile[];
+  repositories?: Repository[];
+  /** Called when the user clicks Confirm or Request Changes on a plan card. */
+  onPlanAction?: (planId: string, action: "confirm" | "request-changes") => void;
 }
 
-export default function ChatWindow({ messages, streamingText, isStreaming, selfScroll }: Props) {
+export default function ChatWindow({
+  items,
+  streamingText,
+  isStreaming,
+  selfScroll,
+  agentProfiles = [],
+  repositories = [],
+  onPlanAction,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
+  }, [items, streamingText]);
 
-  const isEmpty = messages.length === 0 && !isStreaming && !streamingText;
+  const isEmpty = items.length === 0 && !isStreaming && !streamingText;
 
   const content = (
     <>
@@ -30,9 +43,26 @@ export default function ChatWindow({ messages, streamingText, isStreaming, selfS
         </div>
       )}
 
-      {messages.map((m) => (
-        <MessageBubble key={m.id} message={m} />
-      ))}
+      {items.map((item) => {
+        if ("type" in item && item.type === "plan-draft") {
+          return (
+            <div key={item.id} className="mb-4">
+              <PlanDraftCard
+                plan={item.plan}
+                tasks={item.tasks}
+                agentProfiles={agentProfiles}
+                repositories={repositories}
+                version={item.version}
+                onConfirm={() => onPlanAction?.(item.id, "confirm")}
+                onRequestChanges={() => onPlanAction?.(item.id, "request-changes")}
+              />
+            </div>
+          );
+        }
+        // Remaining items are Message (discriminated out via the type check above)
+        const msg = item as import("../../types").Message;
+        return <MessageBubble key={msg.id} message={msg} />;
+      })}
 
       {streamingText && (
         <div className="flex justify-start mb-3" aria-live="polite" aria-atomic="false">
@@ -72,3 +102,4 @@ export default function ChatWindow({ messages, streamingText, isStreaming, selfS
     </div>
   );
 }
+
