@@ -27,8 +27,11 @@ export const deleteRepository = (projectId: string, id: string) =>
   http.delete(`/projects/${projectId}/repositories/${id}`);
 
 // Plans
+export const getPlans = (projectId: string) =>
+  http.get<Plan[]>("/plans", { params: { project_id: projectId } }).then((r) => r.data);
+
 export const getPlan = (projectId: string) =>
-  http.get<Plan[]>(`/plans?project_id=${projectId}`).then((r) => r.data[0] ?? null);
+  http.get<Plan[]>("/plans", { params: { project_id: projectId } }).then((r) => r.data[0] ?? null);
 
 // Tasks
 export const getTasks = (planId: string) =>

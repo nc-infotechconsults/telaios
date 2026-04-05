@@ -7,9 +7,11 @@ import {
   Chip,
   Card,
   CardBody,
+  useDisclosure,
 } from "@heroui/react";
 import { createRepository, deleteRepository } from "../../lib/api";
 import type { Repository } from "../../types";
+import ConfirmModal from "../common/ConfirmModal";
 
 interface Props {
   projectId: string;
@@ -36,6 +38,9 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
   const [token, setToken] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Repository | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
 
   const isFormValid = form.name.trim() && form.remote_url.trim();
 
@@ -56,10 +61,22 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
     }
   };
 
-  const handleDelete = async (repo: Repository) => {
-    if (!confirm(`Remove repository "${repo.name}"?`)) return;
-    await deleteRepository(projectId, repo.id);
-    onChange(repositories.filter((r) => r.id !== repo.id));
+  const handleDelete = (repo: Repository) => {
+    setDeleteTarget(repo);
+    onDeleteOpen();
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteRepository(projectId, deleteTarget.id);
+      onChange(repositories.filter((r) => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      onDeleteOpenChange();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -122,6 +139,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                     size="sm"
                     variant="light"
                     color="danger"
+                    aria-label={`Remove repository ${r.name}`}
                     onPress={() => handleDelete(r)}
                     className="shrink-0"
                   >
@@ -232,6 +250,16 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
           </CardBody>
         </Card>
       )}
+
+      <ConfirmModal
+        isOpen={isDeleteOpen}
+        onOpenChange={onDeleteOpenChange}
+        title="Remove Repository"
+        message={`Remove "${deleteTarget?.name}" from this project? The remote repository will not be affected.`}
+        confirmLabel="Remove"
+        onConfirm={confirmDelete}
+        isLoading={deleting}
+      />
     </div>
   );
 }

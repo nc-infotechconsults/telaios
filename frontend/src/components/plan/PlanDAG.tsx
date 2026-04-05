@@ -4,6 +4,8 @@ import {
   Background,
   Controls,
   MiniMap,
+  Handle,
+  Position,
   type Node,
   type Edge,
   type NodeProps,
@@ -52,6 +54,8 @@ function TaskNode({ data }: NodeProps) {
         color: "#f9fafb",
       }}
     >
+      <Handle type="target" position={Position.Top} style={{ background: STATUS_BORDER[task.status] }} />
+
       {/* Task title */}
       <div className="font-semibold leading-tight mb-1 truncate" title={task.title}>
         {task.title}
@@ -91,6 +95,8 @@ function TaskNode({ data }: NodeProps) {
           ))}
         </div>
       )}
+
+      <Handle type="source" position={Position.Bottom} style={{ background: STATUS_BORDER[task.status] }} />
     </div>
   );
 }

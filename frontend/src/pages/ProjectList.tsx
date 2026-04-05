@@ -40,6 +40,78 @@ const REPO_STATUS_COLOR: Record<
   error: "danger",
 };
 
+// ---------------------------------------------------------------------------
+// Demo / fallback data — shown when the backend is not reachable
+// ---------------------------------------------------------------------------
+const DEMO_PROJECTS: Project[] = [
+  {
+    id: "demo-1",
+    name: "E-commerce API Refactor",
+    description:
+      "Migrating the monolithic REST API to microservices with improved auth and caching. Zero-downtime deployment using the strangler-fig pattern.",
+    status: "executing",
+    created_at: "2026-03-28T10:00:00Z",
+  },
+  {
+    id: "demo-2",
+    name: "Mobile App — Onboarding Flow",
+    description:
+      "Redesigning the user onboarding experience with step-by-step guidance, error recovery, and A/B testing support.",
+    status: "planning",
+    created_at: "2026-04-01T09:00:00Z",
+  },
+  {
+    id: "demo-3",
+    name: "Data Pipeline Orchestration",
+    description:
+      "Building a fault-tolerant ETL pipeline with Apache Airflow and dbt for the data analytics team.",
+    status: "done",
+    created_at: "2026-03-15T14:30:00Z",
+  },
+];
+
+const DEMO_REPOS: Record<string, Repository[]> = {
+  "demo-1": [
+    {
+      id: "r1",
+      project_id: "demo-1",
+      name: "api-service",
+      remote_url: "https://github.com/org/api-service.git",
+      branch: "main",
+      auth_type: "token",
+      has_credentials: true,
+      status: "ready",
+      updated_at: "2026-03-28T10:05:00Z",
+    },
+    {
+      id: "r2",
+      project_id: "demo-1",
+      name: "auth-service",
+      remote_url: "https://github.com/org/auth-service.git",
+      branch: "main",
+      auth_type: "token",
+      has_credentials: true,
+      status: "cloning",
+      updated_at: "2026-03-28T10:10:00Z",
+    },
+  ],
+  "demo-2": [],
+  "demo-3": [
+    {
+      id: "r3",
+      project_id: "demo-3",
+      name: "data-pipeline",
+      remote_url: "https://github.com/org/data-pipeline.git",
+      branch: "main",
+      auth_type: "none",
+      has_credentials: false,
+      status: "ready",
+      updated_at: "2026-03-16T09:00:00Z",
+    },
+  ],
+};
+// ---------------------------------------------------------------------------
+
 export default function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [reposByProject, setReposByProject] = useState<Record<string, Repository[]>>({});
@@ -69,7 +141,26 @@ export default function ProjectList() {
           setReposByProject(byProject);
         });
       })
-      .catch(console.error)
+      .catch((error: unknown) => {
+        // Only fall back to demo data when the backend is completely unreachable
+        // (no HTTP response). Surface real HTTP errors (401/403/500 etc.) instead.
+        const hasResponse =
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          (error as { response: unknown }).response != null;
+
+        if (hasResponse) {
+          console.error("Failed to load projects from backend", error);
+          setProjects([]);
+          setReposByProject({});
+          return;
+        }
+
+        // Backend not reachable — show demo data so the UI is not empty
+        setProjects(DEMO_PROJECTS);
+        setReposByProject(DEMO_REPOS);
+      })
       .finally(() => setLoading(false));
   };
 
