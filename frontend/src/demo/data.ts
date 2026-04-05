@@ -102,6 +102,13 @@ export const REPOSITORIES: Record<string, Repository[]> = {
 export const PLANS: Record<string, Plan[]> = {
   "demo-1": [
     {
+      id: "plan-1-v1",
+      project_id: "demo-1",
+      status: "completed",
+      created_at: "2026-03-27T15:30:00Z",
+      confirmed_at: "2026-03-27T16:00:00Z",
+    },
+    {
       id: "plan-1",
       project_id: "demo-1",
       status: "executing",
@@ -131,6 +138,50 @@ export const PLANS: Record<string, Plan[]> = {
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
 export const TASKS: Record<string, Task[]> = {
+  "plan-1-v1": [
+    {
+      id: "v1t1",
+      plan_id: "plan-1-v1",
+      title: "Initial service boundary analysis",
+      description: "Map the monolith into candidate service domains and agree on data ownership boundaries.",
+      type: "general",
+      status: "done",
+      execution_order: 0,
+      agent_profile_id: "ap1",
+      repository_ids: ["r1"],
+      depends_on_task_ids: [],
+      created_at: "2026-03-27T15:30:00Z",
+      updated_at: "2026-03-27T17:00:00Z",
+    },
+    {
+      id: "v1t2",
+      plan_id: "plan-1-v1",
+      title: "Design API gateway routing rules",
+      description: "Define how the existing REST endpoints will be routed to the new microservices via the gateway.",
+      type: "code",
+      status: "done",
+      execution_order: 1,
+      agent_profile_id: "ap1",
+      repository_ids: ["r1"],
+      depends_on_task_ids: ["v1t1"],
+      created_at: "2026-03-27T15:30:00Z",
+      updated_at: "2026-03-27T18:30:00Z",
+    },
+    {
+      id: "v1t3",
+      plan_id: "plan-1-v1",
+      title: "Write architectural decision records (ADRs)",
+      description: "Document the strangler-fig migration strategy, technology choices, and rollback plan.",
+      type: "general",
+      status: "done",
+      execution_order: 2,
+      agent_profile_id: "ap2",
+      repository_ids: ["r1"],
+      depends_on_task_ids: ["v1t2"],
+      created_at: "2026-03-27T15:30:00Z",
+      updated_at: "2026-03-27T19:00:00Z",
+    },
+  ],
   "plan-1": [
     {
       id: "t1",

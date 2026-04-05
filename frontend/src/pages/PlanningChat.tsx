@@ -25,11 +25,12 @@ import { formatStatus } from "../lib/statusLabels";
 import type { Message, Plan, Task, Repository, AgentProfile, WsEvent, ChatItem, PlanChatItem } from "../types";
 import RepositorySetup from "../components/plan/RepositorySetup";
 import PlanSidebar from "../components/plan/PlanSidebar";
+import PlanListTab from "../components/plan/PlanListTab";
 import ChatWindow from "../components/chat/ChatWindow";
 import ChatInput from "../components/chat/ChatInput";
 import PlanConfirmModal from "../components/plan/PlanConfirmModal";
 
-type ActiveTab = "chat" | "repos";
+type ActiveTab = "chat" | "plans" | "repos";
 
 export default function PlanningChat() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -343,7 +344,7 @@ export default function PlanningChat() {
 
         {/* Tab bar */}
         <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
-          {(["chat", "repos"] as ActiveTab[]).map((tab) => (
+          {(["chat", "plans", "repos"] as ActiveTab[]).map((tab) => (
             <button
               key={tab}
               role="tab"
@@ -357,7 +358,11 @@ export default function PlanningChat() {
                   : "border-transparent text-default-400 hover:text-foreground"
               }`}
             >
-              {tab === "chat" ? "Planning Chat" : `Repositories (${repositories.length})`}
+              {tab === "chat"
+                ? "Planning Chat"
+                : tab === "plans"
+                ? `Plans (${plans.length})`
+                : `Repositories (${repositories.length})`}
             </button>
           ))}
         </div>
@@ -384,6 +389,26 @@ export default function PlanningChat() {
             <div className="border-t border-divider px-5 py-3 shrink-0">
               <ChatInput onSend={handleSend} disabled={isStreaming} />
             </div>
+          </div>
+
+          <div
+            id="tabpanel-plans"
+            role="tabpanel"
+            aria-labelledby="tab-plans"
+            hidden={activeTab !== "plans"}
+            className="h-full overflow-y-auto px-5 py-5"
+          >
+            <PlanListTab
+              plans={plans}
+              planTasks={planTasks}
+              activePlanId={activePlanId}
+              onActivate={(planId) => {
+                setActivePlanId(planId);
+                setActiveTab("chat");
+              }}
+              agentProfiles={agentProfiles}
+              repositories={repositories}
+            />
           </div>
 
           <div
