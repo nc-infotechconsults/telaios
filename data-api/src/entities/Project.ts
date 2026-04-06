@@ -8,6 +8,7 @@ import {
 import { Repository } from "./Repository";
 import { Plan } from "./Plan";
 import { Message } from "./Message";
+import { ProjectMember } from "./ProjectMember";
 
 export type ProjectStatus = "planning" | "executing" | "done";
 
@@ -36,4 +37,7 @@ export class Project {
 
   @OneToMany(() => Message, (m) => m.project, { cascade: true })
   messages!: Message[];
+
+  @OneToMany(() => ProjectMember, (pm) => pm.project, { cascade: true })
+  members!: ProjectMember[];
 }

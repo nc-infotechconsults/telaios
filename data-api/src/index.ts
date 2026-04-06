@@ -7,9 +7,10 @@ import express, { type Request, type Response, type NextFunction } from "express
 import cors from "cors";
 import helmet from "helmet";
 import { AppDataSource } from "./data-source";
-import { Repository as RepositoryEntity } from "./entities/Repository";
-import { encrypt } from "./middleware/crypto";
 
+import authRouter from "./routes/auth";
+import usersRouter from "./routes/users";
+import projectMembersRouter from "./routes/projectMembers";
 import projectsRouter from "./routes/projects";
 import repositoriesRouter from "./routes/repositories";
 import plansRouter from "./routes/plans";
@@ -17,6 +18,8 @@ import tasksRouter from "./routes/tasks";
 import messagesRouter from "./routes/messages";
 import settingsRouter from "./routes/settings";
 import agentProfilesRouter from "./routes/agentProfiles";
+import { patchRepositoryById } from "./controllers/repository.controller";
+import { authenticate } from "./middleware/authenticate";
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
@@ -25,24 +28,22 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// Open routes
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+app.use("/auth", authRouter);
 
+// All routes below require authentication
+app.use(authenticate);
+
+app.use("/users", usersRouter);
 app.use("/projects", projectsRouter);
 app.use("/projects", repositoriesRouter);
+app.use("/projects", projectMembersRouter);
 
 // Standalone repository PATCH — used by agent-service to update clone status without project_id
-app.patch("/repositories/:id", async (req, res) => {
-  const repoRepo = AppDataSource.getRepository(RepositoryEntity);
-  const body = { ...req.body };
-  if (body.credentials) body.credentials = encrypt(body.credentials);
-  await repoRepo.update(req.params.id, body);
-  const updated = await repoRepo.findOneBy({ id: req.params.id });
-  if (!updated) return res.status(404).json({ error: "Not found" });
-  const { credentials, ...rest } = updated;
-  return res.json({ ...rest, has_credentials: !!credentials });
-});
+app.patch("/repositories/:id", patchRepositoryById);
 
 app.use("/plans", plansRouter);
 app.use("/tasks", tasksRouter);
@@ -52,19 +53,23 @@ app.use("/agent-profiles", agentProfilesRouter);
 
 // Global error handler — prevents unhandled async errors from crashing the server
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error & { statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.statusCode ?? 500;
   console.error("Unhandled error:", err.message);
-  res.status(500).json({ error: "Internal server error", message: err.message });
+  res.status(status).json({ error: status === 500 ? "Internal server error" : err.message });
 });
 
-AppDataSource.initialize()
-  .then(() => {
+(async () => {
+  try {
+    await AppDataSource.initialize();
     console.log("Database connected");
     app.listen(PORT, () => {
       console.log(`Data API listening on port ${PORT}`);
     });
-  })
-  .catch((err) => {
+  } catch (err) {
     console.error("Database connection failed:", err);
     process.exit(1);
-  });
+  }
+})();
+
+
