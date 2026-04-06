@@ -9,6 +9,7 @@ router.get("/", planController.listPlans);
 router.post("/", requireProjectAccess("editor"), planController.createPlan);
 router.get("/:id", requireProjectAccess("viewer"), planController.getPlan);
 router.patch("/:id", requireProjectAccess("editor"), planController.patchPlan);
+router.delete("/:id", requireProjectAccess("editor"), planController.deletePlan);
 
 // Messages scoped to a plan
 router.get("/:id/messages", planController.getPlanMessages);

@@ -208,7 +208,12 @@ export default function Layout() {
   const sidebarWidth = collapsed ? "w-14" : "w-56";
 
   // ── Sidebar content (shared between drawer and desktop) ──
-  const SidebarContent = ({ onClose }: { onClose?: () => void }) => (
+  const SidebarContent = ({ onClose }: { onClose?: () => void }) => {
+    // Mobile drawer is always fully expanded regardless of desktop collapse state
+    const isExpanded = !!onClose;
+    const effectiveCollapsed = isExpanded ? false : collapsed;
+
+    return (
     <div className="flex flex-col h-full">
       {/* Mobile close button */}
       {onClose && (
@@ -230,7 +235,7 @@ export default function Layout() {
           <SideNavLink
             key={item.to}
             {...item}
-            collapsed={collapsed}
+            collapsed={effectiveCollapsed}
             onClick={onClose}
           />
         ))}
@@ -240,7 +245,7 @@ export default function Layout() {
             end={false}
             label="Users"
             icon={<UsersIcon />}
-            collapsed={collapsed}
+            collapsed={effectiveCollapsed}
             onClick={onClose}
           />
         )}
@@ -259,7 +264,8 @@ export default function Layout() {
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">

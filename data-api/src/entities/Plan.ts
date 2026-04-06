@@ -5,6 +5,7 @@ import {
   ManyToOne,
   OneToMany,
   CreateDateColumn,
+  DeleteDateColumn,
   JoinColumn,
 } from "typeorm";
 import { Project } from "./Project";
@@ -39,6 +40,9 @@ export class Plan {
 
   @Column({ nullable: true })
   confirmed_at!: Date;
+
+  @DeleteDateColumn({ name: "deleted_at", nullable: true })
+  deleted_at!: Date | null;
 
   @OneToMany(() => Task, (t) => t.plan, { cascade: true })
   tasks!: Task[];

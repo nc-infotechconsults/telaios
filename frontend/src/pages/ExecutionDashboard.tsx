@@ -6,7 +6,6 @@ import { useProjectSSE } from "../lib/sse";
 import { formatStatus } from "../lib/statusLabels";
 import type { Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
-import TaskCard from "../components/plan/TaskCard";
 import TaskDetailModal from "../components/plan/TaskDetailModal";
 import AgentPoolPanel from "../components/agents/AgentPoolPanel";
 import type { AgentInstance } from "../components/agents/AgentStatusBadge";
@@ -274,24 +273,72 @@ export default function ExecutionDashboard() {
                       onTaskClick={openTaskDetail}
                     />
                   ) : (
-                    <div className="h-full overflow-y-auto p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
-                      {[...tasks]
-                        .sort((a, b) => a.execution_order - b.execution_order)
-                        .map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => openTaskDetail(t)}
-                            className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
-                          >
-                            <TaskCard
-                              task={t}
-                              profile={agentProfiles.find((p) => p.id === t.agent_profile_id)}
-                              repositories={repositories}
-                              showResult
-                            />
-                          </button>
-                        ))}
+                    <div className="h-full overflow-y-auto">
+                      <ul className="divide-y divide-divider">
+                        {[...tasks]
+                          .sort((a, b) => a.execution_order - b.execution_order)
+                          .map((t) => {
+                            const profile = agentProfiles.find((p) => p.id === t.agent_profile_id);
+                            const depCount = (t.depends_on_task_ids ?? []).length;
+                            return (
+                              <li key={t.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => openTaskDetail(t)}
+                                  className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-default-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary transition-colors"
+                                >
+                                  {/* Execution order */}
+                                  <span className="text-xs text-default-400 w-5 shrink-0 text-right font-mono">
+                                    {t.execution_order}
+                                  </span>
+
+                                  {/* Status dot */}
+                                  <Chip
+                                    size="sm"
+                                    color={
+                                      t.status === "done" ? "success"
+                                      : t.status === "in_progress" ? "warning"
+                                      : t.status === "failed" ? "danger"
+                                      : t.status === "ready" ? "primary"
+                                      : "default"
+                                    }
+                                    variant="flat"
+                                    className="shrink-0"
+                                  >
+                                    {t.status.replace("_", " ")}
+                                  </Chip>
+
+                                  {/* Title */}
+                                  <span className="flex-1 text-sm font-medium truncate">{t.title}</span>
+
+                                  {/* Type */}
+                                  <Chip size="sm" variant="bordered" className="shrink-0 hidden sm:flex">
+                                    {t.type}
+                                  </Chip>
+
+                                  {/* Agent profile */}
+                                  {profile && (
+                                    <span className="text-xs text-default-400 shrink-0 hidden md:block truncate max-w-[120px]">
+                                      {profile.name}
+                                    </span>
+                                  )}
+
+                                  {/* Deps */}
+                                  {depCount > 0 && (
+                                    <span className="text-xs text-default-400 shrink-0 hidden sm:block">
+                                      ⛓ {depCount}
+                                    </span>
+                                  )}
+
+                                  {/* Chevron */}
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-default-300" aria-hidden="true">
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                </button>
+                              </li>
+                            );
+                          })}
+                      </ul>
                     </div>
                   )}
                 </CardBody>

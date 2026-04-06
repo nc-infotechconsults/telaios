@@ -36,6 +36,7 @@ export default function PlanningChat() {
   const [chatItems, setChatItems] = useState<ChatItem[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [toolActivity, setToolActivity] = useState<string | null>(null);
 
   const [planTasks, setPlanTasks] = useState<Task[]>([]);
   const [currentDraft, setCurrentDraft] = useState<Plan | null>(null);
@@ -103,11 +104,17 @@ export default function PlanningChat() {
       if (event.type === "chat_thinking") {
         setIsStreaming(true);
         setStreamingText("");
+        setToolActivity(null);
+      } else if (event.type === "chat_tool_use") {
+        setIsStreaming(true);
+        setToolActivity(event.tool);
       } else if (event.type === "chat_token") {
         setIsStreaming(true);
+        setToolActivity(null);
         setStreamingText((prev) => prev + event.content);
       } else if (event.type === "chat_end") {
         setIsStreaming(false);
+        setToolActivity(null);
         setStreamingText((prev) => {
           if (prev) {
             setChatItems((m) => [
@@ -126,6 +133,7 @@ export default function PlanningChat() {
         });
       } else if (event.type === "plan_draft") {
         setIsStreaming(false);
+        setToolActivity(null);
         setStreamingText((prev) => {
           if (prev) {
             setChatItems((m) => [
@@ -196,6 +204,7 @@ export default function PlanningChat() {
         );
       } else if (event.type === "error") {
         setIsStreaming(false);
+        setToolActivity(null);
         toast.error("Planning error", event.message);
       }
     },
@@ -329,6 +338,7 @@ export default function PlanningChat() {
             items={chatItems}
             streamingText={streamingText}
             isStreaming={isStreaming}
+            toolActivity={toolActivity ?? undefined}
             agentProfiles={agentProfiles}
             repositories={repositories}
             onPlanAction={handlePlanAction}

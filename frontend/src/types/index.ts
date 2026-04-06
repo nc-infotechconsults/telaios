@@ -192,4 +192,5 @@ export type WsEvent =
   | { type: "error"; message: string }
   | { type: "repo_status"; repo_id: string; repo_name: string; status: RepoStatus; message?: string }
   | { type: "task_status"; task_id: string; status: TaskStatus; agent_instance_id?: string; agent_profile_id?: string }
-  | { type: "agent_status"; instance_id: string; profile_id: string; status: string; task_id?: string };
+  | { type: "agent_status"; instance_id: string; profile_id: string; status: string; task_id?: string }
+  | { type: "chat_tool_use"; tool: string; input: Record<string, unknown> };

@@ -12,7 +12,7 @@ import {
   Spinner,
   useDisclosure,
 } from "@heroui/react";
-import { getProjects, getPlans, createPlan, getRepositories } from "../lib/api";
+import { getProjects, getPlans, createPlan, deletePlan, getRepositories } from "../lib/api";
 import { toast } from "../lib/toast";
 import { formatStatus } from "../lib/statusLabels";
 import type { Project, Plan, Repository } from "../types";
@@ -38,8 +38,11 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("plans");
   const [newPlanTitle, setNewPlanTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { isOpen: isNewPlanOpen, onOpen: onNewPlanOpen, onOpenChange: onNewPlanOpenChange } = useDisclosure();
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
 
   useEffect(() => {
     if (!projectId) return;
@@ -69,6 +72,22 @@ export default function ProjectDetail() {
       toast.error("Failed to create plan");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeletePlan = async () => {
+    if (!planToDelete) return;
+    setDeleting(true);
+    try {
+      await deletePlan(planToDelete.id);
+      setPlans((prev) => prev.filter((p) => p.id !== planToDelete.id));
+      toast.success("Plan deleted", planToDelete.title ?? "Plan removed");
+      onDeleteOpenChange();
+      setPlanToDelete(null);
+    } catch {
+      toast.error("Failed to delete plan");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -136,28 +155,48 @@ export default function ProjectDetail() {
           ) : (
             <div className="flex flex-col gap-3">
               {plans.map((plan) => (
-                <button
+                <div
                   key={plan.id}
-                  onClick={() => navigate(`/projects/${projectId}/plans/${plan.id}`)}
-                  className="flex items-center gap-4 p-4 rounded-xl border border-divider hover:border-primary/50 hover:bg-default-50 transition-all text-left w-full"
+                  className="flex items-center gap-2 p-4 rounded-xl border border-divider hover:border-primary/50 hover:bg-default-50 transition-all"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">
-                      {plan.title ?? <span className="text-default-400 italic">Untitled Plan</span>}
-                    </p>
-                    <p className="text-xs text-default-400 mt-0.5">
-                      Created {new Date(plan.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Chip
-                    size="sm"
-                    variant="flat"
-                    color={STATUS_COLOR[plan.status] ?? "default"}
+                  <button
+                    onClick={() => navigate(`/projects/${projectId}/plans/${plan.id}`)}
+                    className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                    aria-label={`Open plan: ${plan.title ?? "Untitled Plan"}`}
                   >
-                    {formatStatus(plan.status)}
-                  </Chip>
-                  <span className="text-default-300 text-sm">→</span>
-                </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {plan.title ?? <span className="text-default-400 italic">Untitled Plan</span>}
+                      </p>
+                      <p className="text-xs text-default-400 mt-0.5">
+                        Created {new Date(plan.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Chip
+                      size="sm"
+                      variant="flat"
+                      color={STATUS_COLOR[plan.status] ?? "default"}
+                    >
+                      {formatStatus(plan.status)}
+                    </Chip>
+                    <span className="text-default-300 text-sm" aria-hidden="true">→</span>
+                  </button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="light"
+                    color="danger"
+                    aria-label={`Delete plan: ${plan.title ?? "Untitled Plan"}`}
+                    onPress={() => {
+                      setPlanToDelete(plan);
+                      onDeleteOpen();
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </Button>
+                </div>
               ))}
             </div>
           )}
@@ -202,6 +241,34 @@ export default function ProjectDetail() {
                 </Button>
                 <Button color="primary" onPress={handleCreatePlan} isLoading={creating}>
                   Create Plan
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Plan confirmation modal */}
+      <Modal isOpen={isDeleteOpen} onOpenChange={onDeleteOpenChange} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Delete Plan</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  Are you sure you want to delete{" "}
+                  <span className="font-semibold">
+                    {planToDelete?.title ?? "this plan"}
+                  </span>
+                  ? This action cannot be undone.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose} isDisabled={deleting}>
+                  Cancel
+                </Button>
+                <Button color="danger" onPress={handleDeletePlan} isLoading={deleting}>
+                  Delete
                 </Button>
               </ModalFooter>
             </>

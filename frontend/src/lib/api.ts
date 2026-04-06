@@ -147,6 +147,9 @@ export const createPlan = (projectId: string, title?: string): Promise<Plan> =>
       })
     : http.post<Plan>("/plans", { project_id: projectId, title }).then((r) => r.data);
 
+export const deletePlan = (planId: string): Promise<void> =>
+  DEMO ? delay(undefined) : http.delete(`/plans/${planId}`).then(() => undefined);
+
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
 export const getTasks = (planId: string): Promise<Task[]> =>

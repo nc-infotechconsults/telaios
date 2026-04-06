@@ -35,6 +35,12 @@ export async function patchPlan(req: Request, res: Response) {
   return res.json(updated);
 }
 
+export async function deletePlan(req: Request, res: Response) {
+  const deleted = await planService.deletePlan(req.params.id);
+  if (!deleted) return res.status(404).json({ error: "Not found" });
+  return res.status(204).send();
+}
+
 export async function deletePlanTasks(req: Request, res: Response) {
   const count = await taskService.deleteTasksByPlanId(req.params.id);
   return res.json({ deleted: count });

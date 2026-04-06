@@ -7,6 +7,8 @@ interface Props {
   items: ChatItem[];
   streamingText?: string;
   isStreaming?: boolean;
+  /** Current tool the agent is using (e.g. "list_directory"), if any */
+  toolActivity?: string;
   /** When true, the component manages its own scroll container */
   selfScroll?: boolean;
   agentProfiles?: AgentProfile[];
@@ -19,6 +21,7 @@ export default function ChatWindow({
   items,
   streamingText,
   isStreaming,
+  toolActivity,
   selfScroll,
   agentProfiles = [],
   repositories = [],
@@ -30,7 +33,7 @@ export default function ChatWindow({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items, streamingText]);
 
-  const isEmpty = items.length === 0 && !isStreaming && !streamingText;
+  const isEmpty = items.length === 0 && !isStreaming && !streamingText && !toolActivity;
 
   const content = (
     <>
@@ -70,19 +73,26 @@ export default function ChatWindow({
           <div className="max-w-[80%] flex flex-col gap-1 items-start">
             <span className="text-xs text-default-400 px-1" aria-hidden="true">Planning Agent</span>
             <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-default-100">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
-                  style={{ animationDelay: "0ms", animationDuration: "1s" }}
-                />
-                <span
-                  className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
-                  style={{ animationDelay: "200ms", animationDuration: "1s" }}
-                />
-                <span
-                  className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
-                  style={{ animationDelay: "400ms", animationDuration: "1s" }}
-                />
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
+                    style={{ animationDelay: "0ms", animationDuration: "1s" }}
+                  />
+                  <span
+                    className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
+                    style={{ animationDelay: "200ms", animationDuration: "1s" }}
+                  />
+                  <span
+                    className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
+                    style={{ animationDelay: "400ms", animationDuration: "1s" }}
+                  />
+                </div>
+                {toolActivity && (
+                  <span className="text-xs text-default-400 italic">
+                    🔍 {toolActivity.replace(/_/g, " ")}…
+                  </span>
+                )}
               </div>
             </div>
           </div>

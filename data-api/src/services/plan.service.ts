@@ -38,6 +38,13 @@ export async function getPlan(id: string) {
   };
 }
 
+export async function deletePlan(id: string): Promise<boolean> {
+  const plan = await repo().findOneBy({ id });
+  if (!plan) return false;
+  await repo().softDelete(id);
+  return true;
+}
+
 export async function patchPlan(id: string, dto: PatchPlanDto): Promise<Plan | null> {
   await repo().update(id, dto);
   return repo().findOneBy({ id });

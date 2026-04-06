@@ -22,7 +22,31 @@ export interface PlanDto {
   status: string;
 }
 
+export interface ProjectDto {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+}
+
+export interface PlanSummaryDto {
+  id: string;
+  title: string | null;
+  status: string;
+  created_at: string;
+}
+
 export const dataClient = {
+  async getProject(projectId: string): Promise<ProjectDto> {
+    const res = await client.get(`/projects/${projectId}`);
+    return res.data;
+  },
+
+  async getProjectPlans(projectId: string): Promise<PlanSummaryDto[]> {
+    const res = await client.get(`/plans?project_id=${projectId}`);
+    return res.data;
+  },
+
   async getSettings(): Promise<SettingsDto> {
     const res = await client.get("/settings/raw");
     return res.data;
@@ -96,7 +120,7 @@ export const dataClient = {
 
   async updateRepositoryStatus(
     repoId: string,
-    data: { status: string; local_clone_path?: string; error_message?: string }
+    data: { status: string; local_path?: string; error_message?: string }
   ) {
     const res = await client.patch(`/repositories/${repoId}`, data);
     return res.data;

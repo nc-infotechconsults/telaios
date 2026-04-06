@@ -27,6 +27,7 @@ import { CreateUsers1743897600000 } from "./migrations/1743897600000-CreateUsers
 import { CreateProjectMembers1743897600001 } from "./migrations/1743897600001-CreateProjectMembers";
 import { AddSettingsLlmParams1743897600002 } from "./migrations/1743897600002-AddSettingsLlmParams";
 import { PlanTitleAndMessagePlanId1743898000000 } from "./migrations/1743898000000-PlanTitleAndMessagePlanId";
+import { SoftDeletePlans1743899000000 } from "./migrations/1743899000000-SoftDeletePlans";
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ export const AppDataSource = new DataSource({
     CreateProjectMembers1743897600001,
     AddSettingsLlmParams1743897600002,
     PlanTitleAndMessagePlanId1743898000000,
+    SoftDeletePlans1743899000000,
   ],
 });
 

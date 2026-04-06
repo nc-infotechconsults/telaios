@@ -15,7 +15,7 @@ interface RepoConfig {
   branch: string;
   auth_type: string;
   credentials: string;
-  local_clone_path?: string;
+  local_path?: string;
 }
 
 interface TaskConfig {
@@ -25,8 +25,8 @@ interface TaskConfig {
   type: string;
   status: string;
   agent_profile_id: string | null;
-  taskRepositories: Array<{ repository: RepoConfig }>;
-  dependencies: Array<{ depends_on_task_id: string }>;
+  depends_on_task_ids: string[];
+  repository_ids: string[];
 }
 
 export class Scheduler {
@@ -37,12 +37,12 @@ export class Scheduler {
   }
 
   async run(projectId: string, planId: string): Promise<void> {
-    const repositories: RepoConfig[] = await dataClient.getProjectRepositories(projectId);
+    const repositoryList: RepoConfig[] = await dataClient.getProjectRepositories(projectId);
     const tasks: TaskConfig[] = await dataClient.getPlanTasks(planId);
 
-    const workspaceMap = await this.cloneRepositories(projectId, repositories);
+    const workspaceMap = await this.cloneRepositories(projectId, repositoryList);
 
-    const taskMap = new Map(tasks.map((t) => [t.id, t]));
+    const repositories = new Map(repositoryList.map((r) => [r.id, r]));
     const completedIds = new Set<string>();
     const inFlightIds = new Set<string>();
 
@@ -51,7 +51,7 @@ export class Scheduler {
     while (completedIds.size < pendingTasks.length) {
       const ready = pendingTasks.filter((t) => {
         if (completedIds.has(t.id) || inFlightIds.has(t.id)) return false;
-        return t.dependencies.every((d) => completedIds.has(d.depends_on_task_id));
+        return t.depends_on_task_ids.every((id) => completedIds.has(id));
       });
 
       if (ready.length === 0) {
@@ -61,7 +61,7 @@ export class Scheduler {
       }
 
       const dispatches = ready.map((task) =>
-        this.dispatchTask(projectId, task, workspaceMap, completedIds, inFlightIds, taskMap)
+        this.dispatchTask(projectId, task, workspaceMap, repositories, completedIds, inFlightIds)
       );
 
       await Promise.allSettled(dispatches);
@@ -95,7 +95,7 @@ export class Scheduler {
 
         await dataClient.updateRepositoryStatus(repo.id, {
           status: "ready",
-          local_clone_path: localPath,
+          local_path: localPath,
         });
 
         workspaceMap.set(repo.id, localPath);
@@ -138,9 +138,9 @@ export class Scheduler {
     projectId: string,
     task: TaskConfig,
     workspaceMap: Map<string, string>,
+    repositories: Map<string, RepoConfig>,
     completedIds: Set<string>,
-    inFlightIds: Set<string>,
-    taskMap: Map<string, TaskConfig>
+    inFlightIds: Set<string>
   ): Promise<void> {
     inFlightIds.add(task.id);
 
@@ -153,9 +153,10 @@ export class Scheduler {
     });
 
     const workspaces: Record<string, string> = {};
-    for (const tr of task.taskRepositories) {
-      const localPath = workspaceMap.get(tr.repository.id);
-      if (localPath) workspaces[tr.repository.name] = localPath;
+    for (const repoId of task.repository_ids) {
+      const localPath = workspaceMap.get(repoId);
+      const repoName = repositories.get(repoId)?.name ?? repoId;
+      if (localPath) workspaces[repoName] = localPath;
     }
 
     if (Object.keys(workspaces).length === 0) {
