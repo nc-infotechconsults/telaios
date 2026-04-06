@@ -1,5 +1,6 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
@@ -57,6 +58,27 @@ function MoonIcon() {
   );
 }
 
+function UsersIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
 const NAV_ITEMS = [
   { to: "/", end: true, label: "Projects", icon: <BriefcaseIcon /> },
   { to: "/agents", end: false, label: "Agent Profiles", icon: <BotIcon /> },
@@ -65,7 +87,14 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const { user, logout } = useAuth();
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
   const isFullHeight =
     location.pathname.includes("/projects/") ||
@@ -128,20 +157,62 @@ export default function Layout() {
               )}
             </NavLink>
           ))}
+          {/* Admin-only: User management */}
+          {user?.system_role === "admin" && (
+            <NavLink
+              to="/users"
+              end={false}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-default-500 hover:bg-default-100 hover:text-foreground"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <UsersIcon />
+                  <span>Users</span>
+                  {isActive && <span className="sr-only">(current page)</span>}
+                </>
+              )}
+            </NavLink>
+          )}
         </nav>
 
-        {/* Sidebar footer: theme toggle + version */}
-        <div className="px-3 py-3 border-t border-divider shrink-0 flex items-center justify-between gap-2">
-          <span className="text-xs text-default-300 pl-2">v0.1</span>
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-default-500 hover:bg-default-100 hover:text-foreground transition-colors"
-          >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            <span>{theme === "dark" ? "Light" : "Dark"}</span>
-          </button>
+        {/* Sidebar footer: user info + theme toggle */}
+        <div className="px-3 py-3 border-t border-divider shrink-0 space-y-2">
+          {/* Current user */}
+          {user && (
+            <div className="flex items-center justify-between gap-2 px-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{user.display_name}</p>
+                <p className="text-xs text-default-400 truncate">{user.system_role}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Sign out"
+                title="Sign out"
+                className="shrink-0 flex items-center p-1.5 rounded-lg text-default-400 hover:bg-default-100 hover:text-foreground transition-colors"
+              >
+                <LogoutIcon />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-default-300 pl-2">v0.1</span>
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-default-500 hover:bg-default-100 hover:text-foreground transition-colors"
+            >
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+              <span>{theme === "dark" ? "Light" : "Dark"}</span>
+            </button>
+          </div>
         </div>
       </aside>
 

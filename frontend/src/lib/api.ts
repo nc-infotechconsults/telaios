@@ -7,10 +7,12 @@ import type {
   Message,
   AgentProfile,
   Settings,
+  User,
 } from "../types";
 import * as demo from "../demo/data";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
+const TOKEN_KEY = "swe_auth_token";
 
 /** Simulated network delay used in demo mode. */
 function delay<T>(data: T, ms = 300): Promise<T> {
@@ -18,6 +20,52 @@ function delay<T>(data: T, ms = 300): Promise<T> {
 }
 
 const http = axios.create({ baseURL: "/api" });
+
+// Attach JWT token to every request
+http.interceptors.request.use((config) => {
+  if (!DEMO) {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// On 401 clear token and redirect to login
+http.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (!DEMO && err.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export const authLogin = (data: { email: string; password: string }): Promise<{ token: string; user: User }> =>
+  http.post<{ token: string; user: User }>("/auth/login", data).then((r) => r.data);
+
+export const authMe = (): Promise<User> =>
+  http.get<User>("/auth/me").then((r) => r.data);
+
+// ─── Users (admin) ────────────────────────────────────────────────────────────
+
+export const listUsers = (): Promise<User[]> =>
+  DEMO ? delay([]) : http.get<User[]>("/users").then((r) => r.data);
+
+export const createUser = (data: { email: string; password: string; display_name: string }): Promise<{ token: string; user: User }> =>
+  http.post<{ token: string; user: User }>("/auth/register", data).then((r) => r.data);
+
+export const patchUser = (id: string, data: Partial<Pick<User, "display_name" | "system_role" | "is_active">>): Promise<User> =>
+  http.patch<User>(`/users/${id}`, data).then((r) => r.data);
+
+export const deleteUser = (id: string): Promise<void> =>
+  http.delete(`/users/${id}`).then(() => undefined);
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 

@@ -26,6 +26,8 @@ export default function SettingsPage() {
           llm_temperature: s.llm_temperature ?? 1.0,
           llm_max_tokens: s.llm_max_tokens?.toString() ?? "",
           llm_top_p: s.llm_top_p?.toString() ?? "",
+          llm_frequency_penalty: s.llm_frequency_penalty?.toString() ?? "",
+          llm_presence_penalty: s.llm_presence_penalty?.toString() ?? "",
         }));
         setHasApiKey(!!s.has_api_key);
       })
@@ -43,6 +45,8 @@ export default function SettingsPage() {
         llm_temperature: config.llm_temperature,
         llm_max_tokens: config.llm_max_tokens ? parseInt(config.llm_max_tokens) : undefined,
         llm_top_p: config.llm_top_p ? parseFloat(config.llm_top_p) : undefined,
+        llm_frequency_penalty: config.llm_frequency_penalty ? parseFloat(config.llm_frequency_penalty) : undefined,
+        llm_presence_penalty: config.llm_presence_penalty ? parseFloat(config.llm_presence_penalty) : undefined,
         ...(config.llm_api_key_raw ? { llm_api_key_raw: config.llm_api_key_raw } : {}),
       });
       setHasApiKey(!!(updated as Partial<Settings>).has_api_key);

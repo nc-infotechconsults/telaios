@@ -25,6 +25,7 @@ import { CreateTaskDependencies1743897000008 } from "./migrations/1743897000008-
 import { CreateTaskRepositories1743897000009 } from "./migrations/1743897000009-CreateTaskRepositories";
 import { CreateUsers1743897600000 } from "./migrations/1743897600000-CreateUsers";
 import { CreateProjectMembers1743897600001 } from "./migrations/1743897600001-CreateProjectMembers";
+import { AddSettingsLlmParams1743897600002 } from "./migrations/1743897600002-AddSettingsLlmParams";
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ export const AppDataSource = new DataSource({
     CreateTaskRepositories1743897000009,
     CreateUsers1743897600000,
     CreateProjectMembers1743897600001,
+    AddSettingsLlmParams1743897600002,
   ],
 });
 

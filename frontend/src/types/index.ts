@@ -1,3 +1,15 @@
+export type SystemRole = "admin" | "member";
+
+export interface User {
+  id: string;
+  email: string;
+  display_name: string;
+  system_role: SystemRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ProjectStatus = "planning" | "executing" | "done";
 export type PlanStatus = "draft" | "confirmed" | "executing" | "completed";
 export type TaskStatus = "pending" | "ready" | "in_progress" | "done" | "failed";
@@ -149,6 +161,8 @@ export interface Settings {
   llm_temperature?: number;
   llm_max_tokens?: number;
   llm_top_p?: number;
+  llm_frequency_penalty?: number;
+  llm_presence_penalty?: number;
   updated_at: string;
 }
 
