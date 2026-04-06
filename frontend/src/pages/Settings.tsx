@@ -66,8 +66,8 @@ export default function SettingsPage() {
       await testLlm({
         provider: config.llm_provider,
         model: config.llm_model,
-        api_key: config.llm_api_key_raw || undefined,
-        base_url: config.llm_base_url || undefined,
+        apiKey: config.llm_api_key_raw || undefined,
+        baseUrl: config.llm_base_url || undefined,
       });
       setTestResult({ ok: true, message: "Connection successful" });
     } catch (err: unknown) {

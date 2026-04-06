@@ -194,7 +194,7 @@ export const updateSettings = (data: Partial<Settings> & { llm_api_key_raw?: str
     ? delay<Settings>({ ...demo.SETTINGS, ...data, updated_at: new Date().toISOString() })
     : http.put<Settings>("/settings", data).then((r) => r.data);
 
-export const testLlm = (data: { provider: string; model: string; api_key?: string; base_url?: string }): Promise<{ ok: boolean }> =>
+export const testLlm = (data: { provider: string; model: string; apiKey?: string; baseUrl?: string }): Promise<{ ok: boolean }> =>
   DEMO
     ? delay({ ok: true })
     : axios.post("/agent/test-llm", data).then((r) => r.data);

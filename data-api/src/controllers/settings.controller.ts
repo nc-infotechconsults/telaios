@@ -7,6 +7,11 @@ export async function getSettings(_req: Request, res: Response) {
   res.json(settings);
 }
 
+export async function getRawSettings(_req: Request, res: Response) {
+  const settings = await settingsService.getRawSettings();
+  res.json(settings);
+}
+
 export async function putSettings(req: Request, res: Response) {
   const parsed = PutSettingsSchema.safeParse(req.body);
   if (!parsed.success) {

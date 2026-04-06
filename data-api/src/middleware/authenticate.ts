@@ -10,6 +10,8 @@ declare global {
   }
 }
 
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
@@ -17,6 +19,19 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 
   const token = authHeader.slice(7);
+
+  // Service-to-service internal key bypass
+  if (INTERNAL_API_KEY && token === INTERNAL_API_KEY) {
+    req.user = {
+      id: "service",
+      email: "service@internal",
+      display_name: "Internal Service",
+      system_role: "admin",
+      is_active: true,
+    } as User;
+    return next();
+  }
+
   try {
     const payload = verifyToken(token);
     const user = await getUserById(payload.sub);

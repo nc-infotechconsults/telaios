@@ -6,6 +6,7 @@ import { z } from "zod";
 const ConfigSchema = z.object({
   PORT: z.coerce.number().default(8000),
   DATA_API_URL: z.string().default("http://localhost:3000"),
+  DATA_API_KEY: z.string().default(""),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   ENCRYPTION_KEY: z.string().default("default-key-change-in-production!"),
   WORKSPACES_ROOT: z.string().default("/tmp/swe-ai-workspaces"),

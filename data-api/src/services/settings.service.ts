@@ -11,6 +11,19 @@ function sanitizeSettings(s: Settings) {
   return { ...rest, has_api_key: hasKey };
 }
 
+export async function getRawSettings() {
+  let settings = await repo().findOneBy({ id: 1 });
+  if (!settings) {
+    settings = repo().create({ id: 1 });
+    await repo().save(settings);
+  }
+  const { llm_api_key, ...rest } = settings;
+  return {
+    ...rest,
+    llm_api_key_raw: llm_api_key ? decrypt(llm_api_key) : undefined,
+  };
+}
+
 export async function getSettings() {
   let settings = await repo().findOneBy({ id: 1 });
   if (!settings) {

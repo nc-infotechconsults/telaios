@@ -1,7 +1,12 @@
 import axios from "axios";
 import { config } from "../core/config";
 
-const client = axios.create({ baseURL: config.DATA_API_URL });
+const client = axios.create({
+  baseURL: config.DATA_API_URL,
+  headers: config.DATA_API_KEY
+    ? { Authorization: `Bearer ${config.DATA_API_KEY}` }
+    : {},
+});
 
 export interface SettingsDto {
   llm_provider: string;
@@ -12,7 +17,7 @@ export interface SettingsDto {
 
 export const dataClient = {
   async getSettings(): Promise<SettingsDto> {
-    const res = await client.get("/settings");
+    const res = await client.get("/settings/raw");
     return res.data;
   },
 
