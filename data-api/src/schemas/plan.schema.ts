@@ -4,10 +4,12 @@ export const PlanStatusSchema = z.enum(["draft", "confirmed", "executing", "comp
 
 export const CreatePlanSchema = z.object({
   project_id: z.string().uuid(),
+  title: z.string().optional(),
   status: PlanStatusSchema.optional(),
 });
 
 export const PatchPlanSchema = z.object({
+  title: z.string().optional(),
   status: PlanStatusSchema.optional(),
   confirmed_at: z.coerce.date().optional(),
 });

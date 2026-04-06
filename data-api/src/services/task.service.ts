@@ -69,6 +69,12 @@ export async function getTask(id: string) {
   return task ? serializeTask(task) : null;
 }
 
+export async function deleteTasksByPlanId(planId: string): Promise<number> {
+  // TaskDependency and TaskRepository are cascade-deleted via the Task entity's onDelete
+  const result = await taskRepo().delete({ plan_id: planId });
+  return result.affected ?? 0;
+}
+
 export async function patchTask(id: string, dto: PatchTaskDto) {
   const { repository_ids, depends_on_task_ids, ...taskData } = dto;
 

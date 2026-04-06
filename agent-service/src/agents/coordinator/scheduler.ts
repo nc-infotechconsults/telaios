@@ -6,7 +6,7 @@ import { redis } from "../../core/redis";
 import { dataClient } from "../../services/dataClient";
 import { AgentPool } from "./pool";
 import type { AgentTask } from "./drivers/base";
-import { wsManager } from "../../services/wsManager";
+import { sseManager } from "../../services/sseManager";
 
 interface RepoConfig {
   id: string;
@@ -203,7 +203,7 @@ export class Scheduler {
   }
 
   private emit(projectId: string, event: object): void {
-    wsManager.broadcast(projectId, event);
+    sseManager.broadcast(projectId, event);
     void redis.publish(`project:${projectId}:events`, JSON.stringify(event));
   }
 }

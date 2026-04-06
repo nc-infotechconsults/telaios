@@ -22,6 +22,7 @@ import {
   TableCell,
 } from "@heroui/react";
 import { getProjects, createProject, getRepositories } from "../lib/api";
+import { toast } from "../lib/toast";
 import type { Project, Repository } from "../types";
 import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
 
@@ -83,6 +84,7 @@ export default function ProjectList() {
       })
       .catch((error: unknown) => {
         console.error("Failed to load projects", error);
+        toast.error("Failed to load projects");
         setProjects([]);
         setReposByProject({});
       })
@@ -105,6 +107,8 @@ export default function ProjectList() {
       setDescription("");
       onClose();
       navigate(`/projects/${project.id}`);
+    } catch {
+      toast.error("Failed to create project");
     } finally {
       setCreating(false);
     }

@@ -13,133 +13,117 @@ import {
   Spinner,
 } from "@heroui/react";
 import {
-  getProjects,
-  getMessages,
-  getPlans,
+  getPlan,
+  getPlanMessages,
   getTasks,
   getRepositories,
   getAgentProfiles,
 } from "../lib/api";
-import { useProjectWebSocket } from "../lib/ws";
+import { usePlanSSE } from "../lib/sse";
+import { toast } from "../lib/toast";
 import { formatStatus } from "../lib/statusLabels";
 import type { Message, Plan, Task, Repository, AgentProfile, WsEvent, ChatItem, PlanChatItem } from "../types";
-import RepositorySetup from "../components/plan/RepositorySetup";
 import PlanSidebar from "../components/plan/PlanSidebar";
-import PlanListTab from "../components/plan/PlanListTab";
 import ChatWindow from "../components/chat/ChatWindow";
 import ChatInput from "../components/chat/ChatInput";
 import PlanConfirmModal from "../components/plan/PlanConfirmModal";
 
-type ActiveTab = "chat" | "plans" | "repos";
-
 export default function PlanningChat() {
-  const { id: projectId } = useParams<{ id: string }>();
+  const { projectId, planId } = useParams<{ projectId: string; planId: string }>();
   const navigate = useNavigate();
 
-  // Chat items: interleaved messages and inline plan-draft cards
+  const [plan, setPlan] = useState<Plan | null>(null);
   const [chatItems, setChatItems] = useState<ChatItem[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Plan management
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [planTasks, setPlanTasks] = useState<Record<string, Task[]>>({});
-  const [activePlanId, setActivePlanId] = useState<string | null>(null);
-  const [currentDraftPlanId, setCurrentDraftPlanId] = useState<string | null>(null);
+  const [planTasks, setPlanTasks] = useState<Task[]>([]);
+  const [currentDraft, setCurrentDraft] = useState<Plan | null>(null);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Plan being reviewed in the confirm modal
   const [planBeingReviewed, setPlanBeingReviewed] = useState<{ plan: Plan; tasks: Task[] } | null>(null);
-
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
-  const [projectName, setProjectName] = useState("");
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
   const [changesNote, setChangesNote] = useState("");
 
   const { isOpen: isConfirmOpen, onOpen: onConfirmOpen, onOpenChange: onConfirmOpenChange } = useDisclosure();
   const { isOpen: isChangesOpen, onOpen: onChangesOpen, onOpenChange: onChangesOpenChange } = useDisclosure();
 
-  // Derived values
-  const confirmedPlans = plans.filter(
-    (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
-  );
-  const activePlan = plans.find((p) => p.id === activePlanId) ?? null;
-  const activeTasks = activePlanId ? (planTasks[activePlanId] ?? []) : [];
-  const currentDraft = plans.find((p) => p.id === currentDraftPlanId) ?? null;
-
-  // O(1) task→plan lookup used by task_status WS events
-  const taskIdToPlanId = useMemo<Record<string, string>>(() => {
-    const index: Record<string, string> = {};
-    for (const [planId, tasks] of Object.entries(planTasks)) {
-      for (const task of tasks) {
-        index[task.id] = planId;
-      }
-    }
-    return index;
-  }, [planTasks]);
+  // O(1) task lookup for task_status events
+  const taskIdSet = useMemo(() => new Set(planTasks.map((t) => t.id)), [planTasks]);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!planId || !projectId) return;
     setLoading(true);
     Promise.all([
-      getProjects(),
-      getMessages(projectId),
-      getPlans(projectId),
+      getPlan(planId),
+      getPlanMessages(planId),
+      getTasks(planId),
       getRepositories(projectId),
       getAgentProfiles(),
     ])
-      .then(async ([projects, msgs, allPlans, repos, profiles]) => {
-        const proj = projects.find((x) => x.id === projectId);
-        if (proj) setProjectName(proj.name);
+      .then(([loadedPlan, msgs, tasks, repos, profiles]) => {
+        setPlan(loadedPlan);
         setRepositories(repos);
         setAgentProfiles(profiles);
+        setPlanTasks(tasks);
 
-        // Load tasks for each plan
-        const taskResults = await Promise.all(
-          allPlans.map((p) =>
-            p.tasks ? Promise.resolve(p.tasks) : getTasks(p.id).catch(() => [] as Task[])
-          )
-        );
-        const allPlanTasks: Record<string, Task[]> = {};
-        allPlans.forEach((p, i) => { allPlanTasks[p.id] = taskResults[i]; });
+        const isDraft = loadedPlan.status === "draft";
+        const isConfirmedStatus =
+          loadedPlan.status === "confirmed" ||
+          loadedPlan.status === "executing" ||
+          loadedPlan.status === "completed";
 
-        setPlans(allPlans);
-        setPlanTasks(allPlanTasks);
+        setIsConfirmed(isConfirmedStatus);
 
-        // Reconstruct inline PlanChatItems for any draft plans so they appear in the
-        // chat stream after a page reload (or when loaded from demo data).
-        const draftPlans = allPlans.filter((p) => p.status === "draft");
-        const draftPlanItems: PlanChatItem[] = draftPlans.map((p, i) => ({
-          type: "plan-draft" as const,
-          id: p.id,
-          plan: p,
-          tasks: allPlanTasks[p.id] ?? [],
-          version: i + 1,
-        }));
-        setChatItems([...msgs, ...draftPlanItems]);
-
-        // Set active plan to latest confirmed/executing
-        const confirmed = allPlans.filter(
-          (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
-        );
-        if (confirmed.length > 0) setActivePlanId(confirmed[confirmed.length - 1].id);
-
-        // Track current draft
-        const draft = allPlans.find((p) => p.status === "draft");
-        if (draft) setCurrentDraftPlanId(draft.id);
+        if (isDraft && tasks.length > 0) {
+          setCurrentDraft(loadedPlan);
+          const draftItem: PlanChatItem = {
+            type: "plan-draft",
+            id: loadedPlan.id,
+            plan: loadedPlan,
+            tasks,
+            version: 1,
+          };
+          setChatItems([...msgs, draftItem]);
+        } else {
+          setChatItems(msgs);
+        }
       })
-      .catch((error: unknown) => {
-        console.error("Failed to load project data", error);
+      .catch((err: unknown) => {
+        console.error("Failed to load plan data", err);
+        toast.error("Failed to load plan data");
       })
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [planId, projectId]);
 
   const handleWsEvent = useCallback(
     (event: WsEvent) => {
-      if (event.type === "chat_token") {
+      if (event.type === "chat_thinking") {
         setIsStreaming(true);
-        setStreamingText((prev) => prev + event.token);
+        setStreamingText("");
+      } else if (event.type === "chat_token") {
+        setIsStreaming(true);
+        setStreamingText((prev) => prev + event.content);
+      } else if (event.type === "chat_end") {
+        setIsStreaming(false);
+        setStreamingText((prev) => {
+          if (prev) {
+            setChatItems((m) => [
+              ...m,
+              {
+                id: `stream-${Date.now()}`,
+                project_id: projectId ?? "",
+                plan_id: planId,
+                role: "assistant" as const,
+                content: prev,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+          }
+          return "";
+        });
       } else if (event.type === "plan_draft") {
         setIsStreaming(false);
         setStreamingText((prev) => {
@@ -149,6 +133,7 @@ export default function PlanningChat() {
               {
                 id: `stream-${Date.now()}`,
                 project_id: projectId ?? "",
+                plan_id: planId,
                 role: "assistant" as const,
                 content: prev,
                 created_at: new Date().toISOString(),
@@ -159,51 +144,37 @@ export default function PlanningChat() {
         });
 
         const newPlan = event.plan;
-        const fetchedTasks = newPlan.tasks ?? [];
+        const fetchedTasks = (newPlan.tasks ?? []) as Task[];
 
-        setPlans((prev) => {
-          const existing = prev.find((p) => p.id === newPlan.id);
-          return existing ? prev.map((p) => (p.id === newPlan.id ? newPlan : p)) : [...prev, newPlan];
-        });
+        setPlan((prev) => (prev ? { ...prev, status: "draft" } : prev));
+        setCurrentDraft((prev) => prev ?? { id: newPlan.id, project_id: newPlan.project_id, status: newPlan.status, created_at: newPlan.created_at });
 
-        if (!newPlan.tasks) {
-          getTasks(newPlan.id).then((tasks) => {
-            setPlanTasks((prev) => ({ ...prev, [newPlan.id]: tasks }));
-            setChatItems((prev) => {
-              // Update the plan card's tasks if it was already added with empty tasks
-              return prev.map((item) =>
-                "type" in item && item.type === "plan-draft" && item.id === newPlan.id
-                  ? { ...item, tasks }
-                  : item
-              );
-            });
-          }).catch(console.error);
-        } else {
-          setPlanTasks((prev) => ({ ...prev, [newPlan.id]: fetchedTasks }));
+        if (fetchedTasks.length > 0) {
+          setPlanTasks(fetchedTasks);
         }
 
-        setCurrentDraftPlanId(newPlan.id);
-
-        // Count existing plan-draft items to compute version
         setChatItems((prev) => {
-          const existingPlanItems = prev.filter((i) => "type" in i && i.type === "plan-draft");
-          const alreadyPresent = existingPlanItems.some((i) => "type" in i && i.id === newPlan.id);
-          if (alreadyPresent) return prev;
           const planItem: PlanChatItem = {
             type: "plan-draft",
             id: newPlan.id,
-            plan: newPlan,
+            plan: { id: newPlan.id, project_id: newPlan.project_id, title: newPlan.title, status: newPlan.status, created_at: newPlan.created_at },
             tasks: fetchedTasks,
-            version: existingPlanItems.length + 1,
+            version: 1,
           };
+          // Replace the existing draft card (revision) or append if this is the first draft
+          const existingIdx = prev.findIndex(
+            (i): i is PlanChatItem => "type" in i && (i as PlanChatItem).type === "plan-draft" && (i as PlanChatItem).id === newPlan.id
+          );
+          if (existingIdx >= 0) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...planItem, version: (prev[existingIdx] as PlanChatItem).version + 1 };
+            return updated;
+          }
           return [...prev, planItem];
         });
       } else if (event.type === "plan_confirmed") {
-        // Update plan status in all state locations
         const confirmedPlanId = event.plan_id;
-        setPlans((prev) =>
-          prev.map((p) => (p.id === confirmedPlanId ? { ...p, status: "confirmed" } : p))
-        );
+        setPlan((prev) => (prev && prev.id === confirmedPlanId ? { ...prev, status: "confirmed" } : prev));
         setChatItems((prev) =>
           prev.map((item) =>
             "type" in item && item.type === "plan-draft" && item.id === confirmedPlanId
@@ -211,42 +182,50 @@ export default function PlanningChat() {
               : item
           )
         );
-        setCurrentDraftPlanId(null);
-        setActivePlanId(confirmedPlanId);
-        // Don't auto-navigate — user can click "View Execution →"
+        setCurrentDraft(null);
+        setIsConfirmed(true);
+        toast.success("Plan confirmed!", "Execution will begin shortly.");
       } else if (event.type === "task_status") {
-        const planId = taskIdToPlanId[event.task_id];
-        if (!planId) return;
-        setPlanTasks((prev) => ({
-          ...prev,
-          [planId]: (prev[planId] ?? []).map((t) =>
+        if (!taskIdSet.has(event.task_id)) return;
+        setPlanTasks((prev) =>
+          prev.map((t) =>
             t.id === event.task_id
               ? { ...t, status: event.status, assigned_instance_id: event.agent_instance_id }
               : t
-          ),
-        }));
+          )
+        );
+      } else if (event.type === "error") {
+        setIsStreaming(false);
+        toast.error("Planning error", event.message);
       }
     },
-    [projectId, taskIdToPlanId]
+    [projectId, planId, taskIdSet]
   );
 
-  const { sendMessage } = useProjectWebSocket(projectId, handleWsEvent);
+  const { sendMessage } = usePlanSSE(planId, handleWsEvent);
 
-  const handleSend = (content: string) => {
+  const handleSend = async (content: string) => {
     const userMsg: Message = {
       id: `local-${Date.now()}`,
       project_id: projectId ?? "",
+      plan_id: planId,
       role: "user",
       content,
       created_at: new Date().toISOString(),
     };
     setChatItems((prev) => [...prev, userMsg]);
-    sendMessage(content);
+    setIsStreaming(true);
+    try {
+      await sendMessage(content);
+    } catch {
+      setIsStreaming(false);
+      toast.error("Failed to send message", "Check your connection and try again.");
+    }
   };
 
-  const handlePlanAction = (planId: string, action: "confirm" | "request-changes") => {
+  const handlePlanAction = (planItemId: string, action: "confirm" | "request-changes") => {
     const planItem = chatItems.find(
-      (item): item is PlanChatItem => "type" in item && item.type === "plan-draft" && item.id === planId
+      (item): item is PlanChatItem => "type" in item && item.type === "plan-draft" && item.id === planItemId
     );
     if (!planItem) return;
     setPlanBeingReviewed({ plan: planItem.plan, tasks: planItem.tasks });
@@ -254,9 +233,9 @@ export default function PlanningChat() {
     else onChangesOpen();
   };
 
-  const handleConfirmPlan = () => {
-    sendMessage("confirm");
+  const handleConfirmPlan = async () => {
     onConfirmOpenChange();
+    await handleSend("confirm");
   };
 
   const handleRequestChanges = () => {
@@ -264,20 +243,20 @@ export default function PlanningChat() {
     onChangesOpen();
   };
 
-  const handleSubmitChanges = () => {
+  const handleSubmitChanges = async () => {
     const feedback = changesNote.trim();
     onChangesOpenChange();
     const message = feedback
       ? `Please revise the plan. Here is my feedback:\n${feedback}`
       : "Please revise the plan based on our conversation.";
-    setTimeout(() => handleSend(message), 100);
     setChangesNote("");
+    await handleSend(message);
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Spinner size="lg" label="Loading project…" />
+        <Spinner size="lg" label="Loading plan…" />
       </div>
     );
   }
@@ -287,28 +266,30 @@ export default function PlanningChat() {
       {/* ── Main column ── */}
       <div className="flex flex-col flex-1 min-w-0 border-r border-divider">
         {/* Top bar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-divider shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-3 border-b border-divider shrink-0 min-w-0">
           <button
-            onClick={() => navigate("/")}
-            aria-label="Back to projects list"
-            className="text-default-400 hover:text-foreground transition-colors text-sm"
+            onClick={() => navigate(`/projects/${projectId}`)}
+            aria-label="Back to project"
+            className="text-default-400 hover:text-foreground transition-colors text-sm shrink-0"
           >
-            ← Projects
+            ←
           </button>
-          <span className="text-default-300" aria-hidden="true">/</span>
-          <h1 className="font-semibold truncate">{projectName || "Loading…"}</h1>
+          <span className="text-default-300 shrink-0" aria-hidden="true">/</span>
+          <h1 className="font-semibold truncate min-w-0 text-sm sm:text-base">
+            {plan?.title ?? <span className="text-default-400 italic">Planning Chat</span>}
+          </h1>
 
-          {activePlan?.status && (
+          {plan?.status && (
             <Chip
               size="sm"
               variant="flat"
               color={
-                activePlan.status === "confirmed" || activePlan.status === "executing" || activePlan.status === "completed"
+                plan.status === "confirmed" || plan.status === "executing" || plan.status === "completed"
                   ? "success"
                   : "warning"
               }
             >
-              {formatStatus(activePlan.status)}
+              {formatStatus(plan.status)}
             </Chip>
           )}
 
@@ -319,7 +300,7 @@ export default function PlanningChat() {
                 color="success"
                 onPress={() => {
                   const item = chatItems.find(
-                    (i): i is PlanChatItem => "type" in i && i.type === "plan-draft" && i.id === currentDraft.id
+                    (i): i is PlanChatItem => "type" in i && i.type === "plan-draft" && i.id === (currentDraft?.id ?? "")
                   );
                   if (item) {
                     setPlanBeingReviewed({ plan: item.plan, tasks: item.tasks });
@@ -330,7 +311,7 @@ export default function PlanningChat() {
                 Review &amp; Confirm Plan
               </Button>
             )}
-            {(activePlan?.status === "confirmed" || activePlan?.status === "executing") && (
+            {isConfirmed && (
               <Button
                 size="sm"
                 color="primary"
@@ -342,105 +323,38 @@ export default function PlanningChat() {
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
-          {(["chat", "plans", "repos"] as ActiveTab[]).map((tab) => (
-            <button
-              key={tab}
-              role="tab"
-              aria-selected={activeTab === tab}
-              aria-controls={`tabpanel-${tab}`}
-              id={`tab-${tab}`}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab
-                  ? "border-primary text-primary"
-                  : "border-transparent text-default-400 hover:text-foreground"
-              }`}
-            >
-              {tab === "chat"
-                ? "Planning Chat"
-                : tab === "plans"
-                ? `Plans (${plans.length})`
-                : `Repositories (${repositories.length})`}
-            </button>
-          ))}
+        {/* Chat */}
+        <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4">
+          <ChatWindow
+            items={chatItems}
+            streamingText={streamingText}
+            isStreaming={isStreaming}
+            agentProfiles={agentProfiles}
+            repositories={repositories}
+            onPlanAction={handlePlanAction}
+          />
         </div>
-
-        {/* Tab content */}
-        <div className="flex-1 overflow-hidden">
-          <div
-            id="tabpanel-chat"
-            role="tabpanel"
-            aria-labelledby="tab-chat"
-            hidden={activeTab !== "chat"}
-            className="flex flex-col h-full"
-          >
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-              <ChatWindow
-                items={chatItems}
-                streamingText={streamingText}
-                isStreaming={isStreaming}
-                agentProfiles={agentProfiles}
-                repositories={repositories}
-                onPlanAction={handlePlanAction}
-              />
-            </div>
-            <div className="border-t border-divider px-5 py-3 shrink-0">
-              <ChatInput onSend={handleSend} disabled={isStreaming} />
-            </div>
-          </div>
-
-          <div
-            id="tabpanel-plans"
-            role="tabpanel"
-            aria-labelledby="tab-plans"
-            hidden={activeTab !== "plans"}
-            className="h-full overflow-y-auto px-5 py-5"
-          >
-            <PlanListTab
-              plans={plans}
-              planTasks={planTasks}
-              activePlanId={activePlanId}
-              onActivate={(planId) => {
-                setActivePlanId(planId);
-                setActiveTab("chat");
-              }}
-              agentProfiles={agentProfiles}
-              repositories={repositories}
-            />
-          </div>
-
-          <div
-            id="tabpanel-repos"
-            role="tabpanel"
-            aria-labelledby="tab-repos"
-            hidden={activeTab !== "repos"}
-            className="h-full overflow-y-auto px-5 py-4"
-          >
-            <RepositorySetup
-              projectId={projectId ?? ""}
-              repositories={repositories}
-              onChange={setRepositories}
-            />
-          </div>
+        <div className="border-t border-divider px-3 sm:px-5 py-3 shrink-0">
+          <ChatInput onSend={handleSend} disabled={isStreaming || isConfirmed} />
         </div>
       </div>
 
-      {/* ── Right sidebar: confirmed plan(s) ── */}
+      {/* ── Right sidebar: confirmed plan tasks ── */}
       <div
-        className={`flex flex-col transition-all duration-300 ${
-          activePlanId && confirmedPlans.length > 0 ? "w-[400px] shrink-0" : "w-0 overflow-hidden"
+        className={`flex-col border-l border-divider transition-all duration-300 ${
+          isConfirmed
+            ? "hidden lg:flex lg:w-80 xl:w-[360px] shrink-0"
+            : "hidden"
         }`}
         aria-label="Execution plan"
       >
-        {activePlanId && confirmedPlans.length > 0 && (
+        {isConfirmed && plan && (
           <div className="h-full overflow-hidden flex flex-col">
             <PlanSidebar
-              plans={confirmedPlans}
-              activePlanId={activePlanId}
-              onPlanChange={setActivePlanId}
-              tasks={activeTasks}
+              plans={[plan]}
+              activePlanId={plan.id}
+              onPlanChange={() => {}}
+              tasks={planTasks}
               agentProfiles={agentProfiles}
               repositories={repositories}
             />
@@ -479,7 +393,7 @@ export default function PlanningChat() {
               <ModalHeader>Request Plan Changes</ModalHeader>
               <ModalBody>
                 <p className="text-sm text-default-500 mb-2">
-                  Describe what you'd like changed in the plan. Your feedback will be sent to the planning agent.
+                  Describe what you'd like changed in the plan.
                 </p>
                 <Textarea
                   autoFocus

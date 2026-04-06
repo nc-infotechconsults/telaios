@@ -2,13 +2,12 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import expressWs from "express-ws";
 import cors from "cors";
 import { config } from "./core/config";
-import { registerWsRoutes } from "./api/ws";
+import chatRouter from "./api/chat";
 import { dataClient } from "./services/dataClient";
 
-const { app } = expressWs(express());
+const app = express();
 
 app.use(cors());
 app.use(express.json());
@@ -34,7 +33,7 @@ app.post("/test-llm", async (req, res) => {
   }
 });
 
-registerWsRoutes(app as Parameters<typeof registerWsRoutes>[0]);
+app.use("/chat", chatRouter);
 
 app.listen(config.PORT, () => {
   console.log(`Agent Service listening on port ${config.PORT}`);

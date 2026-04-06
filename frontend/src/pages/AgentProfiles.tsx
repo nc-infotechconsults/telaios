@@ -19,6 +19,7 @@ import {
   TableCell,
 } from "@heroui/react";
 import { getAgentProfiles, deleteAgentProfile } from "../lib/api";
+import { toast } from "../lib/toast";
 import type { AgentProfile } from "../types";
 import AgentProfileForm from "../components/agents/AgentProfileForm";
 import ConfirmModal from "../components/common/ConfirmModal";
@@ -53,7 +54,7 @@ export default function AgentProfiles() {
 
   const load = () => {
     setLoading(true);
-    getAgentProfiles().then(setProfiles).catch(console.error).finally(() => setLoading(false));
+    getAgentProfiles().then(setProfiles).catch(() => toast.error("Failed to load agent profiles")).finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
@@ -73,14 +74,21 @@ export default function AgentProfiles() {
     try {
       await deleteAgentProfile(deleteTarget.id);
       setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      toast.success("Agent profile deleted", `"${deleteTarget.name}" has been removed`);
       setDeleteTarget(null);
       onDeleteOpenChange();
+    } catch {
+      toast.error("Failed to delete agent profile");
     } finally {
       setDeletingId(null);
     }
   };
 
-  const handleSaved = () => { onOpenChange(); load(); };
+  const handleSaved = (isEdit: boolean) => {
+    toast.success(isEdit ? "Agent profile updated" : "Agent profile created");
+    onOpenChange();
+    load();
+  };
 
   return (
     <div>
@@ -263,7 +271,7 @@ export default function AgentProfiles() {
                 </span>
               </ModalHeader>
               <ModalBody className="pb-2">
-                <AgentProfileForm initialData={editing ?? undefined} onSaved={handleSaved} onCancel={onClose} />
+                <AgentProfileForm initialData={editing ?? undefined} onSaved={() => handleSaved(!!editing)} onCancel={onClose} />
               </ModalBody>
               <ModalFooter className="pt-0" />
             </>

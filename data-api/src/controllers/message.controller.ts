@@ -4,7 +4,8 @@ import * as messageService from "../services/message.service";
 
 export async function listMessages(req: Request, res: Response) {
   const projectId = req.query.project_id as string | undefined;
-  const messages = await messageService.listMessages(projectId);
+  const planId = req.query.plan_id as string | undefined;
+  const messages = await messageService.listMessages({ projectId, planId });
   res.json(messages);
 }
 

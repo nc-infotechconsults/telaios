@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Project } from "./Project";
+import { Plan } from "./Plan";
 
 export type MessageRole = "user" | "assistant" | "system";
 
@@ -21,6 +22,13 @@ export class Message {
   @ManyToOne(() => Project, (p) => p.messages, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
   project!: Project;
+
+  @Column({ type: "uuid", nullable: true })
+  plan_id!: string | null;
+
+  @ManyToOne(() => Plan, { nullable: true, onDelete: "CASCADE" })
+  @JoinColumn({ name: "plan_id" })
+  plan!: Plan | null;
 
   @Column()
   role!: MessageRole;

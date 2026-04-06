@@ -10,6 +10,7 @@ import type {
   User,
 } from "../types";
 import * as demo from "../demo/data";
+import { toast } from "./toast";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const TOKEN_KEY = "swe_auth_token";
@@ -33,13 +34,14 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401 clear token and redirect to login
+// On 401 clear token, show toast, and redirect to login
 http.interceptors.response.use(
   (res) => res,
   (err) => {
     if (!DEMO && err.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
-      window.location.href = "/login";
+      toast.warning("Session expired", "Please log in again");
+      setTimeout(() => { window.location.href = "/login"; }, 1500);
     }
     return Promise.reject(err);
   }
@@ -129,10 +131,21 @@ export const deleteRepository = (projectId: string, id: string): Promise<void> =
 export const getPlans = (projectId: string): Promise<Plan[]> =>
   DEMO ? delay(demo.PLANS[projectId] ?? []) : http.get<Plan[]>("/plans", { params: { project_id: projectId } }).then((r) => r.data);
 
-export const getPlan = (projectId: string): Promise<Plan | null> =>
+export const getPlan = (planId: string): Promise<Plan> =>
   DEMO
-    ? delay((demo.PLANS[projectId] ?? [])[0] ?? null)
-    : http.get<Plan[]>("/plans", { params: { project_id: projectId } }).then((r) => r.data[0] ?? null);
+    ? delay((Object.values(demo.PLANS).flat() as Plan[]).find((p) => p.id === planId) ?? (Object.values(demo.PLANS).flat() as Plan[])[0])
+    : http.get<Plan>(`/plans/${planId}`).then((r) => r.data);
+
+export const createPlan = (projectId: string, title?: string): Promise<Plan> =>
+  DEMO
+    ? delay<Plan>({
+        id: `plan-${Date.now()}`,
+        project_id: projectId,
+        title: title ?? null,
+        status: "draft",
+        created_at: new Date().toISOString(),
+      })
+    : http.post<Plan>("/plans", { project_id: projectId, title }).then((r) => r.data);
 
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +153,9 @@ export const getTasks = (planId: string): Promise<Task[]> =>
   DEMO ? delay(demo.TASKS[planId] ?? []) : http.get<Task[]>(`/tasks?plan_id=${planId}`).then((r) => r.data);
 
 // ─── Messages ────────────────────────────────────────────────────────────────
+
+export const getPlanMessages = (planId: string): Promise<Message[]> =>
+  DEMO ? delay(demo.MESSAGES[planId] ?? []) : http.get<Message[]>(`/plans/${planId}/messages`).then((r) => r.data);
 
 export const getMessages = (projectId: string): Promise<Message[]> =>
   DEMO ? delay(demo.MESSAGES[projectId] ?? []) : http.get<Message[]>(`/messages?project_id=${projectId}`).then((r) => r.data);

@@ -12,6 +12,7 @@ import {
   Chip,
 } from "@heroui/react";
 import { createAgentProfile, updateAgentProfile } from "../../lib/api";
+import { toast } from "../../lib/toast";
 import type { AgentProfile, McpServer, Skill, JsonSchemaProperty } from "../../types";
 
 interface Props {
@@ -155,6 +156,8 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         await createAgentProfile(payload);
       }
       onSaved();
+    } catch {
+      toast.error(initialData ? "Failed to update agent profile" : "Failed to create agent profile");
     } finally {
       setSaving(false);
     }

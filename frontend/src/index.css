@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @config "../tailwind.config.cjs";
 
+/* Tailwind v4 does not scan node_modules automatically.
+   HeroUI stores all component class names in its theme package,
+   so we must explicitly source it to include interactive-state
+   utilities (data-[hover], data-[pressed], data-[focus-visible], …) */
+@source "../node_modules/@heroui/theme/dist";
+@source "../node_modules/@heroui/toast/dist";
+
 /* ── ReactFlow dark mode overrides ─────────────────────────────────────────── */
 
 .dark .react-flow__controls {

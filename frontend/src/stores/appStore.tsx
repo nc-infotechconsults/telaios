@@ -92,7 +92,7 @@ function reducer(state: AppState, action: Action): AppState {
     case "WS_EVENT": {
       const ev = action.event;
       if (ev.type === "chat_token") {
-        return { ...state, streamingToken: state.streamingToken + ev.token, isStreaming: true };
+        return { ...state, streamingToken: state.streamingToken + ev.content, isStreaming: true };
       }
       if (ev.type === "plan_draft") {
         return { ...state, plan: ev.plan };

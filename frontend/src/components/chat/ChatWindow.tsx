@@ -64,14 +64,40 @@ export default function ChatWindow({
         return <MessageBubble key={msg.id} message={msg} />;
       })}
 
+      {/* Loading / thinking bubble */}
+      {isStreaming && !streamingText && (
+        <div className="flex justify-start mb-3" aria-label="Agent is thinking" aria-live="polite">
+          <div className="max-w-[80%] flex flex-col gap-1 items-start">
+            <span className="text-xs text-default-400 px-1" aria-hidden="true">Planning Agent</span>
+            <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-default-100">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
+                  style={{ animationDelay: "0ms", animationDuration: "1s" }}
+                />
+                <span
+                  className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
+                  style={{ animationDelay: "200ms", animationDuration: "1s" }}
+                />
+                <span
+                  className="w-2 h-2 rounded-full bg-default-400 animate-bounce"
+                  style={{ animationDelay: "400ms", animationDuration: "1s" }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Streaming text bubble */}
       {streamingText && (
         <div className="flex justify-start mb-3">
           <div className="max-w-[80%] flex flex-col gap-1 items-start">
             <span className="text-xs text-default-400 px-1" aria-hidden="true">Planning Agent</span>
-            <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm bg-default-100 whitespace-pre-wrap leading-relaxed">
+            <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm bg-default-100 leading-relaxed whitespace-pre-wrap">
               {streamingText}
               <span
-                className="inline-block w-1.5 h-3.5 ml-0.5 bg-foreground opacity-70 animate-pulse"
+                className="inline-block w-1.5 h-3.5 ml-0.5 bg-foreground opacity-70 animate-pulse align-middle"
                 aria-hidden="true"
               />
             </div>

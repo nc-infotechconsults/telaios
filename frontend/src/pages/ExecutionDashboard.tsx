@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardBody, CardHeader, Chip, Button, Spinner, useDisclosure } from "@heroui/react";
-import { getPlan, getTasks, getRepositories, getAgentProfiles } from "../lib/api";
-import { useProjectWebSocket } from "../lib/ws";
+import { getPlans, getTasks, getRepositories, getAgentProfiles } from "../lib/api";
+import { useProjectSSE } from "../lib/sse";
 import { formatStatus } from "../lib/statusLabels";
 import type { Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
@@ -28,7 +28,7 @@ const REPO_STATUS_ICON: Record<string, string> = {
 };
 
 export default function ExecutionDashboard() {
-  const { id: projectId } = useParams<{ id: string }>();
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -49,7 +49,12 @@ export default function ExecutionDashboard() {
     if (!projectId) return;
     setLoading(true);
     Promise.all([
-      getPlan(projectId).then((p) => (p ? getTasks(p.id) : [])),
+      getPlans(projectId).then((plans) => {
+        const active = plans.find(
+          (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
+        );
+        return active ? getTasks(active.id) : [];
+      }),
       getRepositories(projectId),
       getAgentProfiles(),
     ])
@@ -112,7 +117,7 @@ export default function ExecutionDashboard() {
     }
   }, []);
 
-  useProjectWebSocket(projectId, handleWsEvent);
+  useProjectSSE(projectId, handleWsEvent);
 
   const done = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in_progress").length;
@@ -137,18 +142,18 @@ export default function ExecutionDashboard() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center gap-4 px-6 py-3 border-b border-divider shrink-0">
+      <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-3 border-b border-divider shrink-0 flex-wrap">
         <button
           onClick={() => navigate(`/projects/${projectId}`)}
           aria-label="Back to planning chat"
-          className="text-default-400 hover:text-foreground transition-colors text-sm"
+          className="text-default-400 hover:text-foreground transition-colors text-sm shrink-0"
         >
           ← Planning
         </button>
-        <span className="text-default-300">/</span>
-        <h2 className="font-semibold">Execution Dashboard</h2>
+        <span className="text-default-300 shrink-0">/</span>
+        <h2 className="font-semibold text-sm sm:text-base">Execution Dashboard</h2>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
           <Chip size="sm" color="success" variant="flat">{done}/{total} done</Chip>
           {inProgress > 0 && <Chip size="sm" color="warning" variant="flat">{inProgress} running</Chip>}
           {failed > 0 && <Chip size="sm" color="danger" variant="flat">{failed} {failed === 1 ? "failure" : "failures"}</Chip>}
@@ -296,7 +301,7 @@ export default function ExecutionDashboard() {
         </div>
 
         {/* Right sidebar: agent pool */}
-        <div className="w-72 shrink-0 border-l border-divider overflow-y-auto p-4">
+        <div className="hidden lg:block w-64 xl:w-72 shrink-0 border-l border-divider overflow-y-auto p-4">
           <AgentPoolPanel
             agentProfiles={agentProfiles}
             instances={enrichedInstances}

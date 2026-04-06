@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import * as api from "../lib/api";
+import { toast } from "../lib/toast";
 import type { User } from "../types";
 import ConfirmModal from "../components/common/ConfirmModal";
 
@@ -16,7 +17,6 @@ export default function Users() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [error, setError] = useState("");
 
   // Create user modal state
   const [showCreate, setShowCreate] = useState(false);
@@ -36,7 +36,7 @@ export default function Users() {
     setLoadingUsers(true);
     api.listUsers()
       .then(setUsers)
-      .catch(() => setError("Failed to load users."))
+      .catch(() => toast.error("Failed to load users"))
       .finally(() => setLoadingUsers(false));
   }, [currentUser]);
 
@@ -54,8 +54,13 @@ export default function Users() {
     try {
       const updated = await api.patchUser(id, data);
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      if ("is_active" in data) {
+        toast.success(data.is_active ? "User activated" : "User deactivated");
+      } else if ("system_role" in data) {
+        toast.success("Role updated", `Role changed to ${data.system_role}`);
+      }
     } catch {
-      setError("Failed to update user.");
+      toast.error("Failed to update user");
     } finally {
       setPatching(null);
     }
@@ -67,9 +72,10 @@ export default function Users() {
     try {
       await api.deleteUser(deleteTarget.id);
       setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
+      toast.success("User deleted", `"${deleteTarget.display_name}" has been removed`);
       setDeleteTarget(null);
     } catch {
-      setError("Failed to delete user.");
+      toast.error("Failed to delete user");
     } finally {
       setDeleteLoading(false);
     }
@@ -84,9 +90,11 @@ export default function Users() {
       setUsers((prev) => [...prev, user]);
       setCreateForm(EMPTY_FORM);
       setShowCreate(false);
+      toast.success("User created", `${user.display_name} can now log in`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setCreateError(msg ?? "Failed to create user.");
+      toast.error("Failed to create user", msg);
     } finally {
       setCreateLoading(false);
     }
@@ -107,10 +115,6 @@ export default function Users() {
           Add User
         </button>
       </div>
-
-      {error && (
-        <p role="alert" className="text-sm text-danger">{error}</p>
-      )}
 
       {loadingUsers ? (
         <p className="text-sm text-default-400 animate-pulse">Loading…</p>

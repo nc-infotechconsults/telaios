@@ -28,6 +28,9 @@ export class Plan {
   @JoinColumn({ name: "project_id" })
   project!: Project;
 
+  @Column({ type: "text", nullable: true })
+  title!: string | null;
+
   @Column({ default: "draft" })
   status!: PlanStatus;
 

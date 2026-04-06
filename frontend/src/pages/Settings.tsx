@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Card, CardBody, CardHeader, Chip } from "@heroui/react";
+import { Button, Card, CardBody, CardHeader } from "@heroui/react";
 import { getSettings, updateSettings, testLlm } from "../lib/api";
+import { toast } from "../lib/toast";
 import type { Settings } from "../types";
 import ProviderForm, { type LLMConfig, DEFAULT_LLM_CONFIG } from "../components/settings/ProviderForm";
 
@@ -11,9 +12,7 @@ export default function SettingsPage() {
   });
   const [hasApiKey, setHasApiKey] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     getSettings()
@@ -31,12 +30,11 @@ export default function SettingsPage() {
         }));
         setHasApiKey(!!s.has_api_key);
       })
-      .catch(console.error);
+      .catch(() => toast.error("Failed to load settings"));
   }, []);
 
   const handleSave = async () => {
     setLoading(true);
-    setSaved(false);
     try {
       const updated = await updateSettings({
         llm_provider: config.llm_provider,
@@ -51,9 +49,9 @@ export default function SettingsPage() {
       });
       setHasApiKey(!!(updated as Partial<Settings>).has_api_key);
       setConfig((c) => ({ ...c, llm_api_key_raw: "" }));
-      setSaved(true);
-      setTestResult(null);
-      setTimeout(() => setSaved(false), 3000);
+      toast.success("Settings saved");
+    } catch {
+      toast.error("Failed to save settings");
     } finally {
       setLoading(false);
     }
@@ -61,7 +59,6 @@ export default function SettingsPage() {
 
   const handleTest = async () => {
     setIsTesting(true);
-    setTestResult(null);
     try {
       await testLlm({
         provider: config.llm_provider,
@@ -69,12 +66,10 @@ export default function SettingsPage() {
         apiKey: config.llm_api_key_raw || undefined,
         baseUrl: config.llm_base_url || undefined,
       });
-      setTestResult({ ok: true, message: "Connection successful" });
+      toast.success("Connection successful", `${config.llm_provider} / ${config.llm_model}`);
     } catch (err: unknown) {
-      setTestResult({
-        ok: false,
-        message: err instanceof Error ? err.message : String(err),
-      });
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Connection failed", msg);
     } finally {
       setIsTesting(false);
     }
@@ -100,14 +95,12 @@ export default function SettingsPage() {
             onChange={setConfig}
             onTest={handleTest}
             isTesting={isTesting}
-            testResult={testResult}
           />
 
           <div className="flex items-center gap-3 pt-1">
             <Button color="primary" isLoading={loading} onPress={handleSave}>
               Save Settings
             </Button>
-            {saved && <Chip color="success" size="sm">✓ Saved!</Chip>}
           </div>
         </CardBody>
       </Card>

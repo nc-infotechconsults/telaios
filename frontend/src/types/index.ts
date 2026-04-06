@@ -45,6 +45,7 @@ export interface Repository {
 export interface Plan {
   id: string;
   project_id: string;
+  title?: string | null;
   status: PlanStatus;
   created_at: string;
   confirmed_at?: string;
@@ -76,6 +77,7 @@ export interface TaskDependency {
 export interface Message {
   id: string;
   project_id: string;
+  plan_id?: string | null;
   role: MessageRole;
   content: string;
   created_at: string;
@@ -182,9 +184,12 @@ export type ChatItem = Message | PlanChatItem;
 
 // WebSocket event payloads
 export type WsEvent =
-  | { type: "chat_token"; token: string }
-  | { type: "plan_draft"; plan: Plan }
+  | { type: "chat_token"; content: string }
+  | { type: "chat_end" }
+  | { type: "chat_thinking" }
+  | { type: "plan_draft"; plan: Plan & { tasks?: Task[] } }
   | { type: "plan_confirmed"; plan_id: string }
+  | { type: "error"; message: string }
   | { type: "repo_status"; repo_id: string; repo_name: string; status: RepoStatus; message?: string }
   | { type: "task_status"; task_id: string; status: TaskStatus; agent_instance_id?: string; agent_profile_id?: string }
   | { type: "agent_status"; instance_id: string; profile_id: string; status: string; task_id?: string };
