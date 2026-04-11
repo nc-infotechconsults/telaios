@@ -22,3 +22,17 @@
 - use `bun run agent:build` for build of a agent-service project
 - use `bun run data:build` for build of a data-api project
 - use `bun run frontend:build` for build of a frontend project
+
+## Project guideline
+- Every project should have a README.md file with a brief description of the project and instructions on how to use it.
+- Use semantic versioning for project releases.
+- Keep the codebase clean and organized.
+- Use AGENTS.md in the subdirectory if available to get more insight about the project scope.
+- Write clear and concise commit messages using the following convention: 
+  - feat: for new features
+  - fix: for bug fixes
+  - docs: for documentation changes
+  - style: for code style changes (e.g., formatting, linting)
+  - refactor: for code refactoring without changing functionality
+  - test: for adding or updating tests
+  - chore: for other changes that don't modify src or test files (e.g., build scripts, dependencies)
