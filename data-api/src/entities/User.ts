@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { ProjectMember } from "./ProjectMember";
 
 export type SystemRole = "admin" | "member";
@@ -24,7 +25,7 @@ export class User {
   @Column()
   display_name!: string;
 
-  @Column({ default: "member" })
+  @Column({ type: "varchar", default: "member" })
   system_role!: SystemRole;
 
   @Column({ default: true })
@@ -37,5 +38,5 @@ export class User {
   updated_at!: Date;
 
   @OneToMany(() => ProjectMember, (pm) => pm.user, { cascade: true })
-  projectMemberships!: ProjectMember[];
+  projectMemberships!: Relation<ProjectMember[]>;
 }

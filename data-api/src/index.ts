@@ -7,7 +7,7 @@ import app from "./app";
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 
-(async () => {
+const main = async () => {
   try {
     await AppDataSource.initialize();
     console.log("Database connected");
@@ -18,6 +18,6 @@ const PORT = parseInt(process.env.PORT ?? "3000", 10);
     console.error("Database connection failed:", err);
     process.exit(1);
   }
-})();
+}
 
-
+main();

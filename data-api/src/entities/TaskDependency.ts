@@ -1,4 +1,5 @@
 import { Entity, Column, ManyToOne, PrimaryColumn, JoinColumn } from "typeorm";
+import type { Relation } from "typeorm";
 import { Task } from "./Task";
 
 @Entity("task_dependencies")
@@ -11,5 +12,5 @@ export class TaskDependency {
 
   @ManyToOne(() => Task, (t) => t.dependencies, { onDelete: "CASCADE" })
   @JoinColumn({ name: "task_id" })
-  task!: Task;
+  task!: Relation<Task>;
 }

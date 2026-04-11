@@ -9,9 +9,9 @@
     "test": "jest --config jest.config.ts",
     "test:integration": "jest --config jest.integration.config.ts --runInBand --forceExit",
     "test:all": "bun test && bun run test:integration",
-    "migration:generate": "bunx typeorm migration:generate -d src/data-source.ts",
-    "migration:run": "bunx typeorm migration:run -d src/data-source.ts",
-    "migration:revert": "bunx typeorm migration:revert -d src/data-source.ts"
+    "migration:generate": "bun node_modules/typeorm/cli.js migration:generate -d src/data-source.ts src/migrations/migration",
+    "migration:run": "bun node_modules/typeorm/cli.js migration:run -d src/data-source.ts",
+    "migration:revert": "bun node_modules/typeorm/cli.js migration:revert -d src/data-source.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -40,6 +40,7 @@
     "jest": "^30.3.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2",
     "typescript": "^5.5.3"
   }
 }

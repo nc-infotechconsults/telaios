@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
   JoinColumn,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { Plan } from "./Plan";
 import { AgentProfile } from "./AgentProfile";
 import { TaskDependency } from "./TaskDependency";
@@ -31,7 +32,7 @@ export class Task {
 
   @ManyToOne(() => Plan, (p) => p.tasks, { onDelete: "CASCADE" })
   @JoinColumn({ name: "plan_id" })
-  plan!: Plan;
+  plan!: Relation<Plan>;
 
   @Column()
   title!: string;
@@ -39,10 +40,10 @@ export class Task {
   @Column({ type: "text", nullable: true })
   description!: string;
 
-  @Column({ default: "general" })
+  @Column({ type: "varchar", default: "general" })
   type!: TaskType;
 
-  @Column({ default: "pending" })
+  @Column({ type: "varchar", default: "pending" })
   status!: TaskStatus;
 
   @Column({ default: 0 })
@@ -53,7 +54,7 @@ export class Task {
 
   @ManyToOne(() => AgentProfile, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "agent_profile_id" })
-  agentProfile!: AgentProfile;
+  agentProfile!: Relation<AgentProfile>;
 
   @Column({ nullable: true })
   assigned_instance_id!: string;
@@ -68,8 +69,8 @@ export class Task {
   updated_at!: Date;
 
   @OneToMany(() => TaskDependency, (td) => td.task, { cascade: true })
-  dependencies!: TaskDependency[];
+  dependencies!: Relation<TaskDependency[]>;
 
   @OneToMany(() => TaskRepository, (tr) => tr.task, { cascade: true })
-  taskRepositories!: TaskRepository[];
+  taskRepositories!: Relation<TaskRepository[]>;
 }

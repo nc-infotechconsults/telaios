@@ -8,6 +8,7 @@ import {
   DeleteDateColumn,
   JoinColumn,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { Project } from "./Project";
 import { Task } from "./Task";
 
@@ -27,12 +28,12 @@ export class Plan {
 
   @ManyToOne(() => Project, (p) => p.plans, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
-  project!: Project;
+  project!: Relation<Project>;
 
   @Column({ type: "text", nullable: true })
   title!: string | null;
 
-  @Column({ default: "draft" })
+  @Column({ type: "varchar", default: "draft" })
   status!: PlanStatus;
 
   @CreateDateColumn()
@@ -45,5 +46,5 @@ export class Plan {
   deleted_at!: Date | null;
 
   @OneToMany(() => Task, (t) => t.plan, { cascade: true })
-  tasks!: Task[];
+  tasks!: Relation<Task[]>;
 }

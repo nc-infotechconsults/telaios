@@ -1,4 +1,5 @@
 import { Entity, ManyToOne, PrimaryColumn, JoinColumn } from "typeorm";
+import type { Relation } from "typeorm";
 import { Task } from "./Task";
 import { Repository } from "./Repository";
 
@@ -12,9 +13,9 @@ export class TaskRepository {
 
   @ManyToOne(() => Task, (t) => t.taskRepositories, { onDelete: "CASCADE" })
   @JoinColumn({ name: "task_id" })
-  task!: Task;
+  task!: Relation<Task>;
 
   @ManyToOne(() => Repository, (r) => r.taskRepositories, { onDelete: "CASCADE" })
   @JoinColumn({ name: "repository_id" })
-  repository!: Repository;
+  repository!: Relation<Repository>;
 }

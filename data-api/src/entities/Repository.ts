@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
   JoinColumn,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { Project } from "./Project";
 import { TaskRepository } from "./TaskRepository";
 
@@ -28,12 +29,12 @@ export class Repository {
 
   @ManyToOne(() => Project, (p) => p.repositories, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
-  project!: Project;
+  project!: Relation<Project>;
 
   @Column()
   name!: string;
 
-  @Column({ default: "remote" })
+  @Column({ type: "varchar", default: "remote" })
   source_type!: RepositorySourceType;
 
   @Column({ nullable: true })
@@ -42,7 +43,7 @@ export class Repository {
   @Column({ default: "main" })
   branch!: string;
 
-  @Column({ default: "none" })
+  @Column({ type: "varchar", default: "none" })
   auth_type!: RepositoryAuthType;
 
   @Column({ nullable: true })
@@ -51,7 +52,7 @@ export class Repository {
   @Column({ nullable: true })
   local_path!: string;
 
-  @Column({ default: "unconfigured" })
+  @Column({ type: "varchar", default: "unconfigured" })
   status!: RepositoryStatus;
 
   @Column({ nullable: true })
@@ -61,5 +62,5 @@ export class Repository {
   updated_at!: Date;
 
   @OneToMany(() => TaskRepository, (tr) => tr.repository)
-  taskRepositories!: TaskRepository[];
+  taskRepositories!: Relation<TaskRepository[]>;
 }

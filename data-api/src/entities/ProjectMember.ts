@@ -6,6 +6,7 @@ import {
   JoinColumn,
   CreateDateColumn,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { User } from "./User";
 import { Project } from "./Project";
 
@@ -21,13 +22,13 @@ export class ProjectMember {
 
   @ManyToOne(() => User, (u) => u.projectMemberships, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
-  user!: User;
+  user!: Relation<User>;
 
   @ManyToOne(() => Project, (p) => p.members, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
-  project!: Project;
+  project!: Relation<Project>;
 
-  @Column({ default: "viewer" })
+  @Column({ type: "varchar", default: "viewer" })
   role!: ProjectRole;
 
   @CreateDateColumn()

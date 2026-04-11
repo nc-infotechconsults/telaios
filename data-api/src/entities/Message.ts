@@ -6,6 +6,7 @@ import {
   CreateDateColumn,
   JoinColumn,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { Project } from "./Project";
 import { Plan } from "./Plan";
 
@@ -21,16 +22,16 @@ export class Message {
 
   @ManyToOne(() => Project, (p) => p.messages, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
-  project!: Project;
+  project!: Relation<Project>;
 
   @Column({ type: "uuid", nullable: true })
   plan_id!: string | null;
 
   @ManyToOne(() => Plan, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "plan_id" })
-  plan!: Plan | null;
+  plan!: Relation<Plan> | null;
 
-  @Column()
+  @Column({ type: "varchar" })
   role!: MessageRole;
 
   @Column({ type: "text" })

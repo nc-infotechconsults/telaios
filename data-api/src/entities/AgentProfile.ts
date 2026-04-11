@@ -63,7 +63,7 @@ export class AgentProfile {
   @Column({ nullable: true })
   description!: string;
 
-  @Column({ default: "langgraph" })
+  @Column({ type: "varchar", default: "langgraph" })
   agent_type!: AgentType;
 
   @Column({ nullable: true })

@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   OneToMany,
 } from "typeorm";
+import type { Relation } from "typeorm";
 import { Repository } from "./Repository";
 import { Plan } from "./Plan";
 import { Message } from "./Message";
@@ -23,21 +24,21 @@ export class Project {
   @Column({ nullable: true })
   description!: string;
 
-  @Column({ default: "planning" })
+  @Column({ type: "varchar", default: "planning" })
   status!: ProjectStatus;
 
   @CreateDateColumn()
   created_at!: Date;
 
   @OneToMany(() => Repository, (r) => r.project, { cascade: true })
-  repositories!: Repository[];
+  repositories!: Relation<Repository[]>;
 
   @OneToMany(() => Plan, (p) => p.project, { cascade: true })
-  plans!: Plan[];
+  plans!: Relation<Plan[]>;
 
   @OneToMany(() => Message, (m) => m.project, { cascade: true })
-  messages!: Message[];
+  messages!: Relation<Message[]>;
 
   @OneToMany(() => ProjectMember, (pm) => pm.project, { cascade: true })
-  members!: ProjectMember[];
+  members!: Relation<ProjectMember[]>;
 }
