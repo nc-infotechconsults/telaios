@@ -4,11 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules smoke.test.js",
-    "test:verbose": "VERBOSE=1 node --experimental-vm-modules smoke.test.js"
+    "test": "bun smoke.test.js",
+    "test:verbose": "VERBOSE=1 bun smoke.test.js"
   },
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.15.0",
     "ws": "^8.20.0"
   }
 }

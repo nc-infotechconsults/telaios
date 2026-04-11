@@ -1,16 +1,16 @@
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 WORKDIR /app
 
-COPY package.json package-lock.json .npmrc ./
+COPY package.json bun.lock ./
 COPY data-api/package.json ./data-api/
 COPY frontend/package.json ./frontend/
 COPY agent-service/package.json ./agent-service/
 COPY tests/package.json ./tests/
 
-RUN npm ci
+RUN bun install --frozen-lockfile
 
 COPY agent-service/ ./agent-service/
 
 WORKDIR /app/agent-service
 EXPOSE 8000
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]
