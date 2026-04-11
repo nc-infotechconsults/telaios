@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import { requireSystemRole } from "../../../middleware/requireSystemRole";
-import { User } from "../../../entities/User";
+import { requireSystemRole } from "../../../middleware/requireSystemRole.middleware";
+import { User } from "../../../entities/User.entity";
 
 function makeRes() {
   const json = jest.fn();

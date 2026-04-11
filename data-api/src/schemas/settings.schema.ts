@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PutSettingsSchema = z.object({
+export const PatchSettingsSchema = z.object({
   llm_provider: z.string().optional(),
   llm_model: z.string().optional(),
   llm_api_key_raw: z.string().optional(),
@@ -12,4 +12,4 @@ export const PutSettingsSchema = z.object({
   llm_presence_penalty: z.number().min(-2).max(2).optional(),
 });
 
-export type PutSettingsDto = z.infer<typeof PutSettingsSchema>;
+export type PatchSettingsDto = z.infer<typeof PatchSettingsSchema>;

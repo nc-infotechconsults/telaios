@@ -1,5 +1,5 @@
-import { AppDataSource } from "../data-source";
-import { ProjectMember, type ProjectRole } from "../entities/ProjectMember";
+import { AppDataSource } from "../configs/data-source.config";
+import { ProjectMember, type ProjectRole } from "../entities/ProjectMember.entity";
 import type { AddMemberDto, PatchMemberDto } from "../schemas/projectMember.schema";
 
 const repo = () => AppDataSource.getRepository(ProjectMember);

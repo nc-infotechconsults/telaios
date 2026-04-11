@@ -1,6 +1,6 @@
-import { AppDataSource } from "../data-source";
-import { AgentProfile } from "../entities/AgentProfile";
-import { encrypt, decrypt } from "../middleware/crypto";
+import { AppDataSource } from "../configs/data-source.config";
+import { AgentProfile } from "../entities/AgentProfile.entity";
+import { encrypt, decrypt } from "../utils/crypto.util";
 import type { CreateAgentProfileDto, PatchAgentProfileDto } from "../schemas/agentProfile.schema";
 
 const repo = () => AppDataSource.getRepository(AgentProfile);
@@ -45,5 +45,5 @@ export async function patchAgentProfile(id: string, dto: PatchAgentProfileDto) {
 }
 
 export async function deleteAgentProfile(id: string): Promise<void> {
-  await repo().delete(id);
+  await repo().softDelete(id);
 }

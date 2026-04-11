@@ -1,5 +1,5 @@
 import { hasMinRole } from "../../../services/projectMember.service";
-import type { ProjectRole } from "../../../entities/ProjectMember";
+import type { ProjectRole } from "../../../entities/ProjectMember.entity";
 
 describe("hasMinRole", () => {
   const cases: Array<{ role: ProjectRole; minRole: ProjectRole; expected: boolean }> = [

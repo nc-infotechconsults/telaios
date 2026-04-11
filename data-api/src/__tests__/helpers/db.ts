@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { Client } from "pg";
-import { AppDataSource } from "../../data-source";
+import { AppDataSource } from "../../configs/data-source.config";
 
 /** Creates the sweai_test database if it doesn't exist, then initialises TypeORM (runs migrations). */
 export async function initTestDb(): Promise<void> {
@@ -24,6 +24,9 @@ export async function initTestDb(): Promise<void> {
   await admin.end();
 
   await AppDataSource.initialize();
+  // Ensure schema is up to date (the migrations path in the config uses a relative glob
+  // that resolves correctly from the CLI but not from ts-jest CWD, so we sync here).
+  await AppDataSource.synchronize();
 }
 
 /** Truncates all user-data tables (preserves the migrations book-keeping table). */

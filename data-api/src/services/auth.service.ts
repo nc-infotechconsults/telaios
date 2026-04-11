@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { AppDataSource } from "../data-source";
-import { User } from "../entities/User";
+import { AppDataSource } from "../configs/data-source.config";
+import { User } from "../entities/User.entity";
 import type { RegisterDto, LoginDto } from "../schemas/auth.schema";
 
 const repo = () => AppDataSource.getRepository(User);

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
-import { authenticate } from "../../../middleware/authenticate";
+import { authenticate } from "../../../middleware/authenticate.middleware";
 import * as authService from "../../../services/auth.service";
-import { User } from "../../../entities/User";
+import { User } from "../../../entities/User.entity";
 
 jest.mock("../../../services/auth.service");
 

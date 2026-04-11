@@ -1,11 +1,11 @@
 import jwt from "jsonwebtoken";
 import { signToken, verifyToken, sanitizeUser, register, login } from "../../../services/auth.service";
-import { AppDataSource } from "../../../data-source";
-import { User } from "../../../entities/User";
+import { AppDataSource } from "../../../configs/data-source.config";
+import { User } from "../../../entities/User.entity";
 import bcrypt from "bcryptjs";
 
-// Mock the entire data-source module so no real DB is needed
-jest.mock("../../../data-source", () => ({
+// Mock the entire data-source.config module so no real DB is needed
+jest.mock("../../../configs/data-source.config", () => ({
   AppDataSource: { getRepository: jest.fn() },
 }));
 

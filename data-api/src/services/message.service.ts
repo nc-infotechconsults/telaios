@@ -1,5 +1,5 @@
-import { AppDataSource } from "../data-source";
-import { Message } from "../entities/Message";
+import { AppDataSource } from "../configs/data-source.config";
+import { Message } from "../entities/Message.entity";
 import type { CreateMessageDto } from "../schemas/message.schema";
 
 const repo = () => AppDataSource.getRepository(Message);

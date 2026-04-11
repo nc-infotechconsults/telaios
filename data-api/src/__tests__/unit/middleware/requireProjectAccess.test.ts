@@ -1,12 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
-import { requireProjectAccess } from "../../../middleware/requireProjectAccess";
+import { requireProjectAccess } from "../../../middleware/requireProjectAccess.middleware";
 import * as projectMemberService from "../../../services/projectMember.service";
-import { AppDataSource } from "../../../data-source";
-import { User } from "../../../entities/User";
-import { ProjectMember } from "../../../entities/ProjectMember";
+import { AppDataSource } from "../../../configs/data-source.config";
+import { User } from "../../../entities/User.entity";
+import { ProjectMember } from "../../../entities/ProjectMember.entity";
 
 jest.mock("../../../services/projectMember.service");
-jest.mock("../../../data-source", () => ({
+jest.mock("../../../configs/data-source.config", () => ({
   AppDataSource: { getRepository: jest.fn() },
 }));
 

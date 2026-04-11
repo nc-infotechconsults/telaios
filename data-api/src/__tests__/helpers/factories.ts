@@ -1,8 +1,12 @@
-import { AppDataSource } from "../../data-source";
-import { User } from "../../entities/User";
-import { Project } from "../../entities/Project";
-import { Plan } from "../../entities/Plan";
-import { ProjectMember } from "../../entities/ProjectMember";
+import { AppDataSource } from "../../configs/data-source.config";
+import { User } from "../../entities/User.entity";
+import { Project } from "../../entities/Project.entity";
+import { Plan } from "../../entities/Plan.entity";
+import { ProjectMember } from "../../entities/ProjectMember.entity";
+import { Repository } from "../../entities/Repository.entity";
+import { Task } from "../../entities/Task.entity";
+import { Message } from "../../entities/Message.entity";
+import { AgentProfile } from "../../entities/AgentProfile.entity";
 import bcrypt from "bcryptjs";
 
 export interface UserOpts {
@@ -44,4 +48,24 @@ export async function createTestProject(
 export async function createTestPlan(projectId: string): Promise<Plan> {
   const repo = AppDataSource.getRepository(Plan);
   return repo.save(repo.create({ project_id: projectId, status: "draft" }));
+}
+
+export async function createTestRepository(projectId: string): Promise<Repository> {
+  const repo = AppDataSource.getRepository(Repository);
+  return repo.save(repo.create({ name: "Test Repo", project_id: projectId }));
+}
+
+export async function createTestTask(planId: string): Promise<Task> {
+  const repo = AppDataSource.getRepository(Task);
+  return repo.save(repo.create({ plan_id: planId, title: "Test Task" }));
+}
+
+export async function createTestMessage(projectId: string, planId?: string): Promise<Message> {
+  const repo = AppDataSource.getRepository(Message);
+  return repo.save(repo.create({ project_id: projectId, plan_id: planId ?? null, role: "user", content: "Hello" }));
+}
+
+export async function createTestAgentProfile(): Promise<AgentProfile> {
+  const repo = AppDataSource.getRepository(AgentProfile);
+  return repo.save(repo.create({ name: "Test Agent", agent_type: "langgraph" }));
 }

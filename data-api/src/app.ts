@@ -4,18 +4,19 @@ import express, { type Request, type Response, type NextFunction } from "express
 import cors from "cors";
 import helmet from "helmet";
 
-import authRouter from "./routes/auth";
-import usersRouter from "./routes/users";
-import projectMembersRouter from "./routes/projectMembers";
-import projectsRouter from "./routes/projects";
-import repositoriesRouter from "./routes/repositories";
-import plansRouter from "./routes/plans";
-import tasksRouter from "./routes/tasks";
-import messagesRouter from "./routes/messages";
-import settingsRouter from "./routes/settings";
-import agentProfilesRouter from "./routes/agentProfiles";
+import authRouter from "./routes/auth.route";
+import usersRouter from "./routes/users.route";
+import projectMembersRouter from "./routes/projectMembers.route";
+import projectsRouter from "./routes/projects.route";
+import repositoriesRouter from "./routes/repositories.route";
+import plansRouter from "./routes/plans.route";
+import tasksRouter from "./routes/tasks.route";
+import messagesRouter from "./routes/messages.route";
+import settingsRouter from "./routes/settings.route";
+import agentProfilesRouter from "./routes/agentProfiles.route";
 import { patchRepositoryById } from "./controllers/repository.controller";
-import { authenticate } from "./middleware/authenticate";
+import { authenticate } from "./middleware/authenticate.middleware";
+import logger from "./utils/logger";
 
 const app = express();
 
@@ -46,11 +47,10 @@ app.use("/messages", messagesRouter);
 app.use("/settings", settingsRouter);
 app.use("/agent-profiles", agentProfilesRouter);
 
-// Global error handler — prevents unhandled async errors from crashing the server
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error & { statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.statusCode ?? 500;
-  console.error("Unhandled error:", err.message);
+  logger.error({ err, status }, "Unhandled error");
   res.status(status).json({ error: status === 500 ? "Internal server error" : err.message });
 });
 

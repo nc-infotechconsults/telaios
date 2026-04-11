@@ -1,5 +1,5 @@
-import { AppDataSource } from "../data-source";
-import { User } from "../entities/User";
+import { AppDataSource } from "../configs/data-source.config";
+import { User } from "../entities/User.entity";
 import { sanitizeUser } from "./auth.service";
 import type { PatchUserDto } from "../schemas/user.schema";
 
@@ -22,5 +22,5 @@ export async function patchUser(id: string, dto: PatchUserDto) {
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  await repo().delete(id);
+  await repo().softDelete(id);
 }

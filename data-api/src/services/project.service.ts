@@ -1,5 +1,5 @@
-import { AppDataSource } from "../data-source";
-import { Project } from "../entities/Project";
+import { AppDataSource } from "../configs/data-source.config";
+import { Project } from "../entities/Project.entity";
 import { addMember } from "./projectMember.service";
 import type { CreateProjectDto, PatchProjectDto } from "../schemas/project.schema";
 
@@ -30,5 +30,5 @@ export async function patchProject(id: string, dto: PatchProjectDto): Promise<Pr
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await repo().delete(id);
+  await repo().softDelete(id);
 }

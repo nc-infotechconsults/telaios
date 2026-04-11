@@ -3,8 +3,8 @@ import app from "../../app";
 import { initTestDb, clearAllTables, destroyTestDb } from "../helpers/db";
 import { createTestUser, createTestProject } from "../helpers/factories";
 import * as authService from "../../services/auth.service";
-import { AppDataSource } from "../../data-source";
-import { ProjectMember } from "../../entities/ProjectMember";
+import { AppDataSource } from "../../configs/data-source.config";
+import { ProjectMember } from "../../entities/ProjectMember.entity";
 
 let ownerToken: string;
 let ownerId: string;

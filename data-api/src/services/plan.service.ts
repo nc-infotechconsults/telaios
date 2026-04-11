@@ -1,8 +1,8 @@
-import { AppDataSource } from "../data-source";
-import { Plan } from "../entities/Plan";
-import { Task } from "../entities/Task";
-import { TaskDependency } from "../entities/TaskDependency";
-import { TaskRepository } from "../entities/TaskRepository";
+import { AppDataSource } from "../configs/data-source.config";
+import { Plan } from "../entities/Plan.entity";
+import { Task } from "../entities/Task.entity";
+import { TaskDependency } from "../entities/TaskDependency.entity";
+import { TaskRepository } from "../entities/TaskRepository.entity";
 import { serializeTask } from "./task.service";
 import type { CreatePlanDto, PatchPlanDto } from "../schemas/plan.schema";
 

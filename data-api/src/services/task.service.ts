@@ -1,7 +1,7 @@
-import { AppDataSource } from "../data-source";
-import { Task } from "../entities/Task";
-import { TaskDependency } from "../entities/TaskDependency";
-import { TaskRepository } from "../entities/TaskRepository";
+import { AppDataSource } from "../configs/data-source.config";
+import { Task } from "../entities/Task.entity";
+import { TaskDependency } from "../entities/TaskDependency.entity";
+import { TaskRepository } from "../entities/TaskRepository.entity";
 import type { CreateTaskDto, PatchTaskDto } from "../schemas/task.schema";
 
 const taskRepo = () => AppDataSource.getRepository(Task);

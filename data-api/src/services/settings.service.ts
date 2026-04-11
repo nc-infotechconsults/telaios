@@ -1,7 +1,7 @@
-import { AppDataSource } from "../data-source";
-import { Settings } from "../entities/Settings";
-import { encrypt, decrypt } from "../middleware/crypto";
-import type { PutSettingsDto } from "../schemas/settings.schema";
+import { AppDataSource } from "../configs/data-source.config";
+import { Settings } from "../entities/Settings.entity";
+import { encrypt, decrypt } from "../utils/crypto.util";
+import type { PatchSettingsDto } from "../schemas/settings.schema";
 
 const repo = () => AppDataSource.getRepository(Settings);
 
@@ -33,7 +33,7 @@ export async function getSettings() {
   return sanitizeSettings(settings);
 }
 
-export async function putSettings(dto: PutSettingsDto) {
+export async function patchSettings(dto: PatchSettingsDto) {
   const { llm_api_key_raw, ...rest } = dto;
   const data: Record<string, unknown> = { ...rest, id: 1 };
   if (llm_api_key_raw) data.llm_api_key = encrypt(llm_api_key_raw);

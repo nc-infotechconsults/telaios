@@ -1,6 +1,6 @@
-import { AppDataSource } from "../data-source";
-import { Repository } from "../entities/Repository";
-import { encrypt, decrypt } from "../middleware/crypto";
+import { AppDataSource } from "../configs/data-source.config";
+import { Repository } from "../entities/Repository.entity";
+import { encrypt, decrypt } from "../utils/crypto.util";
 import type { CreateRepositoryDto, PatchRepositoryDto } from "../schemas/repository.schema";
 
 const repo = () => AppDataSource.getRepository(Repository);
@@ -43,5 +43,5 @@ export async function patchRepositoryById(id: string, dto: PatchRepositoryDto) {
 }
 
 export async function deleteRepository(id: string): Promise<void> {
-  await repo().delete(id);
+  await repo().softDelete(id);
 }
