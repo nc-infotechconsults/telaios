@@ -135,6 +135,47 @@ export const WorkspaceService = {
     await (await import("node:fs/promises")).mkdir(abs, { recursive: true });
   },
 
+  // ── Create file ────────────────────────────────────────────────────────────────
+
+  async createFile(workspaceId: string, dirPath: string, filename: string): Promise<void> {
+    const abs = workspacePath(workspaceId, dirPath, filename);
+    const fs = await import("node:fs/promises");
+    await fs.writeFile(abs, "");
+  },
+
+  // ── Create folder ──────────────────────────────────────────────────
+
+  async createFolder(workspaceId: string, dirPath: string, foldername: string): Promise<void> {
+    const abs = workspacePath(workspaceId, dirPath, foldername);
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(abs, { recursive: true });
+  },
+
+  // ── Delete entry (file or directory) ─────────────────────────────────
+
+  async deleteEntry(workspaceId: string, relPath: string): Promise<void> {
+    const abs = workspacePath(workspaceId, relPath);
+    const fs = await import("node:fs/promises");
+    const stat = await fs.stat(abs).catch(() => null);
+    if (!stat) throw new NotFoundError(`Path not found: ${relPath}`);
+
+    if (stat.isDirectory()) {
+      await fs.rm(abs, { recursive: true, force: true });
+    } else {
+      await fs.unlink(abs);
+    }
+  },
+
+  // ── Rename entry ────────────────────────────────────────────────────────
+
+  async renameEntry(workspaceId: string, oldRel: string, newRel: string): Promise<void> {
+    const oldAbs = workspacePath(workspaceId, oldRel);
+    const newAbs = workspacePath(workspaceId, newRel);
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(path.dirname(newAbs), { recursive: true });
+    await fs.rename(oldAbs, newAbs);
+  },
+
   // ── Search ─────────────────────────────────────────────────────────────────
 
   async search(

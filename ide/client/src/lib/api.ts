@@ -72,6 +72,22 @@ const workspaces = {
     await http.post(`/workspaces/${workspaceId}/mkdir`, { path });
   },
 
+  async createFile(workspaceId: string, dirPath: string, filename: string): Promise<void> {
+    await http.post(`/workspaces/${workspaceId}/create-file`, { dirPath, filename });
+  },
+
+  async createFolder(workspaceId: string, dirPath: string, foldername: string): Promise<void> {
+    await http.post(`/workspaces/${workspaceId}/create-folder`, { dirPath, foldername });
+  },
+
+  async deleteEntry(workspaceId: string, path: string): Promise<void> {
+    await http.delete(`/workspaces/${workspaceId}/entry`, { params: { path } });
+  },
+
+  async renameEntry(workspaceId: string, oldPath: string, newPath: string): Promise<void> {
+    await http.post(`/workspaces/${workspaceId}/rename-entry`, { oldPath, newPath });
+  },
+
   async search(
     workspaceId: string,
     q: string,

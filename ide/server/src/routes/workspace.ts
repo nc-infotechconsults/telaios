@@ -167,4 +167,74 @@ app.get(
   },
 );
 
+// ── Create file ────────────────────────────────────────────────────────────────
+// POST /api/workspaces/:id/create-file
+app.post(
+  "/:id/create-file",
+  zValidator(
+    "json",
+    z.object({
+      dirPath: z.string().default("."),
+      filename: z.string().min(1),
+    }),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const { dirPath, filename } = c.req.valid("json");
+    await WorkspaceService.createFile(id, dirPath, filename);
+    return c.json({ data: { dirPath, filename } });
+  },
+);
+
+// ── Create folder ────────────────────────────────────────────────────────────
+// POST /api/workspaces/:id/create-folder
+app.post(
+  "/:id/create-folder",
+  zValidator(
+    "json",
+    z.object({
+      dirPath: z.string().default("."),
+      foldername: z.string().min(1),
+    }),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const { dirPath, foldername } = c.req.valid("json");
+    await WorkspaceService.createFolder(id, dirPath, foldername);
+    return c.json({ data: { dirPath, foldername } });
+  },
+);
+
+// ── Delete entry ──────────────────────────────────────────────────────
+// DELETE /api/workspaces/:id/entry?path=src/file.ts
+app.delete(
+  "/:id/entry",
+  zValidator("query", z.object({ path: z.string().min(1) })),
+  async (c) => {
+    const { id } = c.req.param();
+    const { path } = c.req.valid("query");
+    await WorkspaceService.deleteEntry(id, path);
+    return c.json({ data: { deleted: true } });
+  },
+);
+
+// ── Rename entry ────────────────────────────────────────────────────
+// POST /api/workspaces/:id/rename-entry
+app.post(
+  "/:id/rename-entry",
+  zValidator(
+    "json",
+    z.object({
+      oldPath: z.string().min(1),
+      newPath: z.string().min(1),
+    }),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const { oldPath, newPath } = c.req.valid("json");
+    await WorkspaceService.renameEntry(id, oldPath, newPath);
+    return c.json({ data: { oldPath, newPath } });
+  },
+);
+
 export default app;

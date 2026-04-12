@@ -6,6 +6,7 @@ import {
 import { ActivityBar } from "./ActivityBar";
 import { StatusBar } from "./StatusBar";
 import { MobileTabBar } from "./MobileTabBar";
+import { TopMenu } from "./TopMenu";
 import { FileExplorer } from "@/components/explorer/FileExplorer";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { Terminal } from "@/components/terminal/Terminal";
@@ -19,6 +20,41 @@ export function PanelLayout({ workspaceId }: Props) {
   const sidebarOpen = useEditorStore((s) => s.sidebarOpen);
   const terminalOpen = useEditorStore((s) => s.terminalOpen);
   const activePanel = useEditorStore((s) => s.activePanel);
+  const setSidebarOpen = useEditorStore((s) => s.setSidebarOpen);
+  const setTerminalOpen = useEditorStore((s) => s.setTerminalOpen);
+  const saveTab = useEditorStore((s) => s.saveTab);
+  const activeTabId = useEditorStore((s) => s.activeTabId);
+  const closeTab = useEditorStore((s) => s.closeTab);
+
+  // TopMenu handlers
+  async function handleSave() {
+    if (activeTabId) {
+      await saveTab(workspaceId, activeTabId);
+    }
+  }
+
+  async function handleSaveAll() {
+    const tabs = useEditorStore.getState().tabs;
+    for (const tab of tabs) {
+      if (tab.isDirty) {
+        await saveTab(workspaceId, tab.id);
+      }
+    }
+  }
+
+  function handleCloseTab() {
+    if (activeTabId) {
+      closeTab(activeTabId);
+    }
+  }
+
+  function handleToggleSidebar() {
+    setSidebarOpen(!sidebarOpen);
+  }
+
+  function handleToggleTerminal() {
+    setTerminalOpen(!terminalOpen);
+  }
 
   const SideContent = () => {
     if (activePanel === "explorer") {
@@ -34,6 +70,16 @@ export function PanelLayout({ workspaceId }: Props) {
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-[#0a0a0c] text-zinc-300 selection:bg-cyan-500/30">
+      {/* Top menu bar */}
+      <TopMenu
+        workspaceId={workspaceId}
+        onSave={handleSave}
+        onSaveAll={handleSaveAll}
+        onCloseTab={handleCloseTab}
+        onToggleSidebar={handleToggleSidebar}
+        onToggleTerminal={handleToggleTerminal}
+      />
+
       {/* Main area: activity bar + sidebar + editor */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* Background ambient glow */}
