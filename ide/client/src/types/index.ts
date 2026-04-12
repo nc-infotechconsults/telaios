@@ -58,6 +58,23 @@ export interface EditorTab {
 
 export type PanelId = "explorer" | "search" | "git" | "terminal" | "db";
 
+export type PanelPosition = "left-top" | "left-bottom" | "right-top" | "right-bottom";
+
+export type SidebarPosition = "left" | "right";
+
+export interface PanelConfig {
+  id: PanelId;
+  position: PanelPosition;
+  preferredSidebar: SidebarPosition; // Remember which sidebar this panel prefers
+  size: number; // percentage (0-100)
+  isOpen: boolean;
+}
+
+export interface DragState {
+  panelId: PanelId | null;
+  sourcePosition: PanelPosition | null;
+}
+
 // ─── Git ─────────────────────────────────────────────────────────────────────
 
 export type GitFileStatus =

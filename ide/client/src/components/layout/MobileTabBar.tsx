@@ -13,7 +13,7 @@ const TABS: { id: PanelId; label: string; icon: React.ElementType }[] = [
 export function MobileTabBar() {
   const activePanel = useEditorStore((s) => s.activePanel);
   const setActivePanel = useEditorStore((s) => s.setActivePanel);
-  const setSidebarOpen = useEditorStore((s) => s.setSidebarOpen);
+  const togglePanel = useEditorStore((s) => s.togglePanel);
   const setTerminalOpen = useEditorStore((s) => s.setTerminalOpen);
 
   function handleTab(id: PanelId) {
@@ -21,8 +21,8 @@ export function MobileTabBar() {
       setTerminalOpen(true);
       return;
     }
+    togglePanel(id);
     setActivePanel(id);
-    setSidebarOpen(true);
   }
 
   return (
