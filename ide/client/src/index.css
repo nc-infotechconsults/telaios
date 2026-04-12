@@ -1,0 +1,54 @@
+/* Tailwind v4 — import the engine */
+@import "tailwindcss";
+
+/* Load the HeroUI theme plugin (v4 compat shim) */
+@config "../tailwind.config.cjs";
+
+/* Tell Tailwind to scan HeroUI component source for class names */
+@source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
+
+/* ── Base overrides ─────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  background-color: #0d0d0f;
+  color: #e4e4e7;
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* ── Monaco editor host ──────────────────────────────────────────────────────── */
+.monaco-host {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Scrollbar styling ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}

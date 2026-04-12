@@ -1,0 +1,36 @@
+services:
+  ide-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    volumes:
+      # Docker socket — required for workspace container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Workspaces directory — must be a real host path so that child workspace
+      # containers can bind-mount the same directory.
+      - ${WORKSPACES_HOST_PATH:-/tmp/ide-workspaces}:${WORKSPACES_ROOT:-/tmp/ide-workspaces}
+    environment:
+      PORT: 4000
+      WORKSPACES_ROOT: ${WORKSPACES_ROOT:-/tmp/ide-workspaces}
+      WORKSPACES_HOST_PATH: ${WORKSPACES_HOST_PATH:-/tmp/ide-workspaces}
+      DISABLE_CONTAINERS: ${DISABLE_CONTAINERS:-false}
+      DEFAULT_CONTAINER_IMAGE: ${DEFAULT_CONTAINER_IMAGE:-ghcr.io/devcontainers/base:ubuntu}
+      SLEEP_TIMEOUT_MINUTES: ${SLEEP_TIMEOUT_MINUTES:-30}
+      PLATFORM_API_URL: ${PLATFORM_API_URL:-}
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL:-}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-}
+    restart: unless-stopped
+
+  ide-client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_IDE_SERVER_URL: ${VITE_IDE_SERVER_URL:-http://localhost:4000}
+    depends_on:
+      - ide-server
+    restart: unless-stopped
