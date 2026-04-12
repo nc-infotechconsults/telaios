@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Workspace } from "@/types";
+import type { Workspace, DbConnection, DbConnectionSchema, DbQueryResult } from "@/types";
 
 const http = axios.create({
   baseURL: "/api",
@@ -197,4 +197,70 @@ const git = {
   },
 };
 
-export const api = { workspaces, containers, git };
+// ── Database API ──────────────────────────────────────────────────────────────
+
+const db = {
+  async listConnections(workspaceId: string): Promise<DbConnection[]> {
+    const { data } = await http.get(`/db/${workspaceId}/connections`);
+    return data.data;
+  },
+
+  async addConnection(
+    workspaceId: string,
+    payload: Omit<DbConnection, "id"> & { password?: string },
+  ): Promise<DbConnection> {
+    const { data } = await http.post(`/db/${workspaceId}/connections`, payload);
+    return data.data;
+  },
+
+  async updateConnection(
+    workspaceId: string,
+    connectionId: string,
+    payload: Partial<Omit<DbConnection, "id"> & { password?: string }>,
+  ): Promise<DbConnection> {
+    const { data } = await http.patch(
+      `/db/${workspaceId}/connections/${connectionId}`,
+      payload,
+    );
+    return data.data;
+  },
+
+  async deleteConnection(
+    workspaceId: string,
+    connectionId: string,
+  ): Promise<void> {
+    await http.delete(`/db/${workspaceId}/connections/${connectionId}`);
+  },
+
+  async testConnection(
+    workspaceId: string,
+    payload: Omit<DbConnection, "id"> & { password?: string },
+  ): Promise<{ ok: boolean; error?: string }> {
+    const { data } = await http.post(`/db/${workspaceId}/test`, payload);
+    return data.data;
+  },
+
+  async getSchema(
+    workspaceId: string,
+    connectionId: string,
+  ): Promise<DbConnectionSchema> {
+    const { data } = await http.get(
+      `/db/${workspaceId}/${connectionId}/schema`,
+    );
+    return data.data;
+  },
+
+  async query(
+    workspaceId: string,
+    connectionId: string,
+    sql: string,
+  ): Promise<DbQueryResult> {
+    const { data } = await http.post(
+      `/db/${workspaceId}/${connectionId}/query`,
+      { sql },
+    );
+    return data.data;
+  },
+};
+
+export const api = { workspaces, containers, git, db };

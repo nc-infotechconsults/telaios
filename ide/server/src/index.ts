@@ -12,6 +12,7 @@ import { ContainerService } from "@/services/container.service";
 import workspaceRoutes from "@/routes/workspace";
 import containerRoutes from "@/routes/container";
 import gitRoutes from "@/routes/git";
+import dbRoutes from "@/routes/db";
 
 // ── WebSocket setup ───────────────────────────────────────────────────────────
 //
@@ -68,6 +69,7 @@ app.use(
 app.route("/api/workspaces", workspaceRoutes);
 app.route("/api/containers", containerRoutes);
 app.route("/api/git", gitRoutes);
+app.route("/api/db", dbRoutes);
 
 // ── Health ────────────────────────────────────────────────────────────────────
 

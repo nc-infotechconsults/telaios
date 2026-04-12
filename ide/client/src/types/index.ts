@@ -46,7 +46,7 @@ export interface FileContent {
 // ─── Editor ──────────────────────────────────────────────────────────────────
 
 export interface EditorTab {
-  id: string; // same as file path
+  id: string; // file path OR db://connectionId/console-N
   path: string;
   name: string;
   language: string;
@@ -54,25 +54,42 @@ export interface EditorTab {
   isDirty: boolean;
   cursorLine?: number;
   cursorColumn?: number;
+  // Virtual tab fields (Query Console)
+  isVirtual?: boolean;
+  virtualType?: "query-console";
+  connectionId?: string;
 }
 
 export type PanelId = "explorer" | "search" | "git" | "terminal" | "db";
 
-export type PanelPosition = "left-top" | "left-bottom" | "right-top" | "right-bottom";
+/**
+ * Which region a panel currently lives in.
+ *
+ * "bottom" is the full-width bottom strip (terminal).
+ * "left-bottom" / "right-bottom" are the lower halves of the sidebars.
+ */
+export type PanelArea =
+  | "left-top"
+  | "left-bottom"
+  | "right-top"
+  | "right-bottom"
+  | "bottom";
 
-export type SidebarPosition = "left" | "right";
-
-export interface PanelConfig {
+export interface PanelState {
   id: PanelId;
-  position: PanelPosition;
-  preferredSidebar: SidebarPosition; // Remember which sidebar this panel prefers
-  size: number; // percentage (0-100)
+  area: PanelArea;
+  /** Sort order within the area (0-based). */
+  order: number;
   isOpen: boolean;
+  /** Percentage size (0-100). */
+  size: number;
+  /** Timestamp of when this panel was last opened; null when closed. Used for FIFO queue. */
+  openedAt: number | null;
 }
 
 export interface DragState {
   panelId: PanelId | null;
-  sourcePosition: PanelPosition | null;
+  sourceArea: PanelArea | null;
 }
 
 // ─── Git ─────────────────────────────────────────────────────────────────────
@@ -157,6 +174,63 @@ export interface TerminalResizePayload {
   sessionId: string;
   cols: number;
   rows: number;
+}
+
+// ─── Database ─────────────────────────────────────────────────────────────────
+
+export type DbDriverType = "postgresql" | "sqlite";
+
+export interface DbConnection {
+  id: string;
+  name: string;
+  driver: DbDriverType;
+  // PostgreSQL
+  host?: string;
+  port?: number;
+  user?: string;
+  database?: string;
+  ssl?: boolean;
+  // SQLite
+  filePath?: string;
+}
+
+export interface DbColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  defaultValue?: string;
+}
+
+export interface DbTable {
+  name: string;
+  type: "table" | "view";
+  schema: string;
+  columns: DbColumn[];
+}
+
+export interface DbSchemaGroup {
+  name: string;
+  tables: DbTable[];
+}
+
+export interface DbConnectionSchema {
+  connectionId: string;
+  schemas: DbSchemaGroup[];
+}
+
+export interface DbQueryColumn {
+  name: string;
+  type: string;
+}
+
+export interface DbQueryResult {
+  columns: DbQueryColumn[];
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  executionTimeMs: number;
+  error?: string;
 }
 
 // ─── API responses ────────────────────────────────────────────────────────────

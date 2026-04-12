@@ -1,95 +1,108 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { EditorTab, PanelId, PanelPosition, PanelConfig, DragState, SidebarPosition } from "@/types";
+import type { EditorTab, PanelId, PanelArea, PanelState, DragState } from "@/types";
 import { api } from "@/lib/api";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Maximum number of panels that can be open simultaneously in a single area. */
+const MAX_OPEN_PER_AREA = 2;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function makeDefaultPanels(): Record<PanelId, PanelState> {
+  const now = Date.now();
+  return {
+    explorer: { id: "explorer", area: "left-top",    order: 0, isOpen: true,  size: 50, openedAt: now  },
+    search:   { id: "search",   area: "left-top",    order: 1, isOpen: false, size: 50, openedAt: null },
+    git:      { id: "git",      area: "left-bottom", order: 0, isOpen: false, size: 50, openedAt: null },
+    terminal: { id: "terminal", area: "bottom",      order: 0, isOpen: false, size: 50, openedAt: null },
+    db:       { id: "db",       area: "right-top",   order: 0, isOpen: false, size: 50, openedAt: null },
+  };
+}
+
+function languageFromPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    ts: "typescript",  tsx: "typescript",
+    js: "javascript",  jsx: "javascript",
+    json: "json",      md: "markdown",
+    py: "python",      rs: "rust",
+    go: "go",          java: "java",
+    css: "css",        scss: "scss",
+    html: "html",      yaml: "yaml",
+    yml: "yaml",       toml: "toml",
+    sh: "shell",       bash: "shell",
+    sql: "sql",        graphql: "graphql",
+    gql: "graphql",
+  };
+  return map[ext] ?? "plaintext";
+}
+
+// ── State interface ───────────────────────────────────────────────────────────
 
 interface EditorState {
   tabs: EditorTab[];
   activeTabId: string | null;
-  
-  // Panel configurations for all 4 slots
-  panels: Record<PanelPosition, PanelConfig | null>;
-  
-  // Which panel is currently focused (shows content)
-  activePanel: PanelId;
-  
-  // Terminal state (can be moved to any sidebar)
-  terminalOpen: boolean;
 
-  // Drag state for panel reordering
+  /** All panel states, keyed by panel id. Every panel always exists in this map. */
+  panels: Record<PanelId, PanelState>;
+
+  /** Which panel is currently focused (shows content in the sidebar header). */
+  activePanel: PanelId;
+
+  /** Drag state — set while the user is dragging a panel. */
   dragState: DragState;
 
-  // Actions
+  // ── Tab actions ──────────────────────────────────────────────────────────────
   openFile: (workspaceId: string, path: string) => Promise<void>;
   openTab: (workspaceId: string, path: string) => Promise<void>;
+  openQueryConsole: (connectionId: string, connectionName: string, initialSql?: string) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
   markTabSaved: (id: string) => void;
   saveTab: (workspaceId: string, id: string) => Promise<void>;
-  
-  setActivePanel: (panel: PanelId) => void;
-  movePanel: (panelId: PanelId, position: PanelPosition) => void;
-  togglePanel: (panelId: PanelId) => void;
-  setPanelSize: (position: PanelPosition, size: number) => void;
-  setTerminalOpen: (open: boolean) => void;
-  setTerminalPosition: (position: PanelPosition) => void;
   setCursor: (id: string, line: number, column: number) => void;
-  
-  // Drag actions
-  startDrag: (panelId: PanelId, sourcePosition: PanelPosition) => void;
+
+  // ── Panel actions ────────────────────────────────────────────────────────────
+  setActivePanel: (panel: PanelId) => void;
+
+  /**
+   * Toggle a panel open/closed.
+   * When opening, enforces the FIFO queue: if MAX_OPEN_PER_AREA panels are
+   * already open in the same area, the oldest one is closed first.
+   */
+  togglePanel: (panelId: PanelId) => void;
+
+  /**
+   * Move a panel to a different area (or reorder within the same area).
+   * `insertBefore` is the id of the panel to insert before; omit to append.
+   * Applies the FIFO queue when moving an open panel into a new area.
+   */
+  movePanel: (panelId: PanelId, targetArea: PanelArea, insertBefore?: PanelId) => void;
+
+  /** Update the stored size percentage for a panel (clamped 20-80). */
+  setPanelSize: (panelId: PanelId, size: number) => void;
+
+  // ── Drag actions ─────────────────────────────────────────────────────────────
+  /** Start dragging a panel. sourceArea is derived from the current panel state. */
+  startDrag: (panelId: PanelId) => void;
   endDrag: () => void;
 }
 
-const DEFAULT_PANELS: Record<PanelPosition, PanelConfig | null> = {
-  "left-top": { id: "explorer", position: "left-top", preferredSidebar: "left", size: 50, isOpen: true },
-  "left-bottom": { id: "search", position: "left-bottom", preferredSidebar: "left", size: 50, isOpen: true },
-  "right-top": null,
-  "right-bottom": null,
-};
-
-const DEFAULT_DRAG_STATE: DragState = {
-  panelId: null,
-  sourcePosition: null,
-};
-
-function languageFromPath(path: string): string {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const map: Record<string, string> = {
-    ts: "typescript",
-    tsx: "typescript",
-    js: "javascript",
-    jsx: "javascript",
-    json: "json",
-    md: "markdown",
-    py: "python",
-    rs: "rust",
-    go: "go",
-    java: "java",
-    css: "css",
-    scss: "scss",
-    html: "html",
-    yaml: "yaml",
-    yml: "yaml",
-    toml: "toml",
-    sh: "shell",
-    bash: "shell",
-    sql: "sql",
-    graphql: "graphql",
-    gql: "graphql",
-  };
-  return map[ext] ?? "plaintext";
-}
+// ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useEditorStore = create<EditorState>()(
   devtools(
     (set, get) => ({
       tabs: [],
       activeTabId: null,
-      panels: { ...DEFAULT_PANELS },
+      panels: makeDefaultPanels(),
       activePanel: "explorer",
-      terminalOpen: false,
-      dragState: { ...DEFAULT_DRAG_STATE },
+      dragState: { panelId: null, sourceArea: null },
+
+      // ── Tab actions ───────────────────────────────────────────────────────────
 
       async openFile(workspaceId, path) {
         const existing = get().tabs.find((t) => t.path === path);
@@ -97,12 +110,7 @@ export const useEditorStore = create<EditorState>()(
           set({ activeTabId: existing.id });
           return;
         }
-
-        const { content, encoding } = await api.workspaces.readFile(
-          workspaceId,
-          path,
-        );
-
+        const { content, encoding } = await api.workspaces.readFile(workspaceId, path);
         const tab: EditorTab = {
           id: path,
           path,
@@ -111,12 +119,34 @@ export const useEditorStore = create<EditorState>()(
           content: encoding === "base64" ? "(binary file)" : content,
           isDirty: false,
         };
-
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },
 
       openTab: async (workspaceId, path) => {
         await get().openFile(workspaceId, path);
+      },
+
+      openQueryConsole(connectionId, connectionName, initialSql) {
+        const existing = get().tabs.find(
+          (t) => t.isVirtual && t.connectionId === connectionId,
+        );
+        if (existing) {
+          set({ activeTabId: existing.id });
+          return;
+        }
+        const id = `db://${connectionId}/console-${Date.now()}`;
+        const tab: EditorTab = {
+          id,
+          path: id,
+          name: connectionName,
+          language: "sql",
+          content: initialSql ?? "",
+          isDirty: false,
+          isVirtual: true,
+          virtualType: "query-console",
+          connectionId,
+        };
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },
 
       closeTab(id) {
@@ -125,8 +155,7 @@ export const useEditorStore = create<EditorState>()(
           const newTabs = s.tabs.filter((t) => t.id !== id);
           let activeTabId = s.activeTabId;
           if (activeTabId === id) {
-            activeTabId =
-              newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null;
+            activeTabId = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null;
           }
           return { tabs: newTabs, activeTabId };
         });
@@ -138,17 +167,13 @@ export const useEditorStore = create<EditorState>()(
 
       updateTabContent(id, content) {
         set((s) => ({
-          tabs: s.tabs.map((t) =>
-            t.id === id ? { ...t, content, isDirty: true } : t,
-          ),
+          tabs: s.tabs.map((t) => (t.id === id ? { ...t, content, isDirty: true } : t)),
         }));
       },
 
       markTabSaved(id) {
         set((s) => ({
-          tabs: s.tabs.map((t) =>
-            t.id === id ? { ...t, isDirty: false } : t,
-          ),
+          tabs: s.tabs.map((t) => (t.id === id ? { ...t, isDirty: false } : t)),
         }));
       },
 
@@ -159,153 +184,124 @@ export const useEditorStore = create<EditorState>()(
         get().markTabSaved(id);
       },
 
-      setActivePanel(panel) {
-        set({ activePanel: panel });
-      },
-
-      movePanel(panelId, targetPosition) {
-        set((s) => {
-          const newPanels = { ...s.panels };
-          
-          // Find current position of this panel
-          let sourcePosition: PanelPosition | null = null;
-          let currentConfig: PanelConfig | null = null;
-          for (const [pos, config] of Object.entries(newPanels)) {
-            if (config?.id === panelId) {
-              sourcePosition = pos as PanelPosition;
-              currentConfig = config;
-              break;
-            }
-          }
-
-          // If moving to same position, do nothing
-          if (sourcePosition === targetPosition) return s;
-
-          // If target is occupied, swap them
-          const targetConfig = newPanels[targetPosition];
-          if (targetConfig && sourcePosition) {
-            newPanels[sourcePosition] = { ...targetConfig, position: sourcePosition };
-          }
-
-          // Move panel to new position, updating preferredSidebar to match new side
-          const newSide: SidebarPosition = targetPosition.includes("left") ? "left" : "right";
-          newPanels[targetPosition] = { 
-            id: panelId, 
-            position: targetPosition, 
-            preferredSidebar: newSide,
-            size: targetConfig?.size ?? currentConfig?.size ?? 50, 
-            isOpen: true 
-          };
-
-          return { panels: newPanels };
-        });
-      },
-
-      togglePanel(panelId) {
-        set((s) => {
-          const newPanels = { ...s.panels };
-          
-          // Find current position of this panel (regardless of isOpen state)
-          let currentPosition: PanelPosition | null = null;
-          let currentConfig: PanelConfig | null = null;
-          for (const [pos, config] of Object.entries(newPanels)) {
-            if (config?.id === panelId) {
-              currentPosition = pos as PanelPosition;
-              currentConfig = config;
-              break;
-            }
-          }
-
-          if (currentPosition && currentConfig) {
-            if (currentConfig.isOpen) {
-              // Panel is open → close it in place
-              newPanels[currentPosition] = { ...currentConfig, isOpen: false };
-            } else {
-              // Panel is in the map but closed → re-open it in place
-              newPanels[currentPosition] = { ...currentConfig, isOpen: true };
-            }
-          } else {
-            // Panel is not in the map at all — find a free slot
-            const preferred: SidebarPosition = "left";
-            const topPos: PanelPosition = preferred === "left" ? "left-top" : "right-top";
-            const bottomPos: PanelPosition = preferred === "left" ? "left-bottom" : "right-bottom";
-            
-            // Try preferred sidebar first
-            const positions: PanelPosition[] = [topPos, bottomPos];
-            for (const pos of positions) {
-              if (!newPanels[pos] || !newPanels[pos]?.isOpen) {
-                newPanels[pos] = { 
-                  id: panelId, 
-                  position: pos, 
-                  preferredSidebar: preferred,
-                  size: 50, 
-                  isOpen: true 
-                };
-                return { panels: newPanels };
-              }
-            }
-            
-            // If preferred sidebar is full, try the other sidebar
-            const altSide: SidebarPosition = preferred === "left" ? "right" : "left";
-            const altTopPos: PanelPosition = preferred === "left" ? "right-top" : "left-top";
-            const altBottomPos: PanelPosition = preferred === "left" ? "right-bottom" : "left-bottom";
-            const altPositions: PanelPosition[] = [altTopPos, altBottomPos];
-            for (const pos of altPositions) {
-              if (!newPanels[pos] || !newPanels[pos]?.isOpen) {
-                newPanels[pos] = { 
-                  id: panelId, 
-                  position: pos, 
-                  preferredSidebar: altSide,
-                  size: 50, 
-                  isOpen: true 
-                };
-                return { panels: newPanels };
-              }
-            }
-          }
-
-          return { panels: newPanels };
-        });
-      },
-
-      setPanelSize(position, size) {
-        set((s) => {
-          const config = s.panels[position];
-          if (!config) return s;
-          return {
-            panels: {
-              ...s.panels,
-              [position]: { ...config, size: Math.max(20, Math.min(80, size)) },
-            },
-          };
-        });
-      },
-
-      setTerminalOpen(open) {
-        set({ terminalOpen: open });
-      },
-
-      setTerminalPosition(position) {
-        // Terminal is special - it uses its own state, not in panels config
-        // This would be stored separately if needed
-      },
-
       setCursor(id, line, column) {
         set((s) => ({
           tabs: s.tabs.map((t) =>
-            t.id === id
-              ? { ...t, cursorLine: line, cursorColumn: column }
-              : t,
+            t.id === id ? { ...t, cursorLine: line, cursorColumn: column } : t,
           ),
         }));
       },
 
-      startDrag(panelId, sourcePosition) {
-        set({ dragState: { panelId, sourcePosition } });
+      // ── Panel actions ─────────────────────────────────────────────────────────
+
+      setActivePanel(panel) {
+        set({ activePanel: panel });
+      },
+
+      togglePanel(panelId) {
+        set((s) => {
+          const panels = { ...s.panels };
+          const panel = panels[panelId];
+
+          if (panel.isOpen) {
+            // Close it
+            panels[panelId] = { ...panel, isOpen: false, openedAt: null };
+            return { panels };
+          }
+
+          // Opening — enforce FIFO queue for the panel's area
+          const openInArea = Object.values(panels).filter(
+            (p) => p.area === panel.area && p.isOpen && p.id !== panelId,
+          );
+          // Sort oldest-first
+          openInArea.sort((a, b) => (a.openedAt ?? 0) - (b.openedAt ?? 0));
+
+          if (openInArea.length >= MAX_OPEN_PER_AREA) {
+            const oldest = openInArea[0];
+            panels[oldest.id] = { ...panels[oldest.id], isOpen: false, openedAt: null };
+          }
+
+          panels[panelId] = { ...panel, isOpen: true, openedAt: Date.now() };
+          return { panels };
+        });
+      },
+
+      movePanel(panelId, targetArea, insertBefore) {
+        set((s) => {
+          const panels = { ...s.panels };
+          const panel = panels[panelId];
+          const oldArea = panel.area;
+
+          // ① FIFO: if moving an open panel into a different area, may need to
+          //    close the oldest open panel there.
+          if (panel.isOpen && oldArea !== targetArea) {
+            const openInTarget = Object.values(panels).filter(
+              (p) => p.area === targetArea && p.isOpen && p.id !== panelId,
+            );
+            openInTarget.sort((a, b) => (a.openedAt ?? 0) - (b.openedAt ?? 0));
+            if (openInTarget.length >= MAX_OPEN_PER_AREA) {
+              const oldest = openInTarget[0];
+              panels[oldest.id] = { ...panels[oldest.id], isOpen: false, openedAt: null };
+            }
+          }
+
+          // ② Re-normalise old area (remove the panel from its current slot)
+          if (oldArea !== targetArea) {
+            // Temporarily mark it as belonging to targetArea so filters exclude it
+            panels[panelId] = { ...panel, area: targetArea };
+            const remaining = Object.values(panels)
+              .filter((p) => p.area === oldArea)
+              .sort((a, b) => a.order - b.order);
+            remaining.forEach((p, i) => {
+              panels[p.id] = { ...panels[p.id], order: i };
+            });
+          }
+
+          // ③ Compute final ordering in target area (insert at the right position)
+          const targetOthers = Object.values(panels)
+            .filter((p) => p.area === targetArea && p.id !== panelId)
+            .sort((a, b) => a.order - b.order);
+
+          let insertIdx = targetOthers.length; // default: append
+          if (insertBefore !== undefined) {
+            const idx = targetOthers.findIndex((p) => p.id === insertBefore);
+            if (idx !== -1) insertIdx = idx;
+          }
+
+          // Build the full ordered list for the target area
+          const finalIds = targetOthers.map((p) => p.id);
+          finalIds.splice(insertIdx, 0, panelId);
+
+          finalIds.forEach((id, i) => {
+            panels[id] = { ...panels[id], area: targetArea, order: i };
+          });
+
+          return { panels };
+        });
+      },
+
+      setPanelSize(panelId, size) {
+        set((s) => ({
+          panels: {
+            ...s.panels,
+            [panelId]: {
+              ...s.panels[panelId],
+              size: Math.max(20, Math.min(80, size)),
+            },
+          },
+        }));
+      },
+
+      // ── Drag actions ──────────────────────────────────────────────────────────
+
+      startDrag(panelId) {
+        set((s) => ({
+          dragState: { panelId, sourceArea: s.panels[panelId].area },
+        }));
       },
 
       endDrag() {
-        set({ dragState: { panelId: null, sourcePosition: null } });
+        set({ dragState: { panelId: null, sourceArea: null } });
       },
     }),
     { name: "editor-store" },

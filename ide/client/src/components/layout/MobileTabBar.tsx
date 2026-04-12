@@ -14,13 +14,8 @@ export function MobileTabBar() {
   const activePanel = useEditorStore((s) => s.activePanel);
   const setActivePanel = useEditorStore((s) => s.setActivePanel);
   const togglePanel = useEditorStore((s) => s.togglePanel);
-  const setTerminalOpen = useEditorStore((s) => s.setTerminalOpen);
 
   function handleTab(id: PanelId) {
-    if (id === "terminal") {
-      setTerminalOpen(true);
-      return;
-    }
     togglePanel(id);
     setActivePanel(id);
   }

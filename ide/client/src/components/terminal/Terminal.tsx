@@ -14,7 +14,7 @@ export function Terminal({ workspaceId }: Props) {
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const setTerminalOpen = useEditorStore((s) => s.setTerminalOpen);
+  const togglePanel = useEditorStore((s) => s.togglePanel);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -105,15 +105,6 @@ export function Terminal({ workspaceId }: Props) {
 
   return (
     <div className="flex flex-col h-full bg-[#0d0d0f]">
-      <div className="flex items-center justify-between px-3 py-1 border-b border-zinc-800 bg-[#111113] shrink-0">
-        <span className="text-xs text-zinc-400">Terminal</span>
-        <button
-          onClick={() => setTerminalOpen(false)}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-        >
-          ✕
-        </button>
-      </div>
       <div ref={containerRef} className="flex-1 p-1 overflow-hidden" />
     </div>
   );

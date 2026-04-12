@@ -13,7 +13,7 @@ export function StatusBar({ workspaceId }: Props) {
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const tabs = useEditorStore((s) => s.tabs);
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const setTerminalOpen = useEditorStore((s) => s.setTerminalOpen);
+  const togglePanel = useEditorStore((s) => s.togglePanel);
 
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
 
@@ -66,14 +66,6 @@ export function StatusBar({ workspaceId }: Props) {
             <span>{activeTab.language}</span>
           </>
         )}
-        <button
-          onClick={() => setTerminalOpen(true)}
-          className="flex items-center gap-1.5 hover:text-white transition-colors group"
-          title="Open terminal"
-        >
-          <Terminal size={14} className="text-cyan-400 group-hover:text-cyan-300 transition-colors" />
-          <span>Terminal</span>
-        </button>
       </div>
     </div>
   );

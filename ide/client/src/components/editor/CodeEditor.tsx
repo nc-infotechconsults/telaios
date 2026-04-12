@@ -2,6 +2,7 @@ import MonacoEditor, { type OnMount, type Monaco } from "@monaco-editor/react";
 import { useEditorStore } from "@/stores/editorStore";
 import { EditorTabBar } from "./EditorTabBar";
 import { EditorBreadcrumb } from "./EditorBreadcrumb";
+import { QueryConsole } from "./QueryConsole";
 import { useCallback, useRef } from "react";
 import { FileCode, Keyboard } from "lucide-react";
 
@@ -105,6 +106,22 @@ export function CodeEditor({ workspaceId }: Props) {
               <span>Cmd+S or Ctrl+S to save</span>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Virtual tab: Query Console
+  if (activeTab.isVirtual && activeTab.virtualType === "query-console" && activeTab.connectionId) {
+    return (
+      <div className="flex flex-col h-full bg-transparent">
+        <EditorTabBar workspaceId={workspaceId} />
+        <div className="flex-1 min-h-0">
+          <QueryConsole
+            tabId={activeTab.id}
+            connectionId={activeTab.connectionId}
+            workspaceId={workspaceId}
+          />
         </div>
       </div>
     );
