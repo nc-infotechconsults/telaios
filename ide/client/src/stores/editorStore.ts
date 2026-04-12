@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { EditorTab, PanelId, PanelArea, PanelState, DragState } from "@/types";
+import type { EditorTab, PanelId, PanelArea, PanelState, DragState, CollapsedSections, SectionKey } from "@/types";
 import { api } from "@/lib/api";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -13,11 +13,11 @@ const MAX_OPEN_PER_AREA = 2;
 function makeDefaultPanels(): Record<PanelId, PanelState> {
   const now = Date.now();
   return {
-    explorer: { id: "explorer", area: "left-top",    order: 0, isOpen: true,  size: 50, openedAt: now  },
-    search:   { id: "search",   area: "left-top",    order: 1, isOpen: false, size: 50, openedAt: null },
-    git:      { id: "git",      area: "left-bottom", order: 0, isOpen: false, size: 50, openedAt: null },
-    terminal: { id: "terminal", area: "bottom",      order: 0, isOpen: false, size: 50, openedAt: null },
-    db:       { id: "db",       area: "right-top",   order: 0, isOpen: false, size: 50, openedAt: null },
+    explorer: { id: "explorer", area: "left-top",    order: 0, isOpen: true,  isCollapsed: false, size: 50, openedAt: now  },
+    search:   { id: "search",   area: "left-top",    order: 1, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
+    git:      { id: "git",      area: "left-bottom", order: 0, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
+    terminal: { id: "terminal", area: "bottom",      order: 0, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
+    db:       { id: "db",       area: "right-top",   order: 0, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
   };
 }
 
@@ -54,6 +54,9 @@ interface EditorState {
   /** Drag state — set while the user is dragging a panel. */
   dragState: DragState;
 
+  /** Which sidebar sections are collapsed (section hidden, panel isOpen unchanged). */
+  collapsedSections: CollapsedSections;
+
   // ── Tab actions ──────────────────────────────────────────────────────────────
   openFile: (workspaceId: string, path: string) => Promise<void>;
   openTab: (workspaceId: string, path: string) => Promise<void>;
@@ -85,6 +88,12 @@ interface EditorState {
   /** Update the stored size percentage for a panel (clamped 20-80). */
   setPanelSize: (panelId: PanelId, size: number) => void;
 
+  /** Toggle a panel's collapse-to-header state within its section. */
+  togglePanelCollapse: (panelId: PanelId) => void;
+
+  /** Toggle collapse for an entire sidebar section (top or bottom half of a sidebar). */
+  toggleSectionCollapse: (section: SectionKey) => void;
+
   // ── Drag actions ─────────────────────────────────────────────────────────────
   /** Start dragging a panel. sourceArea is derived from the current panel state. */
   startDrag: (panelId: PanelId) => void;
@@ -101,6 +110,7 @@ export const useEditorStore = create<EditorState>()(
       panels: makeDefaultPanels(),
       activePanel: "explorer",
       dragState: { panelId: null, sourceArea: null },
+      collapsedSections: {},
 
       // ── Tab actions ───────────────────────────────────────────────────────────
 
@@ -204,8 +214,8 @@ export const useEditorStore = create<EditorState>()(
           const panel = panels[panelId];
 
           if (panel.isOpen) {
-            // Close it
-            panels[panelId] = { ...panel, isOpen: false, openedAt: null };
+            // Close it — also un-collapse so it opens fresh next time
+            panels[panelId] = { ...panel, isOpen: false, isCollapsed: false, openedAt: null };
             return { panels };
           }
 
@@ -288,6 +298,27 @@ export const useEditorStore = create<EditorState>()(
               ...s.panels[panelId],
               size: Math.max(20, Math.min(80, size)),
             },
+          },
+        }));
+      },
+
+      togglePanelCollapse(panelId) {
+        set((s) => ({
+          panels: {
+            ...s.panels,
+            [panelId]: {
+              ...s.panels[panelId],
+              isCollapsed: !s.panels[panelId].isCollapsed,
+            },
+          },
+        }));
+      },
+
+      toggleSectionCollapse(section) {
+        set((s) => ({
+          collapsedSections: {
+            ...s.collapsedSections,
+            [section]: !s.collapsedSections[section],
           },
         }));
       },

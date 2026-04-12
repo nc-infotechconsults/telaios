@@ -81,11 +81,20 @@ export interface PanelState {
   /** Sort order within the area (0-based). */
   order: number;
   isOpen: boolean;
+  /** When true the panel is shrunk to its header bar only (accordion-style). */
+  isCollapsed: boolean;
   /** Percentage size (0-100). */
   size: number;
   /** Timestamp of when this panel was last opened; null when closed. Used for FIFO queue. */
   openedAt: number | null;
 }
+
+/**
+ * Tracks which sidebar section is currently collapsed.
+ * A collapsed section hides all its panels without changing their isOpen state.
+ */
+export type SectionKey = "left-top" | "left-bottom" | "right-top" | "right-bottom";
+export type CollapsedSections = Partial<Record<SectionKey, boolean>>;
 
 export interface DragState {
   panelId: PanelId | null;
