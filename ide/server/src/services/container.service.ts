@@ -234,19 +234,19 @@ export const ContainerService = {
     resize: (cols: number, rows: number) => Promise<void>;
   }> {
     if (config.DISABLE_CONTAINERS) {
-      // Spawn a real PTY using the host shell inside the workspace directory.
+      // Spawn a real PTY using the host shell inside the workspace directory via bun-pty.
       const { EventEmitter } = await import("node:events");
       const { mkdir } = await import("node:fs/promises");
-      const pty = await import("node-pty");
+      const pty = await import("bun-pty");
 
       const workspacePath = path.join(config.WORKSPACES_ROOT, workspaceId);
       const shell = process.env.SHELL ?? "/bin/bash";
 
       // The workspace dir may not exist yet (clone still in progress, or
-      // non-git source).  Create it so node-pty doesn't throw posix_spawnp.
+      // non-git source).  Create it so bun-pty doesn't throw.
       await mkdir(workspacePath, { recursive: true });
 
-      // node-pty requires env values to be strings (not string | undefined)
+      // bun-pty requires env values to be strings (not string | undefined)
       const env: Record<string, string> = {};
       for (const [k, v] of Object.entries(process.env)) {
         if (v !== undefined) env[k] = v;
@@ -263,7 +263,7 @@ export const ContainerService = {
 
       const emitter = new EventEmitter();
 
-      // node-pty fires data as strings; the WS handler expects Buffer chunks
+      // bun-pty fires data as strings; the WS handler expects Buffer chunks
       ptyProcess.onData((data: string) => {
         emitter.emit("data", Buffer.from(data, "utf-8"));
       });

@@ -8,6 +8,9 @@ import { StatusBar } from "./StatusBar";
 import { MobileTabBar } from "./MobileTabBar";
 import { TopMenu } from "./TopMenu";
 import { FileExplorer } from "@/components/explorer/FileExplorer";
+import { SearchPanel } from "@/components/panels/SearchPanel";
+import { GitPanel } from "@/components/panels/GitPanel";
+import { DatabasePanel } from "@/components/panels/DatabasePanel";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { Terminal } from "@/components/terminal/Terminal";
 import { useEditorStore } from "@/stores/editorStore";
@@ -57,15 +60,22 @@ export function PanelLayout({ workspaceId }: Props) {
   }
 
   const SideContent = () => {
-    if (activePanel === "explorer") {
-      return <FileExplorer workspaceId={workspaceId} />;
+    switch (activePanel) {
+      case "explorer":
+        return <FileExplorer workspaceId={workspaceId} />;
+      case "search":
+        return <SearchPanel workspaceId={workspaceId} />;
+      case "git":
+        return <GitPanel workspaceId={workspaceId} />;
+      case "db":
+        return <DatabasePanel />;
+      default:
+        return (
+          <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+            Panel coming soon
+          </div>
+        );
     }
-    // Other panels (git, search, db) will be added later
-    return (
-      <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
-        Panel coming soon
-      </div>
-    );
   };
 
   return (
@@ -81,7 +91,7 @@ export function PanelLayout({ workspaceId }: Props) {
       />
 
       {/* Main area: activity bar + sidebar + editor */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         {/* Background ambient glow */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/5 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -90,7 +100,7 @@ export function PanelLayout({ workspaceId }: Props) {
         <ActivityBar />
 
         {/* Sidebar + editor split */}
-        <PanelGroup direction="horizontal" className="flex-1 relative z-10">
+        <PanelGroup direction="horizontal" className="flex-1 relative">
           {sidebarOpen && (
             <>
               <Panel

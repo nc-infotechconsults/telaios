@@ -24,6 +24,51 @@ export function CodeEditor({ workspaceId }: Props) {
     (editor, monaco: Monaco) => {
       editorRef.current = editor;
 
+      monaco.editor.defineTheme("glassmorphism-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "", foreground: "e4e4e7", background: "0a0a0c" },
+          { token: "comment", foreground: "71717a", fontStyle: "italic" },
+          { token: "keyword", foreground: "c084fc" },
+          { token: "string", foreground: "22d3ee" },
+          { token: "number", foreground: "fbbf24" },
+          { token: "type", foreground: "38bdf8" },
+          { token: "function", foreground: "a78bfa" },
+          { token: "variable", foreground: "e4e4e7" },
+          { token: "constant", foreground: "f472b6" },
+          { token: "operator", foreground: "a1a1aa" },
+          { token: "delimiter", foreground: "a1a1aa" },
+          { token: "tag", foreground: "f472b6" },
+          { token: "attribute.name", foreground: "c084fc" },
+          { token: "attribute.value", foreground: "22d3ee" },
+        ],
+        colors: {
+          "editor.background": "#0a0a0c",
+          "editor.foreground": "#e4e4e7",
+          "editor.lineHighlightBackground": "#1f1f23",
+          "editor.selectionBackground": "#3b3b5c66",
+          "editor.inactiveSelectionBackground": "#3b3b5c33",
+          "editorLineNumber.foreground": "#52525b",
+          "editorLineNumber.activeForeground": "#a1a1aa",
+          "editorIndentGuide.background": "#27272a",
+          "editorIndentGuide.activeBackground": "#3f3f46",
+          "editorCursor.foreground": "#22d3ee",
+          "editorWhitespace.foreground": "#27272a",
+          "editor.findMatchBackground": "#8b5cf633",
+          "editor.findMatchHighlightBackground": "#8b5cf622",
+          "editorBracketMatch.background": "#8b5cf644",
+          "editorBracketMatch.border": "#8b5cf6",
+          "scrollbar.shadow": "#00000000",
+          "scrollbarSlider.background": "#3f3f4680",
+          "scrollbarSlider.hoverBackground": "#52525b80",
+          "scrollbarSlider.activeBackground": "#71717a80",
+          "editorGutter.background": "#0a0a0c",
+          "minimap.background": "#09090b",
+        },
+      });
+      monaco.editor.setTheme("glassmorphism-dark");
+
       // Save on Ctrl/Cmd+S
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
         if (activeTabId) saveTab(workspaceId, activeTabId);
@@ -74,7 +119,7 @@ export function CodeEditor({ workspaceId }: Props) {
           key={activeTab.id}
           language={activeTab.language}
           value={activeTab.content}
-          theme="vs-dark"
+          theme="glassmorphism-dark"
           onMount={handleMount}
           onChange={(value) => {
             if (activeTabId && value !== undefined) {

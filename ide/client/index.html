@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#09090b" />
     <title>AgentScope IDE</title>
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="description" content="Container-native web IDE for AI-assisted development" />
     <!-- PWA -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -15,5 +16,12 @@
   <body class="bg-zinc-950 text-zinc-100 overflow-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>

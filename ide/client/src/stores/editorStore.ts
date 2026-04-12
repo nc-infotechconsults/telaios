@@ -12,6 +12,7 @@ interface EditorState {
 
   // Actions
   openFile: (workspaceId: string, path: string) => Promise<void>;
+  openTab: (workspaceId: string, path: string) => Promise<void>;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
@@ -82,6 +83,10 @@ export const useEditorStore = create<EditorState>()(
         };
 
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+      },
+
+      openTab: async (workspaceId, path) => {
+        await get().openFile(workspaceId, path);
       },
 
       closeTab(id) {

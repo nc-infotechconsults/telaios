@@ -203,7 +203,7 @@ export function TopMenu(props: Props) {
   return (
     <div 
       ref={menuRef}
-      className="flex items-center h-9 bg-[#111113]/80 backdrop-blur-md border-b border-white/[0.05] px-2 gap-0.5 shrink-0"
+      className="flex items-center h-9 bg-[#111113]/80 backdrop-blur-md border-b border-white/[0.05] px-2 gap-0.5 shrink-0 z-50"
     >
       {/* Logo / App name */}
       <div className="flex items-center gap-1.5 px-2 mr-2">

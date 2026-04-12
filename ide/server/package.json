@@ -9,19 +9,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.6.0",
     "@hono/zod-validator": "^0.4.0",
-    "zod": "^3.23.0",
-    "dockerode": "^4.0.0",
-    "node-pty": "^1.0.0",
-    "simple-git": "^3.25.0",
-    "chokidar": "^4.0.0",
-    "pg": "^8.12.0",
-    "mysql2": "^3.11.0",
-    "mongodb": "^6.9.0",
-    "ioredis": "^5.4.1",
     "better-sqlite3": "^9.6.0",
-    "diff": "^7.0.0"
+    "bun-pty": "^0.4.8",
+    "chokidar": "^4.0.0",
+    "diff": "^7.0.0",
+    "dockerode": "^4.0.0",
+    "hono": "^4.6.0",
+    "ioredis": "^5.4.1",
+    "mongodb": "^6.9.0",
+    "mysql2": "^3.11.0",
+    "pg": "^8.12.0",
+    "simple-git": "^3.25.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/dockerode": "^3.3.29",
