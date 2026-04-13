@@ -17,7 +17,7 @@ export function CommitList({ commits, onSelect }: Props) {
   }
 
   return (
-    <div className="divide-y divide-white/[0.03]">
+    <div>
       {commits.map((commit) => (
         <CommitRow key={commit.hash} commit={commit} onSelect={onSelect} />
       ))}
@@ -26,29 +26,28 @@ export function CommitList({ commits, onSelect }: Props) {
 }
 
 function CommitRow({ commit, onSelect }: { commit: GitCommit; onSelect?: (commit: GitCommit) => void }) {
-  const refs = commit.refs.filter(Boolean);
+  const refs = commit.refs.filter(Boolean).slice(0, 3);
 
   return (
-    <div className="px-3 py-2 hover:bg-white/[0.03] group cursor-pointer" onClick={() => onSelect?.(commit)}>
-      {/* Ref badges */}
-      {refs.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-1">
-          {refs.map((ref) => (
-            <RefBadge key={ref} ref_={ref} />
-          ))}
-        </div>
-      )}
+    <div
+      className="px-3 py-1.5 hover:bg-white/[0.04] group cursor-pointer border-b border-white/[0.03] last:border-0"
+      onClick={() => onSelect?.(commit)}
+    >
+      {/* Line 1: message + date */}
+      <div className="flex items-baseline gap-2">
+        <p className="text-[11px] text-zinc-200 truncate flex-1 leading-snug">{commit.message}</p>
+        <span className="text-[9px] text-zinc-600 shrink-0 tabular-nums">{commit.date}</span>
+      </div>
 
-      {/* Commit message */}
-      <p className="text-xs text-zinc-200 truncate leading-snug">{commit.message}</p>
-
-      {/* Meta row */}
-      <div className="flex items-center gap-2 mt-0.5">
-        <span className="font-mono text-[10px] text-zinc-500 group-hover:text-violet-400 transition-colors">
+      {/* Line 2: shortHash + ref badges + author */}
+      <div className="flex items-center gap-1.5 mt-0.5">
+        <span className="font-mono text-[9px] text-zinc-500 group-hover:text-violet-400 transition-colors shrink-0">
           {commit.shortHash}
         </span>
-        <span className="text-[10px] text-zinc-600 truncate">{commit.author}</span>
-        <span className="text-[10px] text-zinc-600 ml-auto shrink-0">{commit.date}</span>
+        {refs.map((ref) => (
+          <RefBadge key={ref} ref_={ref} />
+        ))}
+        <span className="text-[9px] text-zinc-600 ml-auto truncate">{commit.author}</span>
       </div>
     </div>
   );
@@ -70,7 +69,7 @@ function RefBadge({ ref_ }: { ref_: string }) {
   const label = isTag ? ref_.replace("tag: ", "") : ref_.replace("HEAD -> ", "");
 
   return (
-    <span className={`inline-flex items-center px-1 py-px text-[9px] font-medium rounded border ${colors}`}>
+    <span className={`inline-flex items-center px-1 py-px text-[8px] font-medium rounded border shrink-0 ${colors}`}>
       {label}
     </span>
   );
