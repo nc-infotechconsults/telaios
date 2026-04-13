@@ -5,7 +5,7 @@ import { Hexagon } from "lucide-react";
 
 export function WorkspacesPage() {
   return (
-    <div className="min-h-screen bg-[#0d0d0f] relative overflow-hidden flex items-start justify-center px-4 pt-20 pb-16">
+    <div className="h-screen overflow-y-auto overflow-x-hidden bg-[#0d0d0f] relative flex items-start justify-center px-4 pt-20 pb-16">
       <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-violet-600/20 blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-600/20 blur-[120px] pointer-events-none" />
 

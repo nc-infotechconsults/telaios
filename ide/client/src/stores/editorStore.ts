@@ -67,6 +67,8 @@ interface EditorState {
   markTabSaved: (id: string) => void;
   saveTab: (workspaceId: string, id: string) => Promise<void>;
   setCursor: (id: string, line: number, column: number) => void;
+  /** Update tab path/name/id after a file rename. No-op if the path is not open. */
+  renameTab: (oldPath: string, newPath: string) => void;
 
   // ── Panel actions ────────────────────────────────────────────────────────────
   setActivePanel: (panel: PanelId) => void;
@@ -200,6 +202,27 @@ export const useEditorStore = create<EditorState>()(
             t.id === id ? { ...t, cursorLine: line, cursorColumn: column } : t,
           ),
         }));
+      },
+
+      renameTab(oldPath, newPath) {
+        set((s) => {
+          const hasTab = s.tabs.some((t) => t.path === oldPath);
+          if (!hasTab) return s;
+          return {
+            tabs: s.tabs.map((t) =>
+              t.path === oldPath
+                ? {
+                    ...t,
+                    id: newPath,
+                    path: newPath,
+                    name: newPath.split("/").pop() ?? newPath,
+                    language: languageFromPath(newPath),
+                  }
+                : t,
+            ),
+            activeTabId: s.activeTabId === oldPath ? newPath : s.activeTabId,
+          };
+        });
       },
 
       // ── Panel actions ─────────────────────────────────────────────────────────
