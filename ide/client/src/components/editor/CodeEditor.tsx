@@ -3,6 +3,7 @@ import { useEditorStore } from "@/stores/editorStore";
 import { EditorTabBar } from "./EditorTabBar";
 import { EditorBreadcrumb } from "./EditorBreadcrumb";
 import { QueryConsole } from "./QueryConsole";
+import { CommitDetailView } from "@/components/git/CommitDetailView";
 import { useCallback, useRef } from "react";
 import { FileCode, Keyboard } from "lucide-react";
 
@@ -152,6 +153,18 @@ export function CodeEditor({ workspaceId }: Props) {
               padding: { top: 12 },
             }}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // Virtual tab: Commit detail
+  if (activeTab.isVirtual && activeTab.virtualType === "commit-detail" && activeTab.commitDetail) {
+    return (
+      <div className="flex flex-col h-full bg-transparent">
+        <EditorTabBar workspaceId={workspaceId} />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <CommitDetailView workspaceId={workspaceId} detail={activeTab.commitDetail} />
         </div>
       </div>
     );

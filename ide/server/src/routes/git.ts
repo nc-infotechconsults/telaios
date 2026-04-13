@@ -248,6 +248,14 @@ app.post(
   },
 );
 
+// ── Show commit ───────────────────────────────────────────────────────────────
+// GET /api/git/:id/show/:hash
+app.get("/:id/show/:hash", async (c) => {
+  const { id, hash } = c.req.param();
+  const detail = await GitService.showCommit(id, hash);
+  return c.json({ data: detail });
+});
+
 // ── Clone ─────────────────────────────────────────────────────────────────────
 // POST /api/git/clone
 app.post(

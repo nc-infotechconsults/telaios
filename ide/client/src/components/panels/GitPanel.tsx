@@ -59,6 +59,7 @@ export function GitPanel({ workspaceId }: Props) {
   } = useGitStore();
 
   const openDiff = useEditorStore((s) => s.openDiff);
+  const openCommitDetail = useEditorStore((s) => s.openCommitDetail);
 
   const [commitMsg, setCommitMsg] = useState("");
   const [amend, setAmend] = useState(false);
@@ -296,6 +297,7 @@ export function GitPanel({ workspaceId }: Props) {
                       key={f.path}
                       file={f}
                       onStage={() => stage(workspaceId, [f.path])}
+                      onOpenDiff={() => openDiff(workspaceId, f.path, false)}
                     />
                   ))}
                 </AnimatePresence>
@@ -319,6 +321,7 @@ export function GitPanel({ workspaceId }: Props) {
                       key={f.path}
                       file={f}
                       onStage={() => stage(workspaceId, [f.path])}
+                      onOpenDiff={() => openDiff(workspaceId, f.path, false)}
                     />
                   ))}
                 </AnimatePresence>
@@ -336,8 +339,8 @@ export function GitPanel({ workspaceId }: Props) {
               </div>
             ) : (
               <>
-                <GitGraph commits={log} />
-                <CommitList commits={log} />
+                <GitGraph commits={log} onSelect={(c) => openCommitDetail(workspaceId, c.hash)} />
+                <CommitList commits={log} onSelect={(c) => openCommitDetail(workspaceId, c.hash)} />
               </>
             )}
           </div>

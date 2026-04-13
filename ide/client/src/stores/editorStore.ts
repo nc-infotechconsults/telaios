@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { EditorTab, PanelId, PanelArea, PanelState, DragState, CollapsedSections, SectionKey } from "@/types";
+import type { EditorTab, PanelId, PanelArea, PanelState, DragState, CollapsedSections, SectionKey, GitCommitFile, GitCommitDetail } from "@/types";
 import { api } from "@/lib/api";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -62,6 +62,15 @@ interface EditorState {
   openTab: (workspaceId: string, path: string) => Promise<void>;
   openQueryConsole: (connectionId: string, connectionName: string, initialSql?: string) => void;
   openDiff: (workspaceId: string, filePath: string, staged: boolean) => Promise<void>;
+  /** Open a commit detail tab for the given commit hash. Fetches detail from server. */
+  openCommitDetail: (workspaceId: string, hash: string) => Promise<void>;
+  /** Open a side-by-side diff tab comparing a file at parent vs commit. */
+  openCommitFileDiff: (
+    workspaceId: string,
+    file: GitCommitFile,
+    commitHash: string,
+    parentHash?: string,
+  ) => Promise<void>;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
@@ -190,6 +199,66 @@ export const useEditorStore = create<EditorState>()(
           diffModifiedContent: currentContent,
           diffFilePath: filePath,
           diffStaged: staged,
+        };
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+      },
+
+      async openCommitDetail(workspaceId, hash) {
+        const tabId = `commit://${hash}`;
+        const existing = get().tabs.find((t) => t.id === tabId);
+        if (existing) {
+          set({ activeTabId: tabId });
+          return;
+        }
+        const detail: GitCommitDetail = await api.git.commitDetail(workspaceId, hash);
+        const tab: EditorTab = {
+          id: tabId,
+          path: tabId,
+          name: `${detail.shortHash} — ${detail.message.slice(0, 40)}`,
+          language: "plaintext",
+          content: "",
+          isDirty: false,
+          isVirtual: true,
+          virtualType: "commit-detail",
+          commitDetail: detail,
+        };
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+      },
+
+      async openCommitFileDiff(workspaceId, file, commitHash, parentHash) {
+        const displayPath = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+        const tabId = `commit-diff://${commitHash}/${file.path}`;
+        const existing = get().tabs.find((t) => t.id === tabId);
+        if (existing) {
+          set({ activeTabId: tabId });
+          return;
+        }
+
+        // For added files original is empty; for deleted files modified is empty
+        const parentRef = parentHash ?? `${commitHash}^`;
+        const [originalContent, modifiedContent] = await Promise.all([
+          file.status === "A"
+            ? Promise.resolve("")
+            : api.git.fileAtRef(workspaceId, file.oldPath ?? file.path, parentRef).catch(() => ""),
+          file.status === "D"
+            ? Promise.resolve("")
+            : api.git.fileAtRef(workspaceId, file.path, commitHash).catch(() => ""),
+        ]);
+
+        const name = file.path.split("/").pop() ?? file.path;
+        const tab: EditorTab = {
+          id: tabId,
+          path: tabId,
+          name: `${name} (${commitHash.slice(0, 7)})`,
+          language: languageFromPath(file.path),
+          content: modifiedContent,
+          isDirty: false,
+          isVirtual: true,
+          virtualType: "diff",
+          diffOriginalContent: originalContent,
+          diffModifiedContent: modifiedContent,
+          diffFilePath: displayPath,
+          diffStaged: false,
         };
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },

@@ -54,15 +54,17 @@ export interface EditorTab {
   isDirty: boolean;
   cursorLine?: number;
   cursorColumn?: number;
-  // Virtual tab fields (Query Console)
+  // Virtual tab fields (Query Console / Diff / Commit Detail)
   isVirtual?: boolean;
-  virtualType?: "query-console" | "diff";
+  virtualType?: "query-console" | "diff" | "commit-detail";
   connectionId?: string;
   // Diff tab fields
   diffOriginalContent?: string;
   diffModifiedContent?: string;
   diffFilePath?: string;
   diffStaged?: boolean;
+  // Commit detail tab fields
+  commitDetail?: GitCommitDetail;
 }
 
 export type PanelId = "explorer" | "search" | "git" | "terminal" | "db";
@@ -152,6 +154,18 @@ export interface GitStash {
   index: string; // e.g. "stash@{0}"
   message: string;
   date: string;
+}
+
+export interface GitCommitFile {
+  path: string;
+  oldPath?: string; // for renames / copies
+  /** Single-char git status: A=Added M=Modified D=Deleted R=Renamed C=Copied T=TypeChange */
+  status: string;
+}
+
+export interface GitCommitDetail extends GitCommit {
+  body: string;
+  files: GitCommitFile[];
 }
 
 // ─── Terminal ─────────────────────────────────────────────────────────────────

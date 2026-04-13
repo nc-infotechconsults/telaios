@@ -265,6 +265,61 @@ export const GitService = {
     await git.raw(["stash", "drop", index]);
   },
 
+  // ── Show commit ───────────────────────────────────────────────────────────
+
+  async showCommit(workspaceId: string, hash: string) {
+    const git = repo(workspaceId);
+    // %H=hash %P=parents %D=refs %s=subject %b=body %an=author %ar=relative-date
+    // %x00 (null byte) marks end of commit header so we can split cleanly from --name-status
+    const raw = await git.raw([
+      "show",
+      "--name-status",
+      "--format=%H%x1f%P%x1f%D%x1f%s%x1f%b%x1f%an%x1f%ar%x00",
+      hash,
+    ]);
+
+    const nullIdx = raw.indexOf("\x00");
+    const headerStr = nullIdx >= 0 ? raw.slice(0, nullIdx) : raw;
+    const fileStr   = nullIdx >= 0 ? raw.slice(nullIdx + 1) : "";
+
+    const [
+      fullHash = "",
+      parents  = "",
+      refs     = "",
+      subject  = "",
+      body     = "",
+      author   = "",
+      date     = "",
+    ] = headerStr.split("\x1f");
+
+    const files = fileStr
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split("\t");
+        const rawStatus = parts[0] ?? "";
+        const statusChar = rawStatus[0] ?? "M"; // R100 → R, M → M
+        if (statusChar === "R" || statusChar === "C") {
+          return { path: parts[2] ?? parts[1] ?? "", oldPath: parts[1], status: statusChar };
+        }
+        return { path: parts[1] ?? "", status: statusChar };
+      })
+      .filter((f) => f.path);
+
+    return {
+      hash: fullHash.trim(),
+      shortHash: fullHash.trim().slice(0, 7),
+      message: subject.trim(),
+      author: author.trim(),
+      date: date.trim(),
+      parentHashes: parents.trim() ? parents.trim().split(" ") : [],
+      refs: refs.trim() ? refs.split(",").map((r) => r.trim()).filter(Boolean) : [],
+      body: body.trim(),
+      files,
+    };
+  },
+
   // ── Task branch helpers ───────────────────────────────────────────────────
 
   async createTaskBranch(workspaceId: string, taskId: string) {

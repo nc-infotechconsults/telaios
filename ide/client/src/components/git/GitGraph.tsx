@@ -3,6 +3,7 @@ import type { GitCommit } from "@/types";
 
 interface Props {
   commits: GitCommit[];
+  onSelect?: (commit: GitCommit) => void;
 }
 
 // ── Lane computation ──────────────────────────────────────────────────────────
@@ -89,7 +90,7 @@ const LANE_W = 14; // px per lane
 const DOT_R = 3;   // commit dot radius
 const PADDING_LEFT = 6;
 
-export function GitGraph({ commits }: Props) {
+export function GitGraph({ commits, onSelect }: Props) {
   const nodes = useMemo(() => computeGraph(commits.slice(0, 200)), [commits]);
 
   if (nodes.length === 0) return null;
@@ -168,7 +169,8 @@ export function GitGraph({ commits }: Props) {
             <div
               key={node.commit.hash}
               style={{ height: ROW_H }}
-              className="flex items-center gap-2 px-2 hover:bg-white/[0.03] cursor-default group"
+              className="flex items-center gap-2 px-2 hover:bg-white/[0.03] cursor-pointer group"
+              onClick={() => onSelect?.(node.commit)}
             >
               {refs.length > 0 && (
                 <div className="flex gap-0.5 shrink-0">

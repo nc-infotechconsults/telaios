@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Workspace, DbConnection, DbConnectionSchema, DbQueryResult, GitStash, GitCommit } from "@/types";
+import type { Workspace, DbConnection, DbConnectionSchema, DbQueryResult, GitStash, GitCommit, GitCommitDetail } from "@/types";
 
 const http = axios.create({
   baseURL: "/api",
@@ -214,6 +214,11 @@ const git = {
 
   async discard(workspaceId: string, paths: string[]) {
     await http.post(`/git/${workspaceId}/discard`, { paths });
+  },
+
+  async commitDetail(workspaceId: string, hash: string): Promise<GitCommitDetail> {
+    const { data } = await http.get(`/git/${workspaceId}/show/${hash}`);
+    return data.data as GitCommitDetail;
   },
 
   async clone(workspaceId: string, url: string, branch?: string) {

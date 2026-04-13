@@ -3,9 +3,10 @@ import type { GitCommit } from "@/types";
 
 interface Props {
   commits: GitCommit[];
+  onSelect?: (commit: GitCommit) => void;
 }
 
-export function CommitList({ commits }: Props) {
+export function CommitList({ commits, onSelect }: Props) {
   if (commits.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-zinc-600">
@@ -18,17 +19,17 @@ export function CommitList({ commits }: Props) {
   return (
     <div className="divide-y divide-white/[0.03]">
       {commits.map((commit) => (
-        <CommitRow key={commit.hash} commit={commit} />
+        <CommitRow key={commit.hash} commit={commit} onSelect={onSelect} />
       ))}
     </div>
   );
 }
 
-function CommitRow({ commit }: { commit: GitCommit }) {
+function CommitRow({ commit, onSelect }: { commit: GitCommit; onSelect?: (commit: GitCommit) => void }) {
   const refs = commit.refs.filter(Boolean);
 
   return (
-    <div className="px-3 py-2 hover:bg-white/[0.03] group cursor-default">
+    <div className="px-3 py-2 hover:bg-white/[0.03] group cursor-pointer" onClick={() => onSelect?.(commit)}>
       {/* Ref badges */}
       {refs.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-1">
