@@ -81,12 +81,13 @@ app.post(
       message: z.string().min(1),
       authorName: z.string().optional(),
       authorEmail: z.string().email().optional(),
+      amend: z.boolean().default(false),
     }),
   ),
   async (c) => {
     const { id } = c.req.param();
-    const { message, authorName, authorEmail } = c.req.valid("json");
-    await GitService.commit(id, message, { authorName, authorEmail });
+    const { message, authorName, authorEmail, amend } = c.req.valid("json");
+    await GitService.commit(id, message, { authorName, authorEmail, amend });
     return c.json({ data: { committed: true } });
   },
 );
@@ -157,6 +158,80 @@ app.get(
     const { limit } = c.req.valid("query");
     const commits = await GitService.log(id, limit);
     return c.json({ data: commits, total: commits.length });
+  },
+);
+
+// ── File at ref ───────────────────────────────────────────────────────────────
+// GET /api/git/:id/file-at-ref?path=src/index.ts&ref=HEAD
+app.get(
+  "/:id/file-at-ref",
+  zValidator(
+    "query",
+    z.object({
+      path: z.string().min(1),
+      ref: z.string().min(1),
+    }),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const { path, ref } = c.req.valid("query");
+    const content = await GitService.fileAtRef(id, path, ref);
+    return c.json({ data: { content } });
+  },
+);
+
+// ── Stash list ────────────────────────────────────────────────────────────────
+// GET /api/git/:id/stash
+app.get("/:id/stash", async (c) => {
+  const stashes = await GitService.stashList(c.req.param("id"));
+  return c.json({ data: stashes });
+});
+
+// ── Stash push ────────────────────────────────────────────────────────────────
+// POST /api/git/:id/stash
+app.post(
+  "/:id/stash",
+  zValidator(
+    "json",
+    z.object({ message: z.string().optional() }).optional(),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+    await GitService.stashPush(id, body?.message);
+    return c.json({ data: { stashed: true } });
+  },
+);
+
+// ── Stash pop ─────────────────────────────────────────────────────────────────
+// POST /api/git/:id/stash/pop
+app.post(
+  "/:id/stash/pop",
+  zValidator(
+    "json",
+    z.object({ index: z.string().optional() }).optional(),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+    await GitService.stashPop(id, body?.index);
+    return c.json({ data: { popped: true } });
+  },
+);
+
+// ── Stash drop ────────────────────────────────────────────────────────────────
+// POST /api/git/:id/stash/drop
+app.post(
+  "/:id/stash/drop",
+  zValidator(
+    "json",
+    z.object({ index: z.string().min(1) }),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const { index } = c.req.valid("json");
+    await GitService.stashDrop(id, index);
+    return c.json({ data: { dropped: true } });
   },
 );
 

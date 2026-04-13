@@ -61,6 +61,7 @@ interface EditorState {
   openFile: (workspaceId: string, path: string) => Promise<void>;
   openTab: (workspaceId: string, path: string) => Promise<void>;
   openQueryConsole: (connectionId: string, connectionName: string, initialSql?: string) => void;
+  openDiff: (workspaceId: string, filePath: string, staged: boolean) => Promise<void>;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
@@ -157,6 +158,38 @@ export const useEditorStore = create<EditorState>()(
           isVirtual: true,
           virtualType: "query-console",
           connectionId,
+        };
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+      },
+
+      async openDiff(workspaceId, filePath, staged) {
+        const tabId = `diff://${staged ? "staged" : "working"}/${filePath}`;
+        const existing = get().tabs.find((t) => t.id === tabId);
+        if (existing) {
+          set({ activeTabId: tabId });
+          return;
+        }
+
+        // Fetch original (HEAD) content and current content in parallel
+        const [originalContent, currentContent] = await Promise.all([
+          api.git.fileAtRef(workspaceId, filePath, "HEAD").catch(() => ""),
+          api.workspaces.readFile(workspaceId, filePath).then((r) => r.content).catch(() => ""),
+        ]);
+
+        const name = filePath.split("/").pop() ?? filePath;
+        const tab: EditorTab = {
+          id: tabId,
+          path: tabId,
+          name: `${name} (diff)`,
+          language: languageFromPath(filePath),
+          content: currentContent,
+          isDirty: false,
+          isVirtual: true,
+          virtualType: "diff",
+          diffOriginalContent: originalContent,
+          diffModifiedContent: currentContent,
+          diffFilePath: filePath,
+          diffStaged: staged,
         };
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },

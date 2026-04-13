@@ -46,7 +46,7 @@ export interface FileContent {
 // ─── Editor ──────────────────────────────────────────────────────────────────
 
 export interface EditorTab {
-  id: string; // file path OR db://connectionId/console-N
+  id: string; // file path OR db://connectionId/console-N OR diff://<staged|working>/<path>
   path: string;
   name: string;
   language: string;
@@ -56,8 +56,13 @@ export interface EditorTab {
   cursorColumn?: number;
   // Virtual tab fields (Query Console)
   isVirtual?: boolean;
-  virtualType?: "query-console";
+  virtualType?: "query-console" | "diff";
   connectionId?: string;
+  // Diff tab fields
+  diffOriginalContent?: string;
+  diffModifiedContent?: string;
+  diffFilePath?: string;
+  diffStaged?: boolean;
 }
 
 export type PanelId = "explorer" | "search" | "git" | "terminal" | "db";
@@ -138,6 +143,14 @@ export interface GitCommit {
   shortHash: string;
   message: string;
   author: string;
+  date: string;
+  parentHashes: string[];
+  refs: string[];
+}
+
+export interface GitStash {
+  index: string; // e.g. "stash@{0}"
+  message: string;
   date: string;
 }
 

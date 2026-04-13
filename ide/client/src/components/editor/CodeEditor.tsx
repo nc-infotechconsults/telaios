@@ -1,4 +1,4 @@
-import MonacoEditor, { type OnMount, type Monaco } from "@monaco-editor/react";
+import MonacoEditor, { DiffEditor, type OnMount, type Monaco } from "@monaco-editor/react";
 import { useEditorStore } from "@/stores/editorStore";
 import { EditorTabBar } from "./EditorTabBar";
 import { EditorBreadcrumb } from "./EditorBreadcrumb";
@@ -121,6 +121,36 @@ export function CodeEditor({ workspaceId }: Props) {
             tabId={activeTab.id}
             connectionId={activeTab.connectionId}
             workspaceId={workspaceId}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Virtual tab: Diff view
+  if (activeTab.isVirtual && activeTab.virtualType === "diff") {
+    return (
+      <div className="flex flex-col h-full bg-transparent">
+        <EditorTabBar workspaceId={workspaceId} />
+        <EditorBreadcrumb path={activeTab.diffFilePath ?? activeTab.path} />
+        <div className="flex-1 monaco-host bg-[#0a0a0c]">
+          <DiffEditor
+            key={activeTab.id}
+            language={activeTab.language}
+            original={activeTab.diffOriginalContent ?? ""}
+            modified={activeTab.diffModifiedContent ?? ""}
+            theme="glassmorphism-dark"
+            options={{
+              fontSize: 13,
+              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+              fontLigatures: true,
+              lineHeight: 20,
+              readOnly: true,
+              renderSideBySide: true,
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              padding: { top: 12 },
+            }}
           />
         </div>
       </div>

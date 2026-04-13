@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Workspace, DbConnection, DbConnectionSchema, DbQueryResult } from "@/types";
+import type { Workspace, DbConnection, DbConnectionSchema, DbQueryResult, GitStash, GitCommit } from "@/types";
 
 const http = axios.create({
   baseURL: "/api",
@@ -161,7 +161,7 @@ const git = {
   async commit(
     workspaceId: string,
     message: string,
-    opts?: { authorName?: string; authorEmail?: string },
+    opts?: { authorName?: string; authorEmail?: string; amend?: boolean },
   ) {
     await http.post(`/git/${workspaceId}/commit`, { message, ...opts });
   },
@@ -181,11 +181,35 @@ const git = {
     return data.data.diff as string;
   },
 
-  async log(workspaceId: string, limit = 50) {
+  async log(workspaceId: string, limit = 50): Promise<GitCommit[]> {
     const { data } = await http.get(`/git/${workspaceId}/log`, {
       params: { limit },
     });
     return data.data;
+  },
+
+  async fileAtRef(workspaceId: string, path: string, ref: string): Promise<string> {
+    const { data } = await http.get(`/git/${workspaceId}/file-at-ref`, {
+      params: { path, ref },
+    });
+    return data.data.content as string;
+  },
+
+  async stashList(workspaceId: string): Promise<GitStash[]> {
+    const { data } = await http.get(`/git/${workspaceId}/stash`);
+    return data.data;
+  },
+
+  async stashPush(workspaceId: string, message?: string): Promise<void> {
+    await http.post(`/git/${workspaceId}/stash`, { message });
+  },
+
+  async stashPop(workspaceId: string, index?: string): Promise<void> {
+    await http.post(`/git/${workspaceId}/stash/pop`, { index });
+  },
+
+  async stashDrop(workspaceId: string, index: string): Promise<void> {
+    await http.post(`/git/${workspaceId}/stash/drop`, { index });
   },
 
   async discard(workspaceId: string, paths: string[]) {

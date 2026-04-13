@@ -1,149 +1,99 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button, Spinner } from "@heroui/react";
-import { addToast } from "@heroui/toast";
-import { api } from "@/lib/api";
-import { useEditorStore } from "@/stores/editorStore";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   GitBranch,
-  GitCommit,
-  GitPullRequest,
-  Plus,
-  Minus,
-  Check,
   ArrowUp,
   ArrowDown,
-  FileEdit,
   RefreshCw,
-  Loader2,
+  GitCommit as GitCommitIcon,
+  History,
+  Package,
+  Plus,
+  Minus,
   ChevronDown,
   ChevronRight,
-  Diff,
+  AlertTriangle,
 } from "lucide-react";
-
-interface GitStatusFile {
-  path: string;
-  status: string;
-  staged: boolean;
-}
-
-interface GitStatus {
-  branch: string;
-  ahead: number;
-  behind: number;
-  files: GitStatusFile[];
-  isClean: boolean;
-}
+import { useGitStore } from "@/stores/gitStore";
+import { useEditorStore } from "@/stores/editorStore";
+import { ChangedFileRow } from "@/components/git/ChangedFileRow";
+import { BranchSwitcher } from "@/components/git/BranchSwitcher";
+import { StashSection } from "@/components/git/StashSection";
+import { CommitList } from "@/components/git/CommitList";
+import { GitGraph } from "@/components/git/GitGraph";
 
 interface Props {
   workspaceId: string;
 }
 
 export function GitPanel({ workspaceId }: Props) {
-  const [status, setStatus] = useState<GitStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [committing, setCommitting] = useState(false);
-  const [showStageAll, setShowStageAll] = useState(false);
+  const {
+    status,
+    log,
+    branches,
+    stashList,
+    loadingStatus,
+    loadingLog,
+    activeTab,
+    pendingDiscardPaths,
+    fetchStatus,
+    fetchLog,
+    fetchBranches,
+    fetchStash,
+    stage,
+    unstage,
+    stageAll,
+    unstageAll,
+    commit,
+    push,
+    pull,
+    checkout,
+    requestDiscard,
+    cancelDiscard,
+    confirmDiscard,
+    stashPush,
+    stashPop,
+    stashDrop,
+    setActiveTab,
+  } = useGitStore();
+
+  const openDiff = useEditorStore((s) => s.openDiff);
+
   const [commitMsg, setCommitMsg] = useState("");
+  const [amend, setAmend] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     staged: true,
     modified: true,
+    deleted: true,
     untracked: true,
+    conflicted: true,
   });
-  const openTab = useEditorStore((s) => s.openTab);
 
-  const fetchStatus = async () => {
-    setLoading(true);
-    try {
-      const data = await api.git.status(workspaceId);
-      setStatus(data);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to load git status";
-      addToast({ title: "Git error", description: msg, color: "danger" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initial data load
   useEffect(() => {
-    fetchStatus();
+    fetchStatus(workspaceId);
+    fetchBranches(workspaceId);
   }, [workspaceId]);
 
-  async function handleStage(paths: string[]) {
-    try {
-      await api.git.stage(workspaceId, paths);
-      await fetchStatus();
-      addToast({ title: "Staged", description: `${paths.length} file(s) staged`, color: "success" });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to stage";
-      addToast({ title: "Staging failed", description: msg, color: "danger" });
-    }
-  }
+  // Load log/stash when those tabs become active
+  useEffect(() => {
+    if (activeTab === "history") fetchLog(workspaceId);
+    if (activeTab === "stash") fetchStash(workspaceId);
+  }, [activeTab, workspaceId]);
 
-  async function handleUnstage(paths: string[]) {
-    try {
-      await api.git.unstage(workspaceId, paths);
-      await fetchStatus();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to unstage";
-      addToast({ title: "Unstage failed", description: msg, color: "danger" });
-    }
-  }
-
-  async function handleStageAll() {
-    try {
-      await api.git.stageAll(workspaceId);
-      await fetchStatus();
-      addToast({ title: "Staged", description: "All changes staged", color: "success" });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to stage all";
-      addToast({ title: "Staging failed", description: msg, color: "danger" });
-    }
+  function toggleSection(key: string) {
+    setExpandedSections((s) => ({ ...s, [key]: !s[key] }));
   }
 
   async function handleCommit() {
     if (!commitMsg.trim()) return;
-    setCommitting(true);
-    try {
-      await api.git.commit(workspaceId, commitMsg);
-      setCommitMsg("");
-      await fetchStatus();
-      addToast({ title: "Committed", description: "Changes committed successfully", color: "success" });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to commit";
-      addToast({ title: "Commit failed", description: msg, color: "danger" });
-    } finally {
-      setCommitting(false);
-    }
+    await commit(workspaceId, commitMsg, amend);
+    setCommitMsg("");
+    setAmend(false);
   }
 
-  async function handlePush() {
-    try {
-      await api.git.push(workspaceId);
-      await fetchStatus();
-      addToast({ title: "Pushed", description: "Changes pushed", color: "success" });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to push";
-      addToast({ title: "Push failed", description: msg, color: "danger" });
-    }
-  }
-
-  async function handlePull() {
-    try {
-      await api.git.pull(workspaceId);
-      await fetchStatus();
-      addToast({ title: "Pulled", description: "Changes pulled", color: "success" });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to pull";
-      addToast({ title: "Pull failed", description: msg, color: "danger" });
-    }
-  }
-
-  function toggleSection(section: string) {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  }
-
-  if (loading) {
+  if (loadingStatus && !status) {
     return (
       <div className="flex items-center justify-center h-full">
         <Spinner size="sm" color="secondary" />
@@ -162,215 +112,390 @@ export function GitPanel({ workspaceId }: Props) {
 
   const stagedFiles = status.files.filter((f) => f.staged);
   const modifiedFiles = status.files.filter((f) => !f.staged && f.status === "modified");
+  const deletedFiles = status.files.filter((f) => !f.staged && f.status === "deleted");
   const untrackedFiles = status.files.filter((f) => !f.staged && f.status === "untracked");
-  const totalChanges = stagedFiles.length + modifiedFiles.length + untrackedFiles.length;
+  const conflictedFiles = status.files.filter((f) => f.status === "conflicted");
+
+  const hasChanges =
+    stagedFiles.length > 0 ||
+    modifiedFiles.length > 0 ||
+    deletedFiles.length > 0 ||
+    untrackedFiles.length > 0 ||
+    conflictedFiles.length > 0;
 
   return (
     <div className="flex flex-col h-full text-sm">
-      <div className="p-3 border-b border-white/5">
-        <div className="flex items-center gap-2 mb-2">
-          <GitBranch size={14} className="text-violet-400" />
-          <span className="text-zinc-200 font-medium">{status.branch}</span>
-          {(status.ahead > 0 || status.behind > 0) && (
-            <div className="flex items-center gap-1 text-xs text-zinc-500">
-              {status.ahead > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <ArrowUp size={12} />{status.ahead}
-                </span>
-              )}
-              {status.behind > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <ArrowDown size={12} />{status.behind}
-                </span>
-              )}
-            </div>
-          )}
+      {/* ── Header ── */}
+      <div className="p-2 border-b border-white/5 space-y-1.5">
+        {/* Branch row */}
+        <div className="flex items-center justify-between gap-2">
+          <BranchSwitcher
+            branches={branches}
+            currentBranch={status.branch}
+            onCheckout={(branch, create) => checkout(workspaceId, branch, create)}
+          />
+          <div className="flex items-center gap-1">
+            {status.ahead > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+                <ArrowUp size={10} />{status.ahead}
+              </span>
+            )}
+            {status.behind > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+                <ArrowDown size={10} />{status.behind}
+              </span>
+            )}
+            <button
+              onClick={() => { fetchStatus(workspaceId); fetchBranches(workspaceId); }}
+              className="p-1 text-zinc-600 hover:text-zinc-300 rounded hover:bg-white/5 transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw size={11} className={loadingStatus ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
+
+        {/* Push/pull row */}
+        <div className="flex gap-1.5">
           <Button
             size="sm"
             variant="flat"
-            onPress={handlePull}
-            className="bg-white/5 text-zinc-300 hover:bg-white/10 text-xs h-7"
+            onPress={() => pull(workspaceId)}
+            className="flex-1 bg-white/5 text-zinc-300 hover:bg-white/10 text-xs h-6 min-w-0"
           >
-            <ArrowDown size={12} className="mr-1" /> Pull
+            <ArrowDown size={11} className="mr-1" /> Pull
           </Button>
           <Button
             size="sm"
             variant="flat"
-            onPress={handlePush}
-            className="bg-white/5 text-zinc-300 hover:bg-white/10 text-xs h-7"
+            onPress={() => push(workspaceId)}
+            className="flex-1 bg-white/5 text-zinc-300 hover:bg-white/10 text-xs h-6 min-w-0"
           >
-            <ArrowUp size={12} className="mr-1" /> Push
+            <ArrowUp size={11} className="mr-1" /> Push
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
-        {totalChanges > 0 && (
-          <>
-            <SectionHeader
-              title="Staged Changes"
-              count={stagedFiles.length}
-              expanded={expandedSections.staged}
-              onToggle={() => toggleSection("staged")}
-              onAction={stagedFiles.length > 0 ? () => handleUnstage(stagedFiles.map(f => f.path)) : undefined}
-              actionIcon={<Minus size={12} />}
-            />
-            {expandedSections.staged && (
-              <div className="space-y-0.5 mb-2">
-                {stagedFiles.map((f) => (
-                  <FileRow key={f.path} path={f.path} status="staged" onAction={() => handleUnstage([f.path])} actionIcon={<Minus size={12} />} onClick={() => openTab(workspaceId, f.path)} />
-                ))}
+      {/* ── Tabs ── */}
+      <div className="flex border-b border-white/5">
+        {(["changes", "history", "stash"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-1.5 text-[11px] font-medium transition-colors capitalize ${
+              activeTab === tab
+                ? "text-violet-400 border-b border-violet-500"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {tab === "changes" && <GitCommitIcon size={10} className="inline mr-1" />}
+            {tab === "history" && <History size={10} className="inline mr-1" />}
+            {tab === "stash" && <Package size={10} className="inline mr-1" />}
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab Content ── */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Changes tab */}
+        {activeTab === "changes" && (
+          <div className="p-1">
+            {!hasChanges && (
+              <div className="flex flex-col items-center justify-center py-10 text-zinc-600">
+                <GitBranch size={20} className="mb-2 text-emerald-600" />
+                <p className="text-xs">Working tree clean</p>
               </div>
             )}
 
-            <SectionHeader
-              title="Modified"
-              count={modifiedFiles.length}
-              expanded={expandedSections.modified}
-              onToggle={() => toggleSection("modified")}
-              onAction={modifiedFiles.length > 0 ? () => handleStage(modifiedFiles.map(f => f.path)) : undefined}
-              actionIcon={<Plus size={12} />}
-            />
-            {expandedSections.modified && (
-              <div className="space-y-0.5 mb-2">
-                {modifiedFiles.map((f) => (
-                  <FileRow key={f.path} path={f.path} status="modified" onAction={() => handleStage([f.path])} actionIcon={<Plus size={12} />} onClick={() => openTab(workspaceId, f.path)} />
-                ))}
-              </div>
+            {/* Conflicted */}
+            {conflictedFiles.length > 0 && (
+              <FileSection
+                title="Conflicts"
+                count={conflictedFiles.length}
+                expanded={expandedSections.conflicted}
+                onToggle={() => toggleSection("conflicted")}
+                actionLabel="—"
+                titleColor="text-orange-400"
+              >
+                <AnimatePresence initial={false}>
+                  {conflictedFiles.map((f) => (
+                    <ChangedFileRow
+                      key={f.path}
+                      file={f}
+                      onOpenDiff={() => openDiff(workspaceId, f.path, false)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </FileSection>
             )}
 
-            <SectionHeader
-              title="Untracked"
-              count={untrackedFiles.length}
-              expanded={expandedSections.untracked}
-              onToggle={() => toggleSection("untracked")}
-              onAction={untrackedFiles.length > 0 ? () => handleStage(untrackedFiles.map(f => f.path)) : undefined}
-              actionIcon={<Plus size={12} />}
-            />
-            {expandedSections.untracked && (
-              <div className="space-y-0.5 mb-2">
-                {untrackedFiles.map((f) => (
-                  <FileRow key={f.path} path={f.path} status="untracked" onAction={() => handleStage([f.path])} actionIcon={<Plus size={12} />} onClick={() => openTab(workspaceId, f.path)} />
-                ))}
-              </div>
+            {/* Staged */}
+            {stagedFiles.length > 0 && (
+              <FileSection
+                title="Staged"
+                count={stagedFiles.length}
+                expanded={expandedSections.staged}
+                onToggle={() => toggleSection("staged")}
+                actionLabel="Unstage all"
+                actionIcon={<Minus size={10} />}
+                onAction={() => unstageAll(workspaceId)}
+              >
+                <AnimatePresence initial={false}>
+                  {stagedFiles.map((f) => (
+                    <ChangedFileRow
+                      key={f.path}
+                      file={f}
+                      onUnstage={() => unstage(workspaceId, [f.path])}
+                      onOpenDiff={() => openDiff(workspaceId, f.path, true)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </FileSection>
             )}
-          </>
-        )}
 
-        {totalChanges === 0 && !status.isClean && (
-          <div className="text-center py-8 text-zinc-500">
-            <Check size={24} className="mx-auto mb-2 text-emerald-500" />
-            <p className="text-sm">Working tree clean</p>
+            {/* Modified */}
+            {modifiedFiles.length > 0 && (
+              <FileSection
+                title="Modified"
+                count={modifiedFiles.length}
+                expanded={expandedSections.modified}
+                onToggle={() => toggleSection("modified")}
+                actionLabel="Stage all"
+                actionIcon={<Plus size={10} />}
+                onAction={() => stageAll(workspaceId)}
+              >
+                <AnimatePresence initial={false}>
+                  {modifiedFiles.map((f) => (
+                    <ChangedFileRow
+                      key={f.path}
+                      file={f}
+                      onStage={() => stage(workspaceId, [f.path])}
+                      onDiscard={() => requestDiscard([f.path])}
+                      onOpenDiff={() => openDiff(workspaceId, f.path, false)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </FileSection>
+            )}
+
+            {/* Deleted */}
+            {deletedFiles.length > 0 && (
+              <FileSection
+                title="Deleted"
+                count={deletedFiles.length}
+                expanded={expandedSections.deleted}
+                onToggle={() => toggleSection("deleted")}
+                actionLabel="Stage all"
+                actionIcon={<Plus size={10} />}
+                onAction={() => stage(workspaceId, deletedFiles.map((f) => f.path))}
+              >
+                <AnimatePresence initial={false}>
+                  {deletedFiles.map((f) => (
+                    <ChangedFileRow
+                      key={f.path}
+                      file={f}
+                      onStage={() => stage(workspaceId, [f.path])}
+                    />
+                  ))}
+                </AnimatePresence>
+              </FileSection>
+            )}
+
+            {/* Untracked */}
+            {untrackedFiles.length > 0 && (
+              <FileSection
+                title="Untracked"
+                count={untrackedFiles.length}
+                expanded={expandedSections.untracked}
+                onToggle={() => toggleSection("untracked")}
+                actionLabel="Stage all"
+                actionIcon={<Plus size={10} />}
+                onAction={() => stage(workspaceId, untrackedFiles.map((f) => f.path))}
+              >
+                <AnimatePresence initial={false}>
+                  {untrackedFiles.map((f) => (
+                    <ChangedFileRow
+                      key={f.path}
+                      file={f}
+                      onStage={() => stage(workspaceId, [f.path])}
+                    />
+                  ))}
+                </AnimatePresence>
+              </FileSection>
+            )}
           </div>
         )}
 
-        {status.isClean && (
-          <div className="text-center py-8 text-zinc-500">
-            <Check size={24} className="mx-auto mb-2 text-emerald-500" />
-            <p className="text-sm">Working tree clean</p>
+        {/* History tab */}
+        {activeTab === "history" && (
+          <div>
+            {loadingLog && log.length === 0 ? (
+              <div className="flex justify-center py-8">
+                <Spinner size="sm" color="secondary" />
+              </div>
+            ) : (
+              <>
+                <GitGraph commits={log} />
+                <CommitList commits={log} />
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Stash tab */}
+        {activeTab === "stash" && (
+          <div className="p-2 space-y-2">
+            {/* Stash push button */}
+            <Button
+              size="sm"
+              variant="flat"
+              className="w-full bg-white/5 text-zinc-300 hover:bg-white/10 text-xs h-7"
+              onPress={() => stashPush(workspaceId)}
+            >
+              <Package size={11} className="mr-1" /> Stash changes
+            </Button>
+            <StashSection
+              stashes={stashList}
+              onPop={(index) => stashPop(workspaceId, index)}
+              onDrop={(index) => stashDrop(workspaceId, index)}
+            />
           </div>
         )}
       </div>
 
-      {totalChanges > 0 && (
-        <div className="p-3 border-t border-white/5 space-y-2">
-          <input
-            type="text"
-            placeholder="Commit message..."
+      {/* ── Commit form (only on changes tab) ── */}
+      {activeTab === "changes" && (
+        <div className="p-2 border-t border-white/5 space-y-1.5">
+          <textarea
+            placeholder="Commit message…"
             value={commitMsg}
             onChange={(e) => setCommitMsg(e.target.value)}
-            className="w-full bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2 text-zinc-200 text-sm placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50"
+            rows={2}
+            className="w-full bg-white/[0.02] border border-white/10 rounded-lg px-2.5 py-1.5 text-zinc-200 text-xs placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/50 resize-none"
           />
-          <Button
-            size="sm"
-            color="primary"
-            className="w-full bg-gradient-to-r from-violet-600 to-cyan-600 text-xs h-8"
-            isLoading={committing}
-            isDisabled={!commitMsg.trim() || stagedFiles.length === 0}
-            onPress={handleCommit}
-          >
-            <GitCommit size={12} className="mr-1" /> Commit
-          </Button>
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-1.5 text-[11px] text-zinc-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={amend}
+                onChange={(e) => setAmend(e.target.checked)}
+                className="accent-violet-500 w-3 h-3"
+              />
+              Amend
+            </label>
+            <Button
+              size="sm"
+              color="primary"
+              className="bg-gradient-to-r from-violet-600 to-cyan-600 text-xs h-7 px-4"
+              isDisabled={!commitMsg.trim() || (stagedFiles.length === 0 && !amend)}
+              onPress={handleCommit}
+            >
+              <GitCommitIcon size={11} className="mr-1" />
+              {amend ? "Amend" : "Commit"}
+            </Button>
+          </div>
         </div>
       )}
+
+      {/* ── Discard confirm dialog ── */}
+      <AnimatePresence>
+        {pendingDiscardPaths && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              className="w-full bg-zinc-900 border-t border-white/10 p-4 space-y-3"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">Discard changes?</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {pendingDiscardPaths.length === 1
+                      ? pendingDiscardPaths[0]
+                      : `${pendingDiscardPaths.length} files`}
+                    {" "}will be permanently reverted.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="flex-1 bg-white/5 text-zinc-300 text-xs h-7"
+                  onPress={cancelDiscard}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  color="danger"
+                  className="flex-1 text-xs h-7"
+                  onPress={() => confirmDiscard(workspaceId)}
+                >
+                  Discard
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function SectionHeader({
+// ── Section header helper ─────────────────────────────────────────────────────
+
+function FileSection({
   title,
   count,
   expanded,
   onToggle,
   onAction,
+  actionLabel,
   actionIcon,
+  children,
+  titleColor,
 }: {
   title: string;
   count: number;
   expanded: boolean;
   onToggle: () => void;
   onAction?: () => void;
+  actionLabel?: string;
   actionIcon?: React.ReactNode;
+  children: React.ReactNode;
+  titleColor?: string;
 }) {
   return (
-    <div className="flex items-center justify-between py-1.5 px-1">
-      <button onClick={onToggle} className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200">
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <span className="text-xs font-medium">{title}</span>
-        <span className="text-xs text-zinc-600">({count})</span>
-      </button>
-      {onAction && (
+    <div className="mb-1">
+      <div className="flex items-center justify-between px-1 py-1">
         <button
-          onClick={(e) => { e.stopPropagation(); onAction(); }}
-          className="text-zinc-600 hover:text-zinc-300 p-1 rounded hover:bg-white/5"
+          onClick={onToggle}
+          className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors"
         >
-          {actionIcon}
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span className={`text-[11px] font-medium ${titleColor ?? "text-zinc-400"}`}>{title}</span>
+          <span className="text-[10px] text-zinc-600 ml-0.5">({count})</span>
         </button>
-      )}
+        {onAction && count > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAction(); }}
+            className="flex items-center gap-0.5 text-[10px] text-zinc-600 hover:text-zinc-300 px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
+          >
+            {actionIcon}
+            {actionLabel}
+          </button>
+        )}
+      </div>
+      {expanded && <div className="space-y-px">{children}</div>}
     </div>
-  );
-}
-
-function FileRow({
-  path,
-  status,
-  onAction,
-  actionIcon,
-  onClick,
-}: {
-  path: string;
-  status: string;
-  onAction: () => void;
-  actionIcon: React.ReactNode;
-  onClick: () => void;
-}) {
-  const statusColors: Record<string, string> = {
-    staged: "text-emerald-400",
-    modified: "text-yellow-400",
-    untracked: "text-zinc-400",
-    conflicted: "text-red-400",
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -5 }}
-      animate={{ opacity: 1, x: 0 }}
-      className="flex items-center gap-2 py-1 px-2 rounded hover:bg-white/[0.03] group"
-    >
-      <span className={`${statusColors[status]} shrink-0`}>
-        {status === "staged" ? <Check size={12} /> : status === "modified" ? <FileEdit size={12} /> : <Plus size={12} />}
-      </span>
-      <button onClick={onClick} className="flex-1 text-left text-zinc-300 text-xs truncate hover:text-white">
-        {path}
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onAction(); }}
-        className="text-zinc-600 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-      >
-        {actionIcon}
-      </button>
-    </motion.div>
   );
 }

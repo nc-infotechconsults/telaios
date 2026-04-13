@@ -136,13 +136,15 @@ export const GitService = {
   async commit(
     workspaceId: string,
     message: string,
-    opts: { authorName?: string; authorEmail?: string } = {},
+    opts: { authorName?: string; authorEmail?: string; amend?: boolean } = {},
   ) {
     const git = repo(workspaceId);
     const env: Record<string, string> = {};
     if (opts.authorName) env.GIT_AUTHOR_NAME = opts.authorName;
     if (opts.authorEmail) env.GIT_AUTHOR_EMAIL = opts.authorEmail;
-    await git.env(env).commit(message);
+    const options: Record<string, null | string> = {};
+    if (opts.amend) options["--amend"] = null;
+    await git.env(env).commit(message, undefined, options);
   },
 
   // ── Push / pull ────────────────────────────────────────────────────────────
@@ -170,20 +172,97 @@ export const GitService = {
   // ── Log ───────────────────────────────────────────────────────────────────
 
   async log(workspaceId: string, limit = 50) {
-    const result = await repo(workspaceId).log({ maxCount: limit });
-    return result.all.map((c) => ({
-      hash: c.hash,
-      shortHash: c.hash.slice(0, 7),
-      message: c.message,
-      author: c.author_name,
-      date: c.date,
-    }));
+    const git = repo(workspaceId);
+    // %H=hash, %P=parent hashes, %D=ref decorations, %s=subject, %an=author, %ar=relative date
+    // %x1f is ASCII unit-separator (0x1f) — safe field delimiter
+    const out = await git.raw([
+      "log",
+      `--max-count=${limit}`,
+      "--format=%H%x1f%P%x1f%D%x1f%s%x1f%an%x1f%ar",
+    ]);
+
+    if (!out.trim()) return [];
+
+    return out
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const [hash = "", parents = "", refs = "", message = "", author = "", date = ""] =
+          line.split("\x1f");
+        return {
+          hash,
+          shortHash: hash.slice(0, 7),
+          message: message.trim(),
+          author: author.trim(),
+          date: date.trim(),
+          parentHashes: parents.trim() ? parents.trim().split(" ") : [],
+          refs: refs.trim()
+            ? refs.split(",").map((r) => r.trim()).filter(Boolean)
+            : [],
+        };
+      });
+  },
+
+  // ── File at ref ────────────────────────────────────────────────────────────
+
+  async fileAtRef(workspaceId: string, filePath: string, ref: string) {
+    const git = repo(workspaceId);
+    try {
+      return await git.show([`${ref}:${filePath}`]);
+    } catch {
+      return "";
+    }
   },
 
   // ── Discard ───────────────────────────────────────────────────────────────
 
   async discard(workspaceId: string, paths: string[]) {
     await repo(workspaceId).checkout(["--", ...paths]);
+  },
+
+  // ── Stash ─────────────────────────────────────────────────────────────────
+
+  async stashList(workspaceId: string) {
+    const git = repo(workspaceId);
+    try {
+      // %gd=reflog selector (stash@{N}), %gs=stash message, %ar=relative date
+      const out = await git.raw(["stash", "list", "--format=%gd%x1f%gs%x1f%ar"]);
+      if (!out.trim()) return [];
+      return out
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const [index = "", message = "", date = ""] = line.split("\x1f");
+          return {
+            index: index.trim(),
+            message: message.trim(),
+            date: date.trim(),
+          };
+        });
+    } catch {
+      return [];
+    }
+  },
+
+  async stashPush(workspaceId: string, message?: string) {
+    const git = repo(workspaceId);
+    const args = ["stash", "push"];
+    if (message) args.push("-m", message);
+    await git.raw(args);
+  },
+
+  async stashPop(workspaceId: string, index?: string) {
+    const git = repo(workspaceId);
+    const args = ["stash", "pop"];
+    if (index) args.push(index);
+    await git.raw(args);
+  },
+
+  async stashDrop(workspaceId: string, index: string) {
+    const git = repo(workspaceId);
+    await git.raw(["stash", "drop", index]);
   },
 
   // ── Task branch helpers ───────────────────────────────────────────────────
