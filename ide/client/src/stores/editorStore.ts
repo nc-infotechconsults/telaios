@@ -64,6 +64,8 @@ interface EditorState {
   openDiff: (workspaceId: string, filePath: string, staged: boolean) => Promise<void>;
   /** Open a commit detail tab for the given commit hash. Fetches detail from server. */
   openCommitDetail: (workspaceId: string, hash: string) => Promise<void>;
+  /** Open the git graph as a full-screen editor tab. */
+  openGitGraph: (workspaceId: string) => void;
   /** Open a side-by-side diff tab comparing a file at parent vs commit. */
   openCommitFileDiff: (
     workspaceId: string,
@@ -259,6 +261,26 @@ export const useEditorStore = create<EditorState>()(
           diffModifiedContent: modifiedContent,
           diffFilePath: displayPath,
           diffStaged: false,
+        };
+        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+      },
+
+      openGitGraph(workspaceId) {
+        const tabId = `git-graph://${workspaceId}`;
+        const existing = get().tabs.find((t) => t.id === tabId);
+        if (existing) {
+          set({ activeTabId: tabId });
+          return;
+        }
+        const tab: EditorTab = {
+          id: tabId,
+          path: tabId,
+          name: "Git Graph",
+          language: "plaintext",
+          content: "",
+          isDirty: false,
+          isVirtual: true,
+          virtualType: "git-graph",
         };
         set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
       },

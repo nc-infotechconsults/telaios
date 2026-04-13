@@ -56,7 +56,7 @@ export interface EditorTab {
   cursorColumn?: number;
   // Virtual tab fields (Query Console / Diff / Commit Detail)
   isVirtual?: boolean;
-  virtualType?: "query-console" | "diff" | "commit-detail";
+  virtualType?: "query-console" | "diff" | "commit-detail" | "git-graph";
   connectionId?: string;
   // Diff tab fields
   diffOriginalContent?: string;

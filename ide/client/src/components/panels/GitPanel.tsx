@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   AlertTriangle,
+  Network,
 } from "lucide-react";
 import { useGitStore } from "@/stores/gitStore";
 import { useEditorStore } from "@/stores/editorStore";
@@ -21,7 +22,6 @@ import { ChangedFileRow } from "@/components/git/ChangedFileRow";
 import { BranchSwitcher } from "@/components/git/BranchSwitcher";
 import { StashSection } from "@/components/git/StashSection";
 import { CommitList } from "@/components/git/CommitList";
-import { GitGraph } from "@/components/git/GitGraph";
 
 interface Props {
   workspaceId: string;
@@ -60,6 +60,7 @@ export function GitPanel({ workspaceId }: Props) {
 
   const openDiff = useEditorStore((s) => s.openDiff);
   const openCommitDetail = useEditorStore((s) => s.openCommitDetail);
+  const openGitGraph = useEditorStore((s) => s.openGitGraph);
 
   const [commitMsg, setCommitMsg] = useState("");
   const [amend, setAmend] = useState(false);
@@ -339,7 +340,18 @@ export function GitPanel({ workspaceId }: Props) {
               </div>
             ) : (
               <>
-                <GitGraph commits={log} onSelect={(c) => openCommitDetail(workspaceId, c.hash)} />
+                {/* Toolbar */}
+                <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/5">
+                  <span className="text-[10px] text-zinc-600">{log.length} commits</span>
+                  <button
+                    onClick={() => openGitGraph(workspaceId)}
+                    className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-violet-400 px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
+                    title="Open graph in editor"
+                  >
+                    <Network size={10} />
+                    Graph
+                  </button>
+                </div>
                 <CommitList commits={log} onSelect={(c) => openCommitDetail(workspaceId, c.hash)} />
               </>
             )}
