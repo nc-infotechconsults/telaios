@@ -91,10 +91,51 @@ const workspaces = {
   async search(
     workspaceId: string,
     q: string,
-    maxResults = 100,
+    opts: {
+      maxResults?: number;
+      regex?: boolean;
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      include?: string;
+      exclude?: string;
+    } = {},
   ): Promise<Array<{ path: string; line: number; preview: string }>> {
     const { data } = await http.get(`/workspaces/${workspaceId}/search`, {
-      params: { q, maxResults },
+      params: {
+        q,
+        maxResults: opts.maxResults ?? 100,
+        regex: opts.regex ?? false,
+        caseSensitive: opts.caseSensitive ?? false,
+        wholeWord: opts.wholeWord ?? false,
+        ...(opts.include ? { include: opts.include } : {}),
+        ...(opts.exclude ? { exclude: opts.exclude } : {}),
+      },
+    });
+    return data.data;
+  },
+
+  async searchReplace(
+    workspaceId: string,
+    query: string,
+    replacement: string,
+    opts: {
+      regex?: boolean;
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      include?: string;
+      exclude?: string;
+      filePaths?: string[];
+    } = {},
+  ): Promise<{ filesChanged: number; totalReplacements: number }> {
+    const { data } = await http.post(`/workspaces/${workspaceId}/search-replace`, {
+      query,
+      replacement,
+      regex: opts.regex ?? false,
+      caseSensitive: opts.caseSensitive ?? false,
+      wholeWord: opts.wholeWord ?? false,
+      ...(opts.include ? { include: opts.include } : {}),
+      ...(opts.exclude ? { exclude: opts.exclude } : {}),
+      ...(opts.filePaths ? { filePaths: opts.filePaths } : {}),
     });
     return data.data;
   },
@@ -292,4 +333,99 @@ const db = {
   },
 };
 
-export const api = { workspaces, containers, git, db };
+// ── Agent API ─────────────────────────────────────────────────────────────────
+
+export interface AgentSession {
+  id: string;
+  title: string;
+  projectID: string;
+  directory: string;
+  /** Present when this session was spawned as a subagent by another session */
+  parentID?: string;
+  version: string;
+  time: { created: number; updated: number };
+}
+
+export interface AgentMessage {
+  info: {
+    id: string;
+    sessionID: string;
+    role: "user" | "assistant";
+    time: { created: number; completed?: number };
+    cost?: number;
+    tokens?: {
+      input: number;
+      output: number;
+      reasoning: number;
+      cache: { read: number; write: number };
+    };
+  };
+  parts: Array<{
+    id: string;
+    type: string;
+    sessionID: string;
+    messageID: string;
+    [key: string]: unknown;
+  }>;
+}
+
+export type AgentHealthStatus = "connected" | "disconnected" | "error";
+
+export interface AgentHealth {
+  status: AgentHealthStatus;
+  url?: string;
+}
+
+const agent = {
+  async health(): Promise<AgentHealth> {
+    const { data } = await http.get<{ data: AgentHealth }>("/agent/health");
+    return data.data;
+  },
+
+  async listSessions(): Promise<AgentSession[]> {
+    const { data } = await http.get<{ data: AgentSession[] }>("/agent/sessions");
+    return data.data;
+  },
+
+  async createSession(title?: string): Promise<AgentSession> {
+    const { data } = await http.post<{ data: AgentSession }>("/agent/sessions", { title });
+    return data.data;
+  },
+
+  async getSession(id: string): Promise<AgentSession> {
+    const { data } = await http.get<{ data: AgentSession }>(`/agent/sessions/${id}`);
+    return data.data;
+  },
+
+  async deleteSession(id: string): Promise<void> {
+    await http.delete(`/agent/sessions/${id}`);
+  },
+
+  async getMessages(sessionId: string): Promise<AgentMessage[]> {
+    const { data } = await http.get<{ data: AgentMessage[] }>(
+      `/agent/sessions/${sessionId}/messages`,
+    );
+    return data.data;
+  },
+
+  async prompt(
+    sessionId: string,
+    parts: Array<{ type: "text"; text: string }>,
+  ): Promise<void> {
+    await http.post(`/agent/sessions/${sessionId}/prompt`, { parts });
+  },
+
+  async abort(sessionId: string): Promise<void> {
+    await http.post(`/agent/sessions/${sessionId}/abort`, {});
+  },
+
+  /**
+   * Returns an EventSource connected to the session's SSE stream.
+   * The caller is responsible for closing it.
+   */
+  eventSource(sessionId: string): EventSource {
+    return new EventSource(`/api/agent/sessions/${sessionId}/events`);
+  },
+};
+
+export const api = { workspaces, containers, git, db, agent };

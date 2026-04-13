@@ -4,6 +4,31 @@ import { BadRequestError, NotFoundError } from "@/core/errors";
 
 const IGNORED = new Set([".git", "node_modules", ".DS_Store"]);
 
+/** Escape special regex characters in a plain string */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Convert comma-separated glob patterns into an array of RegExp matchers.
+ * Supports: `*` (any filename chars), `**` (any path), `?` (single char).
+ */
+function parseGlobs(pattern: string | undefined): RegExp[] {
+  if (!pattern || !pattern.trim()) return [];
+  return pattern.split(",").map((g) => {
+    let p = g.trim();
+    if (!p) return null;
+    // Escape regex special chars except * and ?
+    p = p.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    // Convert glob patterns to regex
+    p = p.replace(/\*\*/g, "<<GLOBSTAR>>");
+    p = p.replace(/\*/g, "[^/]*");
+    p = p.replace(/<<GLOBSTAR>>/g, ".*");
+    p = p.replace(/\?/g, ".");
+    return new RegExp(`^${p}$`);
+  }).filter((m): m is RegExp => m !== null);
+}
+
 function workspacePath(workspaceId: string, ...parts: string[]): string {
   const base = path.join(config.WORKSPACES_ROOT, workspaceId);
   if (parts.length === 0) return base;
@@ -181,12 +206,34 @@ export const WorkspaceService = {
   async search(
     workspaceId: string,
     query: string,
-    opts: { maxResults?: number; includePattern?: string } = {},
+    opts: {
+      maxResults?: number;
+      regex?: boolean;
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      include?: string;
+      exclude?: string;
+    } = {},
   ): Promise<Array<{ path: string; line: number; preview: string }>> {
     const root = workspacePath(workspaceId);
     const results: Array<{ path: string; line: number; preview: string }> = [];
     const max = opts.maxResults ?? 200;
-    const re = new RegExp(query, "i");
+
+    // Build the search regex
+    let pattern = opts.regex ? query : escapeRegExp(query);
+    if (opts.wholeWord) pattern = `\\b${pattern}\\b`;
+    const flags = opts.caseSensitive ? "g" : "gi";
+    let re: RegExp;
+    try {
+      re = new RegExp(pattern, flags);
+    } catch {
+      // Invalid regex — return empty
+      return results;
+    }
+
+    // Build include/exclude matchers from glob patterns
+    const includeMatchers = parseGlobs(opts.include);
+    const excludeMatchers = parseGlobs(opts.exclude);
 
     async function walk(dir: string) {
       if (results.length >= max) return;
@@ -196,20 +243,27 @@ export const WorkspaceService = {
         if (results.length >= max) break;
         if (IGNORED.has(e.name)) continue;
         const full = path.join(dir, e.name);
+        const rel = path.relative(root, full);
         if (e.isDirectory()) {
           await walk(full);
         } else {
+          // Apply include/exclude filters
+          if (includeMatchers.length > 0 && !includeMatchers.some((m) => m.test(rel))) continue;
+          if (excludeMatchers.some((m) => m.test(rel))) continue;
+
           try {
             const text = await Bun.file(full).text();
             const lines = text.split("\n");
             for (let i = 0; i < lines.length && results.length < max; i++) {
               if (re.test(lines[i])) {
                 results.push({
-                  path: path.relative(root, full),
+                  path: rel,
                   line: i + 1,
                   preview: lines[i].trim().slice(0, 200),
                 });
               }
+              // Reset regex lastIndex since we use 'g' flag
+              re.lastIndex = 0;
             }
           } catch {
             // skip unreadable files
@@ -220,6 +274,90 @@ export const WorkspaceService = {
 
     await walk(root);
     return results;
+  },
+
+  // ── Search & Replace ──────────────────────────────────────────────────────
+
+  async searchReplace(
+    workspaceId: string,
+    query: string,
+    replacement: string,
+    opts: {
+      regex?: boolean;
+      caseSensitive?: boolean;
+      wholeWord?: boolean;
+      include?: string;
+      exclude?: string;
+      filePaths?: string[];   // If provided, only replace in these files
+    } = {},
+  ): Promise<{ filesChanged: number; totalReplacements: number }> {
+    const root = workspacePath(workspaceId);
+
+    // Build the search regex
+    let pattern = opts.regex ? query : escapeRegExp(query);
+    if (opts.wholeWord) pattern = `\\b${pattern}\\b`;
+    const flags = opts.caseSensitive ? "g" : "gi";
+    let re: RegExp;
+    try {
+      re = new RegExp(pattern, flags);
+    } catch {
+      return { filesChanged: 0, totalReplacements: 0 };
+    }
+
+    const fs = await import("node:fs/promises");
+    let filesChanged = 0;
+    let totalReplacements = 0;
+
+    // Collect files to process
+    const filesToProcess: string[] = [];
+
+    if (opts.filePaths && opts.filePaths.length > 0) {
+      // Replace only in specified files
+      filesToProcess.push(...opts.filePaths);
+    } else {
+      // Walk and collect all matching files
+      const includeMatchers = parseGlobs(opts.include);
+      const excludeMatchers = parseGlobs(opts.exclude);
+
+      async function collectFiles(dir: string) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (IGNORED.has(e.name)) continue;
+          const full = path.join(dir, e.name);
+          const rel = path.relative(root, full);
+          if (e.isDirectory()) {
+            await collectFiles(full);
+          } else {
+            if (includeMatchers.length > 0 && !includeMatchers.some((m) => m.test(rel))) continue;
+            if (excludeMatchers.some((m) => m.test(rel))) continue;
+            filesToProcess.push(rel);
+          }
+        }
+      }
+      await collectFiles(root);
+    }
+
+    // Process each file
+    for (const relPath of filesToProcess) {
+      const abs = path.join(root, relPath);
+      try {
+        const text = await Bun.file(abs).text();
+        const replaced = text.replace(re, replacement);
+        if (replaced !== text) {
+          await Bun.write(abs, replaced);
+          // Count replacements (reset and count matches in original)
+          re.lastIndex = 0;
+          const matches = text.match(re);
+          totalReplacements += matches ? matches.length : 0;
+          filesChanged++;
+        }
+        re.lastIndex = 0;
+      } catch {
+        // skip unreadable / unwritable files
+      }
+    }
+
+    return { filesChanged, totalReplacements };
   },
 
   // ── Workspace root helpers ─────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { IDEShell } from "@/components/layout/IDEShell";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { Spinner, Button } from "@heroui/react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
@@ -91,7 +92,9 @@ export function IDEPage() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#0a0a0c]">
-      <IDEShell />
+      <ErrorBoundary>
+        <IDEShell />
+      </ErrorBoundary>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import { addToast } from "@heroui/toast";
+import { notify } from "@/stores/notificationStore";
 import { api } from "@/lib/api";
 import type { GitStatus, GitBranch, GitCommit, GitStash } from "@/types";
 
@@ -65,7 +65,7 @@ interface GitState {
 
 function toastError(title: string, err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
-  addToast({ title, description: message, color: "danger" });
+  notify({ title, description: message, type: "error" });
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ export const useGitStore = create<GitState>()(
         try {
           await api.git.stageAll(workspaceId);
           await get().fetchStatus(workspaceId);
-          addToast({ title: "Staged all changes", color: "success" });
+          notify({ title: "Staged all changes", type: "success" });
         } catch (err) {
           toastError("Stage all failed", err);
         }
@@ -187,7 +187,7 @@ export const useGitStore = create<GitState>()(
             get().fetchStatus(workspaceId),
             get().fetchLog(workspaceId),
           ]);
-          addToast({ title: "Committed", color: "success" });
+          notify({ title: "Committed", type: "success" });
         } catch (err) {
           toastError("Commit failed", err);
         }
@@ -199,7 +199,7 @@ export const useGitStore = create<GitState>()(
         try {
           await api.git.push(workspaceId);
           await get().fetchStatus(workspaceId);
-          addToast({ title: "Pushed", color: "success" });
+          notify({ title: "Pushed", type: "success" });
         } catch (err) {
           toastError("Push failed", err);
         }
@@ -212,7 +212,7 @@ export const useGitStore = create<GitState>()(
             get().fetchStatus(workspaceId),
             get().fetchLog(workspaceId),
           ]);
-          addToast({ title: "Pulled", color: "success" });
+          notify({ title: "Pulled", type: "success" });
         } catch (err) {
           toastError("Pull failed", err);
         }
@@ -227,7 +227,7 @@ export const useGitStore = create<GitState>()(
             get().fetchStatus(workspaceId),
             get().fetchBranches(workspaceId),
           ]);
-          addToast({ title: `Switched to ${branch}`, color: "success" });
+          notify({ title: `Switched to ${branch}`, type: "success" });
         } catch (err) {
           toastError("Checkout failed", err);
         }
@@ -250,7 +250,7 @@ export const useGitStore = create<GitState>()(
         try {
           await api.git.discard(workspaceId, pendingDiscardPaths);
           await get().fetchStatus(workspaceId);
-          addToast({ title: "Changes discarded", color: "success" });
+          notify({ title: "Changes discarded", type: "success" });
         } catch (err) {
           toastError("Discard failed", err);
         }
@@ -265,7 +265,7 @@ export const useGitStore = create<GitState>()(
             get().fetchStatus(workspaceId),
             get().fetchStash(workspaceId),
           ]);
-          addToast({ title: "Stashed changes", color: "success" });
+          notify({ title: "Stashed changes", type: "success" });
         } catch (err) {
           toastError("Stash failed", err);
         }
@@ -278,7 +278,7 @@ export const useGitStore = create<GitState>()(
             get().fetchStatus(workspaceId),
             get().fetchStash(workspaceId),
           ]);
-          addToast({ title: "Stash applied", color: "success" });
+          notify({ title: "Stash applied", type: "success" });
         } catch (err) {
           toastError("Stash pop failed", err);
         }
@@ -288,7 +288,7 @@ export const useGitStore = create<GitState>()(
         try {
           await api.git.stashDrop(workspaceId, index);
           await get().fetchStash(workspaceId);
-          addToast({ title: "Stash dropped", color: "success" });
+          notify({ title: "Stash dropped", type: "success" });
         } catch (err) {
           toastError("Stash drop failed", err);
         }

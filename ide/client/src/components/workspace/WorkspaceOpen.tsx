@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Input, Select, SelectItem } from "@heroui/react";
-import { addToast } from "@heroui/toast";
+import { notify } from "@/stores/notificationStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,20 +48,20 @@ export function WorkspaceOpen() {
           : { type: "s3" as const, bucket: s3Bucket, prefix: s3Prefix || undefined };
 
       const ws = await createWorkspace({ name, source });
-      addToast({
+      notify({
         title: "Workspace created",
         description: `"${ws.name}" is ready`,
-        color: "success",
+        type: "success",
       });
       await openWorkspace(ws.id);
       navigate(`/ide/${ws.id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to create workspace";
       setError(msg);
-      addToast({
+      notify({
         title: "Creation failed",
         description: msg,
-        color: "danger",
+        type: "error",
       });
     } finally {
       setLoading(false);

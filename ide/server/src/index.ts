@@ -8,11 +8,13 @@ import { config } from "@/core/config";
 import { errorHandler } from "@/core/errors";
 import { FileWatcherService } from "@/services/fileWatcher.service";
 import { ContainerService } from "@/services/container.service";
+import { agentService } from "@/services/agent.service";
 
 import workspaceRoutes from "@/routes/workspace";
 import containerRoutes from "@/routes/container";
 import gitRoutes from "@/routes/git";
 import dbRoutes from "@/routes/db";
+import agentRoutes from "@/routes/agent";
 
 // ── WebSocket setup ───────────────────────────────────────────────────────────
 //
@@ -70,6 +72,7 @@ app.route("/api/workspaces", workspaceRoutes);
 app.route("/api/containers", containerRoutes);
 app.route("/api/git", gitRoutes);
 app.route("/api/db", dbRoutes);
+app.route("/api/agent", agentRoutes);
 
 // ── Health ────────────────────────────────────────────────────────────────────
 
@@ -226,6 +229,12 @@ app.notFound((c) =>
 // ── Bun server export ─────────────────────────────────────────────────────────
 
 console.log(`IDE server starting on port ${config.PORT}…`);
+
+// Initialize agent service in the background (non-blocking).
+// Routes return 503 gracefully if OpenCode is not available.
+agentService.initialize().catch((err) => {
+  console.error("[agent] Unhandled initialization error:", err);
+});
 
 export default {
   port: config.PORT,

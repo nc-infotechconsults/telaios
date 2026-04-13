@@ -10,7 +10,7 @@ import {
   Button,
   useDisclosure,
 } from "@heroui/react";
-import { addToast } from "@heroui/toast";
+import { notify } from "@/stores/notificationStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { Workspace } from "@/types";
 import { motion } from "framer-motion";
@@ -99,15 +99,15 @@ export function WorkspaceList() {
     setDeleting(true);
     try {
       await deleteWorkspace(pendingDelete.id);
-      addToast({
+      notify({
         title: "Workspace deleted",
         description: `"${pendingDelete.name}" has been removed`,
-        color: "success",
+        type: "success",
       });
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Failed to delete workspace";
-      addToast({ title: "Delete failed", description: msg, color: "danger" });
+      notify({ title: "Delete failed", description: msg, type: "error" });
     } finally {
       setDeleting(false);
       setPendingDelete(null);

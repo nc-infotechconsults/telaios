@@ -1,25 +1,17 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { EditorTab, PanelId, PanelArea, PanelState, DragState, CollapsedSections, SectionKey, GitCommitFile, GitCommitDetail } from "@/types";
+import type {
+  EditorTab,
+  EditorGroup,
+  EditorSplit,
+  SplitDirection,
+  GitCommitFile,
+  GitCommitDetail,
+} from "@/types";
+import { isEditorGroup } from "@/types";
 import { api } from "@/lib/api";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-/** Maximum number of panels that can be open simultaneously in a single area. */
-const MAX_OPEN_PER_AREA = 2;
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function makeDefaultPanels(): Record<PanelId, PanelState> {
-  const now = Date.now();
-  return {
-    explorer: { id: "explorer", area: "left-top",    order: 0, isOpen: true,  isCollapsed: false, size: 50, openedAt: now  },
-    search:   { id: "search",   area: "left-top",    order: 1, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
-    git:      { id: "git",      area: "left-bottom", order: 0, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
-    terminal: { id: "terminal", area: "bottom",      order: 0, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
-    db:       { id: "db",       area: "right-top",   order: 0, isOpen: false, isCollapsed: false, size: 50, openedAt: null },
-  };
-}
 
 function languageFromPath(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -39,101 +31,362 @@ function languageFromPath(path: string): string {
   return map[ext] ?? "plaintext";
 }
 
+let _nextGroupId = 1;
+function genGroupId(): string {
+  return `group-${_nextGroupId++}`;
+}
+
+let _nextSplitId = 1;
+function genSplitId(): string {
+  return `split-${_nextSplitId++}`;
+}
+
+// ── Backward-compat mirror ────────────────────────────────────────────────────
+// Syncs top-level `tabs` and `activeTabId` to always reflect the active group.
+
+function syncMirror(
+  groups: Record<string, EditorGroup>,
+  activeGroupId: string,
+): { tabs: EditorTab[]; activeTabId: string | null } {
+  const g = groups[activeGroupId];
+  return {
+    tabs: g?.tabs ?? [],
+    activeTabId: g?.activeTabId ?? null,
+  };
+}
+
+// ── Group helpers ─────────────────────────────────────────────────────────────
+
+/** Resolve `groupId` — falls back to `activeGroupId`. */
+function resolveGid(state: EditorState, groupId?: string): string {
+  return groupId ?? state.activeGroupId;
+}
+
+/** Update a single group in the `groups` record and return merged partial state. */
+function patchGroup(
+  state: EditorState,
+  gid: string,
+  patch: Partial<EditorGroup>,
+): Pick<EditorState, "groups" | "tabs" | "activeTabId"> {
+  const group = state.groups[gid];
+  if (!group) return { groups: state.groups, ...syncMirror(state.groups, state.activeGroupId) };
+  const updated: EditorGroup = { ...group, ...patch };
+  // If tabs changed, ensure any patched tabs array is used
+  if (patch.tabs && !patch.activeTabId && updated.activeTabId) {
+    // Verify activeTabId still exists in new tabs
+    if (!patch.tabs.some((t) => t.id === updated.activeTabId)) {
+      updated.activeTabId = patch.tabs[patch.tabs.length - 1]?.id ?? null;
+    }
+  }
+  const newGroups = { ...state.groups, [gid]: updated };
+  return { groups: newGroups, ...syncMirror(newGroups, state.activeGroupId) };
+}
+
+// ── Root-split tree helpers ───────────────────────────────────────────────────
+
+/** Replace a node (by id) in the split tree with a new node. */
+function replaceInTree(
+  node: EditorGroup | EditorSplit,
+  targetId: string,
+  replacement: EditorGroup | EditorSplit,
+): EditorGroup | EditorSplit {
+  if (node.id === targetId) return replacement;
+  if (isEditorGroup(node)) return node;
+  return {
+    ...node,
+    children: node.children.map((c) => replaceInTree(c, targetId, replacement)),
+  };
+}
+
+/** Remove a node (by id) from the split tree, collapsing single-child splits. */
+function removeFromTree(
+  node: EditorGroup | EditorSplit,
+  targetId: string,
+): EditorGroup | EditorSplit | null {
+  if (node.id === targetId) return null;
+  if (isEditorGroup(node)) return node;
+
+  const newChildren: (EditorGroup | EditorSplit)[] = [];
+  const newSizes: number[] = [];
+  const removedSizes: number[] = [];
+
+  for (let i = 0; i < node.children.length; i++) {
+    const result = removeFromTree(node.children[i], targetId);
+    if (result) {
+      newChildren.push(result);
+      newSizes.push(node.sizes[i]);
+    } else {
+      removedSizes.push(node.sizes[i]);
+    }
+  }
+
+  if (newChildren.length === 0) return null;
+  if (newChildren.length === 1) return newChildren[0]; // collapse single-child split
+
+  // Re-distribute removed sizes proportionally
+  const totalRemoved = removedSizes.reduce((a, b) => a + b, 0);
+  const totalRemaining = newSizes.reduce((a, b) => a + b, 0);
+  const adjusted = newSizes.map(
+    (s) => s + (totalRemoved * s) / totalRemaining,
+  );
+
+  return { ...node, children: newChildren, sizes: adjusted };
+}
+
+/** Collect all group IDs from the tree (in order). */
+function collectGroupIds(node: EditorGroup | EditorSplit): string[] {
+  if (isEditorGroup(node)) return [node.id];
+  return node.children.flatMap(collectGroupIds);
+}
+
+// ── Default group ─────────────────────────────────────────────────────────────
+
+const DEFAULT_GROUP_ID = "group-0";
+
+function createEmptyGroup(id: string = DEFAULT_GROUP_ID): EditorGroup {
+  return { id, tabs: [], activeTabId: null };
+}
+
 // ── State interface ───────────────────────────────────────────────────────────
 
 interface EditorState {
+  // ── Multi-group state (NEW) ─────────────────────────────────────────────────
+  groups: Record<string, EditorGroup>;
+  activeGroupId: string;
+  rootSplit: EditorSplit | EditorGroup;
+
+  // ── Backward-compatible mirrors (synced from active group) ──────────────────
   tabs: EditorTab[];
   activeTabId: string | null;
 
-  /** All panel states, keyed by panel id. Every panel always exists in this map. */
-  panels: Record<PanelId, PanelState>;
+  // ── Group actions (NEW) ─────────────────────────────────────────────────────
+  splitGroup: (groupId: string, direction: SplitDirection) => void;
+  closeGroup: (groupId: string) => void;
+  moveTab: (tabId: string, fromGroupId: string, toGroupId: string) => void;
+  setActiveGroup: (groupId: string) => void;
+  /** Split a group and move a specific tab into the new split. */
+  splitWithTab: (tabId: string, fromGroupId: string, direction: SplitDirection) => void;
 
-  /** Which panel is currently focused (shows content in the sidebar header). */
-  activePanel: PanelId;
-
-  /** Drag state — set while the user is dragging a panel. */
-  dragState: DragState;
-
-  /** Which sidebar sections are collapsed (section hidden, panel isOpen unchanged). */
-  collapsedSections: CollapsedSections;
-
-  // ── Tab actions ──────────────────────────────────────────────────────────────
-  openFile: (workspaceId: string, path: string) => Promise<void>;
-  openTab: (workspaceId: string, path: string) => Promise<void>;
-  openQueryConsole: (connectionId: string, connectionName: string, initialSql?: string) => void;
-  openDiff: (workspaceId: string, filePath: string, staged: boolean) => Promise<void>;
-  /** Open a commit detail tab for the given commit hash. Fetches detail from server. */
-  openCommitDetail: (workspaceId: string, hash: string) => Promise<void>;
-  /** Open the git graph as a full-screen editor tab. */
-  openGitGraph: (workspaceId: string) => void;
-  /** Open a side-by-side diff tab comparing a file at parent vs commit. */
+  // ── Tab actions (migrated — optional groupId, defaults to activeGroupId) ────
+  openFile: (workspaceId: string, path: string, groupId?: string) => Promise<void>;
+  openTab: (workspaceId: string, path: string, groupId?: string) => Promise<void>;
+  openQueryConsole: (connectionId: string, connectionName: string, initialSql?: string, groupId?: string) => void;
+  openDiff: (workspaceId: string, filePath: string, staged: boolean, groupId?: string) => Promise<void>;
+  openCommitDetail: (workspaceId: string, hash: string, groupId?: string) => Promise<void>;
+  openGitGraph: (workspaceId: string, groupId?: string) => void;
   openCommitFileDiff: (
     workspaceId: string,
     file: GitCommitFile,
     commitHash: string,
     parentHash?: string,
+    groupId?: string,
   ) => Promise<void>;
-  closeTab: (id: string) => void;
-  setActiveTab: (id: string) => void;
+  closeTab: (id: string, groupId?: string) => void;
+  setActiveTab: (id: string, groupId?: string) => void;
   updateTabContent: (id: string, content: string) => void;
   markTabSaved: (id: string) => void;
   saveTab: (workspaceId: string, id: string) => Promise<void>;
   setCursor: (id: string, line: number, column: number) => void;
-  /** Update tab path/name/id after a file rename. No-op if the path is not open. */
   renameTab: (oldPath: string, newPath: string) => void;
 
-  // ── Panel actions ────────────────────────────────────────────────────────────
-  setActivePanel: (panel: PanelId) => void;
-
-  /**
-   * Toggle a panel open/closed.
-   * When opening, enforces the FIFO queue: if MAX_OPEN_PER_AREA panels are
-   * already open in the same area, the oldest one is closed first.
-   */
-  togglePanel: (panelId: PanelId) => void;
-
-  /**
-   * Move a panel to a different area (or reorder within the same area).
-   * `insertBefore` is the id of the panel to insert before; omit to append.
-   * Applies the FIFO queue when moving an open panel into a new area.
-   */
-  movePanel: (panelId: PanelId, targetArea: PanelArea, insertBefore?: PanelId) => void;
-
-  /** Update the stored size percentage for a panel (clamped 20-80). */
-  setPanelSize: (panelId: PanelId, size: number) => void;
-
-  /** Toggle a panel's collapse-to-header state within its section. */
-  togglePanelCollapse: (panelId: PanelId) => void;
-
-  /** Toggle collapse for an entire sidebar section (top or bottom half of a sidebar). */
-  toggleSectionCollapse: (section: SectionKey) => void;
-
-  // ── Drag actions ─────────────────────────────────────────────────────────────
-  /** Start dragging a panel. sourceArea is derived from the current panel state. */
-  startDrag: (panelId: PanelId) => void;
-  endDrag: () => void;
+  // ── Convenience getters ─────────────────────────────────────────────────────
+  getActiveGroup: () => EditorGroup;
+  getAllTabs: () => EditorTab[];
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
+const defaultGroup = createEmptyGroup();
+
 export const useEditorStore = create<EditorState>()(
   devtools(
     (set, get) => ({
+      // ── Multi-group state ───────────────────────────────────────────────────
+      groups: { [DEFAULT_GROUP_ID]: defaultGroup },
+      activeGroupId: DEFAULT_GROUP_ID,
+      rootSplit: defaultGroup,
+
+      // ── Backward-compatible mirrors ─────────────────────────────────────────
       tabs: [],
       activeTabId: null,
-      panels: makeDefaultPanels(),
-      activePanel: "explorer",
-      dragState: { panelId: null, sourceArea: null },
-      collapsedSections: {},
 
-      // ── Tab actions ───────────────────────────────────────────────────────────
+      // ── Group actions ───────────────────────────────────────────────────────
 
-      async openFile(workspaceId, path) {
-        const existing = get().tabs.find((t) => t.path === path);
+      splitGroup(groupId, direction) {
+        set((s) => {
+          const existing = s.groups[groupId];
+          if (!existing) return s;
+
+          const newId = genGroupId();
+          const newGroup = createEmptyGroup(newId);
+          const newGroups = { ...s.groups, [newId]: newGroup };
+
+          // Create a split node containing the existing group and the new one
+          const splitNode: EditorSplit = {
+            id: genSplitId(),
+            direction,
+            children: [existing, newGroup],
+            sizes: [50, 50],
+          };
+
+          const newRoot = replaceInTree(s.rootSplit, groupId, splitNode);
+
+          return {
+            groups: newGroups,
+            rootSplit: newRoot,
+            activeGroupId: newId,
+            ...syncMirror(newGroups, newId),
+          };
+        });
+      },
+
+      closeGroup(groupId) {
+        set((s) => {
+          const groupIds = collectGroupIds(s.rootSplit);
+          // Cannot close the last group
+          if (groupIds.length <= 1) return s;
+
+          const newRoot = removeFromTree(s.rootSplit, groupId);
+          if (!newRoot) return s; // shouldn't happen
+
+          const { [groupId]: _removed, ...newGroups } = s.groups;
+          const remainingIds = collectGroupIds(newRoot);
+          // Pick next active group: prefer current, else first remaining
+          const newActiveId = remainingIds.includes(s.activeGroupId)
+            ? s.activeGroupId
+            : remainingIds[0];
+
+          return {
+            groups: newGroups,
+            rootSplit: newRoot,
+            activeGroupId: newActiveId,
+            ...syncMirror(newGroups, newActiveId),
+          };
+        });
+      },
+
+      moveTab(tabId, fromGroupId, toGroupId) {
+        set((s) => {
+          const from = s.groups[fromGroupId];
+          const to = s.groups[toGroupId];
+          if (!from || !to) return s;
+
+          const tab = from.tabs.find((t) => t.id === tabId);
+          if (!tab) return s;
+
+          // Remove from source
+          const fromTabs = from.tabs.filter((t) => t.id !== tabId);
+          const fromActiveIdx = from.tabs.findIndex((t) => t.id === tabId);
+          let fromActive = from.activeTabId;
+          if (fromActive === tabId) {
+            fromActive = fromTabs[Math.min(fromActiveIdx, fromTabs.length - 1)]?.id ?? null;
+          }
+
+          // Add to target
+          const toTabs = [...to.tabs, tab];
+
+          const newGroups = {
+            ...s.groups,
+            [fromGroupId]: { ...from, tabs: fromTabs, activeTabId: fromActive },
+            [toGroupId]: { ...to, tabs: toTabs, activeTabId: tab.id },
+          };
+
+          return {
+            groups: newGroups,
+            activeGroupId: toGroupId,
+            ...syncMirror(newGroups, toGroupId),
+          };
+        });
+      },
+
+      setActiveGroup(groupId) {
+        set((s) => {
+          if (!s.groups[groupId]) return s;
+          return {
+            activeGroupId: groupId,
+            ...syncMirror(s.groups, groupId),
+          };
+        });
+      },
+
+      splitWithTab(tabId, fromGroupId, direction) {
+        set((s) => {
+          const from = s.groups[fromGroupId];
+          if (!from) return s;
+
+          const tab = from.tabs.find((t) => t.id === tabId);
+          if (!tab) return s;
+
+          // Remove tab from source group
+          const fromTabs = from.tabs.filter((t) => t.id !== tabId);
+          const fromActiveIdx = from.tabs.findIndex((t) => t.id === tabId);
+          let fromActive = from.activeTabId;
+          if (fromActive === tabId) {
+            fromActive = fromTabs[Math.min(fromActiveIdx, fromTabs.length - 1)]?.id ?? null;
+          }
+
+          // Create new group with the tab
+          const newId = genGroupId();
+          const newGroup: EditorGroup = {
+            id: newId,
+            tabs: [tab],
+            activeTabId: tab.id,
+          };
+
+          const updatedFrom: EditorGroup = { ...from, tabs: fromTabs, activeTabId: fromActive };
+          const newGroups = { ...s.groups, [fromGroupId]: updatedFrom, [newId]: newGroup };
+
+          // Create a split node: existing group + new group
+          const splitNode: EditorSplit = {
+            id: genSplitId(),
+            direction,
+            children: [updatedFrom, newGroup],
+            sizes: [50, 50],
+          };
+
+          const newRoot = replaceInTree(s.rootSplit, fromGroupId, splitNode);
+
+          // If source group is now empty, clean it up
+          if (fromTabs.length === 0) {
+            const { [fromGroupId]: _removed, ...cleanedGroups } = newGroups;
+            const cleanedRoot = removeFromTree(newRoot, fromGroupId);
+            if (!cleanedRoot) {
+              // Shouldn't happen — we just created a new group
+              return s;
+            }
+            return {
+              groups: cleanedGroups,
+              rootSplit: cleanedRoot,
+              activeGroupId: newId,
+              ...syncMirror(cleanedGroups, newId),
+            };
+          }
+
+          return {
+            groups: newGroups,
+            rootSplit: newRoot,
+            activeGroupId: newId,
+            ...syncMirror(newGroups, newId),
+          };
+        });
+      },
+
+      // ── Tab actions (group-scoped) ──────────────────────────────────────────
+
+      async openFile(workspaceId, path, groupId?) {
+        const s = get();
+        const gid = resolveGid(s, groupId);
+        const group = s.groups[gid];
+        if (!group) return;
+
+        const existing = group.tabs.find((t) => t.path === path);
         if (existing) {
-          set({ activeTabId: existing.id });
+          set((s2) => ({
+            ...patchGroup(s2, gid, { activeTabId: existing.id }),
+          }));
           return;
         }
+
         const { content, encoding } = await api.workspaces.readFile(workspaceId, path);
         const tab: EditorTab = {
           id: path,
@@ -143,21 +396,37 @@ export const useEditorStore = create<EditorState>()(
           content: encoding === "base64" ? "(binary file)" : content,
           isDirty: false,
         };
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+
+        set((s2) => {
+          const g = s2.groups[gid];
+          if (!g) return s2;
+          return patchGroup(s2, gid, {
+            tabs: [...g.tabs, tab],
+            activeTabId: tab.id,
+          });
+        });
       },
 
-      openTab: async (workspaceId, path) => {
-        await get().openFile(workspaceId, path);
+      async openTab(workspaceId, path, groupId?) {
+        await get().openFile(workspaceId, path, groupId);
       },
 
-      openQueryConsole(connectionId, connectionName, initialSql) {
-        const existing = get().tabs.find(
+      openQueryConsole(connectionId, connectionName, initialSql?, groupId?) {
+        const s = get();
+        const gid = resolveGid(s, groupId);
+        const group = s.groups[gid];
+        if (!group) return;
+
+        const existing = group.tabs.find(
           (t) => t.isVirtual && t.connectionId === connectionId,
         );
         if (existing) {
-          set({ activeTabId: existing.id });
+          set((s2) => ({
+            ...patchGroup(s2, gid, { activeTabId: existing.id }),
+          }));
           return;
         }
+
         const id = `db://${connectionId}/console-${Date.now()}`;
         const tab: EditorTab = {
           id,
@@ -170,18 +439,31 @@ export const useEditorStore = create<EditorState>()(
           virtualType: "query-console",
           connectionId,
         };
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+        set((s2) => {
+          const g = s2.groups[gid];
+          if (!g) return s2;
+          return patchGroup(s2, gid, {
+            tabs: [...g.tabs, tab],
+            activeTabId: tab.id,
+          });
+        });
       },
 
-      async openDiff(workspaceId, filePath, staged) {
+      async openDiff(workspaceId, filePath, staged, groupId?) {
+        const s = get();
+        const gid = resolveGid(s, groupId);
+        const group = s.groups[gid];
+        if (!group) return;
+
         const tabId = `diff://${staged ? "staged" : "working"}/${filePath}`;
-        const existing = get().tabs.find((t) => t.id === tabId);
+        const existing = group.tabs.find((t) => t.id === tabId);
         if (existing) {
-          set({ activeTabId: tabId });
+          set((s2) => ({
+            ...patchGroup(s2, gid, { activeTabId: tabId }),
+          }));
           return;
         }
 
-        // Fetch original (HEAD) content and current content in parallel
         const [originalContent, currentContent] = await Promise.all([
           api.git.fileAtRef(workspaceId, filePath, "HEAD").catch(() => ""),
           api.workspaces.readFile(workspaceId, filePath).then((r) => r.content).catch(() => ""),
@@ -202,16 +484,31 @@ export const useEditorStore = create<EditorState>()(
           diffFilePath: filePath,
           diffStaged: staged,
         };
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+        set((s2) => {
+          const g = s2.groups[gid];
+          if (!g) return s2;
+          return patchGroup(s2, gid, {
+            tabs: [...g.tabs, tab],
+            activeTabId: tab.id,
+          });
+        });
       },
 
-      async openCommitDetail(workspaceId, hash) {
+      async openCommitDetail(workspaceId, hash, groupId?) {
+        const s = get();
+        const gid = resolveGid(s, groupId);
+        const group = s.groups[gid];
+        if (!group) return;
+
         const tabId = `commit://${hash}`;
-        const existing = get().tabs.find((t) => t.id === tabId);
+        const existing = group.tabs.find((t) => t.id === tabId);
         if (existing) {
-          set({ activeTabId: tabId });
+          set((s2) => ({
+            ...patchGroup(s2, gid, { activeTabId: tabId }),
+          }));
           return;
         }
+
         const detail: GitCommitDetail = await api.git.commitDetail(workspaceId, hash);
         const tab: EditorTab = {
           id: tabId,
@@ -224,19 +521,67 @@ export const useEditorStore = create<EditorState>()(
           virtualType: "commit-detail",
           commitDetail: detail,
         };
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+        set((s2) => {
+          const g = s2.groups[gid];
+          if (!g) return s2;
+          return patchGroup(s2, gid, {
+            tabs: [...g.tabs, tab],
+            activeTabId: tab.id,
+          });
+        });
       },
 
-      async openCommitFileDiff(workspaceId, file, commitHash, parentHash) {
-        const displayPath = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
-        const tabId = `commit-diff://${commitHash}/${file.path}`;
-        const existing = get().tabs.find((t) => t.id === tabId);
+      openGitGraph(workspaceId, groupId?) {
+        const s = get();
+        const gid = resolveGid(s, groupId);
+        const group = s.groups[gid];
+        if (!group) return;
+
+        const tabId = `git-graph://${workspaceId}`;
+        const existing = group.tabs.find((t) => t.id === tabId);
         if (existing) {
-          set({ activeTabId: tabId });
+          set((s2) => ({
+            ...patchGroup(s2, gid, { activeTabId: tabId }),
+          }));
           return;
         }
 
-        // For added files original is empty; for deleted files modified is empty
+        const tab: EditorTab = {
+          id: tabId,
+          path: tabId,
+          name: "Git Graph",
+          language: "plaintext",
+          content: "",
+          isDirty: false,
+          isVirtual: true,
+          virtualType: "git-graph",
+        };
+        set((s2) => {
+          const g = s2.groups[gid];
+          if (!g) return s2;
+          return patchGroup(s2, gid, {
+            tabs: [...g.tabs, tab],
+            activeTabId: tab.id,
+          });
+        });
+      },
+
+      async openCommitFileDiff(workspaceId, file, commitHash, parentHash?, groupId?) {
+        const s = get();
+        const gid = resolveGid(s, groupId);
+        const group = s.groups[gid];
+        if (!group) return;
+
+        const displayPath = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+        const tabId = `commit-diff://${commitHash}/${file.path}`;
+        const existing = group.tabs.find((t) => t.id === tabId);
+        if (existing) {
+          set((s2) => ({
+            ...patchGroup(s2, gid, { activeTabId: tabId }),
+          }));
+          return;
+        }
+
         const parentRef = parentHash ?? `${commitHash}^`;
         const [originalContent, modifiedContent] = await Promise.all([
           file.status === "A"
@@ -262,224 +607,149 @@ export const useEditorStore = create<EditorState>()(
           diffFilePath: displayPath,
           diffStaged: false,
         };
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
-      },
-
-      openGitGraph(workspaceId) {
-        const tabId = `git-graph://${workspaceId}`;
-        const existing = get().tabs.find((t) => t.id === tabId);
-        if (existing) {
-          set({ activeTabId: tabId });
-          return;
-        }
-        const tab: EditorTab = {
-          id: tabId,
-          path: tabId,
-          name: "Git Graph",
-          language: "plaintext",
-          content: "",
-          isDirty: false,
-          isVirtual: true,
-          virtualType: "git-graph",
-        };
-        set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
-      },
-
-      closeTab(id) {
-        set((s) => {
-          const idx = s.tabs.findIndex((t) => t.id === id);
-          const newTabs = s.tabs.filter((t) => t.id !== id);
-          let activeTabId = s.activeTabId;
-          if (activeTabId === id) {
-            activeTabId = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null;
-          }
-          return { tabs: newTabs, activeTabId };
+        set((s2) => {
+          const g = s2.groups[gid];
+          if (!g) return s2;
+          return patchGroup(s2, gid, {
+            tabs: [...g.tabs, tab],
+            activeTabId: tab.id,
+          });
         });
       },
 
-      setActiveTab(id) {
-        set({ activeTabId: id });
+      closeTab(id, groupId?) {
+        set((s) => {
+          const gid = resolveGid(s, groupId);
+          const group = s.groups[gid];
+          if (!group) return s;
+
+          const idx = group.tabs.findIndex((t) => t.id === id);
+          if (idx === -1) return s;
+
+          const newTabs = group.tabs.filter((t) => t.id !== id);
+          let newActive = group.activeTabId;
+          if (newActive === id) {
+            newActive = newTabs[Math.min(idx, newTabs.length - 1)]?.id ?? null;
+          }
+
+          return patchGroup(s, gid, { tabs: newTabs, activeTabId: newActive });
+        });
+      },
+
+      setActiveTab(id, groupId?) {
+        set((s) => {
+          const gid = resolveGid(s, groupId);
+          return patchGroup(s, gid, { activeTabId: id });
+        });
       },
 
       updateTabContent(id, content) {
-        set((s) => ({
-          tabs: s.tabs.map((t) => (t.id === id ? { ...t, content, isDirty: true } : t)),
-        }));
+        set((s) => {
+          // Find which group contains this tab
+          for (const gid of Object.keys(s.groups)) {
+            const group = s.groups[gid];
+            if (group.tabs.some((t) => t.id === id)) {
+              return patchGroup(s, gid, {
+                tabs: group.tabs.map((t) =>
+                  t.id === id ? { ...t, content, isDirty: true } : t,
+                ),
+              });
+            }
+          }
+          return s;
+        });
       },
 
       markTabSaved(id) {
-        set((s) => ({
-          tabs: s.tabs.map((t) => (t.id === id ? { ...t, isDirty: false } : t)),
-        }));
+        set((s) => {
+          for (const gid of Object.keys(s.groups)) {
+            const group = s.groups[gid];
+            if (group.tabs.some((t) => t.id === id)) {
+              return patchGroup(s, gid, {
+                tabs: group.tabs.map((t) =>
+                  t.id === id ? { ...t, isDirty: false } : t,
+                ),
+              });
+            }
+          }
+          return s;
+        });
       },
 
       async saveTab(workspaceId, id) {
-        const tab = get().tabs.find((t) => t.id === id);
+        // Find tab across all groups
+        const s = get();
+        let tab: EditorTab | undefined;
+        for (const group of Object.values(s.groups)) {
+          tab = group.tabs.find((t) => t.id === id);
+          if (tab) break;
+        }
         if (!tab || !tab.isDirty) return;
         await api.workspaces.writeFile(workspaceId, tab.path, tab.content);
         get().markTabSaved(id);
       },
 
       setCursor(id, line, column) {
-        set((s) => ({
-          tabs: s.tabs.map((t) =>
-            t.id === id ? { ...t, cursorLine: line, cursorColumn: column } : t,
-          ),
-        }));
+        set((s) => {
+          for (const gid of Object.keys(s.groups)) {
+            const group = s.groups[gid];
+            if (group.tabs.some((t) => t.id === id)) {
+              return patchGroup(s, gid, {
+                tabs: group.tabs.map((t) =>
+                  t.id === id ? { ...t, cursorLine: line, cursorColumn: column } : t,
+                ),
+              });
+            }
+          }
+          return s;
+        });
       },
 
       renameTab(oldPath, newPath) {
         set((s) => {
-          const hasTab = s.tabs.some((t) => t.path === oldPath);
-          if (!hasTab) return s;
+          let changed = false;
+          const newGroups = { ...s.groups };
+
+          for (const gid of Object.keys(newGroups)) {
+            const group = newGroups[gid];
+            if (group.tabs.some((t) => t.path === oldPath)) {
+              changed = true;
+              newGroups[gid] = {
+                ...group,
+                tabs: group.tabs.map((t) =>
+                  t.path === oldPath
+                    ? {
+                        ...t,
+                        id: newPath,
+                        path: newPath,
+                        name: newPath.split("/").pop() ?? newPath,
+                        language: languageFromPath(newPath),
+                      }
+                    : t,
+                ),
+                activeTabId: group.activeTabId === oldPath ? newPath : group.activeTabId,
+              };
+            }
+          }
+
+          if (!changed) return s;
           return {
-            tabs: s.tabs.map((t) =>
-              t.path === oldPath
-                ? {
-                    ...t,
-                    id: newPath,
-                    path: newPath,
-                    name: newPath.split("/").pop() ?? newPath,
-                    language: languageFromPath(newPath),
-                  }
-                : t,
-            ),
-            activeTabId: s.activeTabId === oldPath ? newPath : s.activeTabId,
+            groups: newGroups,
+            ...syncMirror(newGroups, s.activeGroupId),
           };
         });
       },
 
-      // ── Panel actions ─────────────────────────────────────────────────────────
+      // ── Convenience getters ─────────────────────────────────────────────────
 
-      setActivePanel(panel) {
-        set({ activePanel: panel });
+      getActiveGroup() {
+        const s = get();
+        return s.groups[s.activeGroupId] ?? createEmptyGroup();
       },
 
-      togglePanel(panelId) {
-        set((s) => {
-          const panels = { ...s.panels };
-          const panel = panels[panelId];
-
-          if (panel.isOpen) {
-            // Close it — also un-collapse so it opens fresh next time
-            panels[panelId] = { ...panel, isOpen: false, isCollapsed: false, openedAt: null };
-            return { panels };
-          }
-
-          // Opening — enforce FIFO queue for the panel's area
-          const openInArea = Object.values(panels).filter(
-            (p) => p.area === panel.area && p.isOpen && p.id !== panelId,
-          );
-          // Sort oldest-first
-          openInArea.sort((a, b) => (a.openedAt ?? 0) - (b.openedAt ?? 0));
-
-          if (openInArea.length >= MAX_OPEN_PER_AREA) {
-            const oldest = openInArea[0];
-            panels[oldest.id] = { ...panels[oldest.id], isOpen: false, openedAt: null };
-          }
-
-          panels[panelId] = { ...panel, isOpen: true, openedAt: Date.now() };
-          return { panels };
-        });
-      },
-
-      movePanel(panelId, targetArea, insertBefore) {
-        set((s) => {
-          const panels = { ...s.panels };
-          const panel = panels[panelId];
-          const oldArea = panel.area;
-
-          // ① FIFO: if moving an open panel into a different area, may need to
-          //    close the oldest open panel there.
-          if (panel.isOpen && oldArea !== targetArea) {
-            const openInTarget = Object.values(panels).filter(
-              (p) => p.area === targetArea && p.isOpen && p.id !== panelId,
-            );
-            openInTarget.sort((a, b) => (a.openedAt ?? 0) - (b.openedAt ?? 0));
-            if (openInTarget.length >= MAX_OPEN_PER_AREA) {
-              const oldest = openInTarget[0];
-              panels[oldest.id] = { ...panels[oldest.id], isOpen: false, openedAt: null };
-            }
-          }
-
-          // ② Re-normalise old area (remove the panel from its current slot)
-          if (oldArea !== targetArea) {
-            // Temporarily mark it as belonging to targetArea so filters exclude it
-            panels[panelId] = { ...panel, area: targetArea };
-            const remaining = Object.values(panels)
-              .filter((p) => p.area === oldArea)
-              .sort((a, b) => a.order - b.order);
-            remaining.forEach((p, i) => {
-              panels[p.id] = { ...panels[p.id], order: i };
-            });
-          }
-
-          // ③ Compute final ordering in target area (insert at the right position)
-          const targetOthers = Object.values(panels)
-            .filter((p) => p.area === targetArea && p.id !== panelId)
-            .sort((a, b) => a.order - b.order);
-
-          let insertIdx = targetOthers.length; // default: append
-          if (insertBefore !== undefined) {
-            const idx = targetOthers.findIndex((p) => p.id === insertBefore);
-            if (idx !== -1) insertIdx = idx;
-          }
-
-          // Build the full ordered list for the target area
-          const finalIds = targetOthers.map((p) => p.id);
-          finalIds.splice(insertIdx, 0, panelId);
-
-          finalIds.forEach((id, i) => {
-            panels[id] = { ...panels[id], area: targetArea, order: i };
-          });
-
-          return { panels };
-        });
-      },
-
-      setPanelSize(panelId, size) {
-        set((s) => ({
-          panels: {
-            ...s.panels,
-            [panelId]: {
-              ...s.panels[panelId],
-              size: Math.max(20, Math.min(80, size)),
-            },
-          },
-        }));
-      },
-
-      togglePanelCollapse(panelId) {
-        set((s) => ({
-          panels: {
-            ...s.panels,
-            [panelId]: {
-              ...s.panels[panelId],
-              isCollapsed: !s.panels[panelId].isCollapsed,
-            },
-          },
-        }));
-      },
-
-      toggleSectionCollapse(section) {
-        set((s) => ({
-          collapsedSections: {
-            ...s.collapsedSections,
-            [section]: !s.collapsedSections[section],
-          },
-        }));
-      },
-
-      // ── Drag actions ──────────────────────────────────────────────────────────
-
-      startDrag(panelId) {
-        set((s) => ({
-          dragState: { panelId, sourceArea: s.panels[panelId].area },
-        }));
-      },
-
-      endDrag() {
-        set({ dragState: { panelId: null, sourceArea: null } });
+      getAllTabs() {
+        const s = get();
+        return Object.values(s.groups).flatMap((g) => g.tabs);
       },
     }),
     { name: "editor-store" },

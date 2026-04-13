@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFileTreeStore } from "@/stores/fileTreeStore";
 import { useEditorStore } from "@/stores/editorStore";
 import { NewEntryInput } from "./NewEntryInput";
 import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
+import { getMenuItems } from "@/stores/menuStore";
+import { commandRegistry } from "@/core/commands";
 import {
   FileCode,
   FileJson,
@@ -184,86 +186,106 @@ export function FileNode({ workspaceId, entry, depth }: Props) {
 
   // ── Context menu items ───────────────────────────────────────────────────────
 
-  const menuItems: MenuItem[] =
-    entry.type === "directory"
-      ? [
-          {
-            id: "new-file",
-            label: "New File",
-            icon: FilePlus,
-            onClick: () => {
-              store.expandFolder(workspaceId, entry.path);
-              store.startCreate(entry.path, "file");
+  const menuItems: MenuItem[] = useMemo(() => {
+    const coreItems: MenuItem[] =
+      entry.type === "directory"
+        ? [
+            {
+              id: "new-file",
+              label: "New File",
+              icon: FilePlus,
+              onClick: () => {
+                store.expandFolder(workspaceId, entry.path);
+                store.startCreate(entry.path, "file");
+              },
             },
-          },
-          {
-            id: "new-folder",
-            label: "New Folder",
-            icon: FolderPlus,
-            onClick: () => {
-              store.expandFolder(workspaceId, entry.path);
-              store.startCreate(entry.path, "folder");
+            {
+              id: "new-folder",
+              label: "New Folder",
+              icon: FolderPlus,
+              onClick: () => {
+                store.expandFolder(workspaceId, entry.path);
+                store.startCreate(entry.path, "folder");
+              },
             },
-          },
-          { id: "d1", label: "", divider: true, onClick: () => {} },
-          {
-            id: "rename",
-            label: "Rename",
-            icon: Edit3,
-            shortcut: "F2",
-            onClick: () => store.startRename(entry.path),
-          },
-          {
-            id: "delete",
-            label: "Delete",
-            icon: Trash2,
-            danger: true,
-            onClick: () => store.requestDelete(entry.path),
-          },
-          { id: "d2", label: "", divider: true, onClick: () => {} },
-          {
-            id: "copy-path",
-            label: "Copy Path",
-            icon: Copy,
-            onClick: () => navigator.clipboard.writeText(entry.path),
-          },
-        ]
-      : [
-          {
-            id: "open",
-            label: "Open",
-            icon: FileCode,
-            onClick: () => openFile(workspaceId, entry.path),
-          },
-          { id: "d1", label: "", divider: true, onClick: () => {} },
-          {
-            id: "rename",
-            label: "Rename",
-            icon: Edit3,
-            shortcut: "F2",
-            onClick: () => store.startRename(entry.path),
-          },
-          {
-            id: "delete",
-            label: "Delete",
-            icon: Trash2,
-            danger: true,
-            onClick: () => store.requestDelete(entry.path),
-          },
-          { id: "d2", label: "", divider: true, onClick: () => {} },
-          {
-            id: "copy-path",
-            label: "Copy Path",
-            icon: Copy,
-            onClick: () => navigator.clipboard.writeText(entry.path),
-          },
-          {
-            id: "copy-rel-path",
-            label: "Copy Relative Path",
-            icon: Copy,
-            onClick: () => navigator.clipboard.writeText(entry.path),
-          },
-        ];
+            { id: "d1", label: "", divider: true, onClick: () => {} },
+            {
+              id: "rename",
+              label: "Rename",
+              icon: Edit3,
+              shortcut: "F2",
+              onClick: () => store.startRename(entry.path),
+            },
+            {
+              id: "delete",
+              label: "Delete",
+              icon: Trash2,
+              danger: true,
+              onClick: () => store.requestDelete(entry.path),
+            },
+            { id: "d2", label: "", divider: true, onClick: () => {} },
+            {
+              id: "copy-path",
+              label: "Copy Path",
+              icon: Copy,
+              onClick: () => navigator.clipboard.writeText(entry.path),
+            },
+          ]
+        : [
+            {
+              id: "open",
+              label: "Open",
+              icon: FileCode,
+              onClick: () => openFile(workspaceId, entry.path),
+            },
+            { id: "d1", label: "", divider: true, onClick: () => {} },
+            {
+              id: "rename",
+              label: "Rename",
+              icon: Edit3,
+              shortcut: "F2",
+              onClick: () => store.startRename(entry.path),
+            },
+            {
+              id: "delete",
+              label: "Delete",
+              icon: Trash2,
+              danger: true,
+              onClick: () => store.requestDelete(entry.path),
+            },
+            { id: "d2", label: "", divider: true, onClick: () => {} },
+            {
+              id: "copy-path",
+              label: "Copy Path",
+              icon: Copy,
+              onClick: () => navigator.clipboard.writeText(entry.path),
+            },
+            {
+              id: "copy-rel-path",
+              label: "Copy Relative Path",
+              icon: Copy,
+              onClick: () => navigator.clipboard.writeText(entry.path),
+            },
+          ];
+
+    // Append plugin-contributed explorer context menu items
+    const pluginContribs = getMenuItems("explorer.context");
+    if (pluginContribs.length > 0) {
+      coreItems.push({ id: "d-plugin", label: "", divider: true, onClick: () => {} });
+      for (const contrib of pluginContribs) {
+        const cmd = commandRegistry.get(contrib.commandId);
+        if (!cmd) continue;
+        coreItems.push({
+          id: `plugin-${contrib.commandId}`,
+          label: cmd.label,
+          icon: cmd.icon,
+          onClick: () => commandRegistry.execute(contrib.commandId),
+        });
+      }
+    }
+
+    return coreItems;
+  }, [entry.type, entry.path, workspaceId, store, openFile]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 

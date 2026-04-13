@@ -15,6 +15,12 @@ const envSchema = z.object({
   PLATFORM_API_URL: z.string().url().optional(),
   AGENT_SERVICE_URL: z.string().url().optional(),
   PLATFORM_JWT_SECRET: z.string().optional(),
+
+  // OpenCode agent — choose one mode:
+  // Mode A: Connect to an existing OpenCode server
+  OPENCODE_SERVER_URL: z.string().url().optional(),
+  // Mode B: Use a specific model when starting an embedded OpenCode instance
+  OPENCODE_MODEL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.4.0",
+    "@opencode-ai/sdk": "^1.4.3",
     "better-sqlite3": "^9.6.0",
     "bun-pty": "^0.4.8",
     "chokidar": "^4.0.0",

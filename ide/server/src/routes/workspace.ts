@@ -149,7 +149,7 @@ app.post(
 );
 
 // ── Search ────────────────────────────────────────────────────────────────────
-// GET /api/workspaces/:id/search?q=useState&maxResults=100
+// GET /api/workspaces/:id/search?q=useState&maxResults=100&regex=false&caseSensitive=false&wholeWord=false&include=*.ts&exclude=node_modules/**
 app.get(
   "/:id/search",
   zValidator(
@@ -157,13 +157,58 @@ app.get(
     z.object({
       q: z.string().min(1),
       maxResults: z.coerce.number().int().min(1).max(500).default(100),
+      regex: z.coerce.boolean().default(false),
+      caseSensitive: z.coerce.boolean().default(false),
+      wholeWord: z.coerce.boolean().default(false),
+      include: z.string().optional(),
+      exclude: z.string().optional(),
     }),
   ),
   async (c) => {
     const { id } = c.req.param();
-    const { q, maxResults } = c.req.valid("query");
-    const results = await WorkspaceService.search(id, q, { maxResults });
+    const { q, maxResults, regex, caseSensitive, wholeWord, include, exclude } =
+      c.req.valid("query");
+    const results = await WorkspaceService.search(id, q, {
+      maxResults,
+      regex,
+      caseSensitive,
+      wholeWord,
+      include,
+      exclude,
+    });
     return c.json({ data: results, total: results.length });
+  },
+);
+
+// ── Search & Replace ──────────────────────────────────────────────────────────
+// POST /api/workspaces/:id/search-replace
+app.post(
+  "/:id/search-replace",
+  zValidator(
+    "json",
+    z.object({
+      query: z.string().min(1),
+      replacement: z.string(),
+      regex: z.boolean().default(false),
+      caseSensitive: z.boolean().default(false),
+      wholeWord: z.boolean().default(false),
+      include: z.string().optional(),
+      exclude: z.string().optional(),
+      filePaths: z.array(z.string()).optional(),
+    }),
+  ),
+  async (c) => {
+    const { id } = c.req.param();
+    const body = c.req.valid("json");
+    const result = await WorkspaceService.searchReplace(id, body.query, body.replacement, {
+      regex: body.regex,
+      caseSensitive: body.caseSensitive,
+      wholeWord: body.wholeWord,
+      include: body.include,
+      exclude: body.exclude,
+      filePaths: body.filePaths,
+    });
+    return c.json({ data: result });
   },
 );
 

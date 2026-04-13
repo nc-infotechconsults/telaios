@@ -1,3 +1,6 @@
+// ─── Plugin System ────────────────────────────────────────────────────────────
+export * from "./plugin";
+
 // ─── Workspace ───────────────────────────────────────────────────────────────
 
 export type WorkspaceSource =
@@ -67,45 +70,28 @@ export interface EditorTab {
   commitDetail?: GitCommitDetail;
 }
 
-export type PanelId = "explorer" | "search" | "git" | "terminal" | "db";
+// ─── Editor Groups ───────────────────────────────────────────────────────────
 
-/**
- * Which region a panel currently lives in.
- *
- * "bottom" is the full-width bottom strip (terminal).
- * "left-bottom" / "right-bottom" are the lower halves of the sidebars.
- */
-export type PanelArea =
-  | "left-top"
-  | "left-bottom"
-  | "right-top"
-  | "right-bottom"
-  | "bottom";
-
-export interface PanelState {
-  id: PanelId;
-  area: PanelArea;
-  /** Sort order within the area (0-based). */
-  order: number;
-  isOpen: boolean;
-  /** When true the panel is shrunk to its header bar only (accordion-style). */
-  isCollapsed: boolean;
-  /** Percentage size (0-100). */
-  size: number;
-  /** Timestamp of when this panel was last opened; null when closed. Used for FIFO queue. */
-  openedAt: number | null;
+export interface EditorGroup {
+  id: string;
+  tabs: EditorTab[];
+  activeTabId: string | null;
 }
 
-/**
- * Tracks which sidebar section is currently collapsed.
- * A collapsed section hides all its panels without changing their isOpen state.
- */
-export type SectionKey = "left-top" | "left-bottom" | "right-top" | "right-bottom";
-export type CollapsedSections = Partial<Record<SectionKey, boolean>>;
+export type SplitDirection = "horizontal" | "vertical";
 
-export interface DragState {
-  panelId: PanelId | null;
-  sourceArea: PanelArea | null;
+export interface EditorSplit {
+  id: string;
+  direction: SplitDirection;
+  children: (EditorGroup | EditorSplit)[];
+  sizes: number[];
+}
+
+/** Type guard — distinguishes EditorGroup from EditorSplit in the tree. */
+export function isEditorGroup(
+  node: EditorGroup | EditorSplit,
+): node is EditorGroup {
+  return "tabs" in node;
 }
 
 // ─── Git ─────────────────────────────────────────────────────────────────────
@@ -173,8 +159,10 @@ export interface GitCommitDetail extends GitCommit {
 export interface TerminalSession {
   id: string;
   workspaceId: string;
+  label: string;         // "Terminal 1", "Terminal 2", or custom name
   cols: number;
   rows: number;
+  createdAt: number;
 }
 
 // ─── WebSocket messages ───────────────────────────────────────────────────────
