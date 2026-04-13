@@ -1,15 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useLayoutEffect, useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  FileCode, 
-  FolderPlus, 
-  Trash2, 
-  Copy, 
-  Clipboard,
-  Edit3,
-  Files,
-  ChevronRight
-} from "lucide-react";
 
 export interface MenuItem {
   id: string;
@@ -31,32 +21,29 @@ interface Props {
 
 export function ContextMenu({ x, y, items, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ x, y });
+  // null = not yet measured (hidden); set synchronously before first paint
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [submenuIndex, setSubmenuIndex] = useState<number | null>(null);
 
   // Filter visible items for keyboard nav
   const visibleItems = items.filter(item => !item.divider);
 
-  // Auto-position to stay in viewport
-  useEffect(() => {
-    if (menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      
-      let newX = x;
-      let newY = y;
-      
-      if (x + rect.width > viewportWidth) {
-        newX = viewportWidth - rect.width - 8;
-      }
-      if (y + rect.height > viewportHeight) {
-        newY = viewportHeight - rect.height - 8;
-      }
-      
-      setPosition({ x: newX, y: newY });
-    }
+  // Measure the menu's intrinsic size and clamp it inside the viewport.
+  // useLayoutEffect fires before the browser paints — no visible jump.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+
+    const { width, height } = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const pad = 8;
+
+    setPosition({
+      x: Math.max(pad, x + width  > vw ? vw - width  - pad : x),
+      y: Math.max(pad, y + height > vh ? vh - height - pad : y),
+    });
   }, [x, y]);
 
   // Close on click outside
@@ -112,7 +99,12 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.1 }}
         className="fixed z-50 min-w-[180px] py-1 bg-[#1a1a1d]/95 backdrop-blur-xl border border-white/[0.08] rounded-lg shadow-2xl overflow-hidden"
-        style={{ left: position.x, top: position.y }}
+        style={{
+          left: position?.x ?? x,
+          top: position?.y ?? y,
+          // Stay invisible until the clamped position is computed (before first paint)
+          visibility: position ? "visible" : "hidden",
+        }}
         onKeyDown={handleKeyDown}
       >
         {items.map((item, index) => {
