@@ -1,4 +1,5 @@
 import { useLayoutEffect, useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface MenuItem {
@@ -90,7 +91,10 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
     }
   }, [visibleItems, selectedIndex, submenuIndex, onClose]);
 
-  return (
+  // document.body can be null during HMR module re-evaluation; bail out early
+  if (typeof document === "undefined" || !document.body) return null;
+
+  return createPortal(
     <AnimatePresence>
       <motion.div
         ref={menuRef}
@@ -155,6 +159,7 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
           );
         })}
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
