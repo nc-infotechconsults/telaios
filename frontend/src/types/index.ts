@@ -202,6 +202,28 @@ export interface ProjectAgent {
   assigned_at: string;
 }
 
+// ── Documents ─────────────────────────────────────────────────────────────────
+
+export type DocumentFileType = "pdf" | "docx" | "xlsx" | "md" | "txt" | "csv" | "json" | "other";
+export type DocumentStatus = "uploading" | "processing" | "ready" | "error";
+
+export interface Document {
+  id: string;
+  project_id: string;
+  name: string;
+  file_type: DocumentFileType;
+  mime_type: string;
+  s3_key: string;
+  size_bytes: number;
+  checksum_sha256: string;
+  status: DocumentStatus;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // WebSocket event payloads
 export type WsEvent =
   | { type: "chat_token"; content: string }

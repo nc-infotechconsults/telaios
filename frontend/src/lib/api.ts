@@ -10,6 +10,7 @@ import type {
   AgentRole,
   Settings,
   User,
+  Document,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -252,3 +253,40 @@ export const testLlm = (data: { provider: string; model: string; apiKey?: string
   DEMO
     ? delay({ ok: true })
     : axios.post("/agent/test-llm", data).then((r) => r.data);
+
+// ─── Documents ────────────────────────────────────────────────────────────────
+
+export const listDocuments = (projectId: string): Promise<Document[]> =>
+  DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents`).then((r) => r.data);
+
+export const uploadDocument = (projectId: string, file: File): Promise<Document> => {
+  if (DEMO) {
+    return delay<Document>({
+      id: `doc-${Date.now()}`,
+      project_id: projectId,
+      name: file.name,
+      file_type: "other",
+      mime_type: file.type,
+      s3_key: "",
+      size_bytes: file.size,
+      checksum_sha256: "",
+      status: "processing",
+      error_message: null,
+      metadata: null,
+      uploaded_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }
+  const form = new FormData();
+  form.append("file", file);
+  return http.post<Document>(`/projects/${projectId}/documents`, form).then((r) => r.data);
+};
+
+export const deleteDocument = (projectId: string, id: string): Promise<void> =>
+  DEMO ? delay(undefined as unknown as void) : http.delete(`/projects/${projectId}/documents/${id}`).then(() => undefined);
+
+export const getDocumentDownloadUrl = (projectId: string, id: string): Promise<string> =>
+  DEMO
+    ? delay("")
+    : http.get<{ url: string }>(`/projects/${projectId}/documents/${id}/download`).then((r) => r.data.url);

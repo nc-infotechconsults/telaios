@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { CreateDocumentSchema, PatchDocumentSchema } from "../schemas/document.schema";
 import * as documentService from "../services/document.service";
 import { uploadToS3, getPresignedDownloadUrl, deleteFromS3, buildS3Key } from "../utils/s3.util";
+import logger from "../utils/logger";
 
 export async function listDocuments(req: Request, res: Response) {
   const docs = await documentService.listDocuments(req.params.projectId);
@@ -56,6 +57,20 @@ export async function uploadDocument(req: Request, res: Response) {
 
   const userId = (req as Request & { user?: { id?: string } }).user?.id ?? null;
   const doc = await documentService.createDocument(req.params.projectId, userId, parsed.data);
+
+  // Fire-and-forget: trigger async processing in agent-service
+  const agentServiceUrl = process.env.AGENT_SERVICE_URL ?? "http://localhost:8000";
+  const internalKey = process.env.INTERNAL_API_KEY ?? "";
+  void fetch(`${agentServiceUrl}/documents/${doc.id}/process`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${internalKey}`,
+    },
+    body: JSON.stringify({ project_id: req.params.projectId }),
+  }).catch((err: unknown) => {
+    logger.warn({ err, documentId: doc.id }, "Failed to trigger document processing");
+  });
 
   return res.status(201).json(doc);
 }

@@ -7,6 +7,8 @@ import { Repository } from "../../entities/Repository.entity";
 import { Task } from "../../entities/Task.entity";
 import { Message } from "../../entities/Message.entity";
 import { AgentProfile } from "../../entities/AgentProfile.entity";
+import { Document } from "../../entities/Document.entity";
+import type { DocumentFileType, DocumentStatus } from "../../entities/Document.entity";
 import bcrypt from "bcryptjs";
 
 export interface UserOpts {
@@ -68,4 +70,35 @@ export async function createTestMessage(projectId: string, planId?: string): Pro
 export async function createTestAgentProfile(): Promise<AgentProfile> {
   const repo = AppDataSource.getRepository(AgentProfile);
   return repo.save(repo.create({ name: "Test Agent", agent_type: "langgraph" }));
+}
+
+export interface DocumentOpts {
+  name?: string;
+  file_type?: DocumentFileType;
+  mime_type?: string;
+  s3_key?: string;
+  size_bytes?: number;
+  checksum_sha256?: string;
+  status?: DocumentStatus;
+  uploaded_by?: string | null;
+}
+
+export async function createTestDocument(
+  projectId: string,
+  opts: DocumentOpts = {},
+): Promise<Document> {
+  const repo = AppDataSource.getRepository(Document);
+  return repo.save(
+    repo.create({
+      project_id: projectId,
+      name: opts.name ?? "test-doc.pdf",
+      file_type: opts.file_type ?? "pdf",
+      mime_type: opts.mime_type ?? "application/pdf",
+      s3_key: opts.s3_key ?? `projects/${projectId}/documents/${Date.now()}/test-doc.pdf`,
+      size_bytes: opts.size_bytes ?? 1024,
+      checksum_sha256: opts.checksum_sha256 ?? "abc123def456",
+      status: opts.status ?? "ready",
+      uploaded_by: opts.uploaded_by ?? null,
+    }),
+  );
 }

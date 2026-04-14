@@ -15,6 +15,27 @@ export interface SettingsDto {
   llm_base_url?: string;
 }
 
+export interface DocumentDto {
+  id: string;
+  project_id: string;
+  name: string;
+  file_type: string;
+  mime_type: string;
+  s3_key: string;
+  size_bytes: number;
+  status: string;
+  error_message: string | null;
+}
+
+export interface ChunkSearchResult {
+  id: string;
+  document_id: string;
+  document_name: string;
+  chunk_index: number;
+  content: string;
+  similarity: number;
+}
+
 export interface PlanDto {
   id: string;
   project_id: string;
@@ -134,5 +155,48 @@ export const dataClient = {
       role: string;
       scope: Record<string, unknown> | null;
     }>;
+  },
+
+  // ── Document processing ──────────────────────────────────────────────────────
+
+  async getDocument(projectId: string, documentId: string): Promise<DocumentDto> {
+    const res = await client.get(`/projects/${projectId}/documents/${documentId}`);
+    return res.data as DocumentDto;
+  },
+
+  async updateDocumentStatus(
+    documentId: string,
+    status: string,
+    error_message?: string | null,
+  ): Promise<void> {
+    await client.patch(`/internal/documents/${documentId}/status`, {
+      status,
+      error_message: error_message ?? null,
+    });
+  },
+
+  async storeDocumentChunks(
+    documentId: string,
+    chunks: Array<{
+      chunk_index: number;
+      content: string;
+      embedding: number[];
+      metadata?: Record<string, unknown> | null;
+    }>,
+  ): Promise<void> {
+    await client.post(`/internal/documents/${documentId}/chunks`, { chunks });
+  },
+
+  async searchDocumentChunks(
+    projectId: string,
+    embedding: number[],
+    limit = 5,
+  ): Promise<ChunkSearchResult[]> {
+    const res = await client.post("/internal/documents/search", {
+      project_id: projectId,
+      embedding,
+      limit,
+    });
+    return res.data as ChunkSearchResult[];
   },
 };

@@ -39,6 +39,11 @@ export async function getDocument(
   return repo().findOneBy({ id: documentId, project_id: projectId });
 }
 
+/** Look up a document by id only (for internal/service-to-service calls). */
+export async function getDocumentById(documentId: string): Promise<Document | null> {
+  return repo().findOneBy({ id: documentId });
+}
+
 export async function patchDocument(
   documentId: string,
   projectId: string,

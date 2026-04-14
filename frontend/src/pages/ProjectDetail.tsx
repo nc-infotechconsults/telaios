@@ -29,8 +29,9 @@ import { toast } from "../lib/toast";
 import { formatStatus } from "../lib/statusLabels";
 import type { Project, Plan, Repository, AgentProfile, ProjectAgent, AgentRole } from "../types";
 import RepositorySetup from "../components/plan/RepositorySetup";
+import DocumentsTab from "../components/documents/DocumentsTab";
 
-type ActiveTab = "plans" | "repos" | "agents";
+type ActiveTab = "plans" | "repos" | "agents" | "documents";
 
 const STATUS_COLOR: Record<string, "warning" | "success" | "primary" | "default"> = {
   draft: "warning",
@@ -212,18 +213,25 @@ export default function ProjectDetail() {
               + Assign Agent
             </Button>
           )}
+          {activeTab === "documents" && (
+            <Button size="sm" color="primary" onPress={() => document.getElementById("doc-upload-trigger")?.click()}>
+              + Upload
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Tab bar */}
       <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
-        {(["plans", "repos", "agents"] as ActiveTab[]).map((tab) => {
+        {(["plans", "repos", "agents", "documents"] as ActiveTab[]).map((tab) => {
           const label =
             tab === "plans"
               ? `Plans (${plans.length})`
               : tab === "repos"
               ? `Repositories (${repositories.length})`
-              : `Agents (${agents.length})`;
+              : tab === "agents"
+              ? `Agents (${agents.length})`
+              : "Documents";
           return (
             <button
               key={tab}
@@ -359,6 +367,13 @@ export default function ProjectDetail() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Documents tab */}
+      {activeTab === "documents" && (
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          <DocumentsTab projectId={projectId ?? ""} />
         </div>
       )}
 

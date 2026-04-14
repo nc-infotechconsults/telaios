@@ -57,6 +57,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-sweai-secret}
       S3_BUCKET: ${S3_BUCKET:-sweai-documents}
       S3_REGION: ${S3_REGION:-us-east-1}
+      AGENT_SERVICE_URL: http://agent-service:8000
       PORT: 3000
     depends_on:
       postgres:

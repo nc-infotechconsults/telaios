@@ -6,6 +6,7 @@ import cors from "cors";
 import { config } from "./core/config";
 import chatRouter from "./api/chat";
 import { dataClient } from "./services/dataClient";
+import { processDocument } from "./services/documentProcessor";
 
 const app = express();
 
@@ -31,6 +32,26 @@ app.post("/test-llm", async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err) });
   }
+});
+
+/**
+ * POST /documents/:documentId/process
+ * Body: { project_id: string }
+ * Triggered by data-api after upload — runs the full extraction/embedding pipeline.
+ * Responds immediately (202) and processes asynchronously.
+ */
+app.post("/documents/:documentId/process", (req, res) => {
+  const { documentId } = req.params;
+  const { project_id } = req.body as { project_id?: string };
+
+  if (!project_id) {
+    return res.status(400).json({ error: "project_id is required" });
+  }
+
+  // Fire-and-forget — do not await
+  void processDocument(documentId, project_id);
+
+  return res.status(202).json({ status: "processing" });
 });
 
 app.use("/chat", chatRouter);

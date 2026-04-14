@@ -26,6 +26,8 @@ import { getAgentEventBus } from "../../core/agent-framework/event-bus";
 import { buildChatModel } from "../../core/llm";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { embedTexts } from "../../services/embeddingService";
+import { dataClient } from "../../services/dataClient";
 
 const execAsync = promisify(exec);
 
@@ -47,16 +49,16 @@ export interface KnowledgeAnswer {
 }
 
 const KNOWLEDGE_SYSTEM_PROMPT = `You are an expert software engineer with deep knowledge of codebases.
-You have been given snippets from relevant source files and are asked a question.
+You have been given snippets from relevant source files and project documents, and are asked a question.
 
 Answer accurately and concisely. If you're unsure, say so explicitly.
-Cite specific file paths and line numbers when referencing code.
+Cite specific file paths and line numbers when referencing code, or document names when referencing project documents.
 
 Respond with a JSON object:
 {
   "answer": "detailed answer here",
   "confidence": 0.85,  // 0-1 estimate of how confident you are
-  "sources": ["path/to/file1.ts", "path/to/file2.ts"]  // files you referenced
+  "sources": ["path/to/file1.ts", "Document: design-spec.pdf"]  // files and documents you referenced
 }
 
 Respond with ONLY valid JSON. No markdown fences.`;
@@ -101,16 +103,40 @@ export class KnowledgeAgent extends BaseAgent {
       if (contextFiles.length >= maxFiles) break;
     }
 
-    // Build context block
-    const contextBlock = contextFiles.length > 0
+    // Build code context block
+    const codeContextBlock = contextFiles.length > 0
       ? contextFiles.map((f) =>
           `### ${f.repoName}/${f.filePath}\n\`\`\`\n${f.content.slice(0, 3000)}\n\`\`\``
         ).join("\n\n")
-      : "No relevant source files found.";
+      : "";
+
+    // RAG: retrieve relevant document chunks if project has documents
+    let docContextBlock = "";
+    try {
+      const queryEmbeddings = await embedTexts([query]);
+      const queryEmbedding = queryEmbeddings[0];
+      if (queryEmbedding) {
+        const chunks = await dataClient.searchDocumentChunks(ctx.project.id, queryEmbedding, 5);
+        if (chunks.length > 0) {
+          docContextBlock = chunks
+            .map((c) => `### Document: ${c.document_name} (chunk ${c.chunk_index})\n${c.content}`)
+            .join("\n\n");
+        }
+      }
+    } catch {
+      // RAG is best-effort — don't fail the whole agent if embeddings/search fail
+    }
+
+    const contextBlock = [
+      docContextBlock ? `## Project Documents\n\n${docContextBlock}` : "",
+      codeContextBlock ? `## Source Files\n\n${codeContextBlock}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n") || "No relevant context found.";
 
     const response = await this.llm.invoke([
       new SystemMessage(KNOWLEDGE_SYSTEM_PROMPT),
-      new HumanMessage(`Question: ${query}\n\nRelevant source files:\n\n${contextBlock}`),
+      new HumanMessage(`Question: ${query}\n\nRelevant context:\n\n${contextBlock}`),
     ]);
 
     const content = typeof response.content === "string"
