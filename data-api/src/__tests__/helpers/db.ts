@@ -40,6 +40,7 @@ export async function clearAllTables(): Promise<void> {
       messages,
       plans,
       repositories,
+      documents,
       settings,
       projects,
       agent_profiles,

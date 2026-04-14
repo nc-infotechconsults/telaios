@@ -15,6 +15,14 @@ const ConfigSchema = z.object({
   LLM_MODEL: z.string().default("gpt-4o"),
   LLM_API_KEY: z.string().default(""),
   LLM_BASE_URL: z.string().optional(),
+  // S3 / MinIO for document storage
+  S3_ENDPOINT: z.string().default("http://localhost:9000"),
+  S3_ACCESS_KEY: z.string().default("sweai"),
+  S3_SECRET_KEY: z.string().default("sweai-secret"),
+  S3_BUCKET: z.string().default("sweai-documents"),
+  S3_REGION: z.string().default("us-east-1"),
+  // Embeddings model (OpenAI-compatible)
+  EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
 });
 
 export const config = ConfigSchema.parse(process.env);
