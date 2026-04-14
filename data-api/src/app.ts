@@ -7,6 +7,7 @@ import helmet from "helmet";
 import authRouter from "./routes/auth.route";
 import usersRouter from "./routes/users.route";
 import projectMembersRouter from "./routes/projectMembers.route";
+import projectAgentsRouter from "./routes/projectAgents.route";
 import projectsRouter from "./routes/projects.route";
 import repositoriesRouter from "./routes/repositories.route";
 import plansRouter from "./routes/plans.route";
@@ -37,6 +38,7 @@ app.use("/users", usersRouter);
 app.use("/projects", projectsRouter);
 app.use("/projects", repositoriesRouter);
 app.use("/projects", projectMembersRouter);
+app.use("/projects", projectAgentsRouter);
 
 // Standalone repository PATCH — used by agent-service to update clone status without project_id
 app.patch("/repositories/:id", patchRepositoryById);

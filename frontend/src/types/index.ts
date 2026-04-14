@@ -182,6 +182,26 @@ export type PlanChatItem = {
 /** Union of a regular chat message and an inline plan-draft card. */
 export type ChatItem = Message | PlanChatItem;
 
+// ── Project Agents ────────────────────────────────────────────────────────────
+
+export type AgentRole =
+  | "planner"
+  | "coder"
+  | "reviewer"
+  | "tester"
+  | "infra"
+  | "knowledge";
+
+export interface ProjectAgent {
+  id: string;
+  project_id: string;
+  agent_profile_id: string;
+  agent_profile: AgentProfile;
+  role: AgentRole;
+  scope: Record<string, unknown> | null;
+  assigned_at: string;
+}
+
 // WebSocket event payloads
 export type WsEvent =
   | { type: "chat_token"; content: string }

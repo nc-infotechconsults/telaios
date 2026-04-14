@@ -12,6 +12,7 @@ import {Settings} from "../entities/Settings.entity";
 import {AgentProfile} from "../entities/AgentProfile.entity";
 import {User} from "../entities/User.entity";
 import {ProjectMember} from "../entities/ProjectMember.entity";
+import {ProjectAgent} from "../entities/ProjectAgent.entity";
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ export const AppDataSource = new DataSource({
     AgentProfile,
     User,
     ProjectMember,
+    ProjectAgent,
   ],
   migrations: [
     "../migrations/*.ts"

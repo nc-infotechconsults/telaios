@@ -134,6 +134,56 @@ export class Scheduler {
     return repo.remote_url;
   }
 
+  /**
+   * After a task completes, attempt to push any commits made in each workspace.
+   * This is best-effort — failures are logged but do not fail the task.
+   */
+  private async pushWorkspaces(
+    projectId: string,
+    task: TaskConfig,
+    workspaceMap: Map<string, string>,
+    repositories: Map<string, RepoConfig>
+  ): Promise<void> {
+    for (const repoId of task.repository_ids) {
+      const localPath = workspaceMap.get(repoId);
+      const repo = repositories.get(repoId);
+      if (!localPath || !repo) continue;
+
+      try {
+        const git = simpleGit(localPath);
+
+        // Stage and commit any uncommitted changes the agent left behind
+        const status = await git.status();
+        if (!status.isClean()) {
+          await git.add(".");
+          await git.commit(`chore: agent result for task "${task.title}"`, { "--allow-empty": null });
+        }
+
+        // Push with the authenticated remote URL
+        const pushUrl = this.buildCloneUrl(repo);
+        await git.push(pushUrl, repo.branch ?? "main");
+
+        this.emit(projectId, {
+          type: "repo_status",
+          repo_id: repo.id,
+          repo_name: repo.name,
+          status: "ready",
+          message: "Changes pushed to remote",
+        });
+      } catch (err) {
+        // Non-fatal — log and continue
+        console.error(`[Scheduler] Failed to push repo ${repo.name}:`, err);
+        this.emit(projectId, {
+          type: "repo_status",
+          repo_id: repo.id,
+          repo_name: repo.name,
+          status: "ready",
+          message: `Push failed (non-fatal): ${String(err)}`,
+        });
+      }
+    }
+  }
+
   private async dispatchTask(
     projectId: string,
     task: TaskConfig,
@@ -193,6 +243,11 @@ export class Scheduler {
       status: newStatus,
       agent_profile_id: task.agent_profile_id,
     });
+
+    // Push any commits the agent made — best-effort, non-fatal
+    if (result.success) {
+      await this.pushWorkspaces(projectId, task, workspaceMap, repositories);
+    }
 
     inFlightIds.delete(task.id);
     if (result.success) completedIds.add(task.id);

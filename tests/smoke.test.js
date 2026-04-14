@@ -10,7 +10,8 @@
  */
 
 import axios from "axios";
-import { WebSocket } from "ws";
+import http from "http";
+import https from "https";
 
 const DATA_API = process.env.DATA_API_URL ?? "http://localhost:3000";
 const AGENT_URL = process.env.AGENT_URL ?? "http://localhost:8000";
@@ -290,39 +291,63 @@ async function runAgentServiceTests() {
   });
 }
 
-async function runWebSocketTest() {
-  console.log("\n── WebSocket ─────────────────────────────────────────────────");
+async function runSSETest() {
+  console.log("\n── SSE ───────────────────────────────────────────────────────");
 
-  // Create a temporary project for WS test
+  // Create a temporary project and plan for SSE connectivity test
   const { data: proj } = await api.post("/projects", {
-    name: "WS Smoke Test",
-    description: "Temporary WebSocket test project",
+    name: "SSE Smoke Test",
+    description: "Temporary SSE test project",
   });
   const projectId = proj.id;
 
-  await test("WebSocket connects to /ws/:projectId", () =>
-    new Promise((resolve, reject) => {
-      const wsUrl = AGENT_URL.replace(/^http/, "ws") + `/ws/${projectId}`;
-      const ws = new WebSocket(wsUrl);
-      const timeout = setTimeout(() => {
-        ws.close();
-        reject(new Error("WebSocket connection timed out after 5s"));
-      }, 5000);
+  let planId;
+  try {
+    const { data: plan } = await api.post("/plans", { project_id: projectId });
+    planId = plan.id;
 
-      ws.on("open", () => {
-        clearTimeout(timeout);
-        ws.close();
-        resolve();
-      });
-      ws.on("error", (err) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-    })
-  );
+    await test("SSE connects to /chat/:planId/stream with correct headers", () =>
+      new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("SSE connection timed out after 5s"));
+        }, 5000);
 
-  // Cleanup
-  await api.delete(`/projects/${projectId}`).catch(() => {});
+        const agentUrl = new URL(`/chat/${planId}/stream`, AGENT_URL);
+        const transport = agentUrl.protocol === "https:" ? https : http;
+
+        const req = transport.request(
+          agentUrl,
+          { method: "GET" },
+          (res) => {
+            clearTimeout(timeout);
+            try {
+              assert(res.statusCode === 200, `Expected status 200, got ${res.statusCode}`);
+              const ct = res.headers["content-type"] ?? "";
+              assert(
+                ct.startsWith("text/event-stream"),
+                `Expected content-type text/event-stream, got ${ct}`
+              );
+              res.destroy();
+              resolve();
+            } catch (err) {
+              res.destroy();
+              reject(err);
+            }
+          }
+        );
+
+        req.on("error", (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+
+        req.end();
+      })
+    );
+  } finally {
+    // Cleanup
+    await api.delete(`/projects/${projectId}`).catch(() => {});
+  }
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -345,9 +370,9 @@ async function main() {
   }
 
   try {
-    await runWebSocketTest();
+    await runSSETest();
   } catch (err) {
-    console.error("Fatal error in WebSocket tests:", err.message);
+    console.error("Fatal error in SSE tests:", err.message);
   }
 
   console.log(`\n  Results: ${passed} passed, ${failed} failed\n`);

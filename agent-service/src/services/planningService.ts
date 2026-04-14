@@ -8,7 +8,35 @@ import { dataClient } from "./dataClient";
 import { sseManager } from "./sseManager";
 import { startExecution } from "./executionService";
 import { ensureLocalPath, listDirectory, readFile, searchCode } from "./repoExplorer";
-import type { AgentProfileSummary, PlanDraft, PlannedTask, RepositorySummary } from "../agents/planning/state";
+// ─── Planning types (formerly in agents/planning/state.ts) ───────────────────
+
+interface PlanDraft {
+  tasks: PlannedTask[];
+}
+
+interface PlannedTask {
+  title: string;
+  description: string;
+  type: "code" | "test" | "review" | "general";
+  execution_order: number;
+  depends_on_task_indices: number[];
+  recommended_agent_profile_id: string | null;
+  repository_ids: string[];
+}
+
+interface AgentProfileSummary {
+  id: string;
+  name: string;
+  description: string;
+  agent_type: string;
+  skills: Array<{ name: string; description: string }>;
+}
+
+interface RepositorySummary {
+  id: string;
+  name: string;
+  remote_url: string;
+}
 
 // ─── Session state ────────────────────────────────────────────────────────────
 

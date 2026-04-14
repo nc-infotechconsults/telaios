@@ -6,6 +6,8 @@ import type {
   Task,
   Message,
   AgentProfile,
+  ProjectAgent,
+  AgentRole,
   Settings,
   User,
 } from "../types";
@@ -202,6 +204,39 @@ export const updateAgentProfile = (id: string, data: Partial<AgentProfile>): Pro
 
 export const deleteAgentProfile = (id: string): Promise<void> =>
   DEMO ? delay(undefined as unknown as void) : http.delete(`/agent-profiles/${id}`).then(() => undefined);
+
+// ─── Project Agents ───────────────────────────────────────────────────────────
+
+export const listProjectAgents = (projectId: string): Promise<ProjectAgent[]> =>
+  DEMO ? delay([]) : http.get<ProjectAgent[]>(`/projects/${projectId}/agents`).then((r) => r.data);
+
+export const assignProjectAgent = (
+  projectId: string,
+  data: { agent_profile_id: string; role: AgentRole; scope?: Record<string, unknown> | null },
+): Promise<ProjectAgent> =>
+  DEMO
+    ? delay<ProjectAgent>({
+        id: `pa-${Date.now()}`,
+        project_id: projectId,
+        agent_profile_id: data.agent_profile_id,
+        agent_profile: {} as AgentProfile,
+        role: data.role,
+        scope: data.scope ?? null,
+        assigned_at: new Date().toISOString(),
+      })
+    : http.post<ProjectAgent>(`/projects/${projectId}/agents`, data).then((r) => r.data);
+
+export const patchProjectAgent = (
+  projectId: string,
+  agentId: string,
+  data: { role?: AgentRole; scope?: Record<string, unknown> | null },
+): Promise<ProjectAgent> =>
+  http.patch<ProjectAgent>(`/projects/${projectId}/agents/${agentId}`, data).then((r) => r.data);
+
+export const removeProjectAgent = (projectId: string, agentId: string): Promise<void> =>
+  DEMO
+    ? delay(undefined as unknown as void)
+    : http.delete(`/projects/${projectId}/agents/${agentId}`).then(() => undefined);
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
