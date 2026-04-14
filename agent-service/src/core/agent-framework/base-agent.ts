@@ -1,4 +1,5 @@
 import { AgentContext } from "./context";
+import type { AgentResult } from "../../agents/coordinator/drivers/base";
 
 // ── Status machine ─────────────────────────────────────────────────────────────
 //
@@ -15,6 +16,8 @@ export type AgentStatus =
   | "error"
   | "stopped";
 
+export type { AgentResult };
+
 /**
  * Abstract base class for all agents in the platform.
  *
@@ -29,6 +32,13 @@ export type AgentStatus =
 export abstract class BaseAgent {
   private _status: AgentStatus = "idle";
 
+  /**
+   * Structured result produced by the last successful `execute()` call.
+   * Subclasses set this inside `onExecute()` so callers can retrieve the
+   * outcome without coupling to agent-specific return types.
+   */
+  protected _result: AgentResult | null = null;
+
   constructor(
     /** Unique instance identifier (e.g. UUID from the agent pool). */
     public readonly id: string,
@@ -40,6 +50,14 @@ export abstract class BaseAgent {
 
   getStatus(): AgentStatus {
     return this._status;
+  }
+
+  /**
+   * Returns the result of the last successful `execute()` call, or `null`
+   * if the agent hasn't executed yet (or failed).
+   */
+  getResult(): AgentResult | null {
+    return this._result;
   }
 
   /**

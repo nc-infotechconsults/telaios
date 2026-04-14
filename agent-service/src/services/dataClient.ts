@@ -125,4 +125,14 @@ export const dataClient = {
     const res = await client.patch(`/repositories/${repoId}`, data);
     return res.data;
   },
+
+  async getProjectAgents(projectId: string) {
+    const res = await client.get(`/projects/${projectId}/agents`);
+    return res.data as Array<{
+      id: string;
+      agent_profile_id: string;
+      role: string;
+      scope: Record<string, unknown> | null;
+    }>;
+  },
 };

@@ -4,6 +4,7 @@ import { config } from "../../core/config";
 import { decrypt } from "../../core/crypto";
 import { redis } from "../../core/redis";
 import { dataClient } from "../../services/dataClient";
+import { OrchestrationService } from "../../services/orchestrationService";
 import { AgentPool } from "./pool";
 import type { AgentTask } from "./drivers/base";
 import { sseManager } from "../../services/sseManager";
@@ -61,7 +62,7 @@ export class Scheduler {
       }
 
       const dispatches = ready.map((task) =>
-        this.dispatchTask(projectId, task, workspaceMap, repositories, completedIds, inFlightIds)
+        this.dispatchTask(projectId, planId, task, workspaceMap, repositories, completedIds, inFlightIds)
       );
 
       await Promise.allSettled(dispatches);
@@ -186,6 +187,7 @@ export class Scheduler {
 
   private async dispatchTask(
     projectId: string,
+    planId: string,
     task: TaskConfig,
     workspaceMap: Map<string, string>,
     repositories: Map<string, RepoConfig>,
@@ -222,13 +224,26 @@ export class Scheduler {
       agentProfileId: task.agent_profile_id,
     };
 
-    const driver = task.agent_profile_id ? this.pool.getDriver(task.agent_profile_id) : null;
+    // ── Driver resolution: role-based first, then profile-based ──────────────
+    // Specialist agents (reviewer/tester/knowledge/infra) are registered by role
+    // and take priority. Legacy coding agents are resolved by profile ID.
+    const driver =
+      this.pool.getDriverByRole(task.type) ??
+      (task.agent_profile_id ? this.pool.getDriver(task.agent_profile_id) : null);
+
+    // Emit agent_started lifecycle event
+    this.emit(projectId, {
+      type: "agent_started",
+      task_id: task.id,
+      agent_role: task.type,
+      agent_profile_id: task.agent_profile_id ?? undefined,
+    });
 
     let result;
     if (driver) {
       result = await driver.execute(agentTask, workspaces);
     } else {
-      result = { success: false, output: "", error: "No driver found for profile" };
+      result = { success: false, output: "", error: "No driver found for task type or profile" };
     }
 
     const newStatus = result.success ? "done" : "failed";
@@ -244,6 +259,22 @@ export class Scheduler {
       agent_profile_id: task.agent_profile_id,
     });
 
+    // Emit agent lifecycle completion/failure event
+    if (result.success) {
+      this.emit(projectId, {
+        type: "agent_completed",
+        task_id: task.id,
+        agent_role: task.type,
+      });
+    } else {
+      this.emit(projectId, {
+        type: "agent_failed",
+        task_id: task.id,
+        agent_role: task.type,
+        error: result.error,
+      });
+    }
+
     // Push any commits the agent made — best-effort, non-fatal
     if (result.success) {
       await this.pushWorkspaces(projectId, task, workspaceMap, repositories);
@@ -256,6 +287,9 @@ export class Scheduler {
       `project:${projectId}:task`,
       JSON.stringify({ task_id: task.id, status: newStatus })
     );
+
+    // Notify the OrchestrationService so it can advance multi-agent pipelines
+    OrchestrationService.getInstance().notifyTaskComplete(planId, task.id, result.success);
   }
 
   private emit(projectId: string, event: object): void {

@@ -1,7 +1,11 @@
+import { randomUUID } from "crypto";
 import type { CodingAgentDriver } from "./drivers/base";
 import { LangGraphDriver } from "./drivers/langgraph";
 import { OpenCodeDriver } from "./drivers/opencode";
 import { GitHubCopilotDriver } from "./drivers/githubCopilot";
+import { BaseAgentDriver } from "./drivers/base-agent-driver";
+import { AgentRegistry } from "../../core/agent-framework/registry";
+import { ROLE_TO_AGENT_TYPE } from "../register";
 import { buildChatModel } from "../../core/llm";
 import { decrypt } from "../../core/crypto";
 import type { Skill, McpServer } from "../../core/types";
@@ -18,8 +22,22 @@ export interface AgentProfileConfig {
   skills: Skill[];
 }
 
+export interface ProjectAgentConfig {
+  id: string;
+  agent_profile_id: string;
+  role: string;
+  scope: Record<string, unknown> | null;
+}
+
 export class AgentPool {
+  /** Drivers keyed by agent profile ID (legacy CodingAgentDriver path). */
   private drivers = new Map<string, CodingAgentDriver>();
+
+  /**
+   * Drivers keyed by role string (reviewer/tester/knowledge/infra).
+   * These wrap BaseAgent instances via BaseAgentDriver.
+   */
+  private roleDrivers = new Map<string, CodingAgentDriver>();
 
   initialize(profiles: AgentProfileConfig[]): void {
     for (const profile of profiles) {
@@ -28,8 +46,43 @@ export class AgentPool {
     }
   }
 
+  /**
+   * Create BaseAgentDriver-wrapped drivers for specialist roles
+   * (reviewer, tester, knowledge, infra) and index them by role.
+   * Must be called after `registerAllAgents()`.
+   */
+  registerRoleDrivers(
+    projectAgents: ProjectAgentConfig[],
+    projectCtx: { id: string; name: string },
+  ): void {
+    const registry = AgentRegistry.getInstance();
+
+    for (const pa of projectAgents) {
+      const agentType = ROLE_TO_AGENT_TYPE[pa.role];
+      if (!agentType) continue; // planner/coder use legacy CodingAgentDriver path
+      if (!registry.has(agentType)) continue;
+
+      const instanceId = `${pa.role}-${randomUUID().slice(0, 8)}`;
+      const agent = registry.create(agentType, instanceId);
+      const driver = new BaseAgentDriver(agent, projectCtx);
+
+      this.roleDrivers.set(pa.role, driver);
+      // Also index by profile ID so profile-based fallback still works
+      this.drivers.set(pa.agent_profile_id, driver);
+    }
+  }
+
   getDriver(profileId: string): CodingAgentDriver | undefined {
     return this.drivers.get(profileId);
+  }
+
+  /**
+   * Return the driver registered for a given role (e.g. "reviewer", "tester").
+   * Returns undefined if no role driver was registered (caller should fall back
+   * to a profile-based driver).
+   */
+  getDriverByRole(role: string): CodingAgentDriver | undefined {
+    return this.roleDrivers.get(role);
   }
 
   private buildDriver(profile: AgentProfileConfig): CodingAgentDriver {

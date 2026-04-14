@@ -8,7 +8,9 @@ import type { Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
 import TaskDetailModal from "../components/plan/TaskDetailModal";
 import AgentPoolPanel from "../components/agents/AgentPoolPanel";
+import AgentActivityPanel from "../components/agents/AgentActivityPanel";
 import type { AgentInstance } from "../components/agents/AgentStatusBadge";
+import type { AgentEvent, PipelineState } from "../components/agents/AgentActivityPanel";
 
 type PlanViewMode = "graph" | "list";
 
@@ -34,6 +36,8 @@ export default function ExecutionDashboard() {
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [repoStatuses, setRepoStatuses] = useState<Record<string, Repository["status"]>>({});
   const [agentInstances, setAgentInstances] = useState<AgentInstance[]>([]);
+  const [pipelineState, setPipelineState] = useState<PipelineState | null>(null);
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [planView, setPlanView] = useState<PlanViewMode>("graph");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -113,6 +117,58 @@ export default function ExecutionDashboard() {
         }
         return [...prev, updated];
       });
+
+    // ── Agent lifecycle events ──────────────────────────────────────────────
+    } else if (event.type === "agent_started") {
+      const agentEvent: AgentEvent = {
+        id: `${event.task_id}-${Date.now()}`,
+        type: "started",
+        task_id: event.task_id,
+        agent_role: event.agent_role,
+        timestamp: Date.now(),
+      };
+      setAgentEvents((prev) => [agentEvent, ...prev].slice(0, 20));
+
+    } else if (event.type === "agent_completed") {
+      const agentEvent: AgentEvent = {
+        id: `${event.task_id}-${Date.now()}`,
+        type: "completed",
+        task_id: event.task_id,
+        agent_role: event.agent_role,
+        timestamp: Date.now(),
+      };
+      setAgentEvents((prev) => [agentEvent, ...prev].slice(0, 20));
+
+    } else if (event.type === "agent_failed") {
+      const agentEvent: AgentEvent = {
+        id: `${event.task_id}-${Date.now()}`,
+        type: "failed",
+        task_id: event.task_id,
+        agent_role: event.agent_role,
+        error: event.error,
+        timestamp: Date.now(),
+      };
+      setAgentEvents((prev) => [agentEvent, ...prev].slice(0, 20));
+
+    // ── Pipeline events ─────────────────────────────────────────────────────
+    } else if (event.type === "pipeline_step_started") {
+      setPipelineState({
+        plan_id: event.plan_id,
+        current_step: event.step,
+        step_index: event.step_index,
+        total_steps: event.total_steps,
+        status: "running",
+      });
+    } else if (event.type === "pipeline_complete") {
+      setPipelineState((prev) =>
+        prev
+          ? { ...prev, pipeline: event.pipeline, status: "complete" }
+          : null
+      );
+    } else if (event.type === "pipeline_failed") {
+      setPipelineState((prev) =>
+        prev ? { ...prev, status: "failed" } : null
+      );
     }
   }, []);
 
@@ -347,11 +403,15 @@ export default function ExecutionDashboard() {
           </div>
         </div>
 
-        {/* Right sidebar: agent pool */}
-        <div className="hidden lg:block w-64 xl:w-72 shrink-0 border-l border-divider overflow-y-auto p-4">
+        {/* Right sidebar: agent pool + activity */}
+        <div className="hidden lg:flex flex-col w-64 xl:w-72 shrink-0 border-l border-divider overflow-y-auto p-4 gap-4">
           <AgentPoolPanel
             agentProfiles={agentProfiles}
             instances={enrichedInstances}
+          />
+          <AgentActivityPanel
+            pipelineState={pipelineState}
+            agentEvents={agentEvents}
           />
         </div>
       </div>
