@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PlanStatusSchema = z.enum(["draft", "confirmed", "executing", "completed"]);
+export const PlanStatusSchema = z.enum(["draft", "confirmed", "executing", "completed", "failed"]);
 
 export const CreatePlanSchema = z.object({
   project_id: z.string().uuid(),

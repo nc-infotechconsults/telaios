@@ -46,6 +46,11 @@ export async function deletePlanTasks(req: Request, res: Response) {
   return res.json({ deleted: count });
 }
 
+export async function cancelPlan(req: Request, res: Response) {
+  const count = await taskService.cancelPlanTasks(req.params.id);
+  return res.json({ cancelled: count });
+}
+
 export async function getPlanMessages(req: Request, res: Response) {
   const messages = await messageService.listMessages({ planId: req.params.id });
   res.json(messages);

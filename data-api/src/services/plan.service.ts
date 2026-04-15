@@ -49,3 +49,39 @@ export async function patchPlan(id: string, dto: PatchPlanDto): Promise<Plan | n
   await repo().update(id, dto);
   return repo().findOneBy({ id });
 }
+
+export async function startExecution(plan_id: string): Promise<Plan | null> {
+  const plan = await repo().findOneBy({ id: plan_id });
+  if (!plan) return null;
+  if (plan.status !== "confirmed") {
+    throw new Error(
+      `Plan ${plan_id} cannot be started: expected 'confirmed', got '${plan.status}'`
+    );
+  }
+  await repo().update(plan_id, { status: "executing" });
+  return repo().findOneBy({ id: plan_id });
+}
+
+export async function completePlan(plan_id: string): Promise<Plan | null> {
+  const plan = await repo().findOneBy({ id: plan_id });
+  if (!plan) return null;
+  if (plan.status !== "executing") {
+    throw new Error(
+      `Plan ${plan_id} cannot be completed: expected 'executing', got '${plan.status}'`
+    );
+  }
+  await repo().update(plan_id, { status: "completed" });
+  return repo().findOneBy({ id: plan_id });
+}
+
+export async function failPlan(plan_id: string, reason?: string): Promise<Plan | null> {
+  const plan = await repo().findOneBy({ id: plan_id });
+  if (!plan) return null;
+  if (plan.status !== "executing") {
+    throw new Error(
+      `Plan ${plan_id} cannot be failed: expected 'executing', got '${plan.status}'`
+    );
+  }
+  await repo().update(plan_id, { status: "failed", failure_reason: reason ?? null });
+  return repo().findOneBy({ id: plan_id });
+}

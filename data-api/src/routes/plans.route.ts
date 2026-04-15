@@ -15,4 +15,7 @@ router.delete("/:id", requireProjectAccess("editor"), planController.deletePlan)
 router.get("/:id/messages", planController.getPlanMessages);
 router.delete("/:id/tasks", requireProjectAccess("editor"), planController.deletePlanTasks);
 
+// Execution control
+router.post("/:id/cancel", requireProjectAccess("editor"), planController.cancelPlan);
+
 export default router;

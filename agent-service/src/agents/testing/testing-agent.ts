@@ -16,6 +16,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { BaseAgent } from "../../core/agent-framework/base-agent";
 import type { AgentContext } from "../../core/agent-framework/context";
+import type { AgentArtifact } from "../coordinator/drivers/base";
 import { getAgentEventBus } from "../../core/agent-framework/event-bus";
 import { buildChatModel } from "../../core/llm";
 import { detectFramework, runTests } from "./test-runner";
@@ -114,6 +115,21 @@ export class TestingAgent extends BaseAgent {
     this._result = {
       success: overallSuccess || generatedFiles.length > 0,
       output: JSON.stringify(summary),
+      artifacts: [
+        {
+          type: "test_result",
+          title: `Test Results — ${totalPassed} passed, ${totalFailed} failed`,
+          content: JSON.stringify(summary),
+          content_type: "application/json",
+          metadata: {
+            passed: totalPassed,
+            failed: totalFailed,
+            skipped: 0,
+            total: totalPassed + totalFailed,
+            duration_ms: totalDuration,
+          },
+        } satisfies AgentArtifact,
+      ],
     };
 
     const eventTopic = overallSuccess ? "tests.passed" : "tests.failed";

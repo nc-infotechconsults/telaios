@@ -30,6 +30,8 @@ interface TaskConfig {
   repository_ids: string[];
 }
 
+const TERMINAL_STATUSES = new Set(["done", "failed", "skipped", "cancelled"]);
+
 export class Scheduler {
   private pool: AgentPool;
 
@@ -38,35 +40,105 @@ export class Scheduler {
   }
 
   async run(projectId: string, planId: string): Promise<void> {
+    // Mark the plan as executing — use generic patch so resume works regardless
+    // of current plan status (avoids strict "confirmed" guard on startExecution).
+    await dataClient.updatePlan(planId, { status: "executing" });
+    this.emit(projectId, { type: "plan_executing", plan_id: planId });
+
+    try {
+      await this._runInternal(projectId, planId);
+
+      await dataClient.completePlanExecution(planId);
+      this.emit(projectId, { type: "plan_completed", plan_id: planId });
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      try {
+        await dataClient.failPlanExecution(planId, reason);
+      } catch {
+        // best-effort — don't shadow the original error
+      }
+      this.emit(projectId, { type: "plan_failed", plan_id: planId, error: reason });
+      throw err;
+    }
+  }
+
+  private async _runInternal(projectId: string, planId: string): Promise<void> {
     const repositoryList: RepoConfig[] = await dataClient.getProjectRepositories(projectId);
     const tasks: TaskConfig[] = await dataClient.getPlanTasks(planId);
 
     const workspaceMap = await this.cloneRepositories(projectId, repositoryList);
-
     const repositories = new Map(repositoryList.map((r) => [r.id, r]));
+
+    // terminalIds — all terminal tasks (done/failed/skipped/cancelled).
+    //   Used for loop-termination and filtering ready tasks.
+    // completedIds — only "done" tasks.
+    //   Used to satisfy dependency checks so failed tasks don't unblock dependents.
+    const terminalIds = new Set<string>();
     const completedIds = new Set<string>();
     const inFlightIds = new Set<string>();
 
-    const pendingTasks = tasks.filter((t) => t.status !== "done" && t.status !== "failed");
+    // Pre-populate from DB state so resume works correctly.
+    for (const t of tasks) {
+      if (TERMINAL_STATUSES.has(t.status)) terminalIds.add(t.id);
+      if (t.status === "done") completedIds.add(t.id);
+    }
 
-    while (completedIds.size < pendingTasks.length) {
-      const ready = pendingTasks.filter((t) => {
-        if (completedIds.has(t.id) || inFlightIds.has(t.id)) return false;
+    while (terminalIds.size < tasks.length) {
+      const ready = tasks.filter((t) => {
+        if (terminalIds.has(t.id) || inFlightIds.has(t.id)) return false;
         return t.depends_on_task_ids.every((id) => completedIds.has(id));
       });
 
       if (ready.length === 0) {
-        if (inFlightIds.size === 0) break;
+        if (inFlightIds.size === 0) break; // deadlock or all tasks accounted for
         await new Promise((r) => setTimeout(r, 1000));
         continue;
       }
 
       const dispatches = ready.map((task) =>
-        this.dispatchTask(projectId, planId, task, workspaceMap, repositories, completedIds, inFlightIds)
+        this.dispatchTask(
+          projectId,
+          planId,
+          task,
+          tasks,
+          workspaceMap,
+          repositories,
+          terminalIds,
+          completedIds,
+          inFlightIds,
+        )
       );
 
       await Promise.allSettled(dispatches);
     }
+  }
+
+  /**
+   * Compute all transitive dependents of `taskId` within the loaded task list,
+   * excluding tasks already in `excludeIds`.
+   */
+  private getTransitiveDependents(
+    taskId: string,
+    tasks: TaskConfig[],
+    excludeIds: Set<string>,
+  ): string[] {
+    const result: string[] = [];
+    const visited = new Set<string>();
+
+    const traverse = (id: string): void => {
+      const direct = tasks.filter(
+        (t) => t.depends_on_task_ids.includes(id) && !excludeIds.has(t.id),
+      );
+      for (const dep of direct) {
+        if (visited.has(dep.id)) continue;
+        visited.add(dep.id);
+        result.push(dep.id);
+        traverse(dep.id);
+      }
+    };
+
+    traverse(taskId);
+    return result;
   }
 
   private async cloneRepositories(
@@ -189,8 +261,10 @@ export class Scheduler {
     projectId: string,
     planId: string,
     task: TaskConfig,
+    allTasks: TaskConfig[],
     workspaceMap: Map<string, string>,
     repositories: Map<string, RepoConfig>,
+    terminalIds: Set<string>,
     completedIds: Set<string>,
     inFlightIds: Set<string>
   ): Promise<void> {
@@ -225,13 +299,10 @@ export class Scheduler {
     };
 
     // ── Driver resolution: role-based first, then profile-based ──────────────
-    // Specialist agents (reviewer/tester/knowledge/infra) are registered by role
-    // and take priority. Legacy coding agents are resolved by profile ID.
     const driver =
       this.pool.getDriverByRole(task.type) ??
       (task.agent_profile_id ? this.pool.getDriver(task.agent_profile_id) : null);
 
-    // Emit agent_started lifecycle event
     this.emit(projectId, {
       type: "agent_started",
       task_id: task.id,
@@ -240,17 +311,67 @@ export class Scheduler {
     });
 
     let result;
+    const startedAt = new Date().toISOString();
+
     if (driver) {
       result = await driver.execute(agentTask, workspaces);
     } else {
       result = { success: false, output: "", error: "No driver found for task type or profile" };
     }
 
+    const completedAt = new Date().toISOString();
+
+    // Capture git diff across all assigned workspaces
+    const diffArtifacts: Array<{
+      type: "diff";
+      title: string;
+      content: string;
+      content_type: string;
+      sort_order: number;
+    }> = [];
+    let diffIdx = 0;
+    for (const repoId of task.repository_ids) {
+      const localPath = workspaceMap.get(repoId);
+      const repoName = repositories.get(repoId)?.name ?? repoId;
+      if (!localPath) continue;
+      try {
+        const git = simpleGit(localPath);
+        const diff = await git.diff(["HEAD"]);
+        if (diff.trim().length > 0) {
+          diffArtifacts.push({
+            type: "diff",
+            title: `Git diff — ${repoName}`,
+            content: diff,
+            content_type: "text/x-diff",
+            sort_order: diffIdx++,
+          });
+        }
+      } catch {
+        // non-fatal
+      }
+    }
+
     const newStatus = result.success ? "done" : "failed";
     await dataClient.updateTask(task.id, {
       status: newStatus,
       result: result.output || result.error,
+      started_at: startedAt,
+      completed_at: completedAt,
     });
+
+    // Persist all artifacts (diffs + agent-produced)
+    const agentArtifacts = (result.artifacts ?? []).map((a, i) => ({
+      ...a,
+      sort_order: diffArtifacts.length + i,
+    }));
+    const allArtifacts = [...diffArtifacts, ...agentArtifacts];
+    if (allArtifacts.length > 0) {
+      try {
+        await dataClient.createTaskArtifacts(task.id, allArtifacts);
+      } catch (err) {
+        console.error(`[Scheduler] createTaskArtifacts failed for task ${task.id}:`, err);
+      }
+    }
 
     this.emit(projectId, {
       type: "task_status",
@@ -259,7 +380,6 @@ export class Scheduler {
       agent_profile_id: task.agent_profile_id,
     });
 
-    // Emit agent lifecycle completion/failure event
     if (result.success) {
       this.emit(projectId, {
         type: "agent_completed",
@@ -281,14 +401,38 @@ export class Scheduler {
     }
 
     inFlightIds.delete(task.id);
-    if (result.success) completedIds.add(task.id);
+    terminalIds.add(task.id);
+
+    if (result.success) {
+      completedIds.add(task.id);
+    } else {
+      // Cascade-skip all transitive dependents of the failed task.
+      // 1. Compute dependents locally (avoids extra DB round-trips for in-memory tracking).
+      // 2. Persist to DB via the internal endpoint.
+      // 3. Add to terminalIds and emit SSE so the loop and the frontend stay in sync.
+      const dependents = this.getTransitiveDependents(task.id, allTasks, terminalIds);
+      if (dependents.length > 0) {
+        try {
+          await dataClient.skipDependentTasks(task.id);
+        } catch (err) {
+          console.error(`[Scheduler] skipDependentTasks failed for task ${task.id}:`, err);
+        }
+        for (const depId of dependents) {
+          terminalIds.add(depId);
+          this.emit(projectId, {
+            type: "task_status",
+            task_id: depId,
+            status: "skipped",
+          });
+        }
+      }
+    }
 
     void redis.publish(
       `project:${projectId}:task`,
       JSON.stringify({ task_id: task.id, status: newStatus })
     );
 
-    // Notify the OrchestrationService so it can advance multi-agent pipelines
     OrchestrationService.getInstance().notifyTaskComplete(planId, task.id, result.success);
   }
 

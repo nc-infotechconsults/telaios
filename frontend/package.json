@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@heroui/react": "^2.6.0",
+    "@heroui/theme": "^2.4.26",
+    "@heroui/toast": "^2.0.22",
+    "@monaco-editor/react": "^4.7.0",
     "@xyflow/react": "^12.3.0",
     "axios": "^1.15.0",
     "framer-motion": "^11.3.0",
@@ -18,7 +21,8 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.26.2",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",

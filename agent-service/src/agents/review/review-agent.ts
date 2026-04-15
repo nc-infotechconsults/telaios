@@ -16,6 +16,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { BaseAgent } from "../../core/agent-framework/base-agent";
 import type { AgentContext } from "../../core/agent-framework/context";
+import type { AgentArtifact } from "../coordinator/drivers/base";
 import { getAgentEventBus } from "../../core/agent-framework/event-bus";
 import { buildChatModel } from "../../core/llm";
 import { parseDiff, formatDiffForLLM } from "./diff-parser";
@@ -119,13 +120,23 @@ export class ReviewAgent extends BaseAgent {
     const rawDiff = diffParts.join("\n\n");
 
     if (!rawDiff.trim()) {
+      const emptyReview: ReviewResult = {
+        approved: true,
+        summary: "No code changes detected. Nothing to review.",
+        comments: [],
+      };
       this._result = {
         success: true,
-        output: JSON.stringify({
-          approved: true,
-          summary: "No code changes detected. Nothing to review.",
-          comments: [],
-        } satisfies ReviewResult),
+        output: JSON.stringify(emptyReview),
+        artifacts: [
+          {
+            type: "review",
+            title: "Code Review — No Changes",
+            content: JSON.stringify(emptyReview),
+            content_type: "application/json",
+            metadata: { approved: true, comment_count: 0, summary: emptyReview.summary },
+          } satisfies AgentArtifact,
+        ],
       };
       return;
     }
@@ -161,6 +172,21 @@ export class ReviewAgent extends BaseAgent {
     this._result = {
       success: true,
       output: JSON.stringify(review),
+      artifacts: [
+        {
+          type: "review",
+          title: review.approved
+            ? "Code Review — Approved"
+            : "Code Review — Changes Requested",
+          content: JSON.stringify(review),
+          content_type: "application/json",
+          metadata: {
+            approved: review.approved,
+            comment_count: review.comments.length,
+            summary: review.summary,
+          },
+        } satisfies AgentArtifact,
+      ],
     };
 
     await bus.publish("review.complete", {

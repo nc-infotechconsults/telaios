@@ -7,6 +7,7 @@ import { config } from "./core/config";
 import chatRouter from "./api/chat";
 import { dataClient } from "./services/dataClient";
 import { processDocument } from "./services/documentProcessor";
+import { startExecution } from "./services/executionService";
 
 const app = express();
 
@@ -55,6 +56,26 @@ app.post("/documents/:documentId/process", (req, res) => {
 });
 
 app.use("/chat", chatRouter);
+
+/**
+ * POST /plans/:planId/resume
+ * Body: { project_id: string }
+ * Re-launches a Scheduler + AgentPool for a plan in any state.
+ * The scheduler reads current DB state, so it naturally skips already-done tasks.
+ * Responds 202 immediately; execution is fire-and-forget.
+ */
+app.post("/plans/:planId/resume", (req, res) => {
+  const { planId } = req.params;
+  const { project_id } = req.body as { project_id?: string };
+
+  if (!project_id) {
+    return res.status(400).json({ error: "project_id is required" });
+  }
+
+  void startExecution(project_id, planId);
+
+  return res.status(202).json({ status: "resuming" });
+});
 
 app.listen(config.PORT, () => {
   console.log(`Agent Service listening on port ${config.PORT}`);

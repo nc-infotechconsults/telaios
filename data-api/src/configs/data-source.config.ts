@@ -15,6 +15,7 @@ import {ProjectMember} from "../entities/ProjectMember.entity";
 import {ProjectAgent} from "../entities/ProjectAgent.entity";
 import {Document} from "../entities/Document.entity";
 import {DocumentChunk} from "../entities/DocumentChunk.entity";
+import {TaskArtifact} from "../entities/TaskArtifact.entity";
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ export const AppDataSource = new DataSource({
     ProjectAgent,
     Document,
     DocumentChunk,
+    TaskArtifact,
   ],
   migrations: [
     "../migrations/*.ts"

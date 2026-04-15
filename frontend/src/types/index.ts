@@ -11,9 +11,10 @@ export interface User {
 }
 
 export type ProjectStatus = "planning" | "executing" | "done";
-export type PlanStatus = "draft" | "confirmed" | "executing" | "completed";
-export type TaskStatus = "pending" | "ready" | "in_progress" | "done" | "failed";
-export type TaskType = "code" | "test" | "review" | "general";
+export type PlanStatus = "draft" | "confirmed" | "executing" | "completed" | "failed";
+export type TaskStatus = "pending" | "ready" | "in_progress" | "done" | "failed" | "cancelled" | "skipped";
+export type TaskType = "code" | "test" | "review" | "general" | "knowledge" | "infra";
+export type ArtifactType = "diff" | "test_result" | "review" | "log" | "file" | "link";
 export type RepoStatus = "unconfigured" | "cloning" | "ready" | "error";
 export type AgentType = "langgraph" | "opencode" | "github-copilot";
 export type MessageRole = "user" | "assistant" | "system";
@@ -47,6 +48,7 @@ export interface Plan {
   project_id: string;
   title?: string | null;
   status: PlanStatus;
+  failure_reason?: string | null;
   created_at: string;
   confirmed_at?: string;
   tasks?: Task[];
@@ -63,10 +65,25 @@ export interface Task {
   agent_profile_id?: string;
   assigned_instance_id?: string;
   result?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  metadata?: Record<string, unknown> | null;
   depends_on_task_ids?: string[];
   repository_ids?: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface TaskArtifact {
+  id: string;
+  task_id: string;
+  type: ArtifactType;
+  title: string;
+  content: string;
+  content_type: string;
+  metadata?: Record<string, unknown> | null;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface TaskDependency {
@@ -243,4 +260,8 @@ export type WsEvent =
   // ── Pipeline events ───────────────────────────────────────────────────────
   | { type: "pipeline_step_started"; plan_id: string; step: string; step_index: number; total_steps: number }
   | { type: "pipeline_complete"; plan_id: string; pipeline: string }
-  | { type: "pipeline_failed"; plan_id: string; step: string; step_index: number };
+  | { type: "pipeline_failed"; plan_id: string; step: string; step_index: number }
+  // ── Plan lifecycle events ─────────────────────────────────────────────────
+  | { type: "plan_executing"; plan_id: string }
+  | { type: "plan_completed"; plan_id: string }
+  | { type: "plan_failed"; plan_id: string; reason?: string };

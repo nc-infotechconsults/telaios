@@ -20,6 +20,8 @@ const STATUS_BG: Record<Task["status"], string> = {
   in_progress: "#b45309",
   done: "#065f46",
   failed: "#991b1b",
+  cancelled: "#374151",
+  skipped: "#312e81",
 };
 
 const STATUS_BORDER: Record<Task["status"], string> = {
@@ -28,6 +30,8 @@ const STATUS_BORDER: Record<Task["status"], string> = {
   in_progress: "#f59e0b",
   done: "#10b981",
   failed: "#ef4444",
+  cancelled: "#6b7280",
+  skipped: "#6366f1",
 };
 
 const DRIVER_LABEL: Record<AgentProfile["agent_type"], string> = {

@@ -4,6 +4,10 @@ import {
   createTask,
   getTask,
   patchTask,
+  cancelTask,
+  skipDependentTasks,
+  retryTask,
+  cancelPlanTasks,
 } from "../../../services/task.service";
 import { AppDataSource } from "../../../configs/data-source.config";
 import { Task } from "../../../entities/Task.entity";
@@ -27,6 +31,7 @@ const mockDepRepo = {
   save: jest.fn(),
   create: jest.fn(),
   delete: jest.fn(),
+  find: jest.fn(),
 };
 
 const mockTrRepo = {
@@ -205,5 +210,176 @@ describe("patchTask", () => {
     const result = await patchTask("nonexistent", { title: "X" });
 
     expect(result).toBeNull();
+  });
+});
+
+describe("cancelTask", () => {
+  it("returns null when task is not found", async () => {
+    mockTaskRepo.findOne.mockResolvedValue(null);
+
+    const result = await cancelTask("nonexistent");
+
+    expect(result).toBeNull();
+  });
+
+  it("throws when task is not in a cancellable state", async () => {
+    const task = { id: "t1", status: "in_progress", dependencies: [], taskRepositories: [] } as unknown as Task;
+    mockTaskRepo.findOne.mockResolvedValue(task);
+
+    await expect(cancelTask("t1")).rejects.toThrow("cancelled");
+  });
+
+  it("cancels a pending task", async () => {
+    const task = { id: "t1", status: "pending", dependencies: [], taskRepositories: [] } as unknown as Task;
+    mockTaskRepo.findOne.mockResolvedValue(task);
+    mockTaskRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await cancelTask("t1");
+
+    expect(mockTaskRepo.update).toHaveBeenCalledWith("t1", { status: "cancelled" });
+    expect(result?.status).toBe("cancelled");
+  });
+
+  it("cancels a ready task", async () => {
+    const task = { id: "t1", status: "ready", dependencies: [], taskRepositories: [] } as unknown as Task;
+    mockTaskRepo.findOne.mockResolvedValue(task);
+    mockTaskRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await cancelTask("t1");
+
+    expect(result?.status).toBe("cancelled");
+  });
+});
+
+describe("skipDependentTasks", () => {
+  it("does nothing when there are no dependents", async () => {
+    mockDepRepo.find.mockResolvedValue([]);
+
+    await skipDependentTasks("t1");
+
+    expect(mockTaskRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("skips all non-terminal dependent tasks", async () => {
+    mockDepRepo.find
+      .mockResolvedValueOnce([{ task_id: "t2" }, { task_id: "t3" }])
+      .mockResolvedValue([]); // no further dependents
+    mockTaskRepo.find.mockResolvedValueOnce([
+      { id: "t2", status: "pending" },
+      { id: "t3", status: "ready" },
+    ] as unknown as Task[]);
+    mockTaskRepo.update.mockResolvedValue({ affected: 1 });
+
+    await skipDependentTasks("t1");
+
+    expect(mockTaskRepo.update).toHaveBeenCalledWith("t2", { status: "skipped" });
+    expect(mockTaskRepo.update).toHaveBeenCalledWith("t3", { status: "skipped" });
+  });
+
+  it("does not skip already terminal dependents", async () => {
+    mockDepRepo.find
+      .mockResolvedValueOnce([{ task_id: "t2" }])
+      .mockResolvedValue([]);
+    mockTaskRepo.find.mockResolvedValueOnce([
+      { id: "t2", status: "done" },
+    ] as unknown as Task[]);
+
+    await skipDependentTasks("t1");
+
+    expect(mockTaskRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("prevents infinite loops via the visited set", async () => {
+    // t2 depends on t1 (which just failed), and t1 depends on t2 (circular).
+    // t1 has status "failed" (terminal), so it will not be re-updated.
+    mockDepRepo.find
+      .mockResolvedValueOnce([{ task_id: "t2" }]) // deps of t1
+      .mockResolvedValueOnce([{ task_id: "t1" }]) // deps of t2 (circular ref)
+      .mockResolvedValue([]);
+    mockTaskRepo.find
+      .mockResolvedValueOnce([{ id: "t2", status: "pending" }] as unknown as Task[])
+      .mockResolvedValueOnce([{ id: "t1", status: "failed" }] as unknown as Task[]); // terminal → no update
+    mockTaskRepo.update.mockResolvedValue({ affected: 1 });
+
+    await skipDependentTasks("t1");
+
+    // Only t2 gets skipped; t1 is already terminal so it is not updated
+    expect(mockTaskRepo.update).toHaveBeenCalledTimes(1);
+    expect(mockTaskRepo.update).toHaveBeenCalledWith("t2", { status: "skipped" });
+  });
+});
+
+describe("retryTask", () => {
+  it("returns null when task is not found", async () => {
+    mockTaskRepo.findOne.mockResolvedValue(null);
+
+    const result = await retryTask("nonexistent");
+
+    expect(result).toBeNull();
+  });
+
+  it("throws when task is not in a retryable state", async () => {
+    mockTaskRepo.findOne.mockResolvedValue({ id: "t1", status: "done" } as Task);
+
+    await expect(retryTask("t1")).rejects.toThrow("retried");
+  });
+
+  it("resets a failed task to 'ready' and clears result", async () => {
+    const task = { id: "t1", status: "failed" } as Task;
+    const updated = { id: "t1", status: "ready", result: null, dependencies: [], taskRepositories: [] } as unknown as Task;
+    mockTaskRepo.findOne
+      .mockResolvedValueOnce(task)  // initial fetch
+      .mockResolvedValueOnce(updated); // fetch after update
+    mockTaskRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await retryTask("t1");
+
+    expect(mockTaskRepo.update).toHaveBeenCalledWith("t1", { status: "ready", result: null });
+    expect(result?.status).toBe("ready");
+  });
+
+  it("resets a skipped task to 'ready'", async () => {
+    const task = { id: "t1", status: "skipped" } as Task;
+    const updated = { id: "t1", status: "ready", dependencies: [], taskRepositories: [] } as unknown as Task;
+    mockTaskRepo.findOne
+      .mockResolvedValueOnce(task)
+      .mockResolvedValueOnce(updated);
+    mockTaskRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await retryTask("t1");
+
+    expect(result?.status).toBe("ready");
+  });
+});
+
+describe("cancelPlanTasks", () => {
+  it("returns 0 when there are no cancellable tasks", async () => {
+    mockTaskRepo.find.mockResolvedValue([
+      { id: "t1", status: "done" },
+      { id: "t2", status: "in_progress" },
+    ] as unknown as Task[]);
+
+    const result = await cancelPlanTasks("plan1");
+
+    expect(result).toBe(0);
+    expect(mockTaskRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("cancels all pending and ready tasks, ignoring others", async () => {
+    mockTaskRepo.find.mockResolvedValue([
+      { id: "t1", status: "pending" },
+      { id: "t2", status: "ready" },
+      { id: "t3", status: "in_progress" },
+      { id: "t4", status: "done" },
+    ] as unknown as Task[]);
+    mockTaskRepo.update.mockResolvedValue({ affected: 2 });
+
+    const result = await cancelPlanTasks("plan1");
+
+    expect(result).toBe(2);
+    expect(mockTaskRepo.update).toHaveBeenCalledWith(
+      { id: expect.anything() },
+      { status: "cancelled" }
+    );
   });
 });

@@ -18,6 +18,8 @@ const STATUS_COLOR: Record<Task["status"], "default" | "primary" | "warning" | "
   in_progress: "warning",
   done: "success",
   failed: "danger",
+  cancelled: "default",
+  skipped: "default",
 };
 
 const TYPE_COLOR: Record<Task["type"], "default" | "primary" | "secondary" | "warning"> = {
@@ -25,6 +27,8 @@ const TYPE_COLOR: Record<Task["type"], "default" | "primary" | "secondary" | "wa
   test: "secondary",
   review: "warning",
   general: "default",
+  knowledge: "secondary",
+  infra: "warning",
 };
 
 const DRIVER_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" | "success"> = {

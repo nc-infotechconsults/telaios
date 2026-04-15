@@ -1,4 +1,4 @@
-import { listPlans, createPlan, getPlan, deletePlan, patchPlan } from "../../../services/plan.service";
+import { listPlans, createPlan, getPlan, deletePlan, patchPlan, startExecution, completePlan, failPlan } from "../../../services/plan.service";
 import { AppDataSource } from "../../../configs/data-source.config";
 import { Plan } from "../../../entities/Plan.entity";
 
@@ -126,5 +126,114 @@ describe("patchPlan", () => {
     const result = await patchPlan("nonexistent", { title: "X" });
 
     expect(result).toBeNull();
+  });
+});
+
+describe("startExecution", () => {
+  it("returns null when plan is not found", async () => {
+    mockRepo.findOneBy.mockResolvedValue(null);
+
+    const result = await startExecution("nonexistent");
+
+    expect(result).toBeNull();
+  });
+
+  it("throws when plan is not in 'confirmed' state", async () => {
+    mockRepo.findOneBy.mockResolvedValue({ id: "plan1", status: "draft" } as Plan);
+
+    await expect(startExecution("plan1")).rejects.toThrow("confirmed");
+  });
+
+  it("transitions plan from 'confirmed' to 'executing'", async () => {
+    const plan = { id: "plan1", status: "confirmed" } as Plan;
+    const updated = { id: "plan1", status: "executing" } as Plan;
+    mockRepo.findOneBy
+      .mockResolvedValueOnce(plan)   // initial fetch
+      .mockResolvedValueOnce(updated); // fetch after update
+    mockRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await startExecution("plan1");
+
+    expect(mockRepo.update).toHaveBeenCalledWith("plan1", { status: "executing" });
+    expect(result?.status).toBe("executing");
+  });
+});
+
+describe("completePlan", () => {
+  it("returns null when plan is not found", async () => {
+    mockRepo.findOneBy.mockResolvedValue(null);
+
+    const result = await completePlan("nonexistent");
+
+    expect(result).toBeNull();
+  });
+
+  it("throws when plan is not in 'executing' state", async () => {
+    mockRepo.findOneBy.mockResolvedValue({ id: "plan1", status: "confirmed" } as Plan);
+
+    await expect(completePlan("plan1")).rejects.toThrow("executing");
+  });
+
+  it("transitions plan from 'executing' to 'completed'", async () => {
+    const plan = { id: "plan1", status: "executing" } as Plan;
+    const updated = { id: "plan1", status: "completed" } as Plan;
+    mockRepo.findOneBy
+      .mockResolvedValueOnce(plan)
+      .mockResolvedValueOnce(updated);
+    mockRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await completePlan("plan1");
+
+    expect(mockRepo.update).toHaveBeenCalledWith("plan1", { status: "completed" });
+    expect(result?.status).toBe("completed");
+  });
+});
+
+describe("failPlan", () => {
+  it("returns null when plan is not found", async () => {
+    mockRepo.findOneBy.mockResolvedValue(null);
+
+    const result = await failPlan("nonexistent");
+
+    expect(result).toBeNull();
+  });
+
+  it("throws when plan is not in 'executing' state", async () => {
+    mockRepo.findOneBy.mockResolvedValue({ id: "plan1", status: "completed" } as Plan);
+
+    await expect(failPlan("plan1")).rejects.toThrow("executing");
+  });
+
+  it("transitions plan to 'failed' with null failure_reason by default", async () => {
+    const plan = { id: "plan1", status: "executing" } as Plan;
+    const updated = { id: "plan1", status: "failed", failure_reason: null } as Plan;
+    mockRepo.findOneBy
+      .mockResolvedValueOnce(plan)
+      .mockResolvedValueOnce(updated);
+    mockRepo.update.mockResolvedValue({ affected: 1 });
+
+    const result = await failPlan("plan1");
+
+    expect(mockRepo.update).toHaveBeenCalledWith("plan1", {
+      status: "failed",
+      failure_reason: null,
+    });
+    expect(result?.status).toBe("failed");
+  });
+
+  it("stores the provided failure reason", async () => {
+    const plan = { id: "plan1", status: "executing" } as Plan;
+    const updated = { id: "plan1", status: "failed", failure_reason: "timeout" } as Plan;
+    mockRepo.findOneBy
+      .mockResolvedValueOnce(plan)
+      .mockResolvedValueOnce(updated);
+    mockRepo.update.mockResolvedValue({ affected: 1 });
+
+    await failPlan("plan1", "timeout");
+
+    expect(mockRepo.update).toHaveBeenCalledWith("plan1", {
+      status: "failed",
+      failure_reason: "timeout",
+    });
   });
 });

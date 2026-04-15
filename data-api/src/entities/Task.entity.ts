@@ -14,14 +14,17 @@ import { Plan } from "./Plan.entity";
 import { AgentProfile } from "./AgentProfile.entity";
 import { TaskDependency } from "./TaskDependency.entity";
 import { TaskRepository } from "./TaskRepository.entity";
+import { TaskArtifact } from "./TaskArtifact.entity";
 
-export type TaskType = "code" | "test" | "review" | "general";
+export type TaskType = "code" | "test" | "review" | "general" | "knowledge" | "infra";
 export type TaskStatus =
   | "pending"
   | "ready"
   | "in_progress"
   | "done"
-  | "failed";
+  | "failed"
+  | "cancelled"
+  | "skipped";
 
 @Entity("tasks")
 export class Task {
@@ -63,6 +66,15 @@ export class Task {
   @Column({ type: "text", nullable: true })
   result!: string;
 
+  @Column({ type: "timestamptz", nullable: true })
+  started_at!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  completed_at!: Date | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  metadata!: Record<string, unknown> | null;
+
   @CreateDateColumn()
   created_at!: Date;
 
@@ -77,4 +89,7 @@ export class Task {
 
   @OneToMany(() => TaskRepository, (tr) => tr.task, { cascade: true })
   taskRepositories!: Relation<TaskRepository[]>;
+
+  @OneToMany(() => TaskArtifact, (a) => a.task)
+  artifacts!: Relation<TaskArtifact[]>;
 }

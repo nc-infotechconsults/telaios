@@ -199,4 +199,48 @@ export const dataClient = {
     });
     return res.data as ChunkSearchResult[];
   },
+
+  // ── Plan lifecycle (internal) ─────────────────────────────────────────────
+
+  async startPlanExecution(planId: string): Promise<void> {
+    await client.patch(`/internal/plans/${planId}/status`, { status: "executing" });
+  },
+
+  async completePlanExecution(planId: string): Promise<void> {
+    await client.patch(`/internal/plans/${planId}/status`, { status: "completed" });
+  },
+
+  async failPlanExecution(planId: string, reason?: string): Promise<void> {
+    await client.patch(`/internal/plans/${planId}/status`, {
+      status: "failed",
+      failure_reason: reason ?? null,
+    });
+  },
+
+  // ── Task propagation (internal) ───────────────────────────────────────────
+
+  async skipDependentTasks(taskId: string): Promise<void> {
+    await client.post(`/internal/tasks/${taskId}/skip-dependents`);
+  },
+
+  async cancelPlanTasks(planId: string): Promise<{ cancelled: number }> {
+    const res = await client.post(`/internal/plans/${planId}/cancel-tasks`);
+    return res.data as { cancelled: number };
+  },
+
+  // ── Task artifacts (internal) ───────────────────────────────────────
+
+  async createTaskArtifacts(
+    taskId: string,
+    artifacts: Array<{
+      type: "diff" | "test_result" | "review" | "log" | "file" | "link";
+      title: string;
+      content: string;
+      content_type?: string;
+      metadata?: Record<string, unknown>;
+      sort_order?: number;
+    }>,
+  ): Promise<void> {
+    await client.post(`/internal/tasks/${taskId}/artifacts`, { artifacts });
+  },
 };

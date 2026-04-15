@@ -16,7 +16,8 @@ export type PlanStatus =
   | "draft"
   | "confirmed"
   | "executing"
-  | "completed";
+  | "completed"
+  | "failed";
 
 @Entity("plans")
 export class Plan {
@@ -41,6 +42,9 @@ export class Plan {
 
   @Column({ nullable: true })
   confirmed_at!: Date;
+
+  @Column({ type: "text", nullable: true })
+  failure_reason!: string | null;
 
   @DeleteDateColumn({ name: "deleted_at", nullable: true })
   deleted_at!: Date | null;

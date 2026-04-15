@@ -53,7 +53,7 @@ describe("CreateTaskSchema", () => {
   });
 
   it("accepts all valid type values", () => {
-    for (const type of ["code", "test", "review", "general"]) {
+    for (const type of ["code", "test", "review", "general", "knowledge", "infra"]) {
       const result = CreateTaskSchema.safeParse({ plan_id: VALID_UUID, title: "T", type });
       expect(result.success).toBe(true);
     }
@@ -65,7 +65,7 @@ describe("CreateTaskSchema", () => {
   });
 
   it("accepts all valid status values", () => {
-    for (const status of ["pending", "ready", "in_progress", "done", "failed"]) {
+    for (const status of ["pending", "ready", "in_progress", "done", "failed", "cancelled", "skipped"]) {
       const result = CreateTaskSchema.safeParse({ plan_id: VALID_UUID, title: "T", status });
       expect(result.success).toBe(true);
     }
@@ -132,7 +132,7 @@ describe("PatchTaskSchema", () => {
   });
 
   it("rejects invalid status enum", () => {
-    const result = PatchTaskSchema.safeParse({ status: "cancelled" });
+    const result = PatchTaskSchema.safeParse({ status: "archived" });
     expect(result.success).toBe(false);
   });
 });

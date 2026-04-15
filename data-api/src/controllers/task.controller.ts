@@ -32,3 +32,25 @@ export async function patchTask(req: Request, res: Response) {
   if (!updated) return res.status(404).json({ error: "Not found" });
   return res.json(updated);
 }
+
+export async function retryTask(req: Request, res: Response) {
+  try {
+    const updated = await taskService.retryTask(req.params.id);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    return res.json(updated);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return res.status(409).json({ error: message });
+  }
+}
+
+export async function cancelTask(req: Request, res: Response) {
+  try {
+    const updated = await taskService.cancelTask(req.params.id);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    return res.json(updated);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return res.status(409).json({ error: message });
+  }
+}

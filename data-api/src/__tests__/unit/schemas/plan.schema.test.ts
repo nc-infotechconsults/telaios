@@ -36,7 +36,7 @@ describe("CreatePlanSchema", () => {
   });
 
   it("accepts all valid status values", () => {
-    for (const status of ["draft", "confirmed", "executing", "completed"]) {
+    for (const status of ["draft", "confirmed", "executing", "completed", "failed"]) {
       const result = CreatePlanSchema.safeParse({ project_id: VALID_UUID, status });
       expect(result.success).toBe(true);
     }

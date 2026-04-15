@@ -1,10 +1,19 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardBody, CardHeader, Chip, Button, Spinner, useDisclosure } from "@heroui/react";
-import { getPlans, getTasks, getRepositories, getAgentProfiles } from "../lib/api";
-import { useProjectSSE } from "../lib/sse";
+import {
+  getPlans,
+  getTasks,
+  getRepositories,
+  getAgentProfiles,
+  retryTask,
+  cancelTask,
+  cancelPlan,
+  resumePlan,
+} from "../lib/api";
+import { usePlanSSE } from "../lib/sse";
 import { formatStatus } from "../lib/statusLabels";
-import type { Task, Repository, AgentProfile, WsEvent } from "../types";
+import type { Plan, Task, Repository, AgentProfile, WsEvent } from "../types";
 import PlanDAG from "../components/plan/PlanDAG";
 import TaskDetailModal from "../components/plan/TaskDetailModal";
 import AgentPoolPanel from "../components/agents/AgentPoolPanel";
@@ -28,9 +37,35 @@ const REPO_STATUS_ICON: Record<string, string> = {
   unconfigured: "○",
 };
 
+const PLAN_STATUS_COLOR: Record<
+  Plan["status"],
+  "default" | "warning" | "primary" | "success" | "danger"
+> = {
+  draft: "default",
+  confirmed: "primary",
+  executing: "warning",
+  completed: "success",
+  failed: "danger",
+};
+
+function taskDurationMs(task: Task): number | null {
+  if (!task.started_at || !task.completed_at) return null;
+  const ms = new Date(task.completed_at).getTime() - new Date(task.started_at).getTime();
+  return ms > 0 ? ms : null;
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  return `${mins}m ${secs}s`;
+}
+
 export default function ExecutionDashboard() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
@@ -52,16 +87,24 @@ export default function ExecutionDashboard() {
     if (!projectId) return;
     setLoading(true);
     Promise.all([
-      getPlans(projectId).then((plans) => {
+      getPlans(projectId).then((plans): Promise<{ plan: Plan | null; tasks: Task[] }> => {
         const active = plans.find(
-          (p) => p.status === "confirmed" || p.status === "executing" || p.status === "completed"
+          (p) =>
+            p.status === "confirmed" ||
+            p.status === "executing" ||
+            p.status === "completed" ||
+            p.status === "failed"
         );
-        return active ? getTasks(active.id) : [];
+        if (active) {
+          return getTasks(active.id).then((t) => ({ plan: active, tasks: t }));
+        }
+        return Promise.resolve({ plan: null, tasks: [] });
       }),
       getRepositories(projectId),
       getAgentProfiles(),
     ])
-      .then(([fetchedTasks, repos, profiles]) => {
+      .then(([{ plan, tasks: fetchedTasks }, repos, profiles]) => {
+        setActivePlan(plan);
         setTasks(fetchedTasks);
         setRepositories(repos);
         setAgentProfiles(profiles);
@@ -78,6 +121,12 @@ export default function ExecutionDashboard() {
             ? { ...t, status: event.status, assigned_instance_id: event.agent_instance_id }
             : t
         )
+      );
+      // Keep selectedTask in sync
+      setSelectedTask((prev) =>
+        prev && prev.id === event.task_id
+          ? { ...prev, status: event.status, assigned_instance_id: event.agent_instance_id }
+          : prev
       );
       if (event.agent_instance_id && event.agent_profile_id) {
         const isBusy = event.status === "in_progress";
@@ -101,8 +150,21 @@ export default function ExecutionDashboard() {
           ];
         });
       }
+
+    } else if (event.type === "plan_executing") {
+      setActivePlan((prev) => prev ? { ...prev, status: "executing" } : prev);
+
+    } else if (event.type === "plan_completed") {
+      setActivePlan((prev) => prev ? { ...prev, status: "completed" } : prev);
+
+    } else if (event.type === "plan_failed") {
+      setActivePlan((prev) =>
+        prev ? { ...prev, status: "failed", failure_reason: event.reason ?? null } : prev
+      );
+
     } else if (event.type === "repo_status") {
       setRepoStatuses((prev) => ({ ...prev, [event.repo_id]: event.status as Repository["status"] }));
+
     } else if (event.type === "agent_status") {
       setAgentInstances((prev) => {
         const existing = prev.find((i) => i.instance_id === event.instance_id);
@@ -172,14 +234,52 @@ export default function ExecutionDashboard() {
     }
   }, []);
 
-  useProjectSSE(projectId, handleWsEvent);
+  // SSE is plan-scoped (keyed on plan ID)
+  usePlanSSE(activePlan?.id, handleWsEvent);
 
+  // ── Task control handlers ─────────────────────────────────────────────────
+  function handleRetryTask(task: Task) {
+    retryTask(task.id)
+      .then((updated) => {
+        setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        setSelectedTask(updated);
+      })
+      .catch(console.error);
+  }
+
+  function handleCancelTask(task: Task) {
+    cancelTask(task.id)
+      .then((updated) => {
+        setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        setSelectedTask(updated);
+      })
+      .catch(console.error);
+  }
+
+  function handleCancelPlan() {
+    if (!activePlan) return;
+    cancelPlan(activePlan.id).catch(console.error);
+  }
+
+  function handleResumePlan() {
+    if (!activePlan) return;
+    resumePlan(activePlan.id).catch(console.error);
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const done = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in_progress").length;
   const failed = tasks.filter((t) => t.status === "failed").length;
+  const cancelled = tasks.filter((t) => t.status === "cancelled").length;
+  const skipped = tasks.filter((t) => t.status === "skipped").length;
   const total = tasks.length;
-
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  // Total wall-clock execution time: sum of all tasks that have timing data
+  const totalDurationMs = tasks.reduce<number>((acc, t) => {
+    const ms = taskDurationMs(t);
+    return ms != null ? acc + ms : acc;
+  }, 0);
 
   const enrichedInstances: AgentInstance[] = agentInstances.map((inst) => {
     const task = tasks.find((t) => t.id === inst.current_task_id);
@@ -208,12 +308,51 @@ export default function ExecutionDashboard() {
         <span className="text-default-300 shrink-0">/</span>
         <h2 className="font-semibold text-sm sm:text-base">Execution Dashboard</h2>
 
+        {/* Plan status */}
+        {activePlan && (
+          <Chip
+            size="sm"
+            color={PLAN_STATUS_COLOR[activePlan.status]}
+            variant="flat"
+            className="shrink-0"
+          >
+            {formatStatus(activePlan.status)}
+          </Chip>
+        )}
+
         <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+          {/* Task stats */}
           <Chip size="sm" color="success" variant="flat">{done}/{total} done</Chip>
           {inProgress > 0 && <Chip size="sm" color="warning" variant="flat">{inProgress} running</Chip>}
           {failed > 0 && <Chip size="sm" color="danger" variant="flat">{failed} {failed === 1 ? "failure" : "failures"}</Chip>}
+          {cancelled > 0 && <Chip size="sm" color="default" variant="flat">{cancelled} cancelled</Chip>}
+          {skipped > 0 && <Chip size="sm" color="default" variant="flat">{skipped} skipped</Chip>}
+          {totalDurationMs > 0 && (
+            <Chip size="sm" color="default" variant="bordered" className="font-mono">
+              ⏱ {formatDuration(totalDurationMs)}
+            </Chip>
+          )}
+
+          {/* Plan-level controls */}
+          {activePlan?.status === "executing" && (
+            <Button size="sm" color="danger" variant="flat" onPress={handleCancelPlan}>
+              Cancel plan
+            </Button>
+          )}
+          {activePlan?.status === "failed" && (
+            <Button size="sm" color="primary" variant="flat" onPress={handleResumePlan}>
+              Resume
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Failure reason banner */}
+      {activePlan?.status === "failed" && activePlan.failure_reason && (
+        <div className="px-4 sm:px-6 py-2 bg-danger/10 border-b border-danger/20 text-danger text-xs shrink-0">
+          <span className="font-semibold">Plan failed:</span> {activePlan.failure_reason}
+        </div>
+      )}
 
       {/* Progress bar */}
       {total > 0 && (
@@ -257,7 +396,7 @@ export default function ExecutionDashboard() {
             </div>
           )}
 
-          {/* DAG */}
+          {/* DAG / List */}
           <div className="flex-1 overflow-hidden p-4">
             {tasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center gap-3">
@@ -337,18 +476,18 @@ export default function ExecutionDashboard() {
                             const profile = agentProfiles.find((p) => p.id === t.agent_profile_id);
                             const depCount = (t.depends_on_task_ids ?? []).length;
                             return (
-                              <li key={t.id}>
+                              <li key={t.id} className="flex items-center">
                                 <button
                                   type="button"
                                   onClick={() => openTaskDetail(t)}
-                                  className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-default-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary transition-colors"
+                                  className="flex-1 text-left px-3 py-2.5 flex items-center gap-3 hover:bg-default-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary transition-colors"
                                 >
                                   {/* Execution order */}
                                   <span className="text-xs text-default-400 w-5 shrink-0 text-right font-mono">
                                     {t.execution_order}
                                   </span>
 
-                                  {/* Status dot */}
+                                  {/* Status chip */}
                                   <Chip
                                     size="sm"
                                     color={
@@ -379,6 +518,16 @@ export default function ExecutionDashboard() {
                                     </span>
                                   )}
 
+                                  {/* Duration */}
+                                  {(() => {
+                                    const ms = taskDurationMs(t);
+                                    return ms != null ? (
+                                      <span className="text-xs font-mono text-default-400 shrink-0 hidden sm:block">
+                                        {formatDuration(ms)}
+                                      </span>
+                                    ) : null;
+                                  })()}
+
                                   {/* Deps */}
                                   {depCount > 0 && (
                                     <span className="text-xs text-default-400 shrink-0 hidden sm:block">
@@ -391,6 +540,28 @@ export default function ExecutionDashboard() {
                                     <polyline points="9 18 15 12 9 6" />
                                   </svg>
                                 </button>
+
+                                {/* Inline task controls */}
+                                {t.status === "failed" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRetryTask(t)}
+                                    className="shrink-0 px-2 py-1 mx-1 rounded text-xs text-primary hover:bg-primary/10 transition-colors"
+                                    title="Retry task"
+                                  >
+                                    Retry
+                                  </button>
+                                )}
+                                {(t.status === "pending" || t.status === "ready") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelTask(t)}
+                                    className="shrink-0 px-2 py-1 mx-1 rounded text-xs text-danger hover:bg-danger/10 transition-colors"
+                                    title="Cancel task"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
                               </li>
                             );
                           })}
@@ -425,6 +596,8 @@ export default function ExecutionDashboard() {
         isOpen={isDetailOpen}
         onOpenChange={onDetailOpenChange}
         onNavigate={openTaskDetail}
+        onRetry={handleRetryTask}
+        onCancel={handleCancelTask}
       />
     </div>
   );

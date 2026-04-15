@@ -4,6 +4,7 @@ import type {
   Repository,
   Plan,
   Task,
+  TaskArtifact,
   Message,
   AgentProfile,
   ProjectAgent,
@@ -157,6 +158,23 @@ export const deletePlan = (planId: string): Promise<void> =>
 
 export const getTasks = (planId: string): Promise<Task[]> =>
   DEMO ? delay(demo.TASKS[planId] ?? []) : http.get<Task[]>(`/tasks?plan_id=${planId}`).then((r) => r.data);
+
+export const retryTask = (taskId: string): Promise<Task> =>
+  DEMO ? delay({} as Task) : http.post<Task>(`/tasks/${taskId}/retry`).then((r) => r.data);
+
+export const cancelTask = (taskId: string): Promise<Task> =>
+  DEMO ? delay({} as Task) : http.post<Task>(`/tasks/${taskId}/cancel`).then((r) => r.data);
+
+export const cancelPlan = (planId: string): Promise<{ cancelled: number }> =>
+  DEMO ? delay({ cancelled: 0 }) : http.post<{ cancelled: number }>(`/plans/${planId}/cancel`).then((r) => r.data);
+
+export const resumePlan = (planId: string): Promise<void> =>
+  DEMO ? delay(undefined) : axios.post(`/agent/plans/${planId}/resume`).then(() => undefined);
+
+// ─── Task Artifacts ───────────────────────────────────────────────────────────
+
+export const getTaskArtifacts = (taskId: string): Promise<TaskArtifact[]> =>
+  DEMO ? delay([]) : http.get<TaskArtifact[]>(`/tasks/${taskId}/artifacts`).then((r) => r.data);
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 

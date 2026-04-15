@@ -1,10 +1,11 @@
 import request from "supertest";
 import app from "../../app";
 import { initTestDb, clearAllTables, destroyTestDb } from "../helpers/db";
-import { createTestUser, createTestProject, createTestPlan } from "../helpers/factories";
+import { createTestUser, createTestProject, createTestPlan, createTestTask } from "../helpers/factories";
 import * as authService from "../../services/auth.service";
 import { AppDataSource } from "../../configs/data-source.config";
 import { ProjectMember } from "../../entities/ProjectMember.entity";
+import { Task } from "../../entities/Task.entity";
 
 let adminToken: string;
 let memberToken: string;
@@ -255,6 +256,62 @@ describe("DELETE /plans/:id", () => {
     const project = await createTestProject("Test", memberId);
     const plan = await createTestPlan(project.id);
     const res = await request(app).delete(`/plans/${plan.id}`);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /plans/:id/cancel", () => {
+  it("owner can cancel all pending/ready tasks in a plan", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const taskRepo = AppDataSource.getRepository(Task);
+    await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Task 1", status: "pending" }));
+    await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Task 2", status: "ready" }));
+    await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Task 3", status: "done" }));
+
+    const res = await request(app)
+      .post(`/plans/${plan.id}/cancel`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.cancelled).toBe(2); // only pending + ready cancelled
+
+    const tasks = await taskRepo.find({ where: { plan_id: plan.id } });
+    const statuses = tasks.map((t) => t.status).sort();
+    expect(statuses).toEqual(["cancelled", "cancelled", "done"]);
+  });
+
+  it("returns 0 when no cancellable tasks", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const taskRepo = AppDataSource.getRepository(Task);
+    await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Done Task", status: "done" }));
+
+    const res = await request(app)
+      .post(`/plans/${plan.id}/cancel`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.cancelled).toBe(0);
+  });
+
+  it("viewer gets 403", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const viewer = await createTestUser({ email: "viewer-cancel-plan@test.com" });
+    const viewerToken = authService.signToken(viewer);
+    await AppDataSource.getRepository(ProjectMember).save(
+      AppDataSource.getRepository(ProjectMember).create({ user_id: viewer.id, project_id: project.id, role: "viewer" })
+    );
+
+    const res = await request(app)
+      .post(`/plans/${plan.id}/cancel`)
+      .set("Authorization", `Bearer ${viewerToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 401 without token", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const res = await request(app).post(`/plans/${plan.id}/cancel`);
     expect(res.status).toBe(401);
   });
 });

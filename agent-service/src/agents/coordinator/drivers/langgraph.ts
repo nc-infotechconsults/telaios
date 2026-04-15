@@ -6,7 +6,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
-import type { CodingAgentDriver, AgentTask, AgentResult, AgentStatus } from "./base";
+import type { CodingAgentDriver, AgentTask, AgentResult, AgentStatus, AgentArtifact } from "./base";
 import type { Skill, McpToolResult, JsonSchema } from "../../../core/types";
 
 const execAsync = promisify(exec);
@@ -199,10 +199,57 @@ export class LangGraphDriver implements CodingAgentDriver {
 
       this.status = "idle";
       const state = finalState as CodingState;
+
+      // Build a tool-call log artifact from the message history
+      const artifacts: AgentArtifact[] = [];
+      const logLines: string[] = [];
+      let toolCallCount = 0;
+
+      for (const msg of state.messages) {
+        if (msg.role === "assistant") {
+          try {
+            const calls = JSON.parse(msg.content) as Array<{
+              name: string;
+              args: Record<string, unknown>;
+              id: string;
+            }>;
+            if (Array.isArray(calls) && calls.length > 0 && typeof calls[0]?.name === "string") {
+              for (const call of calls) {
+                toolCallCount++;
+                const argsFormatted = JSON.stringify(call.args, null, 2)
+                  .split("\n")
+                  .join("\n    ");
+                logLines.push(`[${toolCallCount}] CALL  ${call.name}`);
+                logLines.push(`    args: ${argsFormatted}`);
+              }
+            }
+          } catch {
+            // Natural-language assistant message — not a tool call JSON
+          }
+        } else if (msg.role === "tool") {
+          const preview = msg.content.length > 500
+            ? `${msg.content.slice(0, 500)}\u2026`
+            : msg.content;
+          logLines.push(`    \u2192 ${msg.name ?? "result"}: ${preview}`);
+          logLines.push("");
+        }
+      }
+
+      if (logLines.length > 0) {
+        artifacts.push({
+          type: "log",
+          title: `Tool Call Log (${toolCallCount} call${toolCallCount !== 1 ? "s" : ""})`,
+          content: logLines.join("\n"),
+          content_type: "text/plain",
+          metadata: { tool_call_count: toolCallCount },
+        });
+      }
+
       return {
         success: !state.error,
         output: state.result,
         error: state.error ?? undefined,
+        artifacts,
       };
     } catch (err) {
       this.status = "error";

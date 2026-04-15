@@ -11,6 +11,7 @@ const PLAN_STATUS_COLOR: Record<
   confirmed: "primary",
   executing: "primary",
   completed: "success",
+  failed: "danger",
 };
 
 const TASK_STATUS_COLOR: Record<
@@ -22,6 +23,8 @@ const TASK_STATUS_COLOR: Record<
   in_progress: "warning",
   done: "success",
   failed: "danger",
+  cancelled: "default",
+  skipped: "default",
 };
 
 interface Props {

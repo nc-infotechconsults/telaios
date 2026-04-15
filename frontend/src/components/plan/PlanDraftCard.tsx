@@ -7,13 +7,16 @@ const TYPE_STYLE: Record<Task["type"], string> = {
   test: "text-purple-400",
   review: "text-yellow-400",
   general: "text-default-400",
+  knowledge: "text-teal-400",
+  infra: "text-orange-400",
 };
 
-const STATUS_COLOR: Record<Plan["status"], "warning" | "success" | "primary" | "default"> = {
+const STATUS_COLOR: Record<Plan["status"], "warning" | "success" | "primary" | "default" | "danger"> = {
   draft: "warning",
   confirmed: "success",
   executing: "success",
   completed: "success",
+  failed: "danger",
 };
 
 interface Props {

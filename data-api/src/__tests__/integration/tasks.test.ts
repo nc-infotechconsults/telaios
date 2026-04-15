@@ -198,7 +198,135 @@ describe("GET /tasks/:id", () => {
   });
 });
 
-describe("PATCH /tasks/:id", () => {
+describe("POST /tasks/:id/retry", () => {
+  it("owner can retry a failed task", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const { Task } = await import("../../entities/Task.entity");
+    const taskRepo = AppDataSource.getRepository(Task);
+    const task = await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Retry Task", status: "failed" }));
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/retry`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ready");
+  });
+
+  it("returns 409 when task is not retryable", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const task = await createTestTask(plan.id); // status: pending
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/retry`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 404 for unknown task", async () => {
+    const res = await request(app)
+      .post("/tasks/00000000-0000-0000-0000-000000000000/retry")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("viewer gets 403", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const task = await createTestTask(plan.id);
+    const viewer = await createTestUser({ email: "viewer-retry@test.com" });
+    const viewerToken = authService.signToken(viewer);
+    await AppDataSource.getRepository(ProjectMember).save(
+      AppDataSource.getRepository(ProjectMember).create({ user_id: viewer.id, project_id: project.id, role: "viewer" })
+    );
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/retry`)
+      .set("Authorization", `Bearer ${viewerToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 401 without token", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const task = await createTestTask(plan.id);
+    const res = await request(app).post(`/tasks/${task.id}/retry`);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /tasks/:id/cancel", () => {
+  it("owner can cancel a pending task", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const task = await createTestTask(plan.id); // status: pending
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/cancel`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("cancelled");
+  });
+
+  it("owner can cancel a ready task", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const { Task } = await import("../../entities/Task.entity");
+    const taskRepo = AppDataSource.getRepository(Task);
+    const task = await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Ready Task", status: "ready" }));
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/cancel`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("cancelled");
+  });
+
+  it("returns 409 when task is already done", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const { Task } = await import("../../entities/Task.entity");
+    const taskRepo = AppDataSource.getRepository(Task);
+    const task = await taskRepo.save(taskRepo.create({ plan_id: plan.id, title: "Done Task", status: "done" }));
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/cancel`)
+      .set("Authorization", `Bearer ${memberToken}`);
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 404 for unknown task", async () => {
+    const res = await request(app)
+      .post("/tasks/00000000-0000-0000-0000-000000000000/cancel")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("viewer gets 403", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const task = await createTestTask(plan.id);
+    const viewer = await createTestUser({ email: "viewer-cancel@test.com" });
+    const viewerToken = authService.signToken(viewer);
+    await AppDataSource.getRepository(ProjectMember).save(
+      AppDataSource.getRepository(ProjectMember).create({ user_id: viewer.id, project_id: project.id, role: "viewer" })
+    );
+
+    const res = await request(app)
+      .post(`/tasks/${task.id}/cancel`)
+      .set("Authorization", `Bearer ${viewerToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 401 without token", async () => {
+    const project = await createTestProject("Test", memberId);
+    const plan = await createTestPlan(project.id);
+    const task = await createTestTask(plan.id);
+    const res = await request(app).post(`/tasks/${task.id}/cancel`);
+    expect(res.status).toBe(401);
+  });
+});
   it("editor can update a task", async () => {
     const project = await createTestProject("Test", memberId);
     const plan = await createTestPlan(project.id);
