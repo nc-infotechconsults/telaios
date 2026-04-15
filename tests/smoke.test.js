@@ -7,6 +7,9 @@
  * Usage:
  *   npm test
  *   DATA_API_URL=http://localhost:3000 AGENT_URL=http://localhost:8000 npm test
+ *
+ * Auth: all data-api routes (except /health and /auth) require authentication.
+ * The INTERNAL_API_KEY is used as a Bearer token — treated as admin.
  */
 
 import axios from "axios";
@@ -15,9 +18,14 @@ import https from "https";
 
 const DATA_API = process.env.DATA_API_URL ?? "http://localhost:3000";
 const AGENT_URL = process.env.AGENT_URL ?? "http://localhost:8000";
+const INTERNAL_KEY = process.env.INTERNAL_API_KEY ?? "change_me_internal_api_key";
 const VERBOSE = process.env.VERBOSE === "1";
 
-const api = axios.create({ baseURL: DATA_API });
+// Authenticated client — all data-api routes require Bearer auth.
+const api = axios.create({
+  baseURL: DATA_API,
+  headers: { Authorization: `Bearer ${INTERNAL_KEY}` },
+});
 
 // ─── Tiny test harness ────────────────────────────────────────────────────────
 
@@ -51,7 +59,7 @@ function assertEqual(actual, expected, label) {
     throw new Error(`${label ?? "Value"}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// ─── Data API tests ───────────────────────────────────────────────────────────
 
 async function runDataApiTests() {
   console.log("\n── Data API ──────────────────────────────────────────────────");
@@ -59,7 +67,8 @@ async function runDataApiTests() {
   let projectId, repoId, profileId, planId, taskId;
 
   await test("GET /health returns ok", async () => {
-    const { data } = await api.get("/health");
+    // Health is unauthenticated
+    const { data } = await axios.get(`${DATA_API}/health`);
     assertEqual(data.status, "ok", "health status");
   });
 
@@ -282,6 +291,266 @@ async function runDataApiTests() {
   });
 }
 
+// ─── Execution lifecycle tests ────────────────────────────────────────────────
+//
+// Simulates what the agent-service does during plan execution using the
+// internal API endpoints, without requiring real coding agents to be running.
+// Covers: happy path, failure+cascade-skip, cancel, and task artifacts.
+
+async function runExecutionLifecycleTests() {
+  console.log("\n── Execution Lifecycle ───────────────────────────────────────");
+
+  // ── Shared setup: project + repo + profile shared across sub-suites ──────
+
+  const { data: project } = await api.post("/projects", {
+    name: "Execution Lifecycle Test",
+    description: "Created by execution lifecycle smoke tests",
+  });
+  const projectId = project.id;
+  log("  → projectId:", projectId);
+
+  const { data: repo } = await api.post(`/projects/${projectId}/repositories`, {
+    name: "main-repo",
+    remote_url: "https://github.com/example/test-repo.git",
+    branch: "main",
+    auth_type: "none",
+  });
+  const repoId = repo.id;
+
+  const { data: profile } = await api.post("/agent-profiles", {
+    name: "Lifecycle Test Agent",
+    agent_type: "langgraph",
+    llm_provider: "openai",
+    llm_model: "gpt-4o",
+    mcp_servers: [],
+    skills: [],
+  });
+  const profileId = profile.id;
+
+  try {
+    // ── Suite A: Happy path (all tasks succeed) ───────────────────────────
+
+    let planId, t1Id, t2Id, t3Id;
+
+    await test("Lifecycle/setup: create plan with 3 linear tasks", async () => {
+      const { data: plan } = await api.post("/plans", { project_id: projectId });
+      planId = plan.id;
+
+      const makeTask = (title, order, deps) =>
+        api.post("/tasks", {
+          plan_id: planId,
+          title,
+          description: title,
+          type: "code",
+          execution_order: order,
+          agent_profile_id: profileId,
+          repository_ids: [repoId],
+          depends_on_task_ids: deps,
+        });
+
+      const { data: t1 } = await makeTask("Task 1", 1, []);
+      t1Id = t1.id;
+      const { data: t2 } = await makeTask("Task 2", 2, [t1Id]);
+      t2Id = t2.id;
+      const { data: t3 } = await makeTask("Task 3", 3, [t2Id]);
+      t3Id = t3.id;
+
+      assert(t1Id && t2Id && t3Id, "all three task IDs created");
+      log("  → planId:", planId, "t1:", t1Id, "t2:", t2Id, "t3:", t3Id);
+    });
+
+    await test("Lifecycle/happy: confirm plan → status confirmed", async () => {
+      const { data } = await api.patch(`/plans/${planId}`, { status: "confirmed" });
+      assertEqual(data.status, "confirmed", "plan status");
+    });
+
+    await test("Lifecycle/happy: PATCH internal/plans/:id/status → executing", async () => {
+      const { data } = await api.patch(`/internal/plans/${planId}/status`, {
+        status: "executing",
+      });
+      assertEqual(data.status, "executing", "plan status after start");
+    });
+
+    await test("Lifecycle/happy: mark T1 in_progress → done", async () => {
+      await api.patch(`/tasks/${t1Id}`, { status: "in_progress" });
+      const { data } = await api.patch(`/tasks/${t1Id}`, { status: "done" });
+      assertEqual(data.status, "done", "T1 status");
+    });
+
+    await test("Lifecycle/happy: create task artifacts for T1", async () => {
+      const { status } = await api.post(`/internal/tasks/${t1Id}/artifacts`, {
+        artifacts: [
+          {
+            type: "diff",
+            title: "Git diff — main-repo",
+            content: "diff --git a/auth.ts b/auth.ts\n+export function authenticate() {}",
+            content_type: "text/x-diff",
+            sort_order: 0,
+          },
+          {
+            type: "log",
+            title: "Agent log",
+            content: "Task completed successfully in 4.2s",
+            content_type: "text/plain",
+            sort_order: 1,
+          },
+        ],
+      });
+      assertEqual(status, 201, "artifacts created status");
+    });
+
+    await test("Lifecycle/happy: mark T2 in_progress → done", async () => {
+      await api.patch(`/tasks/${t2Id}`, { status: "in_progress" });
+      const { data } = await api.patch(`/tasks/${t2Id}`, { status: "done" });
+      assertEqual(data.status, "done", "T2 status");
+    });
+
+    await test("Lifecycle/happy: mark T3 in_progress → done", async () => {
+      await api.patch(`/tasks/${t3Id}`, { status: "in_progress" });
+      const { data } = await api.patch(`/tasks/${t3Id}`, { status: "done" });
+      assertEqual(data.status, "done", "T3 status");
+    });
+
+    await test("Lifecycle/happy: PATCH internal/plans/:id/status → completed", async () => {
+      const { data } = await api.patch(`/internal/plans/${planId}/status`, {
+        status: "completed",
+      });
+      assertEqual(data.status, "completed", "plan status");
+    });
+
+    await test("Lifecycle/happy: GET /plans/:id shows completed with all done tasks", async () => {
+      const { data } = await api.get(`/plans/${planId}`);
+      assertEqual(data.status, "completed", "plan completed");
+      const allDone = data.tasks.every((t) => t.status === "done");
+      assert(allDone, `all tasks done — got: ${data.tasks.map((t) => t.status).join(", ")}`);
+    });
+
+    // ── Suite B: Failure + cascade-skip ───────────────────────────────────
+
+    let planB, bT1, bT2, bT3;
+
+    await test("Lifecycle/failure: create plan with T1 → T2 → T3 chain", async () => {
+      const { data: plan } = await api.post("/plans", { project_id: projectId });
+      planB = plan.id;
+
+      const mk = (title, order, deps) =>
+        api.post("/tasks", {
+          plan_id: planB,
+          title,
+          description: title,
+          type: "code",
+          execution_order: order,
+          agent_profile_id: profileId,
+          repository_ids: [repoId],
+          depends_on_task_ids: deps,
+        });
+
+      const { data: t1 } = await mk("Fail T1", 1, []);
+      bT1 = t1.id;
+      const { data: t2 } = await mk("Fail T2", 2, [bT1]);
+      bT2 = t2.id;
+      const { data: t3 } = await mk("Fail T3", 3, [bT2]);
+      bT3 = t3.id;
+      log("  → planB:", planB, "bT1:", bT1, "bT2:", bT2, "bT3:", bT3);
+    });
+
+    await test("Lifecycle/failure: confirm plan and start executing", async () => {
+      await api.patch(`/plans/${planB}`, { status: "confirmed" });
+      const { data } = await api.patch(`/internal/plans/${planB}/status`, { status: "executing" });
+      assertEqual(data.status, "executing", "plan executing");
+    });
+
+    await test("Lifecycle/failure: mark T1 in_progress then failed", async () => {
+      await api.patch(`/tasks/${bT1}`, { status: "in_progress" });
+      const { data } = await api.patch(`/tasks/${bT1}`, { status: "failed" });
+      assertEqual(data.status, "failed", "T1 failed");
+    });
+
+    await test("Lifecycle/failure: POST skip-dependents → T2 and T3 become skipped", async () => {
+      const { data } = await api.post(`/internal/tasks/${bT1}/skip-dependents`);
+      assert(typeof data.skipped === "number", "skipped count returned");
+      assert(data.skipped >= 2, `Expected ≥2 skipped, got ${data.skipped}`);
+
+      const { data: tasks } = await api.get(`/tasks?plan_id=${planB}`);
+      const t2 = tasks.find((t) => t.id === bT2);
+      const t3 = tasks.find((t) => t.id === bT3);
+      assertEqual(t2.status, "skipped", "T2 skipped");
+      assertEqual(t3.status, "skipped", "T3 skipped");
+    });
+
+    await test("Lifecycle/failure: PATCH plan → failed with failure_reason", async () => {
+      const { data } = await api.patch(`/internal/plans/${planB}/status`, {
+        status: "failed",
+        failure_reason: "Task 1 failed: compilation error",
+      });
+      assertEqual(data.status, "failed", "plan failed");
+    });
+
+    await test("Lifecycle/failure: GET /plans/:id reflects final failed state", async () => {
+      const { data } = await api.get(`/plans/${planB}`);
+      assertEqual(data.status, "failed", "plan is failed");
+      const t1Task = data.tasks.find((t) => t.id === bT1);
+      assert(t1Task.status === "failed", "T1 status is failed in plan response");
+    });
+
+    // ── Suite C: Cancel pending tasks ─────────────────────────────────────
+
+    let planC, cT1, cT2;
+
+    await test("Lifecycle/cancel: create plan with 2 pending tasks", async () => {
+      const { data: plan } = await api.post("/plans", { project_id: projectId });
+      planC = plan.id;
+
+      const mk = (title, order, deps) =>
+        api.post("/tasks", {
+          plan_id: planC,
+          title,
+          description: title,
+          type: "code",
+          execution_order: order,
+          agent_profile_id: profileId,
+          repository_ids: [repoId],
+          depends_on_task_ids: deps,
+        });
+
+      const { data: t1 } = await mk("Cancel T1", 1, []);
+      cT1 = t1.id;
+      const { data: t2 } = await mk("Cancel T2", 2, [cT1]);
+      cT2 = t2.id;
+      log("  → planC:", planC, "cT1:", cT1, "cT2:", cT2);
+    });
+
+    await test("Lifecycle/cancel: confirm plan and start executing", async () => {
+      await api.patch(`/plans/${planC}`, { status: "confirmed" });
+      await api.patch(`/internal/plans/${planC}/status`, { status: "executing" });
+    });
+
+    await test("Lifecycle/cancel: POST cancel-tasks cancels pending tasks", async () => {
+      const { data } = await api.post(`/internal/plans/${planC}/cancel-tasks`);
+      assert(typeof data.cancelled === "number", "cancelled count returned");
+      assert(data.cancelled >= 2, `Expected ≥2 cancelled, got ${data.cancelled}`);
+
+      const { data: tasks } = await api.get(`/tasks?plan_id=${planC}`);
+      const allCancelled = tasks.every((t) => t.status === "cancelled");
+      assert(allCancelled, `all tasks should be cancelled — got: ${tasks.map((t) => t.status).join(", ")}`);
+    });
+
+    await test("Lifecycle/cancel: cancel-tasks on already-cancelled plan is idempotent", async () => {
+      const { data } = await api.post(`/internal/plans/${planC}/cancel-tasks`);
+      // All tasks already cancelled — nothing new to cancel
+      assertEqual(data.cancelled, 0, "no additional tasks cancelled");
+    });
+
+  } finally {
+    // Cleanup shared resources
+    await api.delete(`/agent-profiles/${profileId}`).catch(() => {});
+    await api.delete(`/projects/${projectId}/repositories/${repoId}`).catch(() => {});
+    await api.delete(`/projects/${projectId}`).catch(() => {});
+  }
+}
+
+// ─── Agent Service tests ──────────────────────────────────────────────────────
+
 async function runAgentServiceTests() {
   console.log("\n── Agent Service ─────────────────────────────────────────────");
 
@@ -290,6 +559,8 @@ async function runAgentServiceTests() {
     assertEqual(data.status, "ok", "health status");
   });
 }
+
+// ─── SSE test ─────────────────────────────────────────────────────────────────
 
 async function runSSETest() {
   console.log("\n── SSE ───────────────────────────────────────────────────────");
@@ -356,11 +627,18 @@ async function main() {
   console.log("SWE AI Platform — Integration Smoke Tests");
   console.log(`  Data API:      ${DATA_API}`);
   console.log(`  Agent Service: ${AGENT_URL}`);
+  console.log(`  Internal key:  ${INTERNAL_KEY.slice(0, 8)}…`);
 
   try {
     await runDataApiTests();
   } catch (err) {
     console.error("Fatal error in Data API tests:", err.message);
+  }
+
+  try {
+    await runExecutionLifecycleTests();
+  } catch (err) {
+    console.error("Fatal error in Execution Lifecycle tests:", err.message);
   }
 
   try {

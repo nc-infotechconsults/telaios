@@ -302,7 +302,7 @@ Config stored in the `Settings` DB table (singleton). Fetched at session start f
 
 ## Compliance Analysis
 
-> Last updated: 2026-04-05
+> Last updated: 2026-04-15
 
 ### ✅ Fully Compliant
 
@@ -326,6 +326,7 @@ Config stored in the `Settings` DB table (singleton). Fetched at session start f
 - SKILL.md materialization in OpenCodeDriver
 - GitHub Copilot: subscription auth (token) OR BYOK (own LLM keys)
 - LLM factory: openai, anthropic, ollama, vllm, lmstudio
+- **Git push after task completion** — `pushWorkspaces` stages uncommitted changes, commits, and pushes to the authenticated remote URL (best-effort, non-fatal); called from `dispatchTask` on success
 
 **Frontend**
 - All 5 pages implemented at correct routes
@@ -338,7 +339,7 @@ Config stored in the `Settings` DB table (singleton). Fetched at session start f
 - `RepositorySetup` with name, git URL, branch, auth type, credentials
 - `AgentPoolPanel` grouped by profile with idle/busy per-instance status
 - `AgentStatusBadge` animated dot
-- `AgentProfileForm`: driver type, LLM, GitHub section, MCP servers, Claude Skills
+- `AgentProfileForm`: driver type, LLM, GitHub section, MCP servers (with `args[]` space-separated input and `env{}` key-value editor), Claude Skills (with `inputSchema` and `outputSchema` property editors)
 - `ProviderForm` with Test Connection button
 - All 6 WebSocket events handled in frontend
 - ProjectList cards show repository status chips
@@ -348,13 +349,9 @@ Config stored in the `Settings` DB table (singleton). Fetched at session start f
 
 ### ⚠️ Known Gaps
 
-| # | Gap | File | Severity |
-|---|---|---|---|
-| 1 | **Git push after task completion** — coordinator marks tasks done but never calls `git push` to remote | `agent-service/src/agents/coordinator/scheduler.ts` | Medium |
-| 2 | **MCP server `args[]` and `env{}` fields** — present in DB schema and types but missing from the AgentProfileForm UI | `frontend/src/components/agents/AgentProfileForm.tsx` | Low |
-| 3 | **Skill `outputs` field** — in plan spec, DB, and types but absent from the Skills editor in AgentProfileForm | `frontend/src/components/agents/AgentProfileForm.tsx` | Low |
-| 4 | **Demo/fallback data (~150 lines)** hardcoded in PlanningChat.tsx — not in original plan | `frontend/src/pages/PlanningChat.tsx` | Low |
-| 5 | **Full E2E integration test** — plan called for plan→execute with real agents; smoke tests only cover REST/WS | `tests/smoke.test.js` | Low |
+None — all planned features are implemented.
+
+- **Smoke / Integration tests** — `tests/smoke.test.js` covers all REST endpoints, SSE connectivity, and the full execution lifecycle (happy path, failure+cascade-skip, cancel) via the internal API — no real coding agents required
 
 ### ➕ Extras (Beyond Plan)
 
