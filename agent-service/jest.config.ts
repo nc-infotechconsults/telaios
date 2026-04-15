@@ -6,6 +6,7 @@ const config: Config = {
   testEnvironment: "node",
   rootDir: ".",
   testMatch: ["<rootDir>/src/__tests__/**/*.test.ts"],
+  setupFiles: ["<rootDir>/src/__tests__/setup.env.ts"],
   moduleNameMapper: { "^(\\.{1,2}/.*)\\.js$": "$1" },
   clearMocks: true,
 };

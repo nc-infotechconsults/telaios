@@ -117,18 +117,18 @@ export const REPOSITORIES: Record<string, Repository[]> = {
 export const PLANS: Record<string, Plan[]> = {
   "demo-1": [
     {
-      id: "plan-1-v1",
-      project_id: "demo-1",
-      status: "completed",
-      created_at: "2026-03-27T15:30:00Z",
-      confirmed_at: "2026-03-27T16:00:00Z",
-    },
-    {
       id: "plan-1",
       project_id: "demo-1",
       status: "executing",
       created_at: "2026-03-28T10:04:00Z",
       confirmed_at: "2026-03-28T10:15:00Z",
+    },
+    {
+      id: "plan-1-v1",
+      project_id: "demo-1",
+      status: "completed",
+      created_at: "2026-03-27T15:30:00Z",
+      confirmed_at: "2026-03-27T16:00:00Z",
     },
   ],
   "demo-2": [

@@ -33,6 +33,7 @@ export async function initTestDb(): Promise<void> {
 export async function clearAllTables(): Promise<void> {
   await AppDataSource.query(`
     TRUNCATE
+      task_artifacts,
       project_members,
       task_repositories,
       task_dependencies,
