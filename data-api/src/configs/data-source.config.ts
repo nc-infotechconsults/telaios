@@ -1,6 +1,13 @@
 import "reflect-metadata";
 import * as dotenv from "dotenv";
 import {DataSource} from "typeorm";
+import {Migration1775914943523} from "../migrations/1775914943523-migration";
+import {Migration1775940945125} from "../migrations/1775940945125-migration";
+import {Migration1775941000000} from "../migrations/1775941000000-migration";
+import {Migration1775941100000} from "../migrations/1775941100000-migration";
+import {Migration1775941200000} from "../migrations/1775941200000-migration";
+import {Migration1775941300000} from "../migrations/1775941300000-migration";
+import {Migration1775941400000} from "../migrations/1775941400000-migration";
 import {Project} from "../entities/Project.entity";
 import {Repository} from "../entities/Repository.entity";
 import {Plan} from "../entities/Plan.entity";
@@ -43,7 +50,13 @@ export const AppDataSource = new DataSource({
     TaskArtifact,
   ],
   migrations: [
-    "../migrations/*.ts"
+    Migration1775914943523,
+    Migration1775940945125,
+    Migration1775941000000,
+    Migration1775941100000,
+    Migration1775941200000,
+    Migration1775941300000,
+    Migration1775941400000,
   ],
 });
 

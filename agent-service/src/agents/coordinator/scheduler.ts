@@ -83,6 +83,13 @@ export class Scheduler {
       if (t.status === "done") completedIds.add(t.id);
     }
 
+    // Cap parallel LLM executions to avoid token-rate-limit errors.
+    // Reads from MAX_CONCURRENT_TASKS env var; defaults to 1.
+    const maxConcurrent = Math.max(
+      1,
+      parseInt(process.env.MAX_CONCURRENT_TASKS ?? "1", 10) || 1,
+    );
+
     while (terminalIds.size < tasks.length) {
       const ready = tasks.filter((t) => {
         if (terminalIds.has(t.id) || inFlightIds.has(t.id)) return false;
@@ -95,7 +102,15 @@ export class Scheduler {
         continue;
       }
 
-      const dispatches = ready.map((task) =>
+      // Only dispatch up to (maxConcurrent - inFlightIds.size) new tasks
+      const slots = Math.max(0, maxConcurrent - inFlightIds.size);
+      if (slots === 0) {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+
+      const batch = ready.slice(0, slots);
+      const dispatches = batch.map((task) =>
         this.dispatchTask(
           projectId,
           planId,
@@ -270,6 +285,42 @@ export class Scheduler {
   ): Promise<void> {
     inFlightIds.add(task.id);
 
+    try {
+      await this._dispatchTaskInner(
+        projectId, planId, task, allTasks, workspaceMap, repositories,
+        terminalIds, completedIds, inFlightIds,
+      );
+    } catch (err) {
+      // Ensure the task is never left stuck in "in_progress" if something
+      // unexpected throws (e.g. a dataClient call fails, or the process
+      // was interrupted and resumed).
+      console.error(`[Scheduler] Unexpected error in dispatchTask for task ${task.id}:`, err);
+      inFlightIds.delete(task.id);
+      terminalIds.add(task.id);
+      try {
+        await dataClient.updateTask(task.id, {
+          status: "failed",
+          result: `Scheduler internal error: ${String(err)}`,
+          completed_at: new Date().toISOString(),
+        });
+      } catch (updateErr) {
+        console.error(`[Scheduler] Failed to mark task ${task.id} as failed after error:`, updateErr);
+      }
+      this.emit(projectId, { type: "task_status", task_id: task.id, status: "failed" });
+    }
+  }
+
+  private async _dispatchTaskInner(
+    projectId: string,
+    planId: string,
+    task: TaskConfig,
+    allTasks: TaskConfig[],
+    workspaceMap: Map<string, string>,
+    repositories: Map<string, RepoConfig>,
+    terminalIds: Set<string>,
+    completedIds: Set<string>,
+    inFlightIds: Set<string>
+  ): Promise<void> {
     await dataClient.updateTask(task.id, { status: "in_progress" });
     this.emit(projectId, {
       type: "task_status",
@@ -314,9 +365,19 @@ export class Scheduler {
     const startedAt = new Date().toISOString();
 
     if (driver) {
+      console.log(`[Scheduler] Executing task ${task.id} ("${task.title}") with driver`);
       result = await driver.execute(agentTask, workspaces);
+      console.log(`[Scheduler] Task ${task.id} finished: success=${result.success}`, result.error ?? "");
     } else {
-      result = { success: false, output: "", error: "No driver found for task type or profile" };
+      console.warn(`[Scheduler] No driver found for task ${task.id} type="${task.type}" agentProfileId="${task.agent_profile_id}" — marking skipped`);
+      await dataClient.updateTask(task.id, {
+        status: "skipped",
+        result: "No agent assigned for this task type",
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+      });
+      this.emit(projectId, { type: "task_completed", task_id: task.id, success: false });
+      return { success: false, error: "No driver — task skipped" };
     }
 
     const completedAt = new Date().toISOString();
@@ -352,6 +413,7 @@ export class Scheduler {
     }
 
     const newStatus = result.success ? "done" : "failed";
+    console.log(`[Scheduler] Updating task ${task.id} to status "${newStatus}"`);
     await dataClient.updateTask(task.id, {
       status: newStatus,
       result: result.output || result.error,

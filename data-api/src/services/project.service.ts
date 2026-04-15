@@ -5,13 +5,19 @@ import type { CreateProjectDto, PatchProjectDto } from "../schemas/project.schem
 
 const repo = () => AppDataSource.getRepository(Project);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(id: string | undefined): id is string {
+  return !!id && UUID_REGEX.test(id);
+}
+
 export async function listProjects(): Promise<Project[]> {
   return repo().find({ order: { created_at: "DESC" } });
 }
 
 export async function createProject(dto: CreateProjectDto, creatorId?: string): Promise<Project> {
   const project = await repo().save(repo().create(dto));
-  if (creatorId) {
+  if (isValidUuid(creatorId)) {
     await addMember(project.id, { user_id: creatorId, role: "owner" });
   }
   return project;

@@ -25,6 +25,14 @@ export async function listAgentProfiles() {
   return profiles.map(sanitizeProfile);
 }
 
+/**
+ * Returns profiles with raw encrypted keys — for internal agent-service consumption only.
+ * Never expose this on a public/user-facing endpoint.
+ */
+export async function listAgentProfilesRaw() {
+  return repo().find({ order: { name: "ASC" } });
+}
+
 export async function createAgentProfile(dto: CreateAgentProfileDto) {
   const data = encryptSensitive(dto as Record<string, unknown>);
   const profile = await repo().save(repo().create(data as Partial<AgentProfile>));

@@ -265,7 +265,7 @@ export const getSettings = (): Promise<Settings> =>
 export const updateSettings = (data: Partial<Settings> & { llm_api_key_raw?: string }): Promise<Settings> =>
   DEMO
     ? delay<Settings>({ ...demo.SETTINGS, ...data, updated_at: new Date().toISOString() })
-    : http.put<Settings>("/settings", data).then((r) => r.data);
+    : http.patch<Settings>("/settings", data).then((r) => r.data);
 
 export const testLlm = (data: { provider: string; model: string; apiKey?: string; baseUrl?: string }): Promise<{ ok: boolean }> =>
   DEMO

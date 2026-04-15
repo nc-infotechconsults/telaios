@@ -7,6 +7,7 @@ import * as planService from "../services/plan.service";
 import * as taskService from "../services/task.service";
 import * as artifactService from "../services/task_artifact.service";
 import { BulkCreateTaskArtifactsSchema } from "../schemas/task_artifact.schema";
+import * as agentProfileService from "../services/agentProfile.service";
 
 // ─── Status update ────────────────────────────────────────────────────────────
 
@@ -113,8 +114,8 @@ export async function updatePlanStatus(req: Request, res: Response) {
 
 export async function skipDependentTasksHandler(req: Request, res: Response) {
   const { id } = req.params;
-  await taskService.skipDependentTasks(id);
-  return res.status(200).json({ ok: true });
+  const skipped = await taskService.skipDependentTasks(id);
+  return res.status(200).json({ skipped });
 }
 
 export async function cancelPlanTasksHandler(req: Request, res: Response) {
@@ -134,4 +135,15 @@ export async function createTaskArtifactsHandler(req: Request, res: Response) {
   const { id } = req.params;
   const created = await artifactService.createArtifactsBulk(id, parsed.data.artifacts);
   return res.status(201).json({ created: created.length, artifacts: created });
+}
+
+// ─── Agent profiles (raw, for agent-service) ──────────────────────────────────
+
+/**
+ * Returns agent profiles with raw encrypted keys so the agent-service can
+ * decrypt them. Never exposed on any user-facing route.
+ */
+export async function listAgentProfilesRawHandler(_req: Request, res: Response) {
+  const profiles = await agentProfileService.listAgentProfilesRaw();
+  return res.json(profiles);
 }

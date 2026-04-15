@@ -79,8 +79,8 @@ async function runDataApiTests() {
     assert("llm_provider" in data, "has llm_provider");
   });
 
-  await test("PUT /settings updates provider", async () => {
-    const { data } = await api.put("/settings", {
+  await test("PATCH /settings updates provider", async () => {
+    const { data } = await api.patch("/settings", {
       llm_provider: "openai",
       llm_model: "gpt-4o",
     });

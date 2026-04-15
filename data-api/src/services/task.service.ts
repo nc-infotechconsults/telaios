@@ -129,22 +129,25 @@ export async function cancelTask(task_id: string): Promise<ReturnType<typeof ser
 export async function skipDependentTasks(
   taskId: string,
   visited: Set<string> = new Set()
-): Promise<void> {
-  if (visited.has(taskId)) return;
+): Promise<number> {
+  if (visited.has(taskId)) return 0;
   visited.add(taskId);
 
   const deps = await depRepo().find({ where: { depends_on_task_id: taskId } });
-  if (!deps.length) return;
+  if (!deps.length) return 0;
 
   const dependentTaskIds = deps.map((d) => d.task_id);
   const tasks = await taskRepo().find({ where: { id: In(dependentTaskIds) } });
 
+  let skipped = 0;
   for (const task of tasks) {
     if (!(TERMINAL_STATUSES as readonly string[]).includes(task.status)) {
       await taskRepo().update(task.id, { status: "skipped" });
-      await skipDependentTasks(task.id, visited);
+      skipped++;
+      skipped += await skipDependentTasks(task.id, visited);
     }
   }
+  return skipped;
 }
 
 export async function retryTask(task_id: string): Promise<ReturnType<typeof serializeTask> | null> {

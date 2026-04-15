@@ -74,7 +74,7 @@ export const dataClient = {
   },
 
   async getAgentProfiles() {
-    const res = await client.get("/agent-profiles");
+    const res = await client.get("/internal/agent-profiles");
     return res.data;
   },
 

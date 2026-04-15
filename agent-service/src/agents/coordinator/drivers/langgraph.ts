@@ -1,7 +1,6 @@
 import { StateGraph, Annotation, END } from "@langchain/langgraph";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { SystemMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import type { AIMessage } from "@langchain/core/messages";
+import { SystemMessage, HumanMessage, ToolMessage, AIMessage } from "@langchain/core/messages";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { exec } from "child_process";
@@ -171,18 +170,32 @@ export class LangGraphDriver implements CodingAgentDriver {
 
     const allTools = [...BUILTIN_TOOLS, ...skillTools];
 
+    // LangChain's bindTools expects { name, description, schema } — but our tool
+    // definitions (and MCP convention) use `inputSchema`. Remap before binding.
+    const toolsForBinding = allTools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      schema: t.inputSchema,
+    }));
+
     const boundLlm = (this.config.llm as BaseChatModel & {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      bindTools?: (tools: typeof allTools) => any;
-    }).bindTools?.(allTools) ?? this.config.llm;
+      bindTools?: (tools: typeof toolsForBinding) => any;
+    }).bindTools?.(toolsForBinding) ?? this.config.llm;
 
     const systemPrompt =
       `You are an expert software engineer. Complete the coding task below using the provided tools.\n\n` +
       `Workspaces (name → path):\n` +
-      Object.entries(workspaces).map(([n, p]) => `  ${n}: ${p}`).join("\n") +
+      (Object.keys(workspaces).length > 0
+        ? Object.entries(workspaces).map(([n, p]) => `  ${n}: ${p}`).join("\n")
+        : "  (no workspace cloned — write files to the current directory)") +
       `\n\nTask: ${task.title}\n${task.description}\n\n` +
-      `Call tools to read files, run commands, and write code. ` +
-      `When the task is fully complete, call the \`finish\` tool with a summary.`;
+      `IMPORTANT RULES:\n` +
+      `1. Use tools to implement the task (read files, run commands, write code).\n` +
+      `2. Once you have written the necessary code changes, call the \`finish\` tool IMMEDIATELY with a summary.\n` +
+      `3. Do NOT loop trying to verify or re-test your work. Write the code, then call \`finish\`.\n` +
+      `4. If a tool returns an error, try once to fix it, then call \`finish\` with what you accomplished.\n` +
+      `5. Aim to complete the task in at most 10 tool calls.`;
 
     try {
       const workflow = this.buildGraph(boundLlm, allTools);
@@ -195,7 +208,7 @@ export class LangGraphDriver implements CodingAgentDriver {
         result: "",
         done: false,
         error: null,
-      });
+      }, { recursionLimit: 100 });
 
       this.status = "idle";
       const state = finalState as CodingState;
@@ -271,6 +284,32 @@ export class LangGraphDriver implements CodingAgentDriver {
               return new ToolMessage({ content: m.content, tool_call_id: m.tool_call_id ?? "" });
             }
             if (m.role === "system") return new SystemMessage(m.content);
+            if (m.role === "assistant") {
+              // If this message is a JSON-serialized array of tool calls (from a prior
+              // think turn), reconstruct a proper AIMessage with tool_calls so Anthropic
+              // can correctly pair it with the following ToolMessages.
+              try {
+                const parsed = JSON.parse(m.content) as Array<{
+                  name: string;
+                  args: Record<string, unknown>;
+                  id: string;
+                }>;
+                if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0]?.name === "string") {
+                  return new AIMessage({
+                    content: "",
+                    tool_calls: parsed.map((tc) => ({
+                      name: tc.name,
+                      args: tc.args,
+                      id: tc.id,
+                      type: "tool_call" as const,
+                    })),
+                  });
+                }
+              } catch {
+                // Not a tool-call JSON — fall through to plain AIMessage
+              }
+              return new AIMessage(m.content);
+            }
             return new HumanMessage(m.content);
           })
         );
