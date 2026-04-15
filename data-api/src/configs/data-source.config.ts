@@ -8,6 +8,8 @@ import {Migration1775941100000} from "../migrations/1775941100000-migration";
 import {Migration1775941200000} from "../migrations/1775941200000-migration";
 import {Migration1775941300000} from "../migrations/1775941300000-migration";
 import {Migration1775941400000} from "../migrations/1775941400000-migration";
+import {Migration1775941500000} from "../migrations/1775941500000-migration";
+import {Migration1775942000000} from "../migrations/1775942000000-migration";
 import {Project} from "../entities/Project.entity";
 import {Repository} from "../entities/Repository.entity";
 import {Plan} from "../entities/Plan.entity";
@@ -57,6 +59,8 @@ export const AppDataSource = new DataSource({
     Migration1775941200000,
     Migration1775941300000,
     Migration1775941400000,
+    Migration1775941500000,
+    Migration1775942000000,
   ],
 });
 

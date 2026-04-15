@@ -52,8 +52,8 @@ export async function processDocument(
     }
     const buffer = Buffer.concat(chunks);
 
-    // 3. Extract text
-    const text = await extractText(buffer, doc.mime_type);
+    // 3. Extract text (pass file_type as fallback for generic mime types)
+    const text = await extractText(buffer, doc.mime_type, doc.file_type);
     if (!text || text.trim().length === 0) {
       // No extractable text — mark ready with empty chunks
       await dataClient.updateDocumentStatus(documentId, "ready");

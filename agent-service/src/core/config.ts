@@ -21,8 +21,13 @@ const ConfigSchema = z.object({
   S3_SECRET_KEY: z.string().default("sweai-secret"),
   S3_BUCKET: z.string().default("sweai-documents"),
   S3_REGION: z.string().default("us-east-1"),
-  // Embeddings model (OpenAI-compatible)
-  EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
+  // Embeddings model (OpenAI-compatible or local fastembed)
+  // Default: BAAI/bge-small-en-v1.5 (384-dim, no API key required)
+  // For OpenAI: set EMBEDDING_API_KEY and change to "text-embedding-3-small"
+  EMBEDDING_MODEL: z.string().default("BAAI/bge-small-en-v1.5"),
+  // Optional separate API key / base URL for embeddings (e.g. when LLM is Anthropic but embeddings use OpenAI)
+  EMBEDDING_API_KEY: z.string().optional(),
+  EMBEDDING_BASE_URL: z.string().optional(),
 });
 
 export const config = ConfigSchema.parse(process.env);

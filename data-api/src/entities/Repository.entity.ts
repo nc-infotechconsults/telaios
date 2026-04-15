@@ -46,8 +46,11 @@ export class Repository {
   @Column({ nullable: true })
   credentials!: string;
 
+  @Column({ type: "varchar", default: "remote" })
+  source_type!: string;
+
   @Column({ nullable: true })
-  local_clone_path!: string;
+  local_path!: string;
 
   @Column({ type: "varchar", default: "unconfigured" })
   status!: RepositoryStatus;

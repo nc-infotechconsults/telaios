@@ -243,6 +243,8 @@ export class Scheduler {
         // Stage and commit any uncommitted changes the agent left behind
         const status = await git.status();
         if (!status.isClean()) {
+          await git.addConfig("user.email", "agent@swe-ai.local");
+          await git.addConfig("user.name", "SWE AI Agent");
           await git.add(".");
           await git.commit(`chore: agent result for task "${task.title}"`, { "--allow-empty": null });
         }
