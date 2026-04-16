@@ -73,7 +73,9 @@ async def ensure_local_path(repo: dict, project_id: str) -> str:
     if repo.get("auth_type") == "token" and repo.get("credentials"):
         token = decrypt(repo["credentials"])
         parsed = urlparse(clone_url)
-        clone_url = parsed._replace(netloc=f"{token}@{parsed.hostname}{f':{parsed.port}' if parsed.port else ''}").geturl()
+        clone_url = parsed._replace(
+            netloc=f"{token}@{parsed.hostname or ''}{f':{parsed.port}' if parsed.port else ''}"
+        ).geturl()
 
     branch = repo.get("branch") or "main"
 

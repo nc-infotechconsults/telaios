@@ -491,7 +491,7 @@ async def init_session(plan_id: str) -> None:
     try:
         plan = await data_client.get_plan(plan_id)
     except Exception as exc:
-        logger.warning("init_session: could not load plan %s — %s", plan_id, exc)
+        logger.warning("init_session: could not load plan %s - %s", plan_id, exc)
         # Fallback: minimal stub session so SSE clients can connect even if the
         # plan row doesn't exist yet (e.g. rapid re-connection race).
         _sessions[plan_id] = Session(

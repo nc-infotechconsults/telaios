@@ -103,7 +103,7 @@ class Scheduler:
         if repo.get("auth_type") == "token" and repo.get("credentials"):
             token = decrypt(repo["credentials"])
             parsed = urlparse(repo["remote_url"])
-            host = parsed.hostname + (f":{parsed.port}" if parsed.port else "")
+            host = (parsed.hostname or "") + (f":{parsed.port}" if parsed.port else "")
             return parsed._replace(netloc=f"{token}@{host}").geturl()
         return repo["remote_url"]
 
