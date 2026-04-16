@@ -648,17 +648,7 @@ export default function ProjectDetail() {
                       <p className="font-medium truncate">{member.user.display_name || member.user.email}</p>
                       <p className="text-xs text-default-400 mt-0.5">{member.user.email}</p>
                     </div>
-                    <Chip
-                      size="sm"
-                      variant="flat"
-                      color={MEMBER_ROLE_COLOR[member.role]}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setMemberToEditRole(member);
-                        setEditMemberRole(member.role);
-                        onEditMemberRoleOpen();
-                      }}
-                    >
+                    <Chip size="sm" variant="flat" color={MEMBER_ROLE_COLOR[member.role]}>
                       {member.role}
                     </Chip>
                     <Tooltip content="Edit role">

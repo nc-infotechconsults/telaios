@@ -9,6 +9,8 @@ import type {
   AgentProfile,
   ProjectAgent,
   AgentRole,
+  ProjectMember,
+  ProjectRole,
   Settings,
   User,
   Document,
@@ -96,6 +98,48 @@ export const updateProject = (id: string, data: Partial<Project>): Promise<Proje
   }
   return http.patch<Project>(`/projects/${id}`, data).then((r) => r.data);
 };
+
+export const deleteProject = (id: string): Promise<void> =>
+  DEMO ? delay(undefined as unknown as void) : http.delete(`/projects/${id}`).then(() => undefined);
+
+// ─── Project Members ──────────────────────────────────────────────────────────
+
+export const listProjectMembers = (projectId: string): Promise<ProjectMember[]> =>
+  DEMO ? delay([]) : http.get<ProjectMember[]>(`/projects/${projectId}/members`).then((r) => r.data);
+
+export const addProjectMember = (
+  projectId: string,
+  data: { user_id: string; role?: ProjectRole },
+): Promise<ProjectMember> =>
+  DEMO
+    ? delay<ProjectMember>({
+        user_id: data.user_id,
+        project_id: projectId,
+        role: data.role ?? "viewer",
+        joined_at: new Date().toISOString(),
+        user: { id: data.user_id, email: "", display_name: "" },
+      })
+    : http.post<ProjectMember>(`/projects/${projectId}/members`, data).then((r) => r.data);
+
+export const patchProjectMember = (
+  projectId: string,
+  userId: string,
+  data: { role: ProjectRole },
+): Promise<ProjectMember> =>
+  DEMO
+    ? delay<ProjectMember>({
+        user_id: userId,
+        project_id: projectId,
+        role: data.role,
+        joined_at: new Date().toISOString(),
+        user: { id: userId, email: "", display_name: "" },
+      })
+    : http.patch<ProjectMember>(`/projects/${projectId}/members/${userId}`, data).then((r) => r.data);
+
+export const removeProjectMember = (projectId: string, userId: string): Promise<void> =>
+  DEMO
+    ? delay(undefined as unknown as void)
+    : http.delete(`/projects/${projectId}/members/${userId}`).then(() => undefined);
 
 // ─── Repositories ────────────────────────────────────────────────────────────
 
