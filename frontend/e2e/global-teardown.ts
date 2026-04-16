@@ -24,11 +24,15 @@ export default async function globalTeardown() {
     // Deleting projects cascades to their plans, tasks, and repos
     for (const id of [ciData.executingProjectId, ciData.planningProjectId, ciData.completedProjectId]) {
       await api.delete(`/projects/${id}`).catch((err) => {
-        if (err?.response?.status !== 404) console.warn(`Teardown: failed to delete project ${id}:`, err.message);
+        if (err?.response?.status !== 404)
+          console.warn(`Teardown: failed to delete project ${id} (HTTP ${err?.response?.status}):`,
+            err?.response?.data ?? err.message);
       });
     }
     await api.delete(`/agent-profiles/${ciData.agentProfileId}`).catch((err) => {
-      if (err?.response?.status !== 404) console.warn(`Teardown: failed to delete agent profile ${ciData.agentProfileId}:`, err.message);
+      if (err?.response?.status !== 404)
+        console.warn(`Teardown: failed to delete agent profile ${ciData.agentProfileId} (HTTP ${err?.response?.status}):`,
+          err?.response?.data ?? err.message);
     });
   } catch (err) {
     console.warn("E2E teardown warning:", err);

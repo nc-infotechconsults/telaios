@@ -38,7 +38,9 @@ env:
   DATA_API_URL: http://localhost:3000
   DATA_API_KEY: test-internal-api-key
   REDIS_URL: redis://localhost:6379
-  # Python agent-service uses fastembed by default — no API key required
+  # Python agent-service uses fastembed (BAAI/bge-small-en-v1.5) instead of the
+  # TypeScript service's text-embedding-3-small (OpenAI). fastembed runs locally
+  # and requires no API key, which is ideal for CI.
   EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
   LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'openai' }}
   LLM_MODEL: ${{ secrets.LLM_MODEL || 'gpt-4o-mini' }}
