@@ -6,11 +6,6 @@ calls the correct HTTP method and URL with the expected payload.
 """
 from __future__ import annotations
 
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
-
 import pytest
 import pytest_asyncio
 import respx

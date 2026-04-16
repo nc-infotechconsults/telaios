@@ -120,7 +120,3 @@ class AgentPool:
             base_url=profile.llm_base_url,
         )
         return LangGraphDriver(llm=llm, skills=profile.skills)
-
-
-# Needed for type hint inside initialize()
-from typing import Dict  # noqa: E402 (already imported above but kept explicit)

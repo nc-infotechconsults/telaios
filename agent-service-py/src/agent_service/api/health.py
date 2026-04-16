@@ -20,6 +20,9 @@ async def test_llm() -> JSONResponse:
     from agent_service.services import data_client
     from agent_service.core.llm import build_chat_model
     from langchain_core.messages import HumanMessage
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     try:
         settings = await data_client.get_settings()
@@ -33,4 +36,5 @@ async def test_llm() -> JSONResponse:
         content = response.content if isinstance(response.content, str) else str(response.content)
         return JSONResponse({"status": "ok", "response": content})
     except Exception as err:
-        return JSONResponse({"status": "error", "error": str(err)}, status_code=500)
+        logger.error("LLM connectivity check failed: %s", err)
+        return JSONResponse({"status": "error", "error": "LLM connectivity check failed"}, status_code=500)

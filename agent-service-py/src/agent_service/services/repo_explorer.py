@@ -51,8 +51,6 @@ async def ensure_local_path(repo: dict, project_id: str) -> str:
     if os.path.exists(planning_path):
         # Already cloned — try to pull latest
         try:
-            import asyncio
-
             proc = await asyncio.create_subprocess_exec(
                 "git", "-C", planning_path, "pull",
                 stdout=asyncio.subprocess.DEVNULL,

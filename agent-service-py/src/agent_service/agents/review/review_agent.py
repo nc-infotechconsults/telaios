@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
-from dataclasses import dataclass, field
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -69,8 +69,6 @@ class ReviewAgent(BaseAgent):
         diff_parts: list[str] = []
         for repo_name, local_path in (ctx.workspaces or {}).items():
             try:
-                import asyncio
-
                 proc = await asyncio.create_subprocess_shell(
                     "git diff HEAD~1 HEAD 2>/dev/null || git diff HEAD",
                     cwd=local_path,
@@ -83,8 +81,6 @@ class ReviewAgent(BaseAgent):
                     diff_parts.append(f"## Repository: {repo_name}\n{text}")
             except Exception:
                 try:
-                    import asyncio
-
                     proc2 = await asyncio.create_subprocess_shell(
                         "git diff",
                         cwd=local_path,

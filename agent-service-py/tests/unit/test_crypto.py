@@ -3,11 +3,6 @@ Unit tests for the crypto module (AES-256-CBC encrypt/decrypt).
 """
 from __future__ import annotations
 
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
-
 import pytest
 
 
