@@ -2,17 +2,19 @@
 # E2E Tests — SWE AI Platform
 #
 # Spins up the full platform (Postgres, Redis, MinIO, data-api,
-# agent-service, frontend) and runs:
+# agent-service, Vite frontend) and runs:
 #   1. API smoke / integration tests  (tests/smoke.test.js)
+#      – including an LLM connectivity check via LLM_API_KEY secret
 #   2. Playwright browser E2E tests   (frontend/e2e/)
+#      – frontend runs against the real backend (no demo mode)
 # ──────────────────────────────────────────────────────────────
 name: E2E Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, test-ci]
   pull_request:
-    branches: [main]
+    branches: [main, test-ci]
   workflow_dispatch:
 
 permissions:
@@ -37,12 +39,15 @@ env:
   DATA_API_KEY: test-internal-api-key
   REDIS_URL: redis://localhost:6379
   EMBEDDING_MODEL: text-embedding-3-small
+  LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'openai' }}
+  LLM_MODEL: ${{ secrets.LLM_MODEL || 'gpt-4o-mini' }}
+  LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
 
 jobs:
   e2e:
     name: End-to-End Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       # ── Checkout & tooling ────────────────────────────────────
@@ -78,6 +83,9 @@ jobs:
       - name: Start agent-service
         env:
           PORT: "8000"
+          LLM_PROVIDER: ${{ env.LLM_PROVIDER }}
+          LLM_MODEL: ${{ env.LLM_MODEL }}
+          LLM_API_KEY: ${{ env.LLM_API_KEY }}
         run: |
           cd agent-service && bun run start > /tmp/agent-service.log 2>&1 &
           echo "AGENT_SERVICE_PID=$!" >> "$GITHUB_ENV"
@@ -92,8 +100,17 @@ jobs:
           timeout 60 bash -c 'until curl -sf http://localhost:8000/health > /dev/null; do sleep 2; done'
           echo "✓ agent-service ready"
 
+      # ── Configure LLM settings in the DB ─────────────────────
+      - name: Store LLM credentials in platform settings
+        if: ${{ env.LLM_API_KEY != '' }}
+        run: |
+          curl -sf -X PATCH http://localhost:3000/settings \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $INTERNAL_API_KEY" \
+            -d "{\"llm_provider\":\"$LLM_PROVIDER\",\"llm_model\":\"$LLM_MODEL\",\"llm_api_key_raw\":\"$LLM_API_KEY\"}"
+
       # ── API smoke / integration tests ─────────────────────────
-      - name: Run smoke tests
+      - name: Run smoke tests (including LLM connectivity)
         env:
           AGENT_URL: http://localhost:8000
           VERBOSE: "1"
@@ -104,8 +121,11 @@ jobs:
         working-directory: frontend
         run: bunx playwright install --with-deps chromium
 
-      - name: Run Playwright E2E tests
+      - name: Run Playwright E2E tests (real backend, no demo mode)
         working-directory: frontend
+        env:
+          DATA_API_URL: http://localhost:3000
+          INTERNAL_API_KEY: ${{ env.INTERNAL_API_KEY }}
         run: bun run test:e2e
 
       # ── Artifacts ─────────────────────────────────────────────
