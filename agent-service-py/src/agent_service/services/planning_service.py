@@ -488,7 +488,25 @@ async def init_session(plan_id: str) -> None:
     if plan_id in _sessions:
         return
 
-    plan = await data_client.get_plan(plan_id)
+    try:
+        plan = await data_client.get_plan(plan_id)
+    except Exception as exc:
+        logger.warning("init_session: could not load plan %s — %s", plan_id, exc)
+        # Fallback: minimal stub session so SSE clients can connect even if the
+        # plan row doesn't exist yet (e.g. rapid re-connection race).
+        _sessions[plan_id] = Session(
+            plan_id=plan_id,
+            project_id="",
+            plan_title=None,
+            phase="interview",
+            messages=[],
+            plan_draft=None,
+            agent_profiles=[],
+            project_repositories=[],
+            project_context=None,
+            repo_tools=[],
+        )
+        return
     profiles, repos, existing_messages, existing_tasks, project_context = await asyncio.gather(
         data_client.get_agent_profiles(),
         data_client.get_project_repositories(plan["project_id"]),

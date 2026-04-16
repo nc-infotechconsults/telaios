@@ -12,20 +12,15 @@ def build_chat_model(
     base_url: Optional[str] = None,
 ) -> BaseChatModel:
     """Return a LangChain chat model for the given provider configuration."""
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
-
-        return ChatOpenAI(model=model, api_key=api_key)  # type: ignore[arg-type]
-
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
 
         return ChatAnthropic(model=model, api_key=api_key)  # type: ignore[arg-type]
 
-    # Default: OpenAI-compatible with custom base URL
+    # openai provider and any OpenAI-compatible provider (ollama, vllm, lmstudio, etc.)
     from langchain_openai import ChatOpenAI
 
     kwargs: dict = {"model": model, "api_key": api_key or "placeholder"}
     if base_url:
         kwargs["base_url"] = base_url
-    return ChatOpenAI(**kwargs)
+    return ChatOpenAI(**kwargs)  # type: ignore[arg-type]
