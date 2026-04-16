@@ -575,8 +575,10 @@ async function runLLMTest() {
   const model = process.env.LLM_MODEL ?? "gpt-4o-mini";
 
   await test(`POST /test-llm returns ok (provider=${provider}, model=${model})`, async () => {
+    // The Python agent-service reads LLM credentials from DB settings (stored via
+    // the workflow PATCH step). The request body is accepted but ignored.
     const { data } = await axios.post(`${AGENT_URL}/test-llm`, { provider, model, apiKey });
-    assert(data.ok === true, `LLM test failed: ${JSON.stringify(data)}`);
+    assert(data.status === "ok", `LLM test failed: ${JSON.stringify(data)}`);
   });
 }
 

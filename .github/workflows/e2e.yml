@@ -2,7 +2,7 @@
 # E2E Tests — SWE AI Platform
 #
 # Spins up the full platform (Postgres, Redis, MinIO, data-api,
-# agent-service, Vite frontend) and runs:
+# agent-service-py, Vite frontend) and runs:
 #   1. API smoke / integration tests  (tests/smoke.test.js)
 #      – including an LLM connectivity check via LLM_API_KEY secret
 #   2. Playwright browser E2E tests   (frontend/e2e/)
@@ -38,7 +38,8 @@ env:
   DATA_API_URL: http://localhost:3000
   DATA_API_KEY: test-internal-api-key
   REDIS_URL: redis://localhost:6379
-  EMBEDDING_MODEL: text-embedding-3-small
+  # Python agent-service uses fastembed by default — no API key required
+  EMBEDDING_MODEL: BAAI/bge-small-en-v1.5
   LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'openai' }}
   LLM_MODEL: ${{ secrets.LLM_MODEL || 'gpt-4o-mini' }}
   LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -59,13 +60,21 @@ jobs:
         with:
           bun-version: "1"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       # ── Infrastructure ────────────────────────────────────────
       - name: Start infrastructure (Postgres, Redis, MinIO)
         run: docker compose -f docker-compose.dev.yml up -d --wait
 
       # ── Dependencies ──────────────────────────────────────────
-      - name: Install dependencies
+      - name: Install JS dependencies
         run: bun install --frozen-lockfile
+
+      - name: Install Python agent-service dependencies
+        run: pip install -e 'agent-service-py[dev]'
 
       # ── Database ──────────────────────────────────────────────
       - name: Run database migrations
@@ -80,14 +89,15 @@ jobs:
           cd data-api && bun run start > /tmp/data-api.log 2>&1 &
           echo "DATA_API_PID=$!" >> "$GITHUB_ENV"
 
-      - name: Start agent-service
+      - name: Start agent-service (Python / uvicorn)
         env:
           PORT: "8000"
           LLM_PROVIDER: ${{ env.LLM_PROVIDER }}
           LLM_MODEL: ${{ env.LLM_MODEL }}
           LLM_API_KEY: ${{ env.LLM_API_KEY }}
         run: |
-          cd agent-service && bun run start > /tmp/agent-service.log 2>&1 &
+          cd agent-service-py && uvicorn agent_service.main:app \
+            --host 0.0.0.0 --port 8000 > /tmp/agent-service.log 2>&1 &
           echo "AGENT_SERVICE_PID=$!" >> "$GITHUB_ENV"
 
       - name: Wait for services to be ready
@@ -101,6 +111,8 @@ jobs:
           echo "✓ agent-service ready"
 
       # ── Configure LLM settings in the DB ─────────────────────
+      # The Python /test-llm endpoint reads credentials from DB settings,
+      # so we store them here before running the smoke / e2e tests.
       - name: Store LLM credentials in platform settings
         if: ${{ env.LLM_API_KEY != '' }}
         run: |
