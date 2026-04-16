@@ -3,20 +3,24 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright config for swe-ai-platform frontend E2E tests.
  *
- * Tests run against the Vite dev server in demo mode (VITE_DEMO_MODE=true),
- * so no backend services are required — all API calls return hardcoded
- * mock data from src/demo/data.ts.
+ * Tests run against a real backend stack (data-api + agent-service).
+ * globalSetup seeds the required projects/plans/tasks and writes browser
+ * auth state to e2e/fixtures/.auth.json so every test starts authenticated.
  */
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? "github" : "html",
+  retries: process.env.CI ? 1 : 0,
+  workers: 1,
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",
+
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
 
   use: {
     baseURL: "http://localhost:5173",
+    storageState: "./e2e/fixtures/.auth.json",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
@@ -29,9 +33,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "bunx vite --mode demo",
+    command: "bunx vite",
     port: 5173,
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 60_000,
   },
 });

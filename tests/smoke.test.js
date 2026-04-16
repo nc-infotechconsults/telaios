@@ -560,6 +560,28 @@ async function runAgentServiceTests() {
   });
 }
 
+// ─── LLM connectivity test ─────────────────────────────────────────────────────
+
+async function runLLMTest() {
+  console.log("\n── LLM Connectivity ──────────────────────────────────────────");
+
+  const apiKey = process.env.LLM_API_KEY;
+  if (!apiKey) {
+    console.log("  ⚠  LLM_API_KEY not set — skipping LLM test");
+    return;
+  }
+
+  const provider = process.env.LLM_PROVIDER ?? "openai";
+  const model = process.env.LLM_MODEL ?? "gpt-4o-mini";
+
+  await test(`POST /test-llm returns ok (provider=${provider}, model=${model})`, async () => {
+    // The Python agent-service reads LLM credentials from DB settings (stored via
+    // the workflow PATCH step). The request body is accepted but ignored.
+    const { data } = await axios.post(`${AGENT_URL}/test-llm`, { provider, model, apiKey });
+    assert(data.status === "ok", `LLM test failed: ${JSON.stringify(data)}`);
+  });
+}
+
 // ─── SSE test ─────────────────────────────────────────────────────────────────
 
 async function runSSETest() {
@@ -645,6 +667,12 @@ async function main() {
     await runAgentServiceTests();
   } catch (err) {
     console.error("Fatal error in Agent Service tests:", err.message);
+  }
+
+  try {
+    await runLLMTest();
+  } catch (err) {
+    console.error("Fatal error in LLM tests:", err.message);
   }
 
   try {
