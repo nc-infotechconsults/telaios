@@ -8,7 +8,7 @@ import { NotFoundError } from "@/core/errors";
 import { GitService } from "./git.service";
 
 export interface WorkspaceSource {
-  type: "git" | "s3";
+  type: "git" | "s3" | "platform-project";
   url?: string;
   branch?: string;
   bucket?: string;
@@ -33,6 +33,8 @@ export interface WorkspaceMeta {
   forwardedPorts: number[];
   createdAt: string;
   lastActiveAt: string;
+  platformProjectId?: string;
+  platformApiUrl?: string;
 }
 
 const REGISTRY_PATH = path.join(config.WORKSPACES_ROOT, "_registry.json");
@@ -72,6 +74,8 @@ export const WorkspaceRegistry = {
   async create(payload: {
     name: string;
     source: WorkspaceSource;
+    platformProjectId?: string;
+    platformApiUrl?: string;
   }): Promise<WorkspaceMeta> {
     const all = await load();
     const ws: WorkspaceMeta = {
@@ -83,6 +87,8 @@ export const WorkspaceRegistry = {
       forwardedPorts: [],
       createdAt: new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
+      platformProjectId: payload.platformProjectId,
+      platformApiUrl: payload.platformApiUrl,
     };
     all.unshift(ws);
     await save(all);
@@ -127,5 +133,42 @@ export const WorkspaceRegistry = {
     const all = await load();
     const filtered = all.filter((w) => w.id !== id);
     await save(filtered);
+  },
+
+  /**
+   * Re-pull repos and docs for a platform-project workspace.
+   * Pulls the latest from all repositories already cloned in the workspace dir.
+   */
+  async syncFromPlatform(workspaceId: string): Promise<{ repos_synced: number; errors: string[] }> {
+    const ws = await this.get(workspaceId);
+    if (!ws.platformProjectId || !ws.platformApiUrl) {
+      return { repos_synced: 0, errors: ["Not a platform-project workspace"] };
+    }
+
+    const manifestPath = require("node:path").join(config.WORKSPACES_ROOT, workspaceId, ".agentscope", "project.json");
+    let manifest: { repositories?: Array<{ name: string; branch?: string }> } = {};
+    try {
+      const raw = await Bun.file(manifestPath).text();
+      manifest = JSON.parse(raw) as typeof manifest;
+    } catch {
+      return { repos_synced: 0, errors: ["project.json manifest not found"] };
+    }
+
+    const errors: string[] = [];
+    let reposSynced = 0;
+
+    for (const repo of manifest.repositories ?? []) {
+      const repoPath = require("node:path").join(config.WORKSPACES_ROOT, workspaceId, repo.name.replace(/[^a-zA-Z0-9._-]/g, "_"));
+      try {
+        const { simpleGit } = await import("simple-git");
+        const git = simpleGit({ baseDir: repoPath });
+        await git.pull("origin", repo.branch ?? "main");
+        reposSynced++;
+      } catch (err) {
+        errors.push(`${repo.name}: ${String(err)}`);
+      }
+    }
+
+    return { repos_synced: reposSynced, errors };
   },
 };

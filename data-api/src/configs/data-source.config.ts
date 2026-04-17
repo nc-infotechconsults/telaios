@@ -10,6 +10,7 @@ import {Migration1775941300000} from "../migrations/1775941300000-migration";
 import {Migration1775941400000} from "../migrations/1775941400000-migration";
 import {Migration1775941500000} from "../migrations/1775941500000-migration";
 import {Migration1775942000000} from "../migrations/1775942000000-migration";
+import {Migration1775950000000} from "../migrations/1775950000000-migration";
 import {Project} from "../entities/Project.entity";
 import {Repository} from "../entities/Repository.entity";
 import {Plan} from "../entities/Plan.entity";
@@ -25,6 +26,9 @@ import {ProjectAgent} from "../entities/ProjectAgent.entity";
 import {Document} from "../entities/Document.entity";
 import {DocumentChunk} from "../entities/DocumentChunk.entity";
 import {TaskArtifact} from "../entities/TaskArtifact.entity";
+import {Workspace} from "../entities/Workspace.entity";
+import {Environment} from "../entities/Environment.entity";
+import {HelmRelease} from "../entities/HelmRelease.entity";
 
 dotenv.config();
 
@@ -50,6 +54,9 @@ export const AppDataSource = new DataSource({
     Document,
     DocumentChunk,
     TaskArtifact,
+    Workspace,
+    Environment,
+    HelmRelease,
   ],
   migrations: [
     Migration1775914943523,
@@ -61,6 +68,7 @@ export const AppDataSource = new DataSource({
     Migration1775941400000,
     Migration1775941500000,
     Migration1775942000000,
+    Migration1775950000000,
   ],
 });
 

@@ -3,11 +3,24 @@ import { devtools } from "zustand/middleware";
 import type { Workspace, WorkspaceStatus } from "@/types";
 import { api } from "@/lib/api";
 
+export interface PlatformProjectManifest {
+  project_id: string;
+  project_name: string;
+  project_status: string;
+  platform_api_url: string;
+  workspace_id: string;
+  platform_workspace_id?: string;
+  agent_profile_id?: string;
+  repositories: Array<{ name: string; branch: string; remote_url?: string }>;
+  clone_results: Array<{ name: string; status: "ok" | "error"; error?: string }>;
+}
+
 interface WorkspaceState {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
   isLoading: boolean;
   error: string | null;
+  platformProject: PlatformProjectManifest | null;
 
   // Actions
   setActiveWorkspace: (workspace: Workspace | null) => void;
@@ -20,6 +33,8 @@ interface WorkspaceState {
   deleteWorkspace: (id: string) => Promise<void>;
   updateWorkspaceStatus: (id: string, status: WorkspaceStatus) => void;
   heartbeat: (id: string) => void;
+  syncRepos: (id: string) => Promise<void>;
+  loadPlatformProject: (id: string) => Promise<void>;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -29,6 +44,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       activeWorkspace: null,
       isLoading: false,
       error: null,
+      platformProject: null,
 
       setActiveWorkspace(workspace) {
         set({ activeWorkspace: workspace });
@@ -87,6 +103,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       heartbeat(id) {
         api.containers.heartbeat(id).catch(() => {});
+      },
+
+      async syncRepos(id) {
+        set({ isLoading: true, error: null });
+        try {
+          await api.workspaces.syncFromPlatform(id);
+          set({ isLoading: false });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Failed to sync repos";
+          set({ error: msg, isLoading: false });
+        }
+      },
+
+      async loadPlatformProject(id) {
+        const manifest = await api.workspaces.readProjectManifest(id);
+        if (manifest) {
+          set({ platformProject: manifest as unknown as PlatformProjectManifest });
+        }
       },
     }),
     { name: "workspace-store" },
