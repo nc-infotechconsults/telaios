@@ -143,6 +143,22 @@ const workspaces = {
   async delete(workspaceId: string): Promise<void> {
     await http.delete(`/workspaces/${workspaceId}`);
   },
+
+  async syncFromPlatform(workspaceId: string): Promise<{ repos_synced: number; errors: string[] }> {
+    const { data } = await http.post<{ data: { repos_synced: number; errors: string[] } }>(`/workspaces/${workspaceId}/sync`);
+    return data.data;
+  },
+
+  async readProjectManifest(workspaceId: string): Promise<Record<string, unknown> | null> {
+    try {
+      const { data } = await http.get(`/workspaces/${workspaceId}/file`, {
+        params: { path: ".agentscope/project.json" },
+      });
+      return JSON.parse(data.data.content) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  },
 };
 
 // ── Container API ─────────────────────────────────────────────────────────────

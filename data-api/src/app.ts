@@ -17,6 +17,10 @@ import tasksRouter from "./routes/tasks.route";
 import messagesRouter from "./routes/messages.route";
 import settingsRouter from "./routes/settings.route";
 import agentProfilesRouter from "./routes/agentProfiles.route";
+import workspacesRouter from "./routes/workspaces.route";
+import workspaceItemRouter from "./routes/workspaceItem.route";
+import environmentsRouter from "./routes/environments.route";
+import environmentItemRouter from "./routes/environmentItem.route";
 import { patchRepositoryById } from "./controllers/repository.controller";
 import { authenticate } from "./middleware/authenticate.middleware";
 import logger from "./utils/logger";
@@ -42,6 +46,8 @@ app.use("/projects", repositoriesRouter);
 app.use("/projects", projectMembersRouter);
 app.use("/projects", projectAgentsRouter);
 app.use("/projects", documentsRouter);
+app.use("/projects", workspacesRouter);
+app.use("/projects", environmentsRouter);
 app.use("/internal", internalRouter);
 
 // Standalone repository PATCH — used by agent-service to update clone status without project_id
@@ -52,6 +58,8 @@ app.use("/tasks", tasksRouter);
 app.use("/messages", messagesRouter);
 app.use("/settings", settingsRouter);
 app.use("/agent-profiles", agentProfilesRouter);
+app.use("/workspaces", workspaceItemRouter);
+app.use("/environments", environmentItemRouter);
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error & { statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {

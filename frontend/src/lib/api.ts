@@ -14,6 +14,12 @@ import type {
   Settings,
   User,
   Document,
+  Workspace,
+  WorkspaceConfig,
+  Environment,
+  EnvironmentType,
+  HelmRelease,
+  K8sResource,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -352,3 +358,121 @@ export const getDocumentDownloadUrl = (projectId: string, id: string): Promise<s
   DEMO
     ? delay("")
     : http.get<{ url: string }>(`/projects/${projectId}/documents/${id}/download`).then((r) => r.data.url);
+
+// ─── Workspaces ───────────────────────────────────────────────────────────────
+
+export const listWorkspaces = (projectId: string): Promise<Workspace[]> =>
+  DEMO ? delay([]) : http.get<Workspace[]>(`/projects/${projectId}/workspaces`).then((r) => r.data);
+
+export const createWorkspace = (
+  projectId: string,
+  data: { name: string; config?: WorkspaceConfig },
+): Promise<Workspace> =>
+  DEMO
+    ? delay<Workspace>({
+        id: `ws-${Date.now()}`,
+        project_id: projectId,
+        name: data.name,
+        status: "idle",
+        config: data.config ?? {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http.post<Workspace>(`/projects/${projectId}/workspaces`, data).then((r) => r.data);
+
+export const getWorkspace = (id: string): Promise<Workspace> =>
+  http.get<Workspace>(`/workspaces/${id}`).then((r) => r.data);
+
+export const patchWorkspace = (id: string, data: Partial<Workspace>): Promise<Workspace> =>
+  http.patch<Workspace>(`/workspaces/${id}`, data).then((r) => r.data);
+
+export const deleteWorkspace = (id: string): Promise<void> =>
+  http.delete(`/workspaces/${id}`).then(() => undefined);
+
+export const launchWorkspace = (id: string): Promise<Workspace> =>
+  http.post<Workspace>(`/workspaces/${id}/launch`).then((r) => r.data);
+
+// ─── Environments ─────────────────────────────────────────────────────────────
+
+export const listEnvironments = (projectId: string): Promise<Environment[]> =>
+  DEMO ? delay([]) : http.get<Environment[]>(`/projects/${projectId}/environments`).then((r) => r.data);
+
+export const createEnvironment = (
+  projectId: string,
+  data: {
+    name: string;
+    type: EnvironmentType;
+    namespace?: string;
+    connection_config?: Record<string, unknown>;
+  },
+): Promise<Environment> =>
+  DEMO
+    ? delay<Environment>({
+        id: `env-${Date.now()}`,
+        project_id: projectId,
+        name: data.name,
+        type: data.type,
+        status: "disconnected",
+        namespace: data.namespace,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http.post<Environment>(`/projects/${projectId}/environments`, data).then((r) => r.data);
+
+export const getEnvironment = (id: string): Promise<Environment> =>
+  http.get<Environment>(`/environments/${id}`).then((r) => r.data);
+
+export const patchEnvironment = (id: string, data: Partial<Environment & { connection_config: Record<string, unknown> }>): Promise<Environment> =>
+  http.patch<Environment>(`/environments/${id}`, data).then((r) => r.data);
+
+export const deleteEnvironment = (id: string): Promise<void> =>
+  http.delete(`/environments/${id}`).then(() => undefined);
+
+export const testEnvironmentConnection = (id: string): Promise<{ ok: boolean; message?: string }> =>
+  http.post<{ ok: boolean; message?: string }>(`/environments/${id}/test`).then((r) => r.data);
+
+export const listEnvironmentResources = (
+  id: string,
+  kind: string,
+  namespace = "default",
+): Promise<K8sResource[]> =>
+  http.get<K8sResource[]>(`/environments/${id}/resources`, { params: { kind, namespace } }).then((r) => r.data);
+
+export const getEnvironmentResource = (
+  id: string,
+  kind: string,
+  name: string,
+  namespace = "default",
+): Promise<unknown> =>
+  http.get(`/environments/${id}/resources/${kind}/${name}`, { params: { namespace } }).then((r) => r.data);
+
+export const getResourceLogs = (
+  id: string,
+  name: string,
+  namespace = "default",
+  container?: string,
+): Promise<string> =>
+  http.get(`/environments/${id}/resources/pods/${name}/logs`, { params: { namespace, container } }).then((r) => String(r.data));
+
+export const listHelmReleases = (envId: string): Promise<HelmRelease[]> =>
+  http.get<HelmRelease[]>(`/environments/${envId}/helm/releases`).then((r) => r.data);
+
+export const installHelmChart = (
+  envId: string,
+  data: {
+    release_name: string;
+    chart_name: string;
+    chart_repo_url?: string;
+    chart_version?: string;
+    namespace?: string;
+    values_override?: Record<string, unknown>;
+  },
+): Promise<HelmRelease> =>
+  http.post<HelmRelease>(`/environments/${envId}/helm/install`, data).then((r) => r.data);
+
+export const uninstallHelmRelease = (envId: string, releaseName: string): Promise<void> =>
+  http.delete(`/environments/${envId}/helm/releases/${releaseName}`).then(() => undefined);
+
+export const scanProjectCharts = (envId: string): Promise<Array<{ name: string; version: string; description: string; localPath?: string }>> =>
+  http.get(`/environments/${envId}/helm/charts/scan`).then((r) => r.data as Array<{ name: string; version: string; description: string; localPath?: string }>);
+

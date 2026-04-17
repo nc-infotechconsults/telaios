@@ -34,6 +34,8 @@ import {
   updateProject,
   deleteProject,
   listUsers,
+  listWorkspaces,
+  listEnvironments,
 } from "../lib/api";
 import { toast } from "../lib/toast";
 import { formatStatus } from "../lib/statusLabels";
@@ -49,12 +51,14 @@ import type {
   ProjectRole,
   ProjectStatus,
   User,
+  Workspace,
+  Environment,
 } from "../types";
 import RepositorySetup from "../components/plan/RepositorySetup";
 import DocumentsTab from "../components/documents/DocumentsTab";
 import ConfirmModal from "../components/common/ConfirmModal";
 
-type ActiveTab = "plans" | "repos" | "agents" | "members" | "documents";
+type ActiveTab = "plans" | "repos" | "agents" | "members" | "documents" | "workspaces" | "environments";
 
 const STATUS_COLOR: Record<string, "warning" | "success" | "primary" | "default"> = {
   draft: "warning",
@@ -92,6 +96,8 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
   const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -156,8 +162,10 @@ export default function ProjectDetail() {
       getAgentProfiles(),
       listProjectMembers(projectId),
       listUsers(),
+      listWorkspaces(projectId).catch(() => [] as Workspace[]),
+      listEnvironments(projectId).catch(() => [] as Environment[]),
     ])
-      .then(([projects, allPlans, repos, projectAgents, profiles, projectMembers, users]) => {
+      .then(([projects, allPlans, repos, projectAgents, profiles, projectMembers, users, wss, envs]) => {
         const proj = projects.find((p) => p.id === projectId) ?? null;
         setProject(proj);
         setPlans(allPlans);
@@ -166,6 +174,8 @@ export default function ProjectDetail() {
         setAgentProfiles(profiles);
         setMembers(projectMembers);
         setAllUsers(users);
+        setWorkspaces(wss);
+        setEnvironments(envs);
       })
       .catch(() => toast.error("Failed to load project"))
       .finally(() => setLoading(false));
@@ -453,12 +463,48 @@ export default function ProjectDetail() {
               + Upload
             </Button>
           )}
+          {activeTab === "workspaces" && (
+            <Button size="sm" color="primary" onPress={() => {
+              const name = window.prompt("Workspace name");
+              if (name && projectId) {
+                import("../lib/api").then(({ createWorkspace, launchWorkspace }) => {
+                  createWorkspace(projectId, { name })
+                    .then((ws) => {
+                      setWorkspaces((prev) => [...prev, ws]);
+                      return launchWorkspace(ws.id);
+                    })
+                    .then((launched) => {
+                      setWorkspaces((prev) => prev.map((w) => w.id === launched.id ? launched : w));
+                      if (launched.ide_url) window.open(launched.ide_url, "_blank");
+                    })
+                    .catch(() => toast.error("Failed to create workspace"));
+                }).catch(() => undefined);
+              }
+            }}>
+              + New Workspace
+            </Button>
+          )}
+          {activeTab === "environments" && (
+            <Button size="sm" color="primary" onPress={() => {
+              const name = window.prompt("Environment name");
+              const type = (window.prompt("Type (kubernetes / docker)") ?? "kubernetes") as "kubernetes" | "docker";
+              if (name && projectId) {
+                import("../lib/api").then(({ createEnvironment }) => {
+                  createEnvironment(projectId, { name, type })
+                    .then((env) => setEnvironments((prev) => [...prev, env]))
+                    .catch(() => toast.error("Failed to create environment"));
+                }).catch(() => undefined);
+              }
+            }}>
+              + Add Environment
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Tab bar */}
       <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
-        {(["plans", "repos", "agents", "members", "documents"] as ActiveTab[]).map((tab) => {
+        {(["plans", "repos", "agents", "members", "documents", "workspaces", "environments"] as ActiveTab[]).map((tab) => {
           const label =
             tab === "plans"
               ? `Plans (${plans.length})`
@@ -468,6 +514,10 @@ export default function ProjectDetail() {
               ? `Agents (${agents.length})`
               : tab === "members"
               ? `Members (${members.length})`
+              : tab === "workspaces"
+              ? `Workspaces (${workspaces.length})`
+              : tab === "environments"
+              ? `Environments (${environments.length})`
               : "Documents";
           return (
             <button
@@ -699,6 +749,173 @@ export default function ProjectDetail() {
       {activeTab === "documents" && (
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <DocumentsTab projectId={projectId ?? ""} />
+        </div>
+      )}
+
+      {/* Workspaces tab */}
+      {activeTab === "workspaces" && (
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {workspaces.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-20 text-default-400">
+              <p className="text-lg">No workspaces yet</p>
+              <p className="text-sm">Create a workspace to open all project repositories in the IDE.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {workspaces.map((ws) => {
+                const statusColor: Record<string, "warning" | "success" | "primary" | "default" | "danger"> = {
+                  idle: "default",
+                  starting: "warning",
+                  running: "success",
+                  sleeping: "default",
+                  error: "danger",
+                };
+                return (
+                  <div key={ws.id} className="flex items-center gap-4 p-4 rounded-xl border border-divider hover:border-default-300 transition-all">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{ws.name}</p>
+                      <p className="text-xs text-default-400 mt-0.5">Created {new Date(ws.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <Chip size="sm" variant="flat" color={statusColor[ws.status] ?? "default"}>{ws.status}</Chip>
+                    {ws.ide_url && (
+                      <Tooltip content="Open in IDE">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="primary"
+                          as="a"
+                          href={ws.ide_url}
+                          target="_blank"
+                          aria-label={`Open ${ws.name} in IDE`}
+                        >
+                          Open IDE
+                        </Button>
+                      </Tooltip>
+                    )}
+                    {!ws.ide_url && (
+                      <Tooltip content="Launch workspace in IDE">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="primary"
+                          onPress={() => {
+                            import("../lib/api").then(({ launchWorkspace }) => {
+                              launchWorkspace(ws.id)
+                                .then((launched) => {
+                                  setWorkspaces((prev) => prev.map((w) => w.id === launched.id ? launched : w));
+                                  if (launched.ide_url) window.open(launched.ide_url, "_blank");
+                                })
+                                .catch(() => toast.error("Failed to launch workspace"));
+                            }).catch(() => undefined);
+                          }}
+                        >
+                          Launch
+                        </Button>
+                      </Tooltip>
+                    )}
+                    <Tooltip content="Delete workspace" color="danger">
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        aria-label={`Delete workspace: ${ws.name}`}
+                        onPress={() => {
+                          if (!window.confirm(`Delete workspace "${ws.name}"?`)) return;
+                          import("../lib/api").then(({ deleteWorkspace }) => {
+                            deleteWorkspace(ws.id)
+                              .then(() => setWorkspaces((prev) => prev.filter((w) => w.id !== ws.id)))
+                              .catch(() => toast.error("Failed to delete workspace"));
+                          }).catch(() => undefined);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </Button>
+                    </Tooltip>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Environments tab */}
+      {activeTab === "environments" && (
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {environments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-20 text-default-400">
+              <p className="text-lg">No environments yet</p>
+              <p className="text-sm">Add a Kubernetes or Docker environment to view and manage resources.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {environments.map((env) => {
+                const statusColor: Record<string, "success" | "default" | "danger"> = {
+                  connected: "success",
+                  disconnected: "default",
+                  error: "danger",
+                };
+                return (
+                  <div key={env.id} className="flex items-center gap-4 p-4 rounded-xl border border-divider hover:border-default-300 transition-all">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{env.name}</p>
+                      <p className="text-xs text-default-400 mt-0.5">
+                        {env.type}{env.namespace ? ` · ${env.namespace}` : ""} · Created {new Date(env.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Chip size="sm" variant="flat" color={statusColor[env.status] ?? "default"}>{env.status}</Chip>
+                    <Tooltip content="Test connection">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        onPress={() => {
+                          import("../lib/api").then(({ testEnvironmentConnection }) => {
+                            testEnvironmentConnection(env.id)
+                              .then((r) => {
+                                if (r.ok) {
+                                  toast.success("Connection successful");
+                                  setEnvironments((prev) => prev.map((e) => e.id === env.id ? { ...e, status: "connected" as const } : e));
+                                } else {
+                                  toast.error(r.message ?? "Connection failed");
+                                  setEnvironments((prev) => prev.map((e) => e.id === env.id ? { ...e, status: "error" as const } : e));
+                                }
+                              })
+                              .catch(() => toast.error("Failed to test connection"));
+                          }).catch(() => undefined);
+                        }}
+                      >
+                        Test
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content="Delete environment" color="danger">
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        aria-label={`Delete environment: ${env.name}`}
+                        onPress={() => {
+                          if (!window.confirm(`Delete environment "${env.name}"?`)) return;
+                          import("../lib/api").then(({ deleteEnvironment }) => {
+                            deleteEnvironment(env.id)
+                              .then(() => setEnvironments((prev) => prev.filter((e) => e.id !== env.id)))
+                              .catch(() => toast.error("Failed to delete environment"));
+                          }).catch(() => undefined);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </Button>
+                    </Tooltip>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

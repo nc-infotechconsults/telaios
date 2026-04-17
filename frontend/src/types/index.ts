@@ -228,6 +228,81 @@ export interface ProjectAgent {
   assigned_at: string;
 }
 
+// ── Workspaces ────────────────────────────────────────────────────────────────
+
+export type WorkspaceStatus = "idle" | "starting" | "running" | "sleeping" | "error";
+
+export interface WorkspaceConfig {
+  repositories?: Record<string, { branch?: string; enabled?: boolean }>;
+  env_vars?: Record<string, string>;
+  devcontainer_overrides?: {
+    image?: string;
+    postCreateCommand?: string;
+    extensions?: string[];
+  };
+  default_open_files?: string[];
+  agent_profile_id?: string;
+}
+
+export interface Workspace {
+  id: string;
+  project_id: string;
+  name: string;
+  status: WorkspaceStatus;
+  container_id?: string;
+  container_image?: string;
+  ide_url?: string;
+  ide_workspace_id?: string;
+  config: WorkspaceConfig;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Environments ──────────────────────────────────────────────────────────────
+
+export type EnvironmentType = "kubernetes" | "docker";
+export type EnvironmentStatus = "connected" | "disconnected" | "error";
+export type HelmReleaseStatus = "pending" | "deployed" | "failed" | "uninstalled";
+
+export interface Environment {
+  id: string;
+  project_id: string;
+  name: string;
+  type: EnvironmentType;
+  status: EnvironmentStatus;
+  namespace?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HelmRelease {
+  id: string;
+  environment_id: string;
+  project_id: string;
+  name: string;
+  chart_name: string;
+  chart_repo_url?: string;
+  chart_version?: string;
+  namespace?: string;
+  values_override?: Record<string, unknown>;
+  status: HelmReleaseStatus;
+  release_notes?: string;
+  deployed_by?: string;
+  deployed_at?: string;
+  created_at: string;
+}
+
+export interface K8sResource {
+  name: string;
+  namespace: string;
+  kind: string;
+  status: string;
+  age: string;
+  labels: Record<string, string>;
+}
+
 // ── Documents ─────────────────────────────────────────────────────────────────
 
 export type DocumentFileType = "pdf" | "docx" | "xlsx" | "md" | "txt" | "csv" | "json" | "other";

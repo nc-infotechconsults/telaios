@@ -3,8 +3,146 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { WorkspaceService } from "@/services/workspace.service";
 import { WorkspaceRegistry } from "@/services/workspaceRegistry.service";
+import { config } from "@/core/config";
+import path from "node:path";
+import fs from "node:fs/promises";
 
 const app = new Hono();
+
+// ── From-project workspace ────────────────────────────────────────────────────
+// POST /api/workspaces/from-project
+// Creates an IDE workspace from a platform project (multi-repo clone + docs)
+app.post(
+  "/from-project",
+  zValidator(
+    "json",
+    z.object({
+      project_id: z.string().min(1),
+      workspace_id: z.string().optional(),
+      workspace_name: z.string().min(1),
+      platform_api_url: z.string().url(),
+      token: z.string().min(1),
+      config: z.object({
+        repositories: z.record(z.object({
+          branch: z.string().optional(),
+          enabled: z.boolean().optional(),
+        })).optional(),
+        env_vars: z.record(z.string()).optional(),
+        devcontainer_overrides: z.object({
+          image: z.string().optional(),
+          postCreateCommand: z.string().optional(),
+          extensions: z.array(z.string()).optional(),
+        }).optional(),
+        default_open_files: z.array(z.string()).optional(),
+        agent_profile_id: z.string().optional(),
+      }).optional(),
+    }),
+  ),
+  async (c) => {
+    const body = c.req.valid("json");
+
+    // Fetch project from the platform API
+    let projectData: {
+      id: string;
+      name: string;
+      description?: string;
+      status: string;
+    };
+    let repositories: Array<{
+      id: string;
+      name: string;
+      remote_url?: string;
+      branch?: string;
+      auth_type: string;
+    }>;
+
+    try {
+      const headers = { Authorization: `Bearer ${body.token}` };
+      const [projRes, reposRes] = await Promise.all([
+        fetch(`${body.platform_api_url}/projects`, { headers }).then((r) => r.json()),
+        fetch(`${body.platform_api_url}/projects/${body.project_id}/repositories`, { headers }).then((r) => r.json()),
+      ]);
+      const allProjects = projRes as Array<{ id: string; name: string; description?: string; status: string }>;
+      projectData = allProjects.find((p) => p.id === body.project_id) ?? { id: body.project_id, name: body.workspace_name, status: "planning" };
+      repositories = (reposRes as typeof repositories) ?? [];
+    } catch {
+      return c.json({ error: "Failed to fetch project from platform API" }, 502);
+    }
+
+    // Create an IDE workspace record
+    const ws = await WorkspaceRegistry.create({
+      name: body.workspace_name,
+      source: { type: "platform-project", url: body.platform_api_url },
+      platformProjectId: body.project_id,
+      platformApiUrl: body.platform_api_url,
+    });
+
+    const wsRoot = path.join(config.WORKSPACES_ROOT, ws.id);
+    await fs.mkdir(wsRoot, { recursive: true });
+
+    // Clone all project repositories in parallel (best-effort)
+    const cfgRepos = body.config?.repositories ?? {};
+    const cloneResults: Array<{ name: string; status: "ok" | "error"; error?: string }> = [];
+
+    await Promise.allSettled(
+      repositories
+        .filter((r) => {
+          const override = cfgRepos[r.name];
+          return override?.enabled !== false;
+        })
+        .map(async (repo) => {
+          if (!repo.remote_url) {
+            cloneResults.push({ name: repo.name, status: "error", error: "no remote_url" });
+            return;
+          }
+          const override = cfgRepos[repo.name];
+          const branch = override?.branch ?? repo.branch ?? "main";
+          const destName = repo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const destPath = path.join(wsRoot, destName);
+          try {
+            const { simpleGit } = await import("simple-git");
+            const git = simpleGit();
+            await fs.mkdir(destPath, { recursive: true }).catch(() => undefined);
+            await git.clone(repo.remote_url, destPath, branch ? ["--branch", branch, "--single-branch"] : []);
+            cloneResults.push({ name: repo.name, status: "ok" });
+          } catch (err) {
+            cloneResults.push({ name: repo.name, status: "error", error: String(err) });
+          }
+        }),
+    );
+
+    // Write .agentscope/project.json manifest
+    const manifestDir = path.join(wsRoot, ".agentscope");
+    await fs.mkdir(manifestDir, { recursive: true });
+    await fs.writeFile(
+      path.join(manifestDir, "project.json"),
+      JSON.stringify(
+        {
+          project_id: body.project_id,
+          project_name: projectData.name,
+          project_status: projectData.status,
+          platform_api_url: body.platform_api_url,
+          workspace_id: ws.id,
+          platform_workspace_id: body.workspace_id,
+          agent_profile_id: body.config?.agent_profile_id,
+          repositories: repositories.map((r) => ({
+            name: r.name,
+            branch: cfgRepos[r.name]?.branch ?? r.branch ?? "main",
+            remote_url: r.remote_url,
+          })),
+          clone_results: cloneResults,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const ideUrl = `${config.CLIENT_URL ?? "http://localhost:5174"}/ide/${ws.id}`;
+
+    return c.json({ data: { ide_workspace_id: ws.id, ide_url: ideUrl } }, 201);
+  },
+);
 
 // ── Workspace metadata (registry) ─────────────────────────────────────────────
 
@@ -52,6 +190,12 @@ app.get("/:id", async (c) => {
 app.delete("/:id", async (c) => {
   await WorkspaceRegistry.delete(c.req.param("id"));
   return c.json({ data: { deleted: true } });
+});
+
+// POST /api/workspaces/:id/sync — re-pull repos for a platform-project workspace
+app.post("/:id/sync", async (c) => {
+  const result = await WorkspaceRegistry.syncFromPlatform(c.req.param("id"));
+  return c.json({ data: result });
 });
 
 // ── List directory ─────────────────────────────────────────────────────────────

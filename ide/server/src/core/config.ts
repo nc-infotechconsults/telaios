@@ -15,6 +15,7 @@ const envSchema = z.object({
   PLATFORM_API_URL: z.string().url().optional(),
   AGENT_SERVICE_URL: z.string().url().optional(),
   PLATFORM_JWT_SECRET: z.string().optional(),
+  CLIENT_URL: z.string().url().optional(),
 
   // OpenCode agent — choose one mode:
   // Mode A: Connect to an existing OpenCode server

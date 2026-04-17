@@ -4,6 +4,8 @@ import { getMembership, hasMinRole } from "../services/projectMember.service";
 import { AppDataSource } from "../configs/data-source.config";
 import { Plan } from "../entities/Plan.entity";
 import { Task } from "../entities/Task.entity";
+import { Workspace } from "../entities/Workspace.entity";
+import { Environment } from "../entities/Environment.entity";
 
 async function resolveProjectId(req: Request): Promise<string | null> {
   // Direct project param
@@ -26,6 +28,24 @@ async function resolveProjectId(req: Request): Promise<string | null> {
       relations: ["plan"],
     });
     return task?.plan?.project_id ?? null;
+  }
+
+  // Workspaces: resolve via workspace id → project (include soft-deleted so RBAC works post-delete)
+  if (req.baseUrl?.includes("/workspaces") && req.params.id) {
+    const workspace = await AppDataSource.getRepository(Workspace).findOne({
+      where: { id: req.params.id },
+      withDeleted: true,
+    });
+    return workspace?.project_id ?? null;
+  }
+
+  // Environments: resolve via environment id → project (include soft-deleted so RBAC works post-delete)
+  if (req.baseUrl?.includes("/environments") && req.params.id) {
+    const environment = await AppDataSource.getRepository(Environment).findOne({
+      where: { id: req.params.id },
+      withDeleted: true,
+    });
+    return environment?.project_id ?? null;
   }
 
   // Body
