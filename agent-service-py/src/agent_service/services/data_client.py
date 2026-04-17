@@ -137,6 +137,11 @@ async def get_document(project_id: str, document_id: str) -> Dict[str, Any]:
     return await _get(f"/projects/{project_id}/documents/{document_id}")
 
 
+async def list_project_documents(project_id: str) -> List[Dict[str, Any]]:
+    """Return all documents for a project (ordered by created_at DESC)."""
+    return await _get(f"/projects/{project_id}/documents")
+
+
 async def update_document_status(
     document_id: str,
     status: str,

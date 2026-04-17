@@ -370,3 +370,89 @@ describe("DELETE /projects/:projectId/documents/:id", () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PUT /projects/:projectId/documents/:id/content — in-browser editor save
+// ---------------------------------------------------------------------------
+
+describe("PUT /projects/:projectId/documents/:id/content", () => {
+  const EDITABLE_TYPES = ["md", "txt", "csv", "json"] as const;
+
+  EDITABLE_TYPES.forEach((file_type) => {
+    it(`saves content for ${file_type} document`, async () => {
+      const project = await createTestProject("P", ownerId);
+      const doc = await createTestDocument(project.id, { file_type, status: "ready" });
+
+      const res = await request(app)
+        .put(`/projects/${project.id}/documents/${doc.id}/content`)
+        .set("Authorization", `Bearer ${ownerToken}`)
+        .send({ content: `# Hello from ${file_type}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(doc.id);
+    });
+  });
+
+  it("returns 422 for non-editable file types (pdf)", async () => {
+    const project = await createTestProject("P", ownerId);
+    const doc = await createTestDocument(project.id, { file_type: "pdf", status: "ready" });
+
+    const res = await request(app)
+      .put(`/projects/${project.id}/documents/${doc.id}/content`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ content: "some text" });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error).toMatch(/pdf/i);
+  });
+
+  it("returns 400 when content is missing", async () => {
+    const project = await createTestProject("P", ownerId);
+    const doc = await createTestDocument(project.id, { file_type: "md", status: "ready" });
+
+    const res = await request(app)
+      .put(`/projects/${project.id}/documents/${doc.id}/content`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 401 without auth", async () => {
+    const project = await createTestProject("P", ownerId);
+    const doc = await createTestDocument(project.id, { file_type: "md", status: "ready" });
+
+    const res = await request(app)
+      .put(`/projects/${project.id}/documents/${doc.id}/content`)
+      .send({ content: "test" });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for viewer (read-only) role", async () => {
+    const project = await createTestProject("P", ownerId);
+    const [viewerUser] = await AppDataSource.query(
+      "SELECT * FROM users WHERE email = 'viewer@test.com'",
+    );
+    await addViewer(project.id, viewerUser.id);
+    const doc = await createTestDocument(project.id, { file_type: "md", status: "ready" });
+
+    const res = await request(app)
+      .put(`/projects/${project.id}/documents/${doc.id}/content`)
+      .set("Authorization", `Bearer ${viewerToken}`)
+      .send({ content: "test" });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 404 for non-existent document", async () => {
+    const project = await createTestProject("P", ownerId);
+
+    const res = await request(app)
+      .put(`/projects/${project.id}/documents/00000000-0000-0000-0000-000000000000/content`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ content: "test" });
+
+    expect(res.status).toBe(404);
+  });
+});

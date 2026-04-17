@@ -118,6 +118,34 @@ export async function restoreDocument(req: Request, res: Response) {
   return res.json(doc);
 }
 
+export async function updateContent(req: Request, res: Response) {
+  const { content } = req.body as { content?: string };
+  if (typeof content !== "string") {
+    return res.status(400).json({ error: "content (string) is required" });
+  }
+
+  const doc = await documentService.getDocument(req.params.id, req.params.projectId);
+  if (!doc) return res.status(404).json({ error: "Not found" });
+
+  const EDITABLE_TYPES = new Set(["md", "txt", "csv", "json"]);
+  if (!EDITABLE_TYPES.has(doc.file_type)) {
+    return res.status(422).json({ error: `${doc.file_type} files cannot be edited in-browser` });
+  }
+
+  const buffer = Buffer.from(content, "utf-8");
+  const checksum_sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
+
+  await uploadToS3(doc.s3_key, buffer, doc.mime_type);
+
+  const updated = await documentService.patchDocument(req.params.id, req.params.projectId, {
+    size_bytes: buffer.byteLength,
+    checksum_sha256,
+    status: "ready",
+  });
+
+  return res.json(updated);
+}
+
 export async function searchDocuments(req: Request, res: Response) {
   const { q, type, tag } = req.query as { q?: string; type?: string; tag?: string };
   const { AppDataSource } = await import("../configs/data-source.config");

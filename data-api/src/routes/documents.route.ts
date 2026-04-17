@@ -1,4 +1,5 @@
 import { Router } from "express";
+import express from "express";
 import multer from "multer";
 import * as documentController from "../controllers/document.controller";
 import { requireProjectAccess } from "../middleware/requireProjectAccess.middleware";
@@ -47,6 +48,13 @@ router.patch(
   "/:projectId/documents/:id",
   requireProjectAccess("editor"),
   documentController.patchDocument,
+);
+
+router.put(
+  "/:projectId/documents/:id/content",
+  requireProjectAccess("editor"),
+  express.json({ limit: "2mb" }),
+  documentController.updateContent,
 );
 
 router.delete(

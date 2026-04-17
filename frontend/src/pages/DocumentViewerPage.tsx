@@ -24,7 +24,10 @@ import {
 } from "../lib/api";
 import { toast } from "../lib/toast";
 import DocumentViewer from "../components/documents/DocumentViewer";
+import DocumentEditor from "../components/documents/DocumentEditor";
 import FileTypeIcon from "../components/documents/FileTypeIcon";
+
+const EDITABLE_TYPES = new Set(["md", "txt", "csv", "json"]);
 
 const STATUS_COLOR: Record<string, "warning" | "success" | "danger" | "default"> = {
   uploading: "warning",
@@ -63,6 +66,9 @@ export default function DocumentViewerPage() {
   const [copilotAnswer, setCopilotAnswer] = useState<CopilotAskResult | null>(null);
   const [summary, setSummary] = useState<CopilotSummarizeResult | null>(null);
   const [copilotLoading, setCopilotLoading] = useState(false);
+
+  // Edit mode (only for editable file types)
+  const [editMode, setEditMode] = useState(false);
 
   const loadDocument = useCallback(async () => {
     if (!projectId || !documentId) return;
@@ -192,6 +198,20 @@ export default function DocumentViewerPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Edit / Preview toggle (only for editable file types) */}
+          {doc.status === "ready" && EDITABLE_TYPES.has(doc.file_type) && (
+            <Tooltip content={editMode ? "Switch to Preview" : "Edit document"}>
+              <Button
+                size="sm"
+                variant={editMode ? "solid" : "flat"}
+                color={editMode ? "primary" : "default"}
+                onPress={() => setEditMode((m) => !m)}
+                aria-label={editMode ? "Switch to preview" : "Edit document"}
+              >
+                {editMode ? "Preview" : "Edit"}
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip content="Download">
             <Button size="sm" variant="flat" isIconOnly onPress={handleDownload} aria-label="Download">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -234,6 +254,14 @@ export default function DocumentViewerPage() {
               <p className="text-sm">Document is still processing…</p>
               <Button size="sm" variant="flat" onPress={loadDocument}>Refresh</Button>
             </div>
+          ) : editMode && EDITABLE_TYPES.has(doc.file_type) ? (
+            <DocumentEditor
+              url={presignedUrl}
+              fileType={doc.file_type}
+              projectId={projectId!}
+              documentId={documentId!}
+              onSaved={loadDocument}
+            />
           ) : (
             <DocumentViewer
               url={presignedUrl}

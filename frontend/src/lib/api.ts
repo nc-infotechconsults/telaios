@@ -370,6 +370,11 @@ export const getDocumentDownloadUrl = (projectId: string, id: string): Promise<s
     ? delay("")
     : http.get<{ url: string }>(`/projects/${projectId}/documents/${id}/download`).then((r) => r.data.url);
 
+export const updateDocumentContent = (projectId: string, id: string, content: string): Promise<Document> =>
+  DEMO
+    ? delay({} as Document)
+    : http.put<Document>(`/projects/${projectId}/documents/${id}/content`, { content }).then((r) => r.data);
+
 // ─── Document Folders ─────────────────────────────────────────────────────────
 
 export const listFolders = (projectId: string, parentFolderId?: string | null): Promise<DocumentFolder[]> =>

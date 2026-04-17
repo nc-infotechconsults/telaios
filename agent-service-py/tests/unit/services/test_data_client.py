@@ -376,3 +376,20 @@ async def test_error_propagation(respx_mock):
 
     with pytest.raises(httpx.HTTPStatusError):
         await data_client.get_project("p1")
+
+
+@pytest.mark.asyncio
+async def test_list_project_documents(respx_mock):
+    docs = [
+        {"id": "d1", "name": "spec.pdf", "status": "ready"},
+        {"id": "d2", "name": "notes.md", "status": "ready"},
+    ]
+    respx_mock.get("http://localhost:3000/projects/p1/documents").mock(
+        return_value=httpx.Response(200, json=docs)
+    )
+    from agent_service.services import data_client
+
+    result = await data_client.list_project_documents("p1")
+    assert len(result) == 2
+    assert result[0]["id"] == "d1"
+    assert result[1]["name"] == "notes.md"
