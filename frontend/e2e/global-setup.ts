@@ -29,6 +29,10 @@ export interface CIData {
   executingPlanId: string;
   completedPlanId: string;
   agentProfileId: string;
+  /** Profile with system_prompt + sub_agent_ids — used by agent-profiles.spec.ts */
+  promptProfileId: string;
+  /** Simple profile used as the sub-agent target — used by agent-profiles.spec.ts */
+  subAgentProfileId: string;
   t1Id: string;
   t2Id: string;
   t3Id: string;
@@ -104,6 +108,34 @@ export default async function globalSetup(config: FullConfig) {
     skills: [],
   });
   const agentProfileId = agentProfile.id;
+
+  // ── 2b. Sub-agent profile (used as a delegation target in agent-profiles.spec.ts) ───
+  const { data: subAgentProfile } = await api.post<{ id: string }>("/agent-profiles", {
+    name: "E2E Sub-Agent",
+    description: "Simple sub-agent profile seeded for E2E tests",
+    agent_type: "langgraph",
+    llm_provider: "openai",
+    llm_model: "gpt-4o-mini",
+    mcp_servers: [],
+    skills: [],
+  });
+  const subAgentProfileId = subAgentProfile.id;
+
+  // ── 2c. Profile with system_prompt + sub_agent_ids (agent-profiles.spec.ts) ──────────
+  const { data: promptProfile } = await api.post<{ id: string }>("/agent-profiles", {
+    name: "E2E Prompt Profile",
+    description: "Profile with custom system prompt for E2E badge tests",
+    agent_type: "langgraph",
+    llm_provider: "openai",
+    llm_model: "gpt-4o",
+    mcp_servers: [],
+    skills: [],
+    system_prompt: "E2E custom prompt content",
+    system_prompt_mode: "extend",
+    llm_temperature: 0.7,
+    sub_agent_ids: [subAgentProfileId],
+  });
+  const promptProfileId = promptProfile.id;
 
   // ── 3. Executing project ────────────────────────────────────────────────────
   const { data: execProject } = await api.post<{ id: string }>("/projects", {
@@ -206,6 +238,8 @@ export default async function globalSetup(config: FullConfig) {
     executingPlanId,
     completedPlanId,
     agentProfileId,
+    promptProfileId,
+    subAgentProfileId,
     t1Id: t1.id,
     t2Id: t2.id,
     t3Id: t3.id,
