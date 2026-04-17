@@ -320,7 +320,103 @@ export interface Document {
   status: DocumentStatus;
   error_message: string | null;
   metadata: Record<string, unknown> | null;
+  folder_id: string | null;
+  current_version_id: string | null;
   uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Document Folders ──────────────────────────────────────────────────────────
+
+export interface DocumentFolder {
+  id: string;
+  project_id: string;
+  parent_folder_id: string | null;
+  name: string;
+  path: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Document Versions ─────────────────────────────────────────────────────────
+
+export interface DocumentVersion {
+  id: string;
+  document_id: string;
+  version_number: number;
+  s3_key: string;
+  size_bytes: number;
+  checksum_sha256: string;
+  change_description: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+// ── Document Tags ─────────────────────────────────────────────────────────────
+
+export interface DocumentTag {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+// ── Document Comments ─────────────────────────────────────────────────────────
+
+export type CommentAnchorType = "page" | "cell" | "text_range" | "general";
+
+export interface DocumentComment {
+  id: string;
+  document_id: string;
+  user_id: string | null;
+  content: string;
+  anchor_type: CommentAnchorType;
+  anchor_data: Record<string, unknown> | null;
+  resolved: boolean;
+  parent_comment_id: string | null;
+  author?: Pick<User, "id" | "email" | "display_name"> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Document Activity ─────────────────────────────────────────────────────────
+
+export type DocumentActivityAction =
+  | "created"
+  | "viewed"
+  | "edited"
+  | "commented"
+  | "shared"
+  | "deleted"
+  | "restored"
+  | "version_created";
+
+export interface DocumentActivityItem {
+  id: string;
+  document_id: string;
+  user_id: string | null;
+  action: DocumentActivityAction;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  user_name?: string;
+  document_name?: string;
+}
+
+// ── Document Templates ────────────────────────────────────────────────────────
+
+export interface DocumentTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  file_type: DocumentFileType;
+  s3_key: string | null;
+  category: string | null;
+  is_global: boolean;
+  project_id: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -348,4 +444,9 @@ export type WsEvent =
   // ── Plan lifecycle events ─────────────────────────────────────────────────
   | { type: "plan_executing"; plan_id: string }
   | { type: "plan_completed"; plan_id: string }
-  | { type: "plan_failed"; plan_id: string; reason?: string };
+  | { type: "plan_failed"; plan_id: string; reason?: string }
+  // ── Document events ──────────────────────────────────────────────────────
+  | { type: "document_created"; document_id: string; name: string }
+  | { type: "document_updated"; document_id: string; name: string }
+  | { type: "document_deleted"; document_id: string }
+  | { type: "document_processing_complete"; document_id: string; name: string };
