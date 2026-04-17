@@ -1,23 +1,34 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 from typing import Optional
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+AGENT_SERVICE_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = AGENT_SERVICE_ROOT / ".env"
 
-    PORT: int = 8000
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    PORT: int = Field(default=8000, validation_alias=AliasChoices("PORT", "AGENT_SERVICE_PORT"))
     DATA_API_URL: str = "http://localhost:3000"
     DATA_API_KEY: str = ""
     REDIS_URL: str = "redis://localhost:6379"
     ENCRYPTION_KEY: str = ""
     # Comma-separated list of allowed frontend origins for CORS.
     # Example: "http://localhost:5173,https://app.example.com"
-    ALLOWED_ORIGINS: str = ""
+    ALLOWED_ORIGINS: str = Field(
+        default="",
+        validation_alias=AliasChoices("ALLOWED_ORIGINS", "ALLOWED_ORIGIN"),
+    )
     WORKSPACES_ROOT: str = "/tmp/swe-ai-workspaces"
     AGENT_POOL_SIZE: int = 3
     LLM_PROVIDER: str = "openai"

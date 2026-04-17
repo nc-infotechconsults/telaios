@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import os
 from hashlib import scrypt
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from agent_service.config import config
 
 # Derive a 32-byte AES key using scrypt — same parameters as the TypeScript service.
-_encryption_key = os.environ.get("ENCRYPTION_KEY")
+_encryption_key = config.ENCRYPTION_KEY
 if not _encryption_key:
     raise RuntimeError("ENCRYPTION_KEY environment variable is required")
 _KEY_SOURCE = _encryption_key.encode()

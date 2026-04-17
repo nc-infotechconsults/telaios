@@ -12,9 +12,9 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, test-ci]
+    branches: [test-ci]
   pull_request:
-    branches: [main, test-ci]
+    branches: [test-ci]
   workflow_dispatch:
 
 permissions:
