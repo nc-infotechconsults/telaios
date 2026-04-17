@@ -7,8 +7,10 @@
  * Also provides chart scanning across cloned project repositories.
  */
 import { execFile } from "child_process";
+import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs/promises";
+import os from "os";
 import { promisify } from "util";
 import { AppDataSource } from "../configs/data-source.config";
 import { Repository } from "../entities/Repository.entity";
@@ -20,6 +22,14 @@ const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT ?? "/workspaces";
 async function helm(...args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("helm", args);
   return stdout.trim();
+}
+
+/** Write values to a temp YAML file and return `["--values", filePath]` args. */
+async function valuesArgs(values: Record<string, unknown>): Promise<string[]> {
+  const tmpPath = path.join(os.tmpdir(), `helm-values-${randomUUID()}.yaml`);
+  // Serialize as JSON (helm accepts JSON in --values files)
+  await fs.writeFile(tmpPath, JSON.stringify(values), "utf-8");
+  return ["--values", tmpPath];
 }
 
 export interface HelmChart {
@@ -85,8 +95,8 @@ export const HelmService = {
       args.push("--version", chartVersion);
     }
     if (values && Object.keys(values).length > 0) {
-      const valuesJson = JSON.stringify(values);
-      args.push("--set-json", valuesJson);
+      const vArgs = await valuesArgs(values);
+      args.push(...vArgs);
     }
     return helm(...args);
   },
@@ -107,8 +117,8 @@ export const HelmService = {
       args.push("--version", chartVersion);
     }
     if (values && Object.keys(values).length > 0) {
-      const valuesJson = JSON.stringify(values);
-      args.push("--set-json", valuesJson);
+      const vArgs = await valuesArgs(values);
+      args.push(...vArgs);
     }
     return helm(...args);
   },

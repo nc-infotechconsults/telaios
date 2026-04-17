@@ -1,5 +1,6 @@
 import { AppDataSource } from "../configs/data-source.config";
 import { Workspace } from "../entities/Workspace.entity";
+import type { WorkspaceConfig } from "../entities/Workspace.entity";
 import type { DeepPartial } from "typeorm";
 import type { CreateWorkspaceDto, PatchWorkspaceDto } from "../schemas/workspace.schema";
 
@@ -17,10 +18,11 @@ export async function createWorkspace(
   dto: CreateWorkspaceDto,
   createdBy?: string,
 ) {
+  const emptyConfig: WorkspaceConfig = {};
   const workspace = repo().create({
     project_id: projectId,
     name: dto.name,
-    config: dto.config ?? {} as Workspace["config"],
+    config: dto.config ?? emptyConfig,
     created_by: createdBy,
   } as DeepPartial<Workspace>);
   return repo().save(workspace);

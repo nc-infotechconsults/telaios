@@ -3,7 +3,6 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { WorkspaceService } from "@/services/workspace.service";
 import { WorkspaceRegistry } from "@/services/workspaceRegistry.service";
-import { GitService } from "@/services/git.service";
 import { config } from "@/core/config";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -73,7 +72,7 @@ app.post(
     // Create an IDE workspace record
     const ws = await WorkspaceRegistry.create({
       name: body.workspace_name,
-      source: { type: "platform-project" as unknown as "git", url: body.platform_api_url },
+      source: { type: "platform-project", url: body.platform_api_url },
       platformProjectId: body.project_id,
       platformApiUrl: body.platform_api_url,
     });
@@ -101,8 +100,6 @@ app.post(
           const destName = repo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
           const destPath = path.join(wsRoot, destName);
           try {
-            await GitService.clone(repo.remote_url, path.relative(config.WORKSPACES_ROOT, destPath) as unknown as string, branch);
-            // GitService.clone uses workspaceId as the sub-path — use simpleGit directly
             const { simpleGit } = await import("simple-git");
             const git = simpleGit();
             await fs.mkdir(destPath, { recursive: true }).catch(() => undefined);

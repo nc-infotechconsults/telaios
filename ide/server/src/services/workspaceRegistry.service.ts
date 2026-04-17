@@ -145,7 +145,7 @@ export const WorkspaceRegistry = {
       return { repos_synced: 0, errors: ["Not a platform-project workspace"] };
     }
 
-    const manifestPath = require("node:path").join(config.WORKSPACES_ROOT, workspaceId, ".agentscope", "project.json");
+    const manifestPath = path.join(config.WORKSPACES_ROOT, workspaceId, ".agentscope", "project.json");
     let manifest: { repositories?: Array<{ name: string; branch?: string }> } = {};
     try {
       const raw = await Bun.file(manifestPath).text();
@@ -158,7 +158,7 @@ export const WorkspaceRegistry = {
     let reposSynced = 0;
 
     for (const repo of manifest.repositories ?? []) {
-      const repoPath = require("node:path").join(config.WORKSPACES_ROOT, workspaceId, repo.name.replace(/[^a-zA-Z0-9._-]/g, "_"));
+      const repoPath = path.join(config.WORKSPACES_ROOT, workspaceId, repo.name.replace(/[^a-zA-Z0-9._-]/g, "_"));
       try {
         const { simpleGit } = await import("simple-git");
         const git = simpleGit({ baseDir: repoPath });
