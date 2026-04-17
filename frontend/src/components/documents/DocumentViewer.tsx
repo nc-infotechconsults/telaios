@@ -4,7 +4,7 @@
  * PDF        → <embed> / <iframe> with presigned URL
  * Markdown   → react-markdown with GFM
  * DOCX       → mammoth.js DOCX-to-HTML (loaded dynamically)
- * XLSX       → xlsx/sheetjs rendered as a table (loaded dynamically)
+ * XLSX       → read-excel-file renders spreadsheets as interactive tables with sheet tabs
  * Images     → <img> with zoom controls
  * Code files → Monaco Editor (read-only)
  */
@@ -147,12 +147,19 @@ function DocxViewer({ url }: { url: string }) {
   );
 }
 
-interface SheetRow {
-  [key: string]: string | number | boolean | null;
+// read-excel-file returns rows as Cell[][] where Cell = string | number | boolean | Date | null
+type ExcelCell = string | number | boolean | Date | null;
+
+interface ParsedSheet {
+  name: string;
+  /** header row (first row) as strings */
+  headers: string[];
+  /** data rows, each row is a parallel array to headers */
+  rows: ExcelCell[][];
 }
 
 function XlsxViewer({ url }: { url: string }) {
-  const [sheets, setSheets] = useState<{ name: string; rows: SheetRow[] }[]>([]);
+  const [sheets, setSheets] = useState<ParsedSheet[]>([]);
   const [activeSheet, setActiveSheet] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -162,15 +169,39 @@ function XlsxViewer({ url }: { url: string }) {
     (async () => {
       try {
         const buf = await fetchBuffer(url);
-        const XLSX = await import("xlsx");
-        const workbook = XLSX.read(new Uint8Array(buf), { type: "array" });
-        const parsed = workbook.SheetNames.map((name) => ({
-          name,
-          rows: XLSX.utils.sheet_to_json<SheetRow>(workbook.Sheets[name], { defval: null }),
-        }));
-        if (!cancelled) { setSheets(parsed); setLoading(false); }
+        // Dynamic import — read-excel-file works natively in the browser with ArrayBuffer
+        const readXlsxFile = (await import("read-excel-file")).default as (
+          input: ArrayBuffer,
+          opts: { sheet: number },
+        ) => Promise<ExcelCell[][]>;
+
+        // read-excel-file doesn't expose sheet names from ArrayBuffer in its base API,
+        // so we read sheet 1 first and detect multiple sheets by trying until it throws.
+        const parsed: ParsedSheet[] = [];
+        let sheetIndex = 1;
+        while (sheetIndex <= 50) {
+          try {
+            const rawRows: ExcelCell[][] = await readXlsxFile(buf, { sheet: sheetIndex });
+            if (rawRows.length === 0) { sheetIndex++; continue; }
+            const headerRow = rawRows[0].map((c) => (c === null ? "" : String(c)));
+            const dataRows = rawRows.slice(1);
+            parsed.push({ name: `Sheet ${sheetIndex}`, headers: headerRow, rows: dataRows });
+            sheetIndex++;
+          } catch {
+            // No more sheets
+            break;
+          }
+        }
+
+        if (!cancelled) {
+          setSheets(parsed.length > 0 ? parsed : [{ name: "Sheet 1", headers: [], rows: [] }]);
+          setLoading(false);
+        }
       } catch (e) {
-        if (!cancelled) { setError(e instanceof Error ? e.message : "Failed to render spreadsheet"); setLoading(false); }
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to render spreadsheet");
+          setLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -181,7 +212,12 @@ function XlsxViewer({ url }: { url: string }) {
   if (!sheets.length) return <ErrorState message="Empty spreadsheet" />;
 
   const current = sheets[activeSheet];
-  const columns = current.rows.length > 0 ? Object.keys(current.rows[0]) : [];
+
+  function cellValue(cell: ExcelCell): string {
+    if (cell === null || cell === undefined) return "";
+    if (cell instanceof Date) return cell.toLocaleDateString();
+    return String(cell);
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -208,12 +244,12 @@ function XlsxViewer({ url }: { url: string }) {
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-default-100 sticky top-0">
-              {columns.map((col) => (
+              {current.headers.map((col, ci) => (
                 <th
-                  key={col}
+                  key={ci}
                   className="px-3 py-2 text-left font-semibold text-default-600 border border-divider whitespace-nowrap"
                 >
-                  {col}
+                  {col || `Column ${ci + 1}`}
                 </th>
               ))}
             </tr>
@@ -221,9 +257,9 @@ function XlsxViewer({ url }: { url: string }) {
           <tbody>
             {current.rows.map((row, ri) => (
               <tr key={ri} className={ri % 2 === 0 ? "bg-content1" : "bg-default-50"}>
-                {columns.map((col) => (
-                  <td key={col} className="px-3 py-1.5 border border-divider text-default-700 whitespace-nowrap max-w-xs truncate">
-                    {row[col] === null || row[col] === undefined ? "" : String(row[col])}
+                {current.headers.map((_col, ci) => (
+                  <td key={ci} className="px-3 py-1.5 border border-divider text-default-700 whitespace-nowrap max-w-xs truncate">
+                    {cellValue(row[ci] ?? null)}
                   </td>
                 ))}
               </tr>
