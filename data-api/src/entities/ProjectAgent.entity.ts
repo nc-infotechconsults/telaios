@@ -17,7 +17,9 @@ export type AgentRole =
   | "reviewer"
   | "tester"
   | "infra"
-  | "knowledge";
+  | "knowledge"
+  | "custom"
+  | "document-copilot";
 
 /**
  * Junction entity — assigns an AgentProfile to a Project with a specific role.

@@ -333,6 +333,9 @@ export const testLlm = (data: { provider: string; model: string; apiKey?: string
 export const listDocuments = (projectId: string): Promise<Document[]> =>
   DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents`).then((r) => r.data);
 
+export const getDocument = (projectId: string, documentId: string): Promise<Document> =>
+  http.get<Document>(`/projects/${projectId}/documents/${documentId}`).then((r) => r.data);
+
 export const uploadDocument = (projectId: string, file: File): Promise<Document> => {
   if (DEMO) {
     return delay<Document>({
@@ -609,3 +612,32 @@ export const uninstallHelmRelease = (envId: string, releaseName: string): Promis
 export const scanProjectCharts = (envId: string): Promise<Array<{ name: string; version: string; description: string; localPath?: string }>> =>
   http.get(`/environments/${envId}/helm/charts/scan`).then((r) => r.data as Array<{ name: string; version: string; description: string; localPath?: string }>);
 
+
+// ─── Document Copilot ─────────────────────────────────────────────────────────
+
+export interface CopilotSummarizeResult {
+  summary: string;
+  key_points: string[];
+  word_count: number;
+}
+
+export interface CopilotAskResult {
+  answer: string;
+  confidence: number;
+  sources: string[];
+}
+
+export interface CopilotExtractResult {
+  entities: Record<string, unknown>;
+  tables: Array<Record<string, unknown>>;
+  key_values: Record<string, string>;
+}
+
+export const copilotSummarize = (projectId: string, documentId: string): Promise<CopilotSummarizeResult> =>
+  http.post<CopilotSummarizeResult>(`/projects/${projectId}/documents/${documentId}/copilot/summarize`).then((r) => r.data);
+
+export const copilotAsk = (projectId: string, documentId: string, question: string): Promise<CopilotAskResult> =>
+  http.post<CopilotAskResult>(`/projects/${projectId}/documents/${documentId}/copilot/ask`, { question }).then((r) => r.data);
+
+export const copilotExtract = (projectId: string, documentId: string): Promise<CopilotExtractResult> =>
+  http.post<CopilotExtractResult>(`/projects/${projectId}/documents/${documentId}/copilot/extract`).then((r) => r.data);

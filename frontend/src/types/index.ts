@@ -216,7 +216,9 @@ export type AgentRole =
   | "reviewer"
   | "tester"
   | "infra"
-  | "knowledge";
+  | "knowledge"
+  | "custom"
+  | "document-copilot";
 
 export interface ProjectAgent {
   id: string;

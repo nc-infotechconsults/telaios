@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_service.api.chat import router as chat_router
 from agent_service.api.documents import router as documents_router
+from agent_service.api.document_copilot import router as document_copilot_router
 from agent_service.api.health import router as health_router
 from agent_service.api.plans import router as plans_router
 from agent_service.config import config
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(chat_router)
     app.include_router(documents_router)
+    app.include_router(document_copilot_router)
     app.include_router(plans_router)
 
     @app.on_event("startup")
