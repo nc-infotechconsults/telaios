@@ -12,6 +12,18 @@ router.get(
   documentController.listDocuments,
 );
 
+router.get(
+  "/:projectId/documents/trash",
+  requireProjectAccess("viewer"),
+  documentController.listTrash,
+);
+
+router.get(
+  "/:projectId/documents/search",
+  requireProjectAccess("viewer"),
+  documentController.searchDocuments,
+);
+
 router.post(
   "/:projectId/documents",
   requireProjectAccess("editor"),
@@ -41,6 +53,12 @@ router.delete(
   "/:projectId/documents/:id",
   requireProjectAccess("editor"),
   documentController.deleteDocument,
+);
+
+router.post(
+  "/:projectId/documents/:id/restore",
+  requireProjectAccess("editor"),
+  documentController.restoreDocument,
 );
 
 export default router;
