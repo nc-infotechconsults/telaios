@@ -291,7 +291,7 @@ function CodeViewer({ url, fileName }: { url: string; fileName: string }) {
     fetchText(url).then(setText).catch((e: Error) => setError(e.message));
     import("@monaco-editor/react").then((mod) => {
       setMonaco(() => mod.default as MonacoEditorComponent);
-    }).catch(() => {});
+    }).catch((e: Error) => setError(`Failed to load editor: ${e.message}`));
   }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) return <ErrorState message={error} />;

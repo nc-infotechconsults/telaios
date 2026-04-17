@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import { updateDocumentContent } from "../../lib/api";
-import { showToast } from "../../lib/toast";
+import { toast } from "../../lib/toast";
 
 const EDITABLE_TYPES = new Set(["md", "txt", "csv", "json"]);
 
@@ -93,10 +93,10 @@ export default function DocumentEditor({ url, fileType, projectId, documentId, o
     try {
       await updateDocumentContent(projectId, documentId, content);
       setOriginal(content);
-      showToast("Document saved", "success");
+      toast.success("Document saved");
       onSaved?.();
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Save failed", "error");
+      toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
     }
