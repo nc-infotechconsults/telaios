@@ -117,8 +117,6 @@ export default function EnvironmentTab({ projectId }: Props) {
     );
   }
 
-  const expandedEnv = environments.find((e) => e.id === expandedEnvId);
-
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
@@ -166,7 +164,7 @@ export default function EnvironmentTab({ projectId }: Props) {
                     size="sm"
                     variant="flat"
                     isLoading={testingId === env.id}
-                    onPress={(e) => {
+                    onPress={() => {
                       handleTest(env);
                     }}
                   >
@@ -180,7 +178,7 @@ export default function EnvironmentTab({ projectId }: Props) {
                     size="sm"
                     variant="light"
                     aria-label={`Edit ${env.name}`}
-                    onPress={(e) => {
+                    onPress={() => {
                       setEnvToEdit(env);
                       onEditOpen();
                     }}
@@ -198,7 +196,7 @@ export default function EnvironmentTab({ projectId }: Props) {
                     variant="light"
                     color="danger"
                     aria-label={`Delete environment: ${env.name}`}
-                    onPress={(e) => {
+                    onPress={() => {
                       setEnvToDelete(env);
                       onDeleteOpen();
                     }}

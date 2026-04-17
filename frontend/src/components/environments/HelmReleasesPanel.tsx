@@ -28,7 +28,7 @@ const RELEASE_STATUS_COLOR: Record<string, "success" | "warning" | "danger" | "d
   uninstalled: "default",
 };
 
-export default function HelmReleasesPanel({ environmentId, projectId }: Props) {
+export default function HelmReleasesPanel({ environmentId }: Props) {
   const [releases, setReleases] = useState<HelmRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [releaseToUninstall, setReleaseToUninstall] = useState<HelmRelease | null>(null);

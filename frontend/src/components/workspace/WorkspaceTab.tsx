@@ -13,7 +13,6 @@ import {
 } from "@heroui/react";
 import {
   listWorkspaces,
-  getWorkspace,
   launchWorkspace,
   deleteWorkspace,
 } from "../../lib/api";

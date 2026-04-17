@@ -7,7 +7,6 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Spinner,
   Textarea,
 } from "@heroui/react";
 import { installHelmChart, scanProjectCharts } from "../../lib/api";

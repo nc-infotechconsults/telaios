@@ -109,7 +109,6 @@ export default function ResourceBrowser({ environmentId, defaultNamespace, envir
                 if (next) setNamespace(next);
               }}
               className="w-36"
-              allowsCustomValue
             >
               {[defaultNamespace ?? "default", "kube-system", "kube-public"].filter(Boolean).map((ns) => (
                 <SelectItem key={ns!}>{ns}</SelectItem>
@@ -161,7 +160,7 @@ export default function ResourceBrowser({ environmentId, defaultNamespace, envir
                   <Button
                     size="sm"
                     variant="flat"
-                    onPress={(e) => {
+                    onPress={() => {
                       setLogPod(res.name);
                     }}
                   >
