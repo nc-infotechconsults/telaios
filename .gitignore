@@ -7,3 +7,5 @@ thoughts
 # Playwright generated auth/data fixtures (CI runtime artefacts)
 frontend/e2e/fixtures/.auth.json
 frontend/e2e/fixtures/ci-data.json
+__pycache__
+*.egg-info

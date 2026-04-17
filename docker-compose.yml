@@ -71,7 +71,7 @@ services:
 
   agent-service:
     build:
-      context: ./agent-service-py
+      context: ./agent-service
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
