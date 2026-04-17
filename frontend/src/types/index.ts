@@ -174,6 +174,9 @@ export interface AgentProfile {
   llm_top_p?: number;
   llm_frequency_penalty?: number;
   llm_presence_penalty?: number;
+  system_prompt?: string | null;
+  system_prompt_mode?: "override" | "extend";
+  sub_agent_ids?: string[];
   mcp_servers: McpServer[];
   skills: Skill[];
   created_at: string;
@@ -216,7 +219,8 @@ export type AgentRole =
   | "reviewer"
   | "tester"
   | "infra"
-  | "knowledge";
+  | "knowledge"
+  | "custom";
 
 export interface ProjectAgent {
   id: string;

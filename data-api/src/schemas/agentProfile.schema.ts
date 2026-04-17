@@ -53,6 +53,14 @@ export const CreateAgentProfileSchema = z.object({
   github_token: z.string().optional(),
   mcp_servers: z.array(McpServerSchema).optional(),
   skills: z.array(SkillSchema).optional(),
+  system_prompt: z.string().nullable().optional(),
+  system_prompt_mode: z.enum(["override", "extend"]).optional(),
+  llm_temperature: z.number().min(0).max(2).nullable().optional(),
+  llm_max_tokens: z.number().int().positive().nullable().optional(),
+  llm_top_p: z.number().min(0).max(1).nullable().optional(),
+  llm_frequency_penalty: z.number().min(-2).max(2).nullable().optional(),
+  llm_presence_penalty: z.number().min(-2).max(2).nullable().optional(),
+  sub_agent_ids: z.array(z.string().uuid()).optional(),
 });
 
 export const PatchAgentProfileSchema = CreateAgentProfileSchema.partial();

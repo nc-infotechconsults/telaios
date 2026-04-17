@@ -132,9 +132,30 @@ async def _dispatch_tool(
 class LangGraphDriver:
     """LangGraph-based coding agent driver."""
 
-    def __init__(self, llm: BaseChatModel, skills: List[Skill]) -> None:
+    # Built-in coding system prompt used when no profile override is configured.
+    _BUILTIN_SYSTEM = (
+        "You are an expert software engineer. Complete the coding task below using the provided tools.\n\n"
+        "{workspace_block}"
+        "{task_block}"
+        "IMPORTANT RULES:\n"
+        "1. Use tools to implement the task (read files, run commands, write code).\n"
+        "2. Once you have written the necessary code changes, call the `finish` tool IMMEDIATELY with a summary.\n"
+        "3. Do NOT loop trying to verify or re-test your work. Write the code, then call `finish`.\n"
+        "4. If a tool returns an error, try once to fix it, then call `finish` with what you accomplished.\n"
+        "5. Aim to complete the task in at most 10 tool calls."
+    )
+
+    def __init__(
+        self,
+        llm: BaseChatModel,
+        skills: List[Skill],
+        system_prompt: Optional[str] = None,
+        system_prompt_mode: str = "override",
+    ) -> None:
         self._llm = llm
         self._skills = skills
+        self._system_prompt = system_prompt
+        self._system_prompt_mode = system_prompt_mode
         self._status: AgentStatus = "idle"
 
     async def get_status(self) -> AgentStatus:
@@ -155,22 +176,32 @@ class LangGraphDriver:
 
         bound_llm = self._llm.bind_tools(all_tools) if hasattr(self._llm, "bind_tools") else self._llm
 
-        system_prompt = (
-            "You are an expert software engineer. Complete the coding task below using the provided tools.\n\n"
+        workspace_block = (
             "Workspaces (name → path):\n"
             + (
                 "\n".join(f"  {n}: {p}" for n, p in workspaces.items())
                 if workspaces
                 else "  (no workspace cloned — write files to the current directory)"
             )
-            + f"\n\nTask: {task.title}\n{task.description}\n\n"
-            "IMPORTANT RULES:\n"
-            "1. Use tools to implement the task (read files, run commands, write code).\n"
-            "2. Once you have written the necessary code changes, call the `finish` tool IMMEDIATELY with a summary.\n"
-            "3. Do NOT loop trying to verify or re-test your work. Write the code, then call `finish`.\n"
-            "4. If a tool returns an error, try once to fix it, then call `finish` with what you accomplished.\n"
-            "5. Aim to complete the task in at most 10 tool calls."
+            + "\n\n"
         )
+        task_block = f"Task: {task.title}\n{task.description}\n\n"
+        builtin_prompt = self._BUILTIN_SYSTEM.format(
+            workspace_block=workspace_block,
+            task_block=task_block,
+        )
+
+        # Compose the effective system prompt using the profile's setting.
+        if self._system_prompt and self._system_prompt_mode == "override":
+            # Full replacement — still inject workspace/task context up front.
+            system_prompt = (
+                f"{workspace_block}{task_block}"
+                + self._system_prompt
+            )
+        elif self._system_prompt and self._system_prompt_mode == "extend":
+            system_prompt = builtin_prompt + "\n\n" + self._system_prompt
+        else:
+            system_prompt = builtin_prompt
 
         try:
             graph = self._build_graph(bound_llm, all_tools)

@@ -53,6 +53,7 @@ class Session:
         project_repositories: List[Dict[str, Any]],
         project_context: Optional[Dict[str, Any]],
         repo_tools: List[StructuredTool],
+        project_agents: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         self.plan_id = plan_id
         self.project_id = project_id
@@ -64,6 +65,7 @@ class Session:
         self.project_repositories = project_repositories
         self.project_context = project_context
         self.repo_tools = repo_tools
+        self.project_agents: List[Dict[str, Any]] = project_agents or []
 
 
 # In-memory session store keyed by plan_id
@@ -507,12 +509,13 @@ async def init_session(plan_id: str) -> None:
             repo_tools=[],
         )
         return
-    profiles, repos, existing_messages, existing_tasks, project_context = await asyncio.gather(
+    profiles, repos, existing_messages, existing_tasks, project_context, project_agents = await asyncio.gather(
         data_client.get_agent_profiles(),
         data_client.get_project_repositories(plan["project_id"]),
         data_client.get_plan_messages(plan_id),
         data_client.get_plan_tasks(plan_id),
         _gather_project_context(plan["project_id"], plan_id),
+        data_client.get_project_agents(plan["project_id"]),
     )
 
     is_first_visit = len(existing_messages) == 0
@@ -540,6 +543,7 @@ async def init_session(plan_id: str) -> None:
         project_repositories=repos,
         project_context=project_context,
         repo_tools=_build_repo_tools(repos, plan["project_id"]),
+        project_agents=project_agents,
     )
     _sessions[plan_id] = session
 
@@ -559,6 +563,31 @@ async def init_session(plan_id: str) -> None:
         sse_manager.broadcast(plan_id, {"type": "chat_end"})
 
 
+# ─── Planner profile helper ───────────────────────────────────────────────────
+
+def _find_planner_profile(session: Session) -> Optional[Dict[str, Any]]:
+    """
+    Return the raw agent-profile dict for the project's 'planner' role, or None.
+
+    Uses the project_agents list stored on the session (populated from the
+    data-api when the session is first created) to find the profile assigned to
+    the 'planner' role via exact role string matching.
+    """
+    profile_map = {p["id"]: p for p in session.agent_profiles}
+
+    for pa in session.project_agents:
+        if pa.get("role") == "planner":
+            profile_id = pa.get("agent_profile_id") or (pa.get("agent_profile") or {}).get("id")
+            if profile_id and profile_id in profile_map:
+                return profile_map[profile_id]
+            # profile may already be embedded
+            embedded = pa.get("agent_profile")
+            if embedded:
+                return embedded
+
+    return None
+
+
 # ─── User message handler ─────────────────────────────────────────────────────
 
 async def handle_user_message(plan_id: str, content: str) -> None:
@@ -566,12 +595,13 @@ async def handle_user_message(plan_id: str, content: str) -> None:
 
     if not session:
         plan = await data_client.get_plan(plan_id)
-        profiles, repos, existing_messages, existing_tasks, project_context = await asyncio.gather(
+        profiles, repos, existing_messages, existing_tasks, project_context, project_agents = await asyncio.gather(
             data_client.get_agent_profiles(),
             data_client.get_project_repositories(plan["project_id"]),
             data_client.get_plan_messages(plan_id),
             data_client.get_plan_tasks(plan_id),
             _gather_project_context(plan["project_id"], plan_id),
+            data_client.get_project_agents(plan["project_id"]),
         )
 
         is_in_review = plan["status"] == "draft" and len(existing_tasks) > 0
@@ -596,6 +626,7 @@ async def handle_user_message(plan_id: str, content: str) -> None:
             project_repositories=repos,
             project_context=project_context,
             repo_tools=_build_repo_tools(repos, plan["project_id"]),
+            project_agents=project_agents,
         )
         _sessions[plan_id] = session
 
@@ -613,22 +644,41 @@ async def handle_user_message(plan_id: str, content: str) -> None:
     sse_manager.broadcast(plan_id, {"type": "chat_thinking"})
 
     settings = await data_client.get_settings()
-    llm = build_chat_model(
-        provider=settings["llm_provider"],
-        model=settings["llm_model"],
-        api_key=settings.get("llm_api_key_raw") or "",
-        base_url=settings.get("llm_base_url"),
-    )
+
+    # Use the planner profile's LLM settings if one is assigned to this project.
+    planner_profile = _find_planner_profile(session)
+    if planner_profile:
+        from agent_service.crypto import decrypt as _decrypt
+        raw_key = planner_profile.get("llm_api_key", "")
+        api_key = _decrypt(raw_key) if raw_key else (settings.get("llm_api_key_raw") or "")
+        llm = build_chat_model(
+            provider=planner_profile.get("llm_provider") or settings["llm_provider"],
+            model=planner_profile.get("llm_model") or settings["llm_model"],
+            api_key=api_key,
+            base_url=planner_profile.get("llm_base_url") or settings.get("llm_base_url"),
+            temperature=planner_profile.get("llm_temperature"),
+            max_tokens=planner_profile.get("llm_max_tokens"),
+            top_p=planner_profile.get("llm_top_p"),
+            frequency_penalty=planner_profile.get("llm_frequency_penalty"),
+            presence_penalty=planner_profile.get("llm_presence_penalty"),
+        )
+    else:
+        llm = build_chat_model(
+            provider=settings["llm_provider"],
+            model=settings["llm_model"],
+            api_key=settings.get("llm_api_key_raw") or "",
+            base_url=settings.get("llm_base_url"),
+        )
 
     if session.phase == "interview":
-        await _run_interview(session, llm, plan_id)
+        await _run_interview(session, llm, plan_id, planner_profile)
     else:
-        await _run_review(session, llm, trimmed, plan_id)
+        await _run_review(session, llm, trimmed, plan_id, planner_profile)
 
 
 # ─── Interview phase ──────────────────────────────────────────────────────────
 
-async def _run_interview(session: Session, llm: Any, plan_id: str) -> None:
+async def _run_interview(session: Session, llm: Any, plan_id: str, planner_profile: Optional[Dict[str, Any]] = None) -> None:
     profiles_text = (
         "\n".join(
             f"- id:{p['id']} name:{p['name']} type:{p.get('agent_type','')} skills:[{','.join(s['name'] for s in p.get('skills',[]))}]"
@@ -660,7 +710,7 @@ async def _run_interview(session: Session, llm: Any, plan_id: str) -> None:
         else ""
     )
 
-    system_content = (
+    base_content = (
         BASE_SYSTEM
         + context_block
         + f"\n\nAvailable agent profiles:\n{profiles_text}"
@@ -671,6 +721,17 @@ async def _run_interview(session: Session, llm: Any, plan_id: str) -> None:
         "Set ready_for_plan to true only when you have enough information for a complete plan."
         + STRUCTURED_OUTPUT_INSTRUCTIONS
     )
+
+    # Apply planner profile system prompt if configured
+    if planner_profile and planner_profile.get("system_prompt"):
+        custom = planner_profile["system_prompt"]
+        mode = planner_profile.get("system_prompt_mode") or "override"
+        if mode == "override":
+            system_content = custom + STRUCTURED_OUTPUT_INSTRUCTIONS
+        else:
+            system_content = base_content + "\n\n" + custom
+    else:
+        system_content = base_content
 
     lc_messages = _build_message_list(session.messages, system_content)
     text = await _run_tool_loop(llm, session.repo_tools, lc_messages, plan_id)
@@ -713,7 +774,7 @@ async def _run_interview(session: Session, llm: Any, plan_id: str) -> None:
 
 # ─── Review phase ─────────────────────────────────────────────────────────────
 
-async def _run_review(session: Session, llm: Any, user_content: str, plan_id: str) -> None:
+async def _run_review(session: Session, llm: Any, user_content: str, plan_id: str, planner_profile: Optional[Dict[str, Any]] = None) -> None:
     lower = user_content.lower()
     is_confirm = (
         lower in ("confirm", "yes")
@@ -726,7 +787,7 @@ async def _run_review(session: Session, llm: Any, user_content: str, plan_id: st
     if is_confirm:
         await _confirm_plan(session, plan_id)
     else:
-        await _refine_plan(session, llm, plan_id)
+        await _refine_plan(session, llm, plan_id, planner_profile)
 
 
 async def _confirm_plan(session: Session, plan_id: str) -> None:
@@ -765,7 +826,7 @@ async def _confirm_plan(session: Session, plan_id: str) -> None:
     asyncio.create_task(start_execution(session.project_id, plan["id"]))
 
 
-async def _refine_plan(session: Session, llm: Any, plan_id: str) -> None:
+async def _refine_plan(session: Session, llm: Any, plan_id: str, planner_profile: Optional[Dict[str, Any]] = None) -> None:
     profiles_text = (
         "\n".join(
             f"- id:{p['id']} name:{p['name']} type:{p.get('agent_type','')}"
@@ -786,7 +847,7 @@ async def _refine_plan(session: Session, llm: Any, plan_id: str) -> None:
             session.project_context, session.plan_title
         )
 
-    system_content = (
+    base_system = (
         BASE_SYSTEM
         + context_block
         + "\n\nThe user wants to revise the current plan."
@@ -796,6 +857,17 @@ async def _refine_plan(session: Session, llm: Any, plan_id: str) -> None:
         + "\n\nApply the user's requested changes and return the updated plan. Always set ready_for_plan to true."
         + STRUCTURED_OUTPUT_INSTRUCTIONS
     )
+
+    # Apply planner profile system prompt if configured
+    if planner_profile and planner_profile.get("system_prompt"):
+        custom = planner_profile["system_prompt"]
+        mode = planner_profile.get("system_prompt_mode") or "override"
+        if mode == "override":
+            system_content = custom + STRUCTURED_OUTPUT_INSTRUCTIONS
+        else:
+            system_content = base_system + "\n\n" + custom
+    else:
+        system_content = base_system
 
     lc_messages = _build_message_list(session.messages, system_content)
     response = await llm.ainvoke(

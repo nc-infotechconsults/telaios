@@ -160,6 +160,12 @@ export default function AgentProfiles() {
                       {p.skills.length > 0 && (
                         <Chip size="sm" variant="bordered">⚡ {p.skills.length} skill{p.skills.length > 1 ? "s" : ""}</Chip>
                       )}
+                      {(p.sub_agent_ids?.length ?? 0) > 0 && (
+                        <Chip size="sm" variant="bordered" color="secondary">🤝 {p.sub_agent_ids!.length} sub</Chip>
+                      )}
+                      {p.system_prompt && (
+                        <Chip size="sm" variant="bordered" color="default" title={p.system_prompt}>💬 prompt</Chip>
+                      )}
                     </div>
                     <div className="flex gap-2 pt-1 border-t border-divider">
                       <Button size="sm" variant="light" className="flex-1" aria-label={`Edit ${p.name}`} onPress={() => handleEdit(p)}>Edit</Button>
@@ -191,6 +197,12 @@ export default function AgentProfiles() {
                     )}
                     {p.skills.length > 0 && (
                       <span className="text-xs text-default-400">⚡ {p.skills.length}</span>
+                    )}
+                    {(p.sub_agent_ids?.length ?? 0) > 0 && (
+                      <span className="text-xs text-default-400">🤝 {p.sub_agent_ids!.length}</span>
+                    )}
+                    {p.system_prompt && (
+                      <span className="text-xs text-default-400" title={p.system_prompt}>💬</span>
                     )}
                     <Chip size="sm" color={TYPE_COLOR[p.agent_type]} variant="flat">
                       {TYPE_LABEL[p.agent_type]}
@@ -243,6 +255,12 @@ export default function AgentProfiles() {
                         )}
                         {p.skills.length > 0 && (
                           <Chip size="sm" variant="bordered">⚡ {p.skills.length}</Chip>
+                        )}
+                        {(p.sub_agent_ids?.length ?? 0) > 0 && (
+                          <Chip size="sm" variant="bordered" color="secondary">🤝 {p.sub_agent_ids!.length}</Chip>
+                        )}
+                        {p.system_prompt && (
+                          <Chip size="sm" variant="bordered" title={p.system_prompt}>💬</Chip>
                         )}
                       </div>
                     </TableCell>

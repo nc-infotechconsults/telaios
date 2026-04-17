@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Button,
   Input,
@@ -11,7 +11,7 @@ import {
   CardBody,
   Chip,
 } from "@heroui/react";
-import { createAgentProfile, updateAgentProfile } from "../../lib/api";
+import { createAgentProfile, updateAgentProfile, getAgentProfiles } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { AgentProfile, McpServer, Skill, JsonSchemaProperty } from "../../types";
 
@@ -94,6 +94,15 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
   const [presPenalty, setPresPenalty] = useState(initialData?.llm_presence_penalty?.toString() ?? "");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // System prompt
+  const [systemPrompt, setSystemPrompt] = useState(initialData?.system_prompt ?? "");
+  const [systemPromptMode, setSystemPromptMode] = useState<"override" | "extend">(
+    initialData?.system_prompt_mode ?? "extend"
+  );
+
+  // Sub-agents
+  const [subAgentIds, setSubAgentIds] = useState<string[]>(initialData?.sub_agent_ids ?? []);
+
   // MCP Servers + their env entries (parallel array)
   const [mcpServers, setMcpServers] = useState<McpServer[]>(initialData?.mcp_servers ?? []);
   const [mcpEnvEntries, setMcpEnvEntries] = useState<EnvEntry[][]>(
@@ -110,8 +119,16 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
   );
   const [saving, setSaving] = useState(false);
 
+  // All profiles for sub-agent picker
+  const [allProfiles, setAllProfiles] = useState<AgentProfile[]>([]);
+
   const needsBaseUrl = ["ollama", "vllm", "lmstudio"].includes(llmProvider);
   const showPenalties = OPENAI_COMPAT.includes(llmProvider);
+
+  // Load all profiles for sub-agent picker
+  useEffect(() => {
+    getAgentProfiles().then(setAllProfiles).catch(() => {});
+  }, []);
 
   // ── MCP helpers ──────────────────────────────────────────────────────────────
 
@@ -226,6 +243,9 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         llm_top_p: topP ? parseFloat(topP) : undefined,
         llm_frequency_penalty: freqPenalty ? parseFloat(freqPenalty) : undefined,
         llm_presence_penalty: presPenalty ? parseFloat(presPenalty) : undefined,
+        system_prompt: systemPrompt.trim() || null,
+        system_prompt_mode: systemPromptMode,
+        sub_agent_ids: subAgentIds,
         mcp_servers: mcpServers,
         skills,
         ...(llmApiKey ? { llm_api_key_raw: llmApiKey } : {}),
@@ -478,6 +498,81 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
           )}
         </div>
       )}
+
+      {/* ── System Prompt ── */}
+      <Divider />
+      <div>
+        <p className="font-semibold text-sm">System Prompt</p>
+        <p className="text-[11px] text-default-400 mt-0.5">
+          Customise the agent's built-in instructions. Leave blank to use the default.
+        </p>
+      </div>
+      <Select
+        label="Mode"
+        selectedKeys={[systemPromptMode]}
+        onSelectionChange={(keys) => setSystemPromptMode(Array.from(keys)[0] as "override" | "extend")}
+        description={
+          systemPromptMode === "override"
+            ? "Fully replaces the built-in agent prompt."
+            : "Appended after the built-in agent prompt."
+        }
+      >
+        <SelectItem key="override">Override — replace built-in prompt</SelectItem>
+        <SelectItem key="extend">Extend — append to built-in prompt</SelectItem>
+      </Select>
+      <Textarea
+        label="System Prompt"
+        placeholder={systemPromptMode === "override" ? "You are a specialized agent that…" : "Additionally, you must…"}
+        value={systemPrompt}
+        onValueChange={setSystemPrompt}
+        minRows={4}
+        description={systemPrompt ? `${systemPrompt.length} characters` : "Optional. Markdown is supported."}
+      />
+
+      {/* ── Sub-agents ── */}
+      <Divider />
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-sm">Sub-agents</p>
+          <p className="text-[11px] text-default-400">Other agent profiles this agent may delegate to</p>
+        </div>
+      </div>
+      {subAgentIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {subAgentIds.map((id) => {
+            const profile = allProfiles.find((p) => p.id === id);
+            return (
+              <Chip
+                key={id}
+                size="sm"
+                variant="flat"
+                color="secondary"
+                onClose={() => setSubAgentIds((prev) => prev.filter((sid) => sid !== id))}
+              >
+                {profile?.name ?? id.slice(0, 8)}
+              </Chip>
+            );
+          })}
+        </div>
+      )}
+      {(() => {
+        const eligibleProfiles = allProfiles.filter((p) => p.id !== initialData?.id && !subAgentIds.includes(p.id));
+        return eligibleProfiles.length > 0 ? (
+          <Select
+            label="Add sub-agent"
+            placeholder="Select an agent profile…"
+            selectedKeys={[]}
+            onSelectionChange={(keys) => {
+              const picked = Array.from(keys)[0] as string;
+              if (picked && !subAgentIds.includes(picked)) {
+                setSubAgentIds((prev) => [...prev, picked]);
+              }
+            }}
+          >
+            {eligibleProfiles.map((p) => <SelectItem key={p.id}>{p.name}</SelectItem>)}
+          </Select>
+        ) : null;
+      })()}
 
       {/* ── MCP Servers ── */}
       <Divider />

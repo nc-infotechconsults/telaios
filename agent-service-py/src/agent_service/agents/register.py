@@ -5,6 +5,7 @@ from agent_service.agents.review.review_agent import ReviewAgent, ReviewAgentCon
 from agent_service.agents.testing.testing_agent import TestingAgent, TestingAgentConfig
 from agent_service.agents.knowledge.knowledge_agent import KnowledgeAgent, KnowledgeAgentConfig
 from agent_service.agents.infra.infra_agent import InfraAgent, InfraAgentConfig
+from agent_service.agents.configurable.configurable_agent import ConfigurableAgent, ConfigurableAgentConfig
 
 # Map from role string (from data-api) to registry type string.
 ROLE_TO_AGENT_TYPE: dict[str, str] = {
@@ -12,6 +13,7 @@ ROLE_TO_AGENT_TYPE: dict[str, str] = {
     "tester": "tester",
     "knowledge": "knowledge",
     "infra": "infra",
+    "custom": "custom",
     # "planner" and "coder" are handled by CodingAgentDriver (LangGraph / OpenCode / Copilot)
 }
 
@@ -40,4 +42,8 @@ def register_all_agents() -> None:
     registry.register(
         "infra",
         lambda id, cfg: InfraAgent(id, InfraAgentConfig(**(cfg or {}))),
+    )
+    registry.register(
+        "custom",
+        lambda id, cfg: ConfigurableAgent(id, ConfigurableAgentConfig(**(cfg or {}))),
     )
