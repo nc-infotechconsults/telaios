@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from agent_service.api.deps import ApiKeyDep
 from agent_service.services.execution_service import start_execution
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ class ResumeRequest(BaseModel):
 
 
 @router.post("/plans/{plan_id}/resume", status_code=202)
-async def resume_plan(plan_id: str, body: ResumeRequest) -> dict:
+async def resume_plan(plan_id: str, body: ResumeRequest, _auth: ApiKeyDep) -> dict:
     """
     Resume / start execution for a confirmed plan.
 

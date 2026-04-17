@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     DATA_API_URL: str = "http://localhost:3000"
     DATA_API_KEY: str = ""
     REDIS_URL: str = "redis://localhost:6379"
-    ENCRYPTION_KEY: str = "default-key-change-in-production!"
+    ENCRYPTION_KEY: str = ""
+    # Comma-separated list of allowed frontend origins for CORS.
+    # Example: "http://localhost:5173,https://app.example.com"
+    ALLOWED_ORIGINS: str = ""
     WORKSPACES_ROOT: str = "/tmp/swe-ai-workspaces"
     AGENT_POOL_SIZE: int = 3
     LLM_PROVIDER: str = "openai"

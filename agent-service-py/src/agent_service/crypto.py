@@ -7,7 +7,10 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 
 # Derive a 32-byte AES key using scrypt — same parameters as the TypeScript service.
-_KEY_SOURCE = os.environ.get("ENCRYPTION_KEY", "default-key-change-in-production!").encode()
+_encryption_key = os.environ.get("ENCRYPTION_KEY")
+if not _encryption_key:
+    raise RuntimeError("ENCRYPTION_KEY environment variable is required")
+_KEY_SOURCE = _encryption_key.encode()
 _KEY = scrypt(_KEY_SOURCE, salt=b"salt", n=16384, r=8, p=1, dklen=32)
 
 

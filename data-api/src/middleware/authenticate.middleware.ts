@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { timingSafeEqual } from "crypto";
 import { verifyToken, getUserById } from "../services/auth.service";
 import type { User } from "../entities/User.entity";
 
@@ -21,15 +22,19 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   const token = authHeader.slice(7);
 
   // Service-to-service internal key bypass
-  if (INTERNAL_API_KEY && token === INTERNAL_API_KEY) {
-    req.user = {
-      id: "service",
-      email: "service@internal",
-      display_name: "Internal Service",
-      system_role: "admin",
-      is_active: true,
-    } as User;
-    return next();
+  if (INTERNAL_API_KEY) {
+    const a = Buffer.from(token);
+    const b = Buffer.from(INTERNAL_API_KEY);
+    if (a.length === b.length && timingSafeEqual(a, b)) {
+      req.user = {
+        id: "service",
+        email: "service@internal",
+        display_name: "Internal Service",
+        system_role: "admin",
+        is_active: true,
+      } as User;
+      return next();
+    }
   }
 
   try {

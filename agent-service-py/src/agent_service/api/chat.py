@@ -4,10 +4,11 @@ import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Body, HTTPException, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from agent_service.api.deps import ApiKeyDep
 from agent_service.services import sse_manager
 from agent_service.services.planning_service import handle_user_message, init_session
 
@@ -19,7 +20,7 @@ HEARTBEAT_INTERVAL = 20  # seconds
 
 
 @router.get("/chat/{plan_id}/stream")
-async def chat_stream(plan_id: str, request: Request) -> StreamingResponse:
+async def chat_stream(plan_id: str, request: Request, _auth: ApiKeyDep) -> StreamingResponse:
     """
     SSE stream for a planning session.
 
@@ -64,7 +65,7 @@ class MessageRequest(BaseModel):
 
 
 @router.post("/chat/{plan_id}/message", status_code=202)
-async def send_message(plan_id: str, body: MessageRequest) -> dict:
+async def send_message(plan_id: str, body: MessageRequest, _auth: ApiKeyDep) -> dict:
     """
     Send a user message to the planning session.
     Returns 202 Accepted immediately; processing happens asynchronously.

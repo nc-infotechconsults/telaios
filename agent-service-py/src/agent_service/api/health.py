@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from agent_service.api.deps import ApiKeyDep
+
 router = APIRouter()
 
 
@@ -12,7 +14,7 @@ async def health() -> JSONResponse:
 
 
 @router.post("/test-llm")
-async def test_llm() -> JSONResponse:
+async def test_llm(_auth: ApiKeyDep) -> JSONResponse:
     """
     Quick connectivity test for the configured LLM.
     Returns the model's response to a trivial prompt.

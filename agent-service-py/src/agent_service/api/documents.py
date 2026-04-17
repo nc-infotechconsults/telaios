@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from agent_service.api.deps import ApiKeyDep
 from agent_service.services.document_processor import process_document
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ class ProcessRequest(BaseModel):
 
 
 @router.post("/documents/{document_id}/process", status_code=202)
-async def process_document_endpoint(document_id: str, body: ProcessRequest) -> dict:
+async def process_document_endpoint(document_id: str, body: ProcessRequest, _auth: ApiKeyDep) -> dict:
     """
     Trigger asynchronous document processing.
 

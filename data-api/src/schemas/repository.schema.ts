@@ -5,8 +5,17 @@ export const RepositoryStatusSchema = z.enum(["unconfigured", "cloning", "ready"
 
 export const RepositorySourceTypeSchema = z.enum(["remote", "local"]);
 
+// Restrict name to safe filesystem characters — prevents path traversal when
+// directory names are derived from this field (e.g. /workspaces/<project>/<name>).
+const safeNameRegex = /^[a-zA-Z0-9_.-]+$/;
+const safeName = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(safeNameRegex, "Name may only contain letters, digits, hyphens, underscores, and dots");
+
 export const CreateRepositorySchema = z.object({
-  name: z.string().min(1),
+  name: safeName,
   source_type: RepositorySourceTypeSchema.optional(),
   remote_url: z.string().optional(),
   branch: z.string().optional(),
@@ -16,7 +25,7 @@ export const CreateRepositorySchema = z.object({
 });
 
 export const PatchRepositorySchema = z.object({
-  name: z.string().min(1).optional(),
+  name: safeName.optional(),
   source_type: RepositorySourceTypeSchema.optional(),
   remote_url: z.string().optional(),
   branch: z.string().optional(),
