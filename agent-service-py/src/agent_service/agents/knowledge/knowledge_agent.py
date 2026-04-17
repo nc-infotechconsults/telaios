@@ -22,7 +22,26 @@ class KnowledgeAgentConfig(BaseModel):
     llmModel: str = "gpt-4o"
     llmApiKey: str = ""
     llmBaseUrl: Optional[str] = None
+    llmTemperature: Optional[float] = None
+    llmMaxTokens: Optional[int] = None
+    llmTopP: Optional[float] = None
+    llmFrequencyPenalty: Optional[float] = None
+    llmPresencePenalty: Optional[float] = None
+    systemPrompt: Optional[str] = None
+    systemPromptMode: str = "override"  # "override" | "extend"
+    mcpServers: List[dict] = []
+    skills: List[dict] = []
+    subAgentIds: List[str] = []
     maxContextFiles: int = 10
+
+
+def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
+    """Return the effective system prompt based on mode and user-supplied prompt."""
+    if not custom:
+        return builtin
+    if mode == "override":
+        return custom
+    return f"{builtin}\n\n{custom}"
 
 
 KNOWLEDGE_SYSTEM_PROMPT = """\
@@ -54,6 +73,11 @@ class KnowledgeAgent(BaseAgent):
             model=self._config.llmModel,
             api_key=self._config.llmApiKey,
             base_url=self._config.llmBaseUrl,
+            temperature=self._config.llmTemperature,
+            max_tokens=self._config.llmMaxTokens,
+            top_p=self._config.llmTopP,
+            frequency_penalty=self._config.llmFrequencyPenalty,
+            presence_penalty=self._config.llmPresencePenalty,
         )
 
     async def on_execute(self, ctx: AgentContext) -> None:
@@ -100,7 +124,7 @@ class KnowledgeAgent(BaseAgent):
         context_block = "\n\n".join(parts) if parts else "No relevant context found."
 
         response = await self._llm.ainvoke([
-            SystemMessage(content=KNOWLEDGE_SYSTEM_PROMPT),
+            SystemMessage(content=_compose_prompt(KNOWLEDGE_SYSTEM_PROMPT, self._config.systemPrompt, self._config.systemPromptMode)),
             HumanMessage(content=f"Question: {query}\n\nRelevant context:\n\n{context_block}"),
         ])
         content = response.content if isinstance(response.content, str) else json.dumps(response.content)

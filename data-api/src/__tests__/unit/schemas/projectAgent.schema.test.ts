@@ -10,7 +10,7 @@ describe("AssignAgentSchema", () => {
   });
 
   it("accepts all valid role values", () => {
-    const roles = ["planner", "coder", "reviewer", "tester", "infra", "knowledge"];
+    const roles = ["planner", "coder", "reviewer", "tester", "infra", "knowledge", "custom"];
     for (const role of roles) {
       const result = AssignAgentSchema.safeParse({
         agent_profile_id: "550e8400-e29b-41d4-a716-446655440000",

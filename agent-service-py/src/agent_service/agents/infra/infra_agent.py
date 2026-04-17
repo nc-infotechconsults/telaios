@@ -25,8 +25,27 @@ class InfraAgentConfig(BaseModel):
     llmModel: str = "gpt-4o"
     llmApiKey: str = ""
     llmBaseUrl: Optional[str] = None
+    llmTemperature: Optional[float] = None
+    llmMaxTokens: Optional[int] = None
+    llmTopP: Optional[float] = None
+    llmFrequencyPenalty: Optional[float] = None
+    llmPresencePenalty: Optional[float] = None
+    systemPrompt: Optional[str] = None
+    systemPromptMode: str = "override"  # "override" | "extend"
+    mcpServers: List[dict] = []
+    skills: List[dict] = []
+    subAgentIds: List[str] = []
     target: Literal["docker", "docker-compose", "kubernetes", "ci-github-actions", "ci-gitlab", "all"] = "all"
     port: int = 3000
+
+
+def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
+    """Return the effective system prompt based on mode and user-supplied prompt."""
+    if not custom:
+        return builtin
+    if mode == "override":
+        return custom
+    return f"{builtin}\n\n{custom}"
 
 
 class InfraAgent(BaseAgent):
@@ -41,6 +60,11 @@ class InfraAgent(BaseAgent):
             model=self._config.llmModel,
             api_key=self._config.llmApiKey,
             base_url=self._config.llmBaseUrl,
+            temperature=self._config.llmTemperature,
+            max_tokens=self._config.llmMaxTokens,
+            top_p=self._config.llmTopP,
+            frequency_penalty=self._config.llmFrequencyPenalty,
+            presence_penalty=self._config.llmPresencePenalty,
         )
 
     async def on_execute(self, ctx: AgentContext) -> None:
@@ -63,7 +87,7 @@ class InfraAgent(BaseAgent):
             templates: list[InfraTemplate] = []
             try:
                 response = await self._llm.ainvoke([
-                    SystemMessage(content=prompt),
+                    SystemMessage(content=_compose_prompt(prompt, self._config.systemPrompt, self._config.systemPromptMode)),
                     HumanMessage(
                         content=(
                             f"Generate infrastructure files for the {stack} project in repository: {repo_name}. "

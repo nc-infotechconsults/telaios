@@ -20,6 +20,26 @@ class ReviewAgentConfig(BaseModel):
     llmModel: str = "gpt-4o"
     llmApiKey: str = ""
     llmBaseUrl: Optional[str] = None
+    llmTemperature: Optional[float] = None
+    llmMaxTokens: Optional[int] = None
+    llmTopP: Optional[float] = None
+    llmFrequencyPenalty: Optional[float] = None
+    llmPresencePenalty: Optional[float] = None
+    systemPrompt: Optional[str] = None
+    systemPromptMode: str = "override"  # "override" | "extend"
+    mcpServers: List[dict] = []
+    skills: List[dict] = []
+    subAgentIds: List[str] = []
+
+
+def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
+    """Return the effective system prompt based on mode and user-supplied prompt."""
+    if not custom:
+        return builtin
+    if mode == "override":
+        return custom
+    # "extend": append user prompt after the built-in one
+    return f"{builtin}\n\n{custom}"
 
 
 REVIEW_SYSTEM_PROMPT = """\
@@ -60,6 +80,11 @@ class ReviewAgent(BaseAgent):
             model=self._config.llmModel,
             api_key=self._config.llmApiKey,
             base_url=self._config.llmBaseUrl,
+            temperature=self._config.llmTemperature,
+            max_tokens=self._config.llmMaxTokens,
+            top_p=self._config.llmTopP,
+            frequency_penalty=self._config.llmFrequencyPenalty,
+            presence_penalty=self._config.llmPresencePenalty,
         )
 
     async def on_execute(self, ctx: AgentContext) -> None:
@@ -116,7 +141,7 @@ class ReviewAgent(BaseAgent):
         task_desc = ctx.task.description if ctx.task else "Review the following code changes."
 
         response = await self._llm.ainvoke([
-            SystemMessage(content=REVIEW_SYSTEM_PROMPT),
+            SystemMessage(content=_compose_prompt(REVIEW_SYSTEM_PROMPT, self._config.systemPrompt, self._config.systemPromptMode)),
             HumanMessage(content=f"Task context: {task_desc}\n\nCode changes to review:\n\n{diff_for_llm}"),
         ])
         content = response.content if isinstance(response.content, str) else json.dumps(response.content)

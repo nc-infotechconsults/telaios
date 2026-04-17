@@ -11,6 +11,8 @@ src/agent_service.egg-info/requires.txt
 src/agent_service.egg-info/top_level.txt
 src/agent_service/agents/__init__.py
 src/agent_service/agents/register.py
+src/agent_service/agents/configurable/__init__.py
+src/agent_service/agents/configurable/configurable_agent.py
 src/agent_service/agents/coordinator/__init__.py
 src/agent_service/agents/coordinator/pool.py
 src/agent_service/agents/coordinator/scheduler.py

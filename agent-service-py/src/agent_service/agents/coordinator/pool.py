@@ -27,6 +27,15 @@ class AgentProfileConfig:
     github_token: Optional[str] = None
     mcp_servers: List[McpServer] = field(default_factory=list)
     skills: List[Skill] = field(default_factory=list)
+    # ── Configurable agent fields ─────────────────────────────────────────────
+    system_prompt: Optional[str] = None
+    system_prompt_mode: str = "override"  # "override" | "extend"
+    llm_temperature: Optional[float] = None
+    llm_max_tokens: Optional[int] = None
+    llm_top_p: Optional[float] = None
+    llm_frequency_penalty: Optional[float] = None
+    llm_presence_penalty: Optional[float] = None
+    sub_agent_ids: List[str] = field(default_factory=list)
 
 
 class AgentPool:
@@ -57,6 +66,14 @@ class AgentPool:
                 github_token=github_token,
                 mcp_servers=mcp_servers,
                 skills=skills,
+                system_prompt=profile.get("system_prompt"),
+                system_prompt_mode=profile.get("system_prompt_mode") or "override",
+                llm_temperature=profile.get("llm_temperature"),
+                llm_max_tokens=profile.get("llm_max_tokens"),
+                llm_top_p=profile.get("llm_top_p"),
+                llm_frequency_penalty=profile.get("llm_frequency_penalty"),
+                llm_presence_penalty=profile.get("llm_presence_penalty"),
+                sub_agent_ids=profile.get("sub_agent_ids") or [],
             )
             driver = self._build_driver(p)
             self._drivers[p.id] = driver
@@ -80,8 +97,32 @@ class AgentPool:
             if not registry.has(agent_type):
                 continue
 
+            # Build per-profile config so agent picks up custom prompt & LLM params.
+            raw_profile = pa.get("agent_profile") or {}
+            api_key_raw = raw_profile.get("llm_api_key", "")
+            api_key = decrypt(api_key_raw) if api_key_raw else ""
+            mcp_servers = [McpServer(**s) for s in (raw_profile.get("mcp_servers") or [])]
+            skills = [Skill(**s) for s in (raw_profile.get("skills") or [])]
+
+            agent_cfg = {
+                "llmProvider": raw_profile.get("llm_provider", "openai"),
+                "llmModel": raw_profile.get("llm_model", "gpt-4o"),
+                "llmApiKey": api_key,
+                "llmBaseUrl": raw_profile.get("llm_base_url"),
+                "systemPrompt": raw_profile.get("system_prompt"),
+                "systemPromptMode": raw_profile.get("system_prompt_mode") or "override",
+                "llmTemperature": raw_profile.get("llm_temperature"),
+                "llmMaxTokens": raw_profile.get("llm_max_tokens"),
+                "llmTopP": raw_profile.get("llm_top_p"),
+                "llmFrequencyPenalty": raw_profile.get("llm_frequency_penalty"),
+                "llmPresencePenalty": raw_profile.get("llm_presence_penalty"),
+                "mcpServers": [s.model_dump() for s in mcp_servers],
+                "skills": [s.model_dump() for s in skills],
+                "subAgentIds": raw_profile.get("sub_agent_ids") or [],
+            }
+
             instance_id = f"{role}-{str(uuid.uuid4())[:8]}"
-            agent = registry.create(agent_type, instance_id)
+            agent = registry.create(agent_type, instance_id, agent_cfg)
             driver = BaseAgentDriver(agent, project_ctx)
             self._role_drivers[role] = driver
             self._drivers[pa.get("agent_profile_id", "")] = driver
@@ -118,5 +159,16 @@ class AgentPool:
             model=profile.llm_model,
             api_key=profile.llm_api_key,
             base_url=profile.llm_base_url,
+            temperature=profile.llm_temperature,
+            max_tokens=profile.llm_max_tokens,
+            top_p=profile.llm_top_p,
+            frequency_penalty=profile.llm_frequency_penalty,
+            presence_penalty=profile.llm_presence_penalty,
         )
-        return LangGraphDriver(llm=llm, skills=profile.skills)
+        return LangGraphDriver(
+            llm=llm,
+            skills=profile.skills,
+            system_prompt=profile.system_prompt,
+            system_prompt_mode=profile.system_prompt_mode,
+        )
+
