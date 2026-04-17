@@ -9,6 +9,9 @@ import { Message } from "../../entities/Message.entity";
 import { AgentProfile } from "../../entities/AgentProfile.entity";
 import { Document } from "../../entities/Document.entity";
 import type { DocumentFileType, DocumentStatus } from "../../entities/Document.entity";
+import { Workspace } from "../../entities/Workspace.entity";
+import { Environment } from "../../entities/Environment.entity";
+import { encrypt } from "../../utils/crypto.util";
 import bcrypt from "bcryptjs";
 
 export interface UserOpts {
@@ -100,5 +103,37 @@ export async function createTestDocument(
       status: opts.status ?? "ready",
       uploaded_by: opts.uploaded_by ?? null,
     }),
+  );
+}
+
+export async function createTestWorkspace(
+  projectId: string,
+  opts: { name?: string; createdBy?: string } = {},
+): Promise<Workspace> {
+  const repo = AppDataSource.getRepository(Workspace);
+  return repo.save(
+    repo.create({
+      project_id: projectId,
+      name: opts.name ?? "Test Workspace",
+      config: {},
+      created_by: opts.createdBy ?? null,
+    } as Partial<Workspace>),
+  );
+}
+
+export async function createTestEnvironment(
+  projectId: string,
+  opts: { name?: string; type?: "kubernetes" | "docker"; createdBy?: string } = {},
+): Promise<Environment> {
+  const repo = AppDataSource.getRepository(Environment);
+  const cfg = { type: opts.type ?? "kubernetes", kubeconfig: "dummy" };
+  return repo.save(
+    repo.create({
+      project_id: projectId,
+      name: opts.name ?? "Test Environment",
+      type: opts.type ?? "kubernetes",
+      connection_config: encrypt(JSON.stringify(cfg)),
+      created_by: opts.createdBy ?? null,
+    } as Partial<Environment>),
   );
 }
