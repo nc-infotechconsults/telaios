@@ -24,12 +24,15 @@ async function helm(...args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-/** Write values to a temp YAML file and return `["--values", filePath]` args. */
-async function valuesArgs(values: Record<string, unknown>): Promise<string[]> {
+/** Write values to a temp YAML file and return args and a cleanup callback. */
+async function valuesArgs(values: Record<string, unknown>): Promise<{ args: string[]; cleanup: () => Promise<void> }> {
   const tmpPath = path.join(os.tmpdir(), `helm-values-${randomUUID()}.yaml`);
   // Serialize as JSON (helm accepts JSON in --values files)
   await fs.writeFile(tmpPath, JSON.stringify(values), "utf-8");
-  return ["--values", tmpPath];
+  return {
+    args: ["--values", tmpPath],
+    cleanup: () => fs.unlink(tmpPath).catch(() => undefined),
+  };
 }
 
 export interface HelmChart {
@@ -95,8 +98,13 @@ export const HelmService = {
       args.push("--version", chartVersion);
     }
     if (values && Object.keys(values).length > 0) {
-      const vArgs = await valuesArgs(values);
+      const { args: vArgs, cleanup } = await valuesArgs(values);
       args.push(...vArgs);
+      try {
+        return await helm(...args);
+      } finally {
+        await cleanup();
+      }
     }
     return helm(...args);
   },
@@ -117,8 +125,13 @@ export const HelmService = {
       args.push("--version", chartVersion);
     }
     if (values && Object.keys(values).length > 0) {
-      const vArgs = await valuesArgs(values);
+      const { args: vArgs, cleanup } = await valuesArgs(values);
       args.push(...vArgs);
+      try {
+        return await helm(...args);
+      } finally {
+        await cleanup();
+      }
     }
     return helm(...args);
   },
