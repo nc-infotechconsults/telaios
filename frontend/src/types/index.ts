@@ -10,6 +10,7 @@ export interface User {
   updated_at: string;
 }
 
+export type ProjectRole = "owner" | "editor" | "viewer";
 export type ProjectStatus = "planning" | "executing" | "done";
 export type PlanStatus = "draft" | "confirmed" | "executing" | "completed" | "failed";
 export type TaskStatus = "pending" | "ready" | "in_progress" | "done" | "failed" | "cancelled" | "skipped";
@@ -25,6 +26,14 @@ export interface Project {
   description: string;
   status: ProjectStatus;
   created_at: string;
+}
+
+export interface ProjectMember {
+  user_id: string;
+  project_id: string;
+  role: ProjectRole;
+  joined_at: string;
+  user: Pick<User, "id" | "email" | "display_name">;
 }
 
 export interface Repository {
