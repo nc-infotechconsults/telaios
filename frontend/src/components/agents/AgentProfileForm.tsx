@@ -555,23 +555,24 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
           })}
         </div>
       )}
-      {allProfiles.filter((p) => p.id !== initialData?.id && !subAgentIds.includes(p.id)).length > 0 && (
-        <Select
-          label="Add sub-agent"
-          placeholder="Select an agent profile…"
-          selectedKeys={[]}
-          onSelectionChange={(keys) => {
-            const picked = Array.from(keys)[0] as string;
-            if (picked && !subAgentIds.includes(picked)) {
-              setSubAgentIds((prev) => [...prev, picked]);
-            }
-          }}
-        >
-          {allProfiles
-            .filter((p) => p.id !== initialData?.id && !subAgentIds.includes(p.id))
-            .map((p) => <SelectItem key={p.id}>{p.name}</SelectItem>)}
-        </Select>
-      )}
+      {(() => {
+        const eligibleProfiles = allProfiles.filter((p) => p.id !== initialData?.id && !subAgentIds.includes(p.id));
+        return eligibleProfiles.length > 0 ? (
+          <Select
+            label="Add sub-agent"
+            placeholder="Select an agent profile…"
+            selectedKeys={[]}
+            onSelectionChange={(keys) => {
+              const picked = Array.from(keys)[0] as string;
+              if (picked && !subAgentIds.includes(picked)) {
+                setSubAgentIds((prev) => [...prev, picked]);
+              }
+            }}
+          >
+            {eligibleProfiles.map((p) => <SelectItem key={p.id}>{p.name}</SelectItem>)}
+          </Select>
+        ) : null;
+      })()}
 
       {/* ── MCP Servers ── */}
       <Divider />

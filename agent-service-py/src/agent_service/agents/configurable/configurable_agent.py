@@ -180,8 +180,9 @@ class ConfigurableAgent(BaseAgent):
             # The skill doesn't implement real execution — it records that the
             # tool was called and returns a placeholder result that the LLM can
             # use to reason about what happened.
-            async def _skill_call(**kwargs: Any) -> str:
-                return f"Skill '{name}' invoked with args: {json.dumps(kwargs)}"
+            # Capture `name` by default argument to avoid closure-over-loop bug.
+            async def _skill_call(_name: str = name, **kwargs: Any) -> str:
+                return f"Skill '{_name}' invoked with args: {json.dumps(kwargs)}"
 
             tools.append(
                 StructuredTool.from_function(

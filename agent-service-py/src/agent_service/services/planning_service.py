@@ -53,6 +53,7 @@ class Session:
         project_repositories: List[Dict[str, Any]],
         project_context: Optional[Dict[str, Any]],
         repo_tools: List[StructuredTool],
+        project_agents: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         self.plan_id = plan_id
         self.project_id = project_id
@@ -64,6 +65,7 @@ class Session:
         self.project_repositories = project_repositories
         self.project_context = project_context
         self.repo_tools = repo_tools
+        self.project_agents: List[Dict[str, Any]] = project_agents or []
 
 
 # In-memory session store keyed by plan_id
@@ -507,12 +509,13 @@ async def init_session(plan_id: str) -> None:
             repo_tools=[],
         )
         return
-    profiles, repos, existing_messages, existing_tasks, project_context = await asyncio.gather(
+    profiles, repos, existing_messages, existing_tasks, project_context, project_agents = await asyncio.gather(
         data_client.get_agent_profiles(),
         data_client.get_project_repositories(plan["project_id"]),
         data_client.get_plan_messages(plan_id),
         data_client.get_plan_tasks(plan_id),
         _gather_project_context(plan["project_id"], plan_id),
+        data_client.get_project_agents(plan["project_id"]),
     )
 
     is_first_visit = len(existing_messages) == 0
@@ -540,6 +543,7 @@ async def init_session(plan_id: str) -> None:
         project_repositories=repos,
         project_context=project_context,
         repo_tools=_build_repo_tools(repos, plan["project_id"]),
+        project_agents=project_agents,
     )
     _sessions[plan_id] = session
 
@@ -565,20 +569,22 @@ def _find_planner_profile(session: Session) -> Optional[Dict[str, Any]]:
     """
     Return the raw agent-profile dict for the project's 'planner' role, or None.
 
-    ``session.agent_profiles`` is the flat list returned by
-    ``/internal/agent-profiles``; the actual planner assignment is embedded in
-    the plan project's project-agents list which is not currently stored in the
-    session.  We therefore do a best-effort lookup: any profile whose *name*
-    contains "planner" (case-insensitive) is treated as the planner profile
-    unless a matching profile is otherwise identified.
-
-    NOTE: A future improvement would be to store the planner project-agent
-    record in the session so we can match on role directly.
+    Uses the project_agents list stored on the session (populated from the
+    data-api when the session is first created) to find the profile assigned to
+    the 'planner' role via exact role string matching.
     """
-    # Quick look-up in agent_profiles for a profile explicitly named "planner"
-    for p in session.agent_profiles:
-        if "planner" in (p.get("name") or "").lower():
-            return p
+    profile_map = {p["id"]: p for p in session.agent_profiles}
+
+    for pa in session.project_agents:
+        if pa.get("role") == "planner":
+            profile_id = pa.get("agent_profile_id") or (pa.get("agent_profile") or {}).get("id")
+            if profile_id and profile_id in profile_map:
+                return profile_map[profile_id]
+            # profile may already be embedded
+            embedded = pa.get("agent_profile")
+            if embedded:
+                return embedded
+
     return None
 
 
@@ -589,12 +595,13 @@ async def handle_user_message(plan_id: str, content: str) -> None:
 
     if not session:
         plan = await data_client.get_plan(plan_id)
-        profiles, repos, existing_messages, existing_tasks, project_context = await asyncio.gather(
+        profiles, repos, existing_messages, existing_tasks, project_context, project_agents = await asyncio.gather(
             data_client.get_agent_profiles(),
             data_client.get_project_repositories(plan["project_id"]),
             data_client.get_plan_messages(plan_id),
             data_client.get_plan_tasks(plan_id),
             _gather_project_context(plan["project_id"], plan_id),
+            data_client.get_project_agents(plan["project_id"]),
         )
 
         is_in_review = plan["status"] == "draft" and len(existing_tasks) > 0
@@ -619,6 +626,7 @@ async def handle_user_message(plan_id: str, content: str) -> None:
             project_repositories=repos,
             project_context=project_context,
             repo_tools=_build_repo_tools(repos, plan["project_id"]),
+            project_agents=project_agents,
         )
         _sessions[plan_id] = session
 
