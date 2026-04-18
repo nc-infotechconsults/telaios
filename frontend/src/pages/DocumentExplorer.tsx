@@ -31,8 +31,13 @@ import FolderTree from "../components/documents/FolderTree";
 import DocumentGrid from "../components/documents/DocumentGrid";
 import DocumentPreviewPanel from "../components/documents/DocumentPreviewPanel";
 
-export default function DocumentExplorer() {
-  const { projectId } = useParams<{ projectId: string }>();
+interface Props {
+  projectId?: string;
+}
+
+export default function DocumentExplorer({ projectId: propProjectId }: Props = {}) {
+  const params = useParams<{ projectId: string }>();
+  const projectId = propProjectId ?? params.projectId;
   const navigate = useNavigate();
 
   const [folders, setFolders] = useState<DocumentFolder[]>([]);

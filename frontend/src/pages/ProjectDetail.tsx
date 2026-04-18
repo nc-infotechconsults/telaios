@@ -51,7 +51,7 @@ import type {
   User,
 } from "../types";
 import RepositorySetup from "../components/plan/RepositorySetup";
-import DocumentsTab from "../components/documents/DocumentsTab";
+import DocumentExplorer from "./DocumentExplorer";
 import ConfirmModal from "../components/common/ConfirmModal";
 import WorkspaceTab from "../components/workspace/WorkspaceTab";
 import EnvironmentTab from "../components/environments/EnvironmentTab";
@@ -452,11 +452,6 @@ export default function ProjectDetail() {
               + Add Member
             </Button>
           )}
-          {activeTab === "documents" && (
-            <Button size="sm" color="primary" onPress={() => document.getElementById("doc-upload-trigger")?.click()}>
-              + Upload
-            </Button>
-          )}
         </div>
       </div>
 
@@ -703,10 +698,10 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {/* Documents tab */}
+      {/* Documents tab — project-scoped explorer embedded inline */}
       {activeTab === "documents" && (
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          <DocumentsTab projectId={projectId ?? ""} />
+        <div className="flex-1 overflow-hidden">
+          <DocumentExplorer projectId={projectId ?? ""} />
         </div>
       )}
 
