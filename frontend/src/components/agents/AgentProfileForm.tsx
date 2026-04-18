@@ -866,7 +866,8 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         <p className="font-semibold text-sm">Structured Output</p>
         <p className="text-[11px] text-default-400 mt-0.5">
           Define a JSON Schema so the agent returns structured data instead of free-form text.
-          Uses the LLM&apos;s <code className="text-[10px]">response_format</code> / <code className="text-[10px]">with_structured_output</code>.
+          Uses the LLM&apos;s <code className="text-[10px]">with_structured_output</code>.
+          Supported by OpenAI, Anthropic, and compatible providers.
         </p>
       </div>
 
