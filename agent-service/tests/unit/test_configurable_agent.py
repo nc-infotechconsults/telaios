@@ -22,6 +22,7 @@ class TestConfigurableAgentConfig:
         assert cfg.mcpServers == []
         assert cfg.skills == []
         assert cfg.subAgentIds == []
+        assert cfg.structuredOutput is None
 
     def test_custom_values_accepted(self):
         cfg = ConfigurableAgentConfig(
@@ -129,3 +130,63 @@ class TestBuildSkillTools:
         assert len(tools) == 2
         names = {t.name for t in tools}
         assert names == {"tool_a", "tool_b"}
+
+
+class TestStructuredOutput:
+    def test_config_accepts_structured_output(self):
+        schema = {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "A summary"},
+                "score": {"type": "number", "description": "Score 0-100"},
+            },
+            "required": ["summary"],
+        }
+        cfg = ConfigurableAgentConfig(structuredOutput=schema)
+        assert cfg.structuredOutput == schema
+        assert cfg.structuredOutput["properties"]["summary"]["type"] == "string"
+
+    def test_format_structured_output_passthrough_when_disabled(self):
+        cfg = ConfigurableAgentConfig(structuredOutput=None)
+        agent = ConfigurableAgent("a", cfg)
+        assert agent._format_structured_output("hello world") == "hello world"
+
+    def test_format_structured_output_passes_valid_json(self):
+        schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }
+        cfg = ConfigurableAgentConfig(structuredOutput=schema)
+        agent = ConfigurableAgent("a", cfg)
+        result = agent._format_structured_output('{"name": "test"}')
+        assert result == '{"name": "test"}'
+
+    def test_format_structured_output_empty_string(self):
+        schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }
+        cfg = ConfigurableAgentConfig(structuredOutput=schema)
+        agent = ConfigurableAgent("a", cfg)
+        assert agent._format_structured_output("") == ""
+
+    def test_build_pydantic_model_from_schema(self):
+        schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "The name"},
+                "count": {"type": "integer", "description": "Count"},
+            },
+            "required": ["name"],
+        }
+        model = ConfigurableAgent._build_pydantic_model_from_schema(schema, "TestModel")
+        # Verify the model has the expected fields
+        assert "name" in model.model_fields
+        assert "count" in model.model_fields
+        # Required field
+        assert model.model_fields["name"].is_required()
+
+    def test_build_pydantic_model_empty_schema(self):
+        schema = {"type": "object", "properties": {}}
+        model = ConfigurableAgent._build_pydantic_model_from_schema(schema, "EmptyModel")
+        assert model is not None

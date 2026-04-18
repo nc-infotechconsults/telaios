@@ -28,6 +28,7 @@ def _make_raw_profile(**overrides) -> dict:
         "llm_frequency_penalty": None,
         "llm_presence_penalty": None,
         "sub_agent_ids": [],
+        "structured_output": None,
     }
     base.update(overrides)
     return base
@@ -50,6 +51,7 @@ class TestAgentProfileConfigDefaults:
         assert cfg.llm_frequency_penalty is None
         assert cfg.llm_presence_penalty is None
         assert cfg.sub_agent_ids == []
+        assert cfg.structured_output is None
 
     def test_custom_fields_stored(self):
         cfg = AgentProfileConfig(
@@ -66,6 +68,7 @@ class TestAgentProfileConfigDefaults:
             llm_frequency_penalty=0.1,
             llm_presence_penalty=-0.1,
             sub_agent_ids=["aaa-bbb-ccc"],
+            structured_output={"type": "object", "properties": {"name": {"type": "string"}}},
         )
         assert cfg.system_prompt == "You are custom."
         assert cfg.system_prompt_mode == "extend"
@@ -75,6 +78,8 @@ class TestAgentProfileConfigDefaults:
         assert cfg.llm_frequency_penalty == 0.1
         assert cfg.llm_presence_penalty == -0.1
         assert cfg.sub_agent_ids == ["aaa-bbb-ccc"]
+        assert cfg.structured_output is not None
+        assert cfg.structured_output["properties"]["name"]["type"] == "string"
 
 
 class TestAgentPoolInitialize:
@@ -230,3 +235,46 @@ class TestAgentPoolRegisterRoleDrivers:
             {},
         )
         assert pool.get_driver_by_role("custom") is not None
+
+
+class TestMcpServerSelectedTools:
+    def test_selected_tools_default_none(self):
+        s = McpServer(name="test", transport="stdio")
+        assert s.selected_tools is None
+
+    def test_selected_tools_set(self):
+        s = McpServer(name="test", transport="stdio", selected_tools=["read_file", "write_file"])
+        assert s.selected_tools == ["read_file", "write_file"]
+
+    def test_selected_tools_empty_list(self):
+        s = McpServer(name="test", transport="stdio", selected_tools=[])
+        assert s.selected_tools == []
+
+
+class TestStructuredOutputPoolInit:
+    def test_structured_output_passed_to_langgraph_driver(self):
+        pool = AgentPool()
+        schema = {
+            "type": "object",
+            "properties": {"summary": {"type": "string"}},
+            "required": ["summary"],
+        }
+        with patch("agent_service.agents.coordinator.pool.build_chat_model") as mock_llm:
+            mock_llm.return_value = MagicMock()
+            with patch("agent_service.agents.coordinator.pool.LangGraphDriver") as mock_lg:
+                mock_lg.return_value = MagicMock()
+                pool.initialize([_make_raw_profile(structured_output=schema)])
+
+        call_kwargs = mock_lg.call_args.kwargs
+        assert call_kwargs["structured_output"] == schema
+
+    def test_structured_output_none_by_default(self):
+        pool = AgentPool()
+        with patch("agent_service.agents.coordinator.pool.build_chat_model") as mock_llm:
+            mock_llm.return_value = MagicMock()
+            with patch("agent_service.agents.coordinator.pool.LangGraphDriver") as mock_lg:
+                mock_lg.return_value = MagicMock()
+                pool.initialize([_make_raw_profile()])
+
+        call_kwargs = mock_lg.call_args.kwargs
+        assert call_kwargs["structured_output"] is None
