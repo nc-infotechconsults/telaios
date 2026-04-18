@@ -518,7 +518,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
       <div>
         <p className="font-semibold text-sm">System Prompt</p>
         <p className="text-[11px] text-default-400 mt-0.5">
-          Customise the agent&apos;s built-in instructions. Leave blank to use the default.
+          Customize the agent&apos;s built-in instructions. Leave blank to use the default.
         </p>
       </div>
       <Select
@@ -984,7 +984,7 @@ function McpToolSelector({
 
       {!discovered && displayTools.length === 0 && !error && (
         <p className="text-[11px] text-default-400 italic">
-          {useAll ? "All tools from this server will be used." : ""} Click &quot;Discover Tools&quot; to see available tools and select specific ones.
+          {useAll && "All tools from this server will be used. "}Click &quot;Discover Tools&quot; to see available tools and select specific ones.
         </p>
       )}
 
