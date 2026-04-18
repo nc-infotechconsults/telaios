@@ -17,6 +17,8 @@ export interface McpServer {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  /** When set, only these tools are exposed to the agent; empty/undefined = all tools. */
+  selected_tools?: string[];
 }
 
 export interface JsonSchemaProperty {

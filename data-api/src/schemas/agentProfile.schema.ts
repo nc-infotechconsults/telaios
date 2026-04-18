@@ -10,6 +10,7 @@ const McpServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   url: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  selected_tools: z.array(z.string()).optional(),
 });
 
 const JsonSchemaPropertySchema: z.ZodType<Record<string, unknown>> = z.record(z.string(), z.unknown());

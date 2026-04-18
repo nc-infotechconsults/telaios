@@ -274,6 +274,15 @@ export const updateAgentProfile = (id: string, data: Partial<AgentProfile>): Pro
 export const deleteAgentProfile = (id: string): Promise<void> =>
   DEMO ? delay(undefined as unknown as void) : http.delete(`/agent-profiles/${id}`).then(() => undefined);
 
+export const discoverMcpTools = (
+  serverConfig: Partial<import("../types").McpServer>
+): Promise<string[]> =>
+  DEMO
+    ? delay(["read_file", "write_file", "list_directory"])
+    : http
+        .post<{ tools: string[] }>("/agent-profiles/mcp-discover", serverConfig)
+        .then((r) => r.data.tools ?? []);
+
 // ─── Project Agents ───────────────────────────────────────────────────────────
 
 export const listProjectAgents = (projectId: string): Promise<ProjectAgent[]> =>
