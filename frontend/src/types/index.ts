@@ -123,6 +123,8 @@ export interface McpServer {
   // streamable-http
   url?: string;
   headers?: Record<string, string>;
+  /** When set, only these tools are exposed to the agent; empty/undefined = all tools. */
+  selected_tools?: string[];
 }
 
 export interface JsonSchemaProperty {
@@ -177,6 +179,8 @@ export interface AgentProfile {
   system_prompt?: string | null;
   system_prompt_mode?: "override" | "extend";
   sub_agent_ids?: string[];
+  /** Optional JSON Schema for structured output — null means free-form text. */
+  structured_output?: JsonSchema | null;
   mcp_servers: McpServer[];
   skills: Skill[];
   created_at: string;

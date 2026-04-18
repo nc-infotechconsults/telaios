@@ -36,6 +36,7 @@ class AgentProfileConfig:
     llm_frequency_penalty: Optional[float] = None
     llm_presence_penalty: Optional[float] = None
     sub_agent_ids: List[str] = field(default_factory=list)
+    structured_output: Optional[Dict] = None
 
 
 class AgentPool:
@@ -74,6 +75,7 @@ class AgentPool:
                 llm_frequency_penalty=profile.get("llm_frequency_penalty"),
                 llm_presence_penalty=profile.get("llm_presence_penalty"),
                 sub_agent_ids=profile.get("sub_agent_ids") or [],
+                structured_output=profile.get("structured_output"),
             )
             driver = self._build_driver(p)
             self._drivers[p.id] = driver
@@ -119,6 +121,7 @@ class AgentPool:
                 "mcpServers": [s.model_dump() for s in mcp_servers],
                 "skills": [s.model_dump() for s in skills],
                 "subAgentIds": raw_profile.get("sub_agent_ids") or [],
+                "structuredOutput": raw_profile.get("structured_output"),
             }
 
             instance_id = f"{role}-{str(uuid.uuid4())[:8]}"
@@ -170,5 +173,6 @@ class AgentPool:
             skills=profile.skills,
             system_prompt=profile.system_prompt,
             system_prompt_mode=profile.system_prompt_mode,
+            structured_output=profile.structured_output,
         )
 

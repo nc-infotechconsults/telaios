@@ -22,6 +22,30 @@ from agent_service.agents.coordinator.drivers.base import (
 from agent_service.core.types import Skill
 
 
+def _build_pydantic_model_from_schema(schema: Dict, model_name: str = "DynamicModel"):
+    """Build a Pydantic model dynamically from a JSON Schema dict."""
+    from pydantic import create_model
+    from pydantic import Field as PydanticField
+
+    properties = schema.get("properties") or {}
+    required_fields = set(schema.get("required") or [])
+    type_map = {"string": str, "number": float, "integer": int, "boolean": bool}
+
+    field_defs: Dict[str, Any] = {}
+    for field_name, prop in properties.items():
+        type_str = prop.get("type", "string")
+        if isinstance(type_str, list):
+            type_str = type_str[0]
+        annotation = type_map.get(type_str, str)
+        default = ... if field_name in required_fields else None
+        field_defs[field_name] = (
+            Optional[annotation] if default is None else annotation,
+            PydanticField(default, description=prop.get("description", "")),
+        )
+
+    return create_model(model_name, **field_defs) if field_defs else create_model(model_name)
+
+
 class _CodingState(TypedDict):
     messages: Annotated[list, lambda a, b: a + b]
     workspaces: dict[str, str]
@@ -151,11 +175,13 @@ class LangGraphDriver:
         skills: List[Skill],
         system_prompt: Optional[str] = None,
         system_prompt_mode: str = "override",
+        structured_output: Optional[Dict] = None,
     ) -> None:
         self._llm = llm
         self._skills = skills
         self._system_prompt = system_prompt
         self._system_prompt_mode = system_prompt_mode
+        self._structured_output = structured_output
         self._status: AgentStatus = "idle"
 
     async def get_status(self) -> AgentStatus:
@@ -254,13 +280,46 @@ class LangGraphDriver:
 
             return AgentResult(
                 success=not state.get("error"),
-                output=state.get("result", ""),
+                output=self._format_structured_output(state.get("result", "")),
                 error=state.get("error"),
                 artifacts=artifacts,
             )
         except Exception as exc:
             self._status = "error"
             return AgentResult(success=False, output="", error=str(exc))
+
+    def _format_structured_output(self, raw_output: str) -> str:
+        """If a structured_output schema is configured, parse the output through it.
+
+        When the schema is set, we ask the LLM one more time to format the
+        free-form result into the expected JSON schema.  If the LLM already
+        returned valid JSON that matches, we pass it through.
+        """
+        if not self._structured_output or not raw_output:
+            return raw_output
+
+        # Try to parse raw_output as JSON first — it might already match
+        try:
+            parsed = json.loads(raw_output)
+            if isinstance(parsed, dict):
+                return json.dumps(parsed)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Build a Pydantic model from the schema and use with_structured_output
+        try:
+            model = _build_pydantic_model_from_schema(self._structured_output, "AgentOutput")
+            structured_llm = self._llm.with_structured_output(model)
+            result = structured_llm.invoke(
+                f"Extract structured data from the following text. "
+                f"Return ONLY a JSON object matching the schema.\n\n{raw_output}"
+            )
+            if hasattr(result, "model_dump"):
+                return json.dumps(result.model_dump())
+            return json.dumps(result) if result else raw_output
+        except Exception:
+            # Fallback to raw output if structured extraction fails
+            return raw_output
 
     def _build_graph(self, bound_llm: Any, tools: list) -> CompiledStateGraph:
         from langchain_core.messages import AIMessage as _AI, ToolMessage as _TM

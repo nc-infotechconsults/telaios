@@ -40,6 +40,7 @@ class ConfigurableAgentConfig(BaseModel):
     mcpServers: List[dict] = []
     skills: List[dict] = []
     subAgentIds: List[str] = []
+    structuredOutput: Optional[Dict[str, Any]] = None
 
 
 def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
@@ -127,6 +128,9 @@ class ConfigurableAgent(BaseAgent):
             content = final.content
             output = content if isinstance(content, str) else json.dumps(content)
 
+        # Apply structured output formatting if configured
+        output = self._format_structured_output(output)
+
         self._result = BaseAgentResult(
             success=True,
             output=output,
@@ -143,6 +147,58 @@ class ConfigurableAgent(BaseAgent):
 
     async def on_cleanup(self) -> None:
         pass
+
+    def _format_structured_output(self, raw_output: str) -> str:
+        """If a structured output schema is configured, format the output accordingly."""
+        schema = self._config.structuredOutput
+        if not schema or not raw_output:
+            return raw_output
+
+        # Try to parse raw_output as JSON first — it might already match
+        try:
+            parsed = json.loads(raw_output)
+            if isinstance(parsed, dict):
+                return json.dumps(parsed)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Build a Pydantic model from the schema and use with_structured_output
+        try:
+            model = self._build_pydantic_model_from_schema(schema, "AgentOutput")
+            structured_llm = self._llm.with_structured_output(model)
+            result = structured_llm.invoke(
+                f"Extract structured data from the following text. "
+                f"Return ONLY a JSON object matching the schema.\n\n{raw_output}"
+            )
+            if hasattr(result, "model_dump"):
+                return json.dumps(result.model_dump())
+            return json.dumps(result) if result else raw_output
+        except Exception:
+            return raw_output
+
+    @staticmethod
+    def _build_pydantic_model_from_schema(schema: Dict[str, Any], model_name: str = "DynamicModel"):
+        """Build a Pydantic model dynamically from a JSON Schema dict."""
+        from pydantic import create_model
+        from pydantic import Field as PydanticField
+
+        properties = schema.get("properties") or {}
+        required_fields = set(schema.get("required") or [])
+        type_map = {"string": str, "number": float, "integer": int, "boolean": bool}
+
+        field_defs: Dict[str, Any] = {}
+        for field_name, prop in properties.items():
+            type_str = prop.get("type", "string")
+            if isinstance(type_str, list):
+                type_str = type_str[0]
+            annotation = type_map.get(type_str, str)
+            default = ... if field_name in required_fields else None
+            field_defs[field_name] = (
+                Optional[annotation] if default is None else annotation,
+                PydanticField(default, description=prop.get("description", "")),
+            )
+
+        return create_model(model_name, **field_defs) if field_defs else create_model(model_name)
 
     def _build_skill_tools(self) -> List[StructuredTool]:
         """Convert the profile's skills list into LangChain StructuredTools."""
