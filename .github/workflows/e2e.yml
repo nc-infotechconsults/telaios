@@ -2,7 +2,7 @@
 # E2E Tests — SWE AI Platform
 #
 # Spins up the full platform (Postgres, Redis, MinIO, data-api,
-# agent-service-py, Vite frontend) and runs:
+# agent-service, Vite frontend) and runs:
 #   1. API smoke / integration tests  (tests/smoke.test.js)
 #      – including an LLM connectivity check via LLM_API_KEY secret
 #   2. Playwright browser E2E tests   (frontend/e2e/)
@@ -12,9 +12,9 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, test-ci]
+    branches: [test-ci]
   pull_request:
-    branches: [main, test-ci]
+    branches: [test-ci]
   workflow_dispatch:
 
 permissions:
@@ -76,7 +76,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Python agent-service dependencies
-        run: pip install -e 'agent-service-py[dev]'
+        run: pip install -e 'agent-service[dev]'
 
       # ── Database ──────────────────────────────────────────────
       - name: Run database migrations
@@ -98,7 +98,7 @@ jobs:
           LLM_MODEL: ${{ env.LLM_MODEL }}
           LLM_API_KEY: ${{ env.LLM_API_KEY }}
         run: |
-          cd agent-service-py && uvicorn agent_service.main:app \
+          cd agent-service && uvicorn agent_service.main:app \
             --host 0.0.0.0 --port 8000 > /tmp/agent-service.log 2>&1 &
           echo "AGENT_SERVICE_PID=$!" >> "$GITHUB_ENV"
 

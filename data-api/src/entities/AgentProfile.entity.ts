@@ -17,6 +17,8 @@ export interface McpServer {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  /** When set, only these tools are exposed to the agent; empty/undefined = all tools. */
+  selected_tools?: string[];
 }
 
 export interface JsonSchemaProperty {
@@ -87,6 +89,49 @@ export class AgentProfile {
 
   @Column({ type: "jsonb", default: "[]" })
   skills!: Skill[];
+
+  /** User-authored system prompt. Replaces or extends the built-in agent prompt. */
+  @Column({ type: "text", nullable: true })
+  system_prompt!: string | null;
+
+  /**
+   * Controls how `system_prompt` is applied.
+   * - `"override"` — fully replaces the built-in prompt.
+   * - `"extend"`   — appended after the built-in prompt.
+   */
+  @Column({ type: "varchar", default: "override" })
+  system_prompt_mode!: "override" | "extend";
+
+  @Column({ type: "float", nullable: true })
+  llm_temperature!: number | null;
+
+  @Column({ type: "int", nullable: true })
+  llm_max_tokens!: number | null;
+
+  @Column({ type: "float", nullable: true })
+  llm_top_p!: number | null;
+
+  @Column({ type: "float", nullable: true })
+  llm_frequency_penalty!: number | null;
+
+  @Column({ type: "float", nullable: true })
+  llm_presence_penalty!: number | null;
+
+  /**
+   * UUIDs of other `AgentProfile` records this agent may delegate work to.
+   * Resolved at execution time — no FK constraint to keep things flexible.
+   */
+  @Column({ type: "jsonb", default: "[]" })
+  sub_agent_ids!: string[];
+
+  /**
+   * Optional JSON Schema for structured output.
+   * When set, the LLM is asked to return a response that validates against this schema
+   * (using OpenAI's `response_format` / LangChain `with_structured_output`).
+   * Null means free-form text output.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  structured_output!: JsonSchema | null;
 
   @CreateDateColumn()
   created_at!: Date;

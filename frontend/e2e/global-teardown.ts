@@ -34,6 +34,13 @@ export default async function globalTeardown() {
         console.warn(`Teardown: failed to delete agent profile ${ciData.agentProfileId} (HTTP ${err?.response?.status}):`,
           err?.response?.data ?? err.message);
     });
+    for (const id of [ciData.promptProfileId, ciData.subAgentProfileId]) {
+      await api.delete(`/agent-profiles/${id}`).catch((err) => {
+        if (err?.response?.status !== 404)
+          console.warn(`Teardown: failed to delete agent profile ${id} (HTTP ${err?.response?.status}):`,
+            err?.response?.data ?? err.message);
+      });
+    }
   } catch (err) {
     console.warn("E2E teardown warning:", err);
   }

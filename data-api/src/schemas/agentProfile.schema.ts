@@ -10,6 +10,7 @@ const McpServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   url: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  selected_tools: z.array(z.string()).optional(),
 });
 
 const JsonSchemaPropertySchema: z.ZodType<Record<string, unknown>> = z.record(z.string(), z.unknown());
@@ -53,6 +54,22 @@ export const CreateAgentProfileSchema = z.object({
   github_token: z.string().optional(),
   mcp_servers: z.array(McpServerSchema).optional(),
   skills: z.array(SkillSchema).optional(),
+  system_prompt: z.string().nullable().optional(),
+  system_prompt_mode: z.enum(["override", "extend"]).optional(),
+  llm_temperature: z.number().min(0).max(2).nullable().optional(),
+  llm_max_tokens: z.number().int().positive().nullable().optional(),
+  llm_top_p: z.number().min(0).max(1).nullable().optional(),
+  llm_frequency_penalty: z.number().min(-2).max(2).nullable().optional(),
+  llm_presence_penalty: z.number().min(-2).max(2).nullable().optional(),
+  sub_agent_ids: z.array(z.string().uuid()).optional(),
+  structured_output: z
+    .object({
+      type: z.literal("object"),
+      properties: z.record(z.string(), JsonSchemaPropertySchema).optional(),
+      required: z.array(z.string()).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const PatchAgentProfileSchema = CreateAgentProfileSchema.partial();

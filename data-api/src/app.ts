@@ -37,7 +37,12 @@ import logger from "./utils/logger";
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGIN || false,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Open routes

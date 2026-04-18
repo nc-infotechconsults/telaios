@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Button,
   Input,
@@ -10,8 +10,11 @@ import {
   Card,
   CardBody,
   Chip,
+  Tabs,
+  Tab,
+  Spinner,
 } from "@heroui/react";
-import { createAgentProfile, updateAgentProfile } from "../../lib/api";
+import { createAgentProfile, updateAgentProfile, getAgentProfiles, discoverMcpTools } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { AgentProfile, McpServer, Skill, JsonSchemaProperty } from "../../types";
 
@@ -94,6 +97,15 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
   const [presPenalty, setPresPenalty] = useState(initialData?.llm_presence_penalty?.toString() ?? "");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // System prompt
+  const [systemPrompt, setSystemPrompt] = useState(initialData?.system_prompt ?? "");
+  const [systemPromptMode, setSystemPromptMode] = useState<"override" | "extend">(
+    initialData?.system_prompt_mode ?? "extend"
+  );
+
+  // Sub-agents
+  const [subAgentIds, setSubAgentIds] = useState<string[]>(initialData?.sub_agent_ids ?? []);
+
   // MCP Servers + their env entries (parallel array)
   const [mcpServers, setMcpServers] = useState<McpServer[]>(initialData?.mcp_servers ?? []);
   const [mcpEnvEntries, setMcpEnvEntries] = useState<EnvEntry[][]>(
@@ -110,8 +122,32 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
   );
   const [saving, setSaving] = useState(false);
 
+  // Structured output
+  const [useStructuredOutput, setUseStructuredOutput] = useState<boolean>(
+    initialData?.structured_output != null
+  );
+  const [structuredOutputProps, setStructuredOutputProps] = useState<SchemaProp[]>(
+    jsonSchemaToProps(initialData?.structured_output ?? undefined)
+  );
+
+  // All profiles for sub-agent picker
+  const [allProfiles, setAllProfiles] = useState<AgentProfile[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState("general");
+
   const needsBaseUrl = ["ollama", "vllm", "lmstudio"].includes(llmProvider);
   const showPenalties = OPENAI_COMPAT.includes(llmProvider);
+
+  // Load all profiles for sub-agent picker
+  useEffect(() => {
+    setLoadingProfiles(true);
+    getAgentProfiles()
+      .then(setAllProfiles)
+      .catch(() => {})
+      .finally(() => setLoadingProfiles(false));
+  }, []);
 
   // ── MCP helpers ──────────────────────────────────────────────────────────────
 
@@ -226,6 +262,10 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         llm_top_p: topP ? parseFloat(topP) : undefined,
         llm_frequency_penalty: freqPenalty ? parseFloat(freqPenalty) : undefined,
         llm_presence_penalty: presPenalty ? parseFloat(presPenalty) : undefined,
+        system_prompt: systemPrompt.trim() || null,
+        system_prompt_mode: systemPromptMode,
+        sub_agent_ids: subAgentIds,
+        structured_output: useStructuredOutput ? schemaPropsToJsonSchema(structuredOutputProps) : null,
         mcp_servers: mcpServers,
         skills,
         ...(llmApiKey ? { llm_api_key_raw: llmApiKey } : {}),
@@ -324,9 +364,10 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
     );
   }
 
-  return (
+  // ── Tab content renderers ─────────────────────────────────────────────────────
+
+  const renderGeneralTab = () => (
     <div className="space-y-4">
-      {/* ── Basic ── */}
       <Input label="Name" value={name} onValueChange={setName} isRequired />
       <Textarea label="Description" value={description} onValueChange={setDescription} />
 
@@ -340,7 +381,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
 
       <Divider />
 
-      {/* ── LLM Connection ── */}
+      {/* LLM Connection */}
       <p className="font-semibold text-sm">
         LLM Configuration
         {agentType === "github-copilot" && (
@@ -390,7 +431,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         </>
       )}
 
-      {/* ── LLM Parameters ── */}
+      {/* LLM Parameters */}
       <Divider />
       <p className="font-semibold text-sm">LLM Parameters</p>
 
@@ -478,13 +519,193 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
           )}
         </div>
       )}
+    </div>
+  );
 
-      {/* ── MCP Servers ── */}
-      <Divider />
-      <div className="flex items-center justify-between">
-        <p className="font-semibold text-sm">MCP Servers</p>
-        <Button size="sm" variant="bordered" onPress={addMcp}>+ Add</Button>
+  const renderSystemPromptTab = () => (
+    <div className="space-y-4">
+      <div>
+        <p className="font-semibold text-sm">System Prompt</p>
+        <p className="text-[11px] text-default-400 mt-0.5">
+          Customize the agent&apos;s built-in instructions. Leave blank to use the default.
+        </p>
       </div>
+      <Select
+        label="Mode"
+        selectedKeys={[systemPromptMode]}
+        onSelectionChange={(keys) => setSystemPromptMode(Array.from(keys)[0] as "override" | "extend")}
+        description={
+          systemPromptMode === "override"
+            ? "Fully replaces the built-in agent prompt."
+            : "Appended after the built-in agent prompt."
+        }
+      >
+        <SelectItem key="override">Override — replace built-in prompt</SelectItem>
+        <SelectItem key="extend">Extend — append to built-in prompt</SelectItem>
+      </Select>
+      <Textarea
+        label="System Prompt"
+        placeholder={systemPromptMode === "override" ? "You are a specialized agent that…" : "Additionally, you must…"}
+        value={systemPrompt}
+        onValueChange={setSystemPrompt}
+        minRows={6}
+        description={systemPrompt ? `${systemPrompt.length} characters` : "Optional. Markdown is supported."}
+      />
+    </div>
+  );
+
+  const renderSubAgentsTab = () => {
+    const eligibleProfiles = allProfiles.filter(
+      (p) => p.id !== initialData?.id && !subAgentIds.includes(p.id)
+    );
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <p className="font-semibold text-sm">Sub-agents</p>
+          <p className="text-[11px] text-default-400 mt-0.5">
+            Other agent profiles this agent may delegate tasks to. The agent can invoke
+            these sub-agents as tools during execution.
+          </p>
+        </div>
+
+        {loadingProfiles ? (
+          <div className="flex justify-center py-8">
+            <Spinner size="sm" label="Loading profiles…" />
+          </div>
+        ) : (
+          <>
+            {/* Selected sub-agents */}
+            {subAgentIds.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-default-600">
+                  Selected ({subAgentIds.length})
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {subAgentIds.map((id) => {
+                    const profile = allProfiles.find((p) => p.id === id);
+                    return (
+                      <Chip
+                        key={id}
+                        size="sm"
+                        variant="flat"
+                        color="secondary"
+                        onClose={() => setSubAgentIds((prev) => prev.filter((sid) => sid !== id))}
+                      >
+                        {profile?.name ?? id.slice(0, 8)}
+                      </Chip>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Add sub-agent */}
+            {eligibleProfiles.length > 0 ? (
+              <Select
+                label="Add sub-agent"
+                placeholder="Select an agent profile…"
+                selectedKeys={[]}
+                onSelectionChange={(keys) => {
+                  const picked = Array.from(keys)[0] as string;
+                  if (picked && !subAgentIds.includes(picked)) {
+                    setSubAgentIds((prev) => [...prev, picked]);
+                  }
+                }}
+              >
+                {eligibleProfiles.map((p) => (
+                  <SelectItem key={p.id} textValue={p.name}>
+                    <div className="flex flex-col">
+                      <span className="text-sm">{p.name}</span>
+                      {p.description && (
+                        <span className="text-xs text-default-400 truncate">{p.description}</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </Select>
+            ) : (
+              <p className="text-xs text-default-400 italic">
+                {allProfiles.length <= 1
+                  ? "No other agent profiles available. Create more profiles to enable delegation."
+                  : "All eligible profiles are already selected."}
+              </p>
+            )}
+
+            {/* Sub-agent summary cards */}
+            {subAgentIds.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-default-600">Delegated Agents</p>
+                {subAgentIds.map((id) => {
+                  const profile = allProfiles.find((p) => p.id === id);
+                  if (!profile) return null;
+                  return (
+                    <Card key={id} className="bg-default-50">
+                      <CardBody className="py-2 px-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{profile.name}</p>
+                            {profile.description && (
+                              <p className="text-xs text-default-400 line-clamp-2 mt-0.5">{profile.description}</p>
+                            )}
+                            <div className="flex gap-1.5 mt-1 flex-wrap">
+                              <Chip size="sm" variant="bordered" className="text-[10px]">
+                                {profile.agent_type}
+                              </Chip>
+                              {profile.llm_model && (
+                                <Chip size="sm" variant="bordered" className="text-[10px]">
+                                  🧠 {profile.llm_model}
+                                </Chip>
+                              )}
+                              {profile.skills.length > 0 && (
+                                <Chip size="sm" variant="bordered" className="text-[10px]">
+                                  ⚡ {profile.skills.length} skill{profile.skills.length > 1 ? "s" : ""}
+                                </Chip>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            color="danger"
+                            aria-label={`Remove ${profile.name}`}
+                            onPress={() => setSubAgentIds((prev) => prev.filter((sid) => sid !== id))}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderMcpServersTab = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-sm">MCP Servers</p>
+          <p className="text-[11px] text-default-400">External tool servers using the Model Context Protocol</p>
+        </div>
+        <Button size="sm" variant="bordered" onPress={addMcp}>+ Add Server</Button>
+      </div>
+
+      {mcpServers.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <p className="text-sm text-default-400">No MCP servers configured</p>
+          <p className="text-xs text-default-300 mt-1">
+            Add an MCP server to give the agent access to external tools.
+          </p>
+        </div>
+      )}
+
       {mcpServers.map((s, i) => (
         <Card key={i} className="bg-default-50">
           <CardBody className="space-y-2 py-2">
@@ -565,13 +786,20 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
                 </div>
               </>
             )}
-            <Button size="sm" variant="light" color="danger" onPress={() => removeMcp(i)}>Remove</Button>
+
+            {/* Tool selection */}
+            <Divider className="my-1" />
+            <McpToolSelector server={s} index={i} updateMcp={updateMcp} />
+
+            <Button size="sm" variant="light" color="danger" onPress={() => removeMcp(i)}>Remove Server</Button>
           </CardBody>
         </Card>
       ))}
+    </div>
+  );
 
-      {/* ── Skills (MCP Tool definitions) ── */}
-      <Divider />
+  const renderSkillsTab = () => (
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="font-semibold text-sm">Skills</p>
@@ -579,6 +807,16 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         </div>
         <Button size="sm" variant="bordered" onPress={addSkill}>+ Add Skill</Button>
       </div>
+
+      {skills.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <p className="text-sm text-default-400">No custom skills defined</p>
+          <p className="text-xs text-default-300 mt-1">
+            Skills are custom MCP tools with instructions for the agent.
+          </p>
+        </div>
+      )}
+
       {skills.map((s, i) => (
         <Card key={i} className="bg-default-50">
           <CardBody className="space-y-3 py-3">
@@ -619,6 +857,104 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
           </CardBody>
         </Card>
       ))}
+    </div>
+  );
+
+  const renderStructuredOutputTab = () => (
+    <div className="space-y-4">
+      <div>
+        <p className="font-semibold text-sm">Structured Output</p>
+        <p className="text-[11px] text-default-400 mt-0.5">
+          Define a JSON Schema so the agent returns structured data instead of free-form text.
+          Uses the LLM&apos;s <code className="text-[10px]">with_structured_output</code>.
+          Supported by OpenAI, Anthropic, and compatible providers.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={useStructuredOutput}
+          onChange={(e) => setUseStructuredOutput(e.target.checked)}
+          className="accent-primary"
+        />
+        <span className="text-sm">Enable structured output</span>
+      </label>
+
+      {useStructuredOutput && (
+        <>
+          <SchemaPropEditor
+            props={structuredOutputProps}
+            onAdd={() =>
+              setStructuredOutputProps((prev) => [
+                ...prev,
+                { name: "", type: "string", description: "", required: false },
+              ])
+            }
+            onUpdate={(pi, update) =>
+              setStructuredOutputProps((prev) =>
+                prev.map((p, i) => (i === pi ? { ...p, ...update } : p))
+              )
+            }
+            onRemove={(pi) =>
+              setStructuredOutputProps((prev) => prev.filter((_, i) => i !== pi))
+            }
+            label="Output Schema Properties"
+          />
+
+          {structuredOutputProps.filter((p) => p.name.trim()).length > 0 && (
+            <Card className="bg-default-50">
+              <CardBody className="py-2 px-3">
+                <p className="text-[11px] font-medium text-default-600 mb-1">Preview</p>
+                <pre className="text-[10px] text-default-500 whitespace-pre-wrap font-mono">
+                  {JSON.stringify(schemaPropsToJsonSchema(structuredOutputProps), null, 2)}
+                </pre>
+              </CardBody>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  // ── Tab badges ──────────────────────────────────────────────────────────────
+
+  function tabTitle(label: string, count?: number) {
+    return (
+      <span className="flex items-center gap-1.5">
+        {label}
+        {count !== undefined && count > 0 && (
+          <Chip size="sm" variant="flat" className="h-4 min-w-4 px-1 text-[10px]">{count}</Chip>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Tabs
+        aria-label="Agent profile sections"
+        selectedKey={activeTab}
+        onSelectionChange={(key) => setActiveTab(key as string)}
+        variant="underlined"
+        classNames={{ tabList: "gap-4" }}
+      >
+        <Tab key="general" title="General" />
+        <Tab key="prompt" title={tabTitle("Prompt", systemPrompt ? 1 : 0)} />
+        <Tab key="subagents" title={tabTitle("Sub-agents", subAgentIds.length)} />
+        <Tab key="mcp" title={tabTitle("MCP Servers", mcpServers.length)} />
+        <Tab key="skills" title={tabTitle("Skills", skills.length)} />
+        <Tab key="structured" title={tabTitle("Structured Output", useStructuredOutput ? 1 : 0)} />
+      </Tabs>
+
+      <div className="min-h-[300px]">
+        {activeTab === "general" && renderGeneralTab()}
+        {activeTab === "prompt" && renderSystemPromptTab()}
+        {activeTab === "subagents" && renderSubAgentsTab()}
+        {activeTab === "mcp" && renderMcpServersTab()}
+        {activeTab === "skills" && renderSkillsTab()}
+        {activeTab === "structured" && renderStructuredOutputTab()}
+      </div>
 
       <Divider />
       <div className="flex gap-2 pb-2">
@@ -627,6 +963,193 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         </Button>
         <Button variant="light" onPress={onCancel}>Cancel</Button>
       </div>
+    </div>
+  );
+}
+
+// ── MCP Tool Selector sub-component ───────────────────────────────────────────
+
+/**
+ * Allows the user to pick which tools from an MCP server should be exposed
+ * to the agent. By default all tools are used. When specific tools are selected,
+ * only those are passed to the agent at runtime.
+ */
+function McpToolSelector({
+  server,
+  index,
+  updateMcp,
+}: {
+  server: McpServer;
+  index: number;
+  updateMcp: (i: number, update: Partial<McpServer>) => void;
+}) {
+  const [toolNames, setToolNames] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState(false);
+
+  const selectedTools = server.selected_tools ?? [];
+  const useAll = selectedTools.length === 0;
+
+  /** Discover available tools by calling the data-api MCP probe endpoint. */
+  const discoverTools = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const names = await discoverMcpTools({
+        transport: server.transport,
+        command: server.command,
+        args: server.args,
+        env: server.env,
+        url: server.url,
+        headers: server.headers,
+      });
+      setToolNames(names);
+      setDiscovered(true);
+    } catch {
+      setError("Could not discover tools. Save the server config first and check connectivity.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = (name: string, checked: boolean) => {
+    let next: string[];
+    if (checked) {
+      next = [...selectedTools, name];
+    } else {
+      next = selectedTools.filter((t) => t !== name);
+    }
+    updateMcp(index, { selected_tools: next.length > 0 ? next : undefined });
+  };
+
+  const handleUseAll = () => {
+    updateMcp(index, { selected_tools: undefined });
+  };
+
+  // If the user already has selected_tools stored, show them even without discovering
+  const displayTools = discovered ? toolNames : (selectedTools.length > 0 ? selectedTools : []);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-medium text-default-600">Tool Selection</p>
+        <div className="flex items-center gap-1.5">
+          {selectedTools.length > 0 && (
+            <Button size="sm" variant="flat" onPress={handleUseAll} className="h-6 px-2 text-[10px]">
+              Use All
+            </Button>
+          )}
+          <Button size="sm" variant="flat" onPress={discoverTools} isLoading={loading} className="h-6 px-2 text-[10px]">
+            Discover Tools
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-[11px] text-danger">{error}</p>
+      )}
+
+      {!discovered && displayTools.length === 0 && !error && (
+        <p className="text-[11px] text-default-400 italic">
+          {useAll && "All tools from this server will be used. "}Click &quot;Discover Tools&quot; to see available tools and select specific ones.
+        </p>
+      )}
+
+      {displayTools.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] text-default-400">
+            {useAll
+              ? `${displayTools.length} tools available — all will be used`
+              : `${selectedTools.length} of ${displayTools.length > selectedTools.length ? displayTools.length : selectedTools.length} tools selected`}
+          </p>
+          <div className="max-h-48 overflow-y-auto space-y-1 rounded-lg border border-divider p-2">
+            {displayTools.map((toolName) => (
+              <label
+                key={toolName}
+                className="flex items-center gap-2 py-0.5 px-1 rounded hover:bg-default-100 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={useAll || selectedTools.includes(toolName)}
+                  onChange={(e) => {
+                    if (useAll) {
+                      // Switching from "all" to specific: select all except this one if unchecking
+                      const allExcept = displayTools.filter((t) => t !== toolName);
+                      updateMcp(index, { selected_tools: allExcept });
+                    } else {
+                      handleToggle(toolName, e.target.checked);
+                    }
+                  }}
+                  className="accent-primary"
+                />
+                <span className="text-xs font-mono">{toolName}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Manual tool name entry */}
+      {!discovered && (
+        <ManualToolEntry
+          selectedTools={selectedTools}
+          onAdd={(name) => updateMcp(index, { selected_tools: [...selectedTools, name] })}
+          onRemove={(name) => {
+            const next = selectedTools.filter((t) => t !== name);
+            updateMcp(index, { selected_tools: next.length > 0 ? next : undefined });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Allows manually typing tool names when discovery isn't available. */
+function ManualToolEntry({
+  selectedTools,
+  onAdd,
+  onRemove,
+}: {
+  selectedTools: string[];
+  onAdd: (name: string) => void;
+  onRemove: (name: string) => void;
+}) {
+  const [newTool, setNewTool] = useState("");
+
+  const handleAdd = () => {
+    const trimmed = newTool.trim();
+    if (trimmed && !selectedTools.includes(trimmed)) {
+      onAdd(trimmed);
+      setNewTool("");
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <Input
+          size="sm"
+          placeholder="Tool name (e.g. read_file)"
+          value={newTool}
+          onValueChange={setNewTool}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
+          aria-label="Add tool name"
+          className="flex-1"
+        />
+        <Button size="sm" variant="flat" onPress={handleAdd} className="h-8 px-2 text-[11px]" isDisabled={!newTool.trim()}>
+          Add
+        </Button>
+      </div>
+      {selectedTools.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedTools.map((t) => (
+            <Chip key={t} size="sm" variant="flat" color="primary" onClose={() => onRemove(t)}>
+              {t}
+            </Chip>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

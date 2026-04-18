@@ -42,10 +42,20 @@ export const PatchEnvironmentSchema = z.object({
 
 export const HelmReleaseStatusSchema = z.enum(["pending", "deployed", "failed", "uninstalled"]);
 
+// Restrict Helm repo URLs to http/https to prevent the Helm CLI from
+// fetching local file paths (file://) or other unsafe schemes.
+const helmRepoUrl = z
+  .string()
+  .url()
+  .refine(
+    (v) => v.startsWith("http://") || v.startsWith("https://"),
+    { message: "Helm repo URL must use http or https" }
+  );
+
 export const InstallHelmChartSchema = z.object({
   release_name: z.string().min(1),
   chart_name: z.string().min(1),
-  chart_repo_url: z.string().optional(),
+  chart_repo_url: helmRepoUrl.optional(),
   chart_version: z.string().optional(),
   namespace: z.string().optional(),
   values_override: z.record(z.string(), z.unknown()).optional(),

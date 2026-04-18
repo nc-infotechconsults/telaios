@@ -6,7 +6,10 @@ import type { RegisterDto, LoginDto } from "../schemas/auth.schema";
 
 const repo = () => AppDataSource.getRepository(User);
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "change-this-secret-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
 const JWT_TTL = "7d";
 
 export function signToken(user: User): string {

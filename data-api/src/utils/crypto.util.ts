@@ -1,6 +1,9 @@
 import { createDecipheriv, createCipheriv, scryptSync, randomBytes } from "crypto";
 
-const KEY_SOURCE = process.env.ENCRYPTION_KEY ?? "default-key-change-in-production!";
+const KEY_SOURCE = process.env.ENCRYPTION_KEY;
+if (!KEY_SOURCE) {
+  throw new Error("ENCRYPTION_KEY environment variable is required");
+}
 const KEY = scryptSync(KEY_SOURCE, "salt", 32);
 
 export function encrypt(text: string | null | undefined): string {
