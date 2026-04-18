@@ -81,21 +81,25 @@ class OpenCodeDriver:
                 fh.write(f"{front}\n\n{skill.instructions}")
 
     async def _write_opencode_config(self, workspace_root: str) -> None:
+        mcp_cfg: dict = {}
+        for s in self._mcp_servers:
+            entry: dict = {
+                "transport": s.transport,
+                **({"url": s.url} if s.url else {}),
+                **({"command": s.command, "args": s.args or []} if s.command else {}),
+                **({"env": s.env} if s.env else {}),
+            }
+            if s.selected_tools:
+                entry["selectedTools"] = s.selected_tools
+            mcp_cfg[s.name] = entry
+
         cfg: dict = {
             "provider": {
                 "name": self._llm_provider,
                 "model": self._llm_model,
                 **({"baseURL": self._llm_base_url} if self._llm_base_url else {}),
             },
-            "mcp": {
-                s.name: {
-                    "transport": s.transport,
-                    **({"url": s.url} if s.url else {}),
-                    **({"command": s.command, "args": s.args or []} if s.command else {}),
-                    **({"env": s.env} if s.env else {}),
-                }
-                for s in self._mcp_servers
-            },
+            "mcp": mcp_cfg,
         }
         with open(os.path.join(workspace_root, "opencode.json"), "w", encoding="utf-8") as fh:
             json.dump(cfg, fh, indent=2)

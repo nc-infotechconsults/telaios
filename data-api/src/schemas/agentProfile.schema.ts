@@ -62,6 +62,14 @@ export const CreateAgentProfileSchema = z.object({
   llm_frequency_penalty: z.number().min(-2).max(2).nullable().optional(),
   llm_presence_penalty: z.number().min(-2).max(2).nullable().optional(),
   sub_agent_ids: z.array(z.string().uuid()).optional(),
+  structured_output: z
+    .object({
+      type: z.literal("object"),
+      properties: z.record(z.string(), JsonSchemaPropertySchema).optional(),
+      required: z.array(z.string()).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const PatchAgentProfileSchema = CreateAgentProfileSchema.partial();

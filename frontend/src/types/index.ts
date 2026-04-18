@@ -179,6 +179,8 @@ export interface AgentProfile {
   system_prompt?: string | null;
   system_prompt_mode?: "override" | "extend";
   sub_agent_ids?: string[];
+  /** Optional JSON Schema for structured output — null means free-form text. */
+  structured_output?: JsonSchema | null;
   mcp_servers: McpServer[];
   skills: Skill[];
   created_at: string;

@@ -122,6 +122,14 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
   );
   const [saving, setSaving] = useState(false);
 
+  // Structured output
+  const [useStructuredOutput, setUseStructuredOutput] = useState<boolean>(
+    initialData?.structured_output != null
+  );
+  const [structuredOutputProps, setStructuredOutputProps] = useState<SchemaProp[]>(
+    jsonSchemaToProps(initialData?.structured_output ?? undefined)
+  );
+
   // All profiles for sub-agent picker
   const [allProfiles, setAllProfiles] = useState<AgentProfile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
@@ -257,6 +265,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         system_prompt: systemPrompt.trim() || null,
         system_prompt_mode: systemPromptMode,
         sub_agent_ids: subAgentIds,
+        structured_output: useStructuredOutput ? schemaPropsToJsonSchema(structuredOutputProps) : null,
         mcp_servers: mcpServers,
         skills,
         ...(llmApiKey ? { llm_api_key_raw: llmApiKey } : {}),
@@ -851,6 +860,62 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
     </div>
   );
 
+  const renderStructuredOutputTab = () => (
+    <div className="space-y-4">
+      <div>
+        <p className="font-semibold text-sm">Structured Output</p>
+        <p className="text-[11px] text-default-400 mt-0.5">
+          Define a JSON Schema so the agent returns structured data instead of free-form text.
+          Uses the LLM&apos;s <code className="text-[10px]">response_format</code> / <code className="text-[10px]">with_structured_output</code>.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={useStructuredOutput}
+          onChange={(e) => setUseStructuredOutput(e.target.checked)}
+          className="accent-primary"
+        />
+        <span className="text-sm">Enable structured output</span>
+      </label>
+
+      {useStructuredOutput && (
+        <>
+          <SchemaPropEditor
+            props={structuredOutputProps}
+            onAdd={() =>
+              setStructuredOutputProps((prev) => [
+                ...prev,
+                { name: "", type: "string", description: "", required: false },
+              ])
+            }
+            onUpdate={(pi, update) =>
+              setStructuredOutputProps((prev) =>
+                prev.map((p, i) => (i === pi ? { ...p, ...update } : p))
+              )
+            }
+            onRemove={(pi) =>
+              setStructuredOutputProps((prev) => prev.filter((_, i) => i !== pi))
+            }
+            label="Output Schema Properties"
+          />
+
+          {structuredOutputProps.filter((p) => p.name.trim()).length > 0 && (
+            <Card className="bg-default-50">
+              <CardBody className="py-2 px-3">
+                <p className="text-[11px] font-medium text-default-600 mb-1">Preview</p>
+                <pre className="text-[10px] text-default-500 whitespace-pre-wrap font-mono">
+                  {JSON.stringify(schemaPropsToJsonSchema(structuredOutputProps), null, 2)}
+                </pre>
+              </CardBody>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+
   // ── Tab badges ──────────────────────────────────────────────────────────────
 
   function tabTitle(label: string, count?: number) {
@@ -878,6 +943,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         <Tab key="subagents" title={tabTitle("Sub-agents", subAgentIds.length)} />
         <Tab key="mcp" title={tabTitle("MCP Servers", mcpServers.length)} />
         <Tab key="skills" title={tabTitle("Skills", skills.length)} />
+        <Tab key="structured" title={tabTitle("Structured Output", useStructuredOutput ? 1 : 0)} />
       </Tabs>
 
       <div className="min-h-[300px]">
@@ -886,6 +952,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
         {activeTab === "subagents" && renderSubAgentsTab()}
         {activeTab === "mcp" && renderMcpServersTab()}
         {activeTab === "skills" && renderSkillsTab()}
+        {activeTab === "structured" && renderStructuredOutputTab()}
       </div>
 
       <Divider />

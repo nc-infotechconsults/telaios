@@ -124,6 +124,15 @@ export class AgentProfile {
   @Column({ type: "jsonb", default: "[]" })
   sub_agent_ids!: string[];
 
+  /**
+   * Optional JSON Schema for structured output.
+   * When set, the LLM is asked to return a response that validates against this schema
+   * (using OpenAI's `response_format` / LangChain `with_structured_output`).
+   * Null means free-form text output.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  structured_output!: JsonSchema | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

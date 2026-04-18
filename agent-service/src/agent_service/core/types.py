@@ -74,6 +74,7 @@ class McpServer(BaseModel):
     env: Optional[Dict[str, str]] = None
     url: Optional[str] = None
     headers: Optional[Dict[str, str]] = None
+    selected_tools: Optional[List[str]] = None
 
 
 # ── Skill ─────────────────────────────────────────────────────────────────────
