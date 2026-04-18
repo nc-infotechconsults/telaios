@@ -11,7 +11,7 @@
  *  - Dirty-state indicator ("•") in the toolbar when unsaved changes exist.
  *  - Monaco is lazy-loaded so it doesn't bloat the initial bundle.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Chip } from "@heroui/react";
 import { updateDocumentContent } from "../../lib/api";
 import { toast } from "../../lib/toast";

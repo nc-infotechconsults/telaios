@@ -75,6 +75,7 @@ const ROLE_COLOR: Record<AgentRole, "warning" | "success" | "primary" | "seconda
   infra: "danger",
   knowledge: "default",
   custom: "default",
+  "document-copilot": "default",
 };
 
 const MEMBER_ROLE_OPTIONS: ProjectRole[] = ["owner", "editor", "viewer"];
