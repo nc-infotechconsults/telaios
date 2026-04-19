@@ -10,7 +10,7 @@ import { AppDataSource } from "../configs/data-source.config";
 import { Environment } from "../entities/Environment.entity";
 import { decrypt } from "../utils/crypto.util";
 import { DockerClient } from "./docker.service";
-import type { DockerConnectionConfig, DockerContainerSummary, DockerImageSummary, DockerVolumeSummary, DockerNetworkSummary } from "./docker.service";
+import type { DockerConnectionConfig, DockerContainerSummary, DockerImageSummary, DockerVolumeSummary, DockerNetworkSummary, DockerVolumeFileEntry } from "./docker.service";
 
 const envRepo = () => AppDataSource.getRepository(Environment);
 
@@ -97,4 +97,41 @@ export async function removeDockerVolume(envId: string, volumeName: string): Pro
 export async function listDockerNetworks(envId: string): Promise<DockerNetworkSummary[]> {
   const { cfg } = await resolveDockerEnv(envId);
   return DockerClient.listNetworks(cfg);
+}
+
+// ─── Inspect ──────────────────────────────────────────────────────────────────
+
+export async function inspectDockerImage(envId: string, imageId: string): Promise<unknown> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.inspectImage(cfg, imageId);
+}
+
+export async function inspectDockerNetwork(envId: string, networkId: string): Promise<unknown> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.inspectNetwork(cfg, networkId);
+}
+
+export async function inspectDockerVolume(envId: string, volumeName: string): Promise<unknown> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.inspectVolume(cfg, volumeName);
+}
+
+// ─── Volume file browser ──────────────────────────────────────────────────────
+
+export async function listDockerVolumeFiles(
+  envId: string,
+  volumeName: string,
+  dirPath: string,
+): Promise<DockerVolumeFileEntry[]> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.listVolumeFiles(cfg, volumeName, dirPath);
+}
+
+export async function downloadDockerVolumeFile(
+  envId: string,
+  volumeName: string,
+  filePath: string,
+): Promise<{ stream: NodeJS.ReadableStream; cleanup: () => Promise<void> }> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.downloadVolumeFile(cfg, volumeName, filePath);
 }

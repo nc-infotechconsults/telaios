@@ -354,6 +354,14 @@ export interface DockerNetwork {
   created: string;
 }
 
+export interface DockerVolumeFileEntry {
+  name: string;
+  type: "file" | "directory";
+  size: number;
+  modified: string;
+  path: string;
+}
+
 // ── Documents ─────────────────────────────────────────────────────────────────
 
 export type DocumentFileType = "pdf" | "docx" | "xlsx" | "md" | "txt" | "csv" | "json" | "other";

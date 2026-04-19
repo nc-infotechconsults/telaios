@@ -30,9 +30,14 @@ router.post("/:id/docker/containers/:containerId/stop", requireProjectAccess("ed
 router.post("/:id/docker/containers/:containerId/restart", requireProjectAccess("editor"), dockerController.restartContainer);
 router.delete("/:id/docker/containers/:containerId", requireProjectAccess("editor"), dockerController.removeContainer);
 router.get("/:id/docker/images", requireProjectAccess("viewer"), dockerController.listImages);
+router.get("/:id/docker/images/:imageId/inspect", requireProjectAccess("viewer"), dockerController.inspectImage);
 router.delete("/:id/docker/images/:imageId", requireProjectAccess("editor"), dockerController.removeImage);
 router.get("/:id/docker/volumes", requireProjectAccess("viewer"), dockerController.listVolumes);
+router.get("/:id/docker/volumes/:volumeName/inspect", requireProjectAccess("viewer"), dockerController.inspectVolume);
+router.get("/:id/docker/volumes/:volumeName/files", requireProjectAccess("viewer"), dockerController.listVolumeFiles);
+router.get("/:id/docker/volumes/:volumeName/files/download", requireProjectAccess("viewer"), dockerController.downloadVolumeFile);
 router.delete("/:id/docker/volumes/:volumeName", requireProjectAccess("editor"), dockerController.removeVolume);
 router.get("/:id/docker/networks", requireProjectAccess("viewer"), dockerController.listNetworks);
+router.get("/:id/docker/networks/:networkId/inspect", requireProjectAccess("viewer"), dockerController.inspectNetwork);
 
 export default router;

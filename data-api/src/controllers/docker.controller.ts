@@ -143,3 +143,81 @@ export async function listNetworks(req: Request, res: Response) {
     return handleError(res, err);
   }
 }
+
+// ─── Inspect ──────────────────────────────────────────────────────────────────
+
+export async function inspectImage(req: Request, res: Response) {
+  try {
+    const data = await dockerService.inspectDockerImage(req.params.id, req.params.imageId);
+    return res.json(data);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function inspectNetwork(req: Request, res: Response) {
+  try {
+    const data = await dockerService.inspectDockerNetwork(req.params.id, req.params.networkId);
+    return res.json(data);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function inspectVolume(req: Request, res: Response) {
+  try {
+    const data = await dockerService.inspectDockerVolume(req.params.id, req.params.volumeName);
+    return res.json(data);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+// ─── Volume file browser ──────────────────────────────────────────────────────
+
+export async function listVolumeFiles(req: Request, res: Response) {
+  try {
+    const { path: dirPath = "/" } = req.query as Record<string, string>;
+
+    if (dirPath.includes("..")) {
+      return res.status(400).json({ error: "Invalid path: path traversal not allowed" });
+    }
+
+    const files = await dockerService.listDockerVolumeFiles(req.params.id, req.params.volumeName, dirPath);
+    return res.json(files);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function downloadVolumeFile(req: Request, res: Response) {
+  try {
+    const { path: filePath } = req.query as Record<string, string>;
+
+    if (!filePath) {
+      return res.status(400).json({ error: "path query parameter is required" });
+    }
+    if (!filePath.startsWith("/") || filePath.includes("..")) {
+      return res.status(400).json({ error: "Invalid path: must be absolute and contain no path traversal" });
+    }
+
+    const { stream, cleanup } = await dockerService.downloadDockerVolumeFile(
+      req.params.id,
+      req.params.volumeName,
+      filePath,
+    );
+
+    const fileName = filePath.split("/").filter(Boolean).pop() ?? "archive";
+    res.setHeader("Content-Type", "application/x-tar");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}.tar"`);
+
+    stream.pipe(res);
+    stream.on("end", () => { cleanup().catch(() => { /* ignore */ }); });
+    stream.on("error", (err) => {
+      cleanup().catch(() => { /* ignore */ });
+      logger.error({ err }, "Volume file download stream error");
+    });
+  } catch (err) {
+    return handleError(res, err);
+  }
+}

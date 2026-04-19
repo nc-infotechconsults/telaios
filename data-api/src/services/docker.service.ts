@@ -59,6 +59,14 @@ export interface DockerNetworkSummary {
   created: string;
 }
 
+export interface DockerVolumeFileEntry {
+  name: string;
+  type: "file" | "directory";
+  size: number;
+  modified: string;
+  path: string;
+}
+
 function buildDockerClient(cfg: DockerConnectionConfig): Docker {
   logger.debug({ cfg }, "Building Docker client with config");
 
@@ -103,6 +111,60 @@ function formatPorts(
       container: p.PrivatePort!,
       protocol: p.Type ?? "tcp",
     }));
+}
+
+/**
+ * Parse a Docker multiplexed exec stream buffer.
+ * Each frame: [stream_type(1), padding(3), size(4), data(size)]
+ */
+function parseMuxedBuffer(buf: Buffer): string {
+  const chunks: Buffer[] = [];
+  let offset = 0;
+  while (offset + 8 <= buf.length) {
+    const size = buf.readUInt32BE(offset + 4);
+    offset += 8;
+    if (offset + size > buf.length) break;
+    chunks.push(buf.subarray(offset, offset + size));
+    offset += size;
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * Parse `ls -la` output into DockerVolumeFileEntry[].
+ * Skips "." and ".." entries. Caps result at 500 items.
+ */
+function parseLsLaOutput(raw: string, dirPath: string): DockerVolumeFileEntry[] {
+  const entries: DockerVolumeFileEntry[] = [];
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("total ")) continue;
+
+    // <permissions> <links> <owner> <group> <size> <month> <day> <time|year> <name>
+    const match = trimmed.match(
+      /^([d\-lcrwxst]{10})\s+\d+\s+\S+\s+\S+\s+(\d+)\s+(\S+\s+\S+\s+\S+)\s+(.+)$/,
+    );
+    if (!match) continue;
+
+    const [, perms, sizeStr, dateStr, namePart] = match;
+    // Handle symlinks: "name -> target"
+    const name = namePart.split(" -> ")[0].trim();
+    if (name === "." || name === "..") continue;
+
+    const isDir = perms.startsWith("d");
+    const entryPath = dirPath === "/" ? `/${name}` : `${dirPath}/${name}`;
+
+    entries.push({
+      name,
+      type: isDir ? "directory" : "file",
+      size: parseInt(sizeStr, 10),
+      modified: dateStr.trim(),
+      path: entryPath,
+    });
+  }
+
+  return entries.slice(0, 500);
 }
 
 export const DockerClient = {
@@ -219,6 +281,93 @@ export const DockerClient = {
     } catch (e){
       logger.error({ err: e }, "Docker connection test failed");
       return { ok: false };
+    }
+  },
+
+  // ─── Inspect ──────────────────────────────────────────────────────────────
+
+  async inspectImage(cfg: DockerConnectionConfig, imageId: string): Promise<unknown> {
+    const docker = buildDockerClient(cfg);
+    return docker.getImage(imageId).inspect();
+  },
+
+  async inspectNetwork(cfg: DockerConnectionConfig, networkId: string): Promise<unknown> {
+    const docker = buildDockerClient(cfg);
+    return docker.getNetwork(networkId).inspect();
+  },
+
+  async inspectVolume(cfg: DockerConnectionConfig, volumeName: string): Promise<unknown> {
+    const docker = buildDockerClient(cfg);
+    return docker.getVolume(volumeName).inspect();
+  },
+
+  // ─── Volume file browser ──────────────────────────────────────────────────
+
+  async listVolumeFiles(
+    cfg: DockerConnectionConfig,
+    volumeName: string,
+    dirPath: string,
+  ): Promise<DockerVolumeFileEntry[]> {
+    const docker = buildDockerClient(cfg);
+    const container = await docker.createContainer({
+      Image: "busybox",
+      Cmd: ["sleep", "infinity"],
+      HostConfig: { Binds: [`${volumeName}:/vol:ro`] },
+      Labels: { "swe-temp": "true" },
+    });
+
+    try {
+      await container.start();
+
+      const exec = await container.exec({
+        Cmd: ["ls", "-la", `/vol${dirPath}`],
+        AttachStdout: true,
+        AttachStderr: false,
+      });
+
+      const stream = await exec.start({ hijack: true, stdin: false });
+
+      const rawOutput = await new Promise<string>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        (stream as NodeJS.ReadableStream).on("data", (chunk: Buffer) => chunks.push(chunk));
+        (stream as NodeJS.ReadableStream).on("end", () => {
+          resolve(parseMuxedBuffer(Buffer.concat(chunks)));
+        });
+        (stream as NodeJS.ReadableStream).on("error", reject);
+      });
+
+      return parseLsLaOutput(rawOutput, dirPath);
+    } finally {
+      try { await container.stop({ t: 0 }); } catch { /* ignore */ }
+      try { await container.remove({ force: true }); } catch { /* ignore */ }
+    }
+  },
+
+  async downloadVolumeFile(
+    cfg: DockerConnectionConfig,
+    volumeName: string,
+    filePath: string,
+  ): Promise<{ stream: NodeJS.ReadableStream; cleanup: () => Promise<void> }> {
+    const docker = buildDockerClient(cfg);
+    const container = await docker.createContainer({
+      Image: "busybox",
+      Cmd: ["sleep", "infinity"],
+      HostConfig: { Binds: [`${volumeName}:/vol:ro`] },
+      Labels: { "swe-temp": "true" },
+    });
+
+    const cleanup = async () => {
+      try { await container.stop({ t: 0 }); } catch { /* ignore */ }
+      try { await container.remove({ force: true }); } catch { /* ignore */ }
+    };
+
+    try {
+      await container.start();
+      const stream = await container.getArchive({ path: `/vol${filePath}` });
+      return { stream: stream as unknown as NodeJS.ReadableStream, cleanup };
+    } catch (err) {
+      await cleanup();
+      throw err;
     }
   },
 };
