@@ -5,9 +5,9 @@
  * wraps common resource operations used by the environment routes.
  *
  * The @kubernetes/client-node package must be installed in data-api.
- * We import it lazily so that the service still boots without it (useful in
- * local dev without a cluster).
  */
+import fs from "node:fs";
+import * as k8s from "@kubernetes/client-node";
 
 export type K8sResourceKind =
   | "pods"
@@ -42,9 +42,7 @@ export interface K8sConnectionConfig {
   context_name?: string;
 }
 
-function buildKubeConfig(cfg: K8sConnectionConfig): unknown {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const k8s = require("@kubernetes/client-node") as typeof import("@kubernetes/client-node");
+function buildKubeConfig(cfg: K8sConnectionConfig): k8s.KubeConfig {
   const kc = new k8s.KubeConfig();
 
   if (cfg.kubeconfig) {
@@ -62,6 +60,98 @@ function buildKubeConfig(cfg: K8sConnectionConfig): unknown {
   }
   return kc;
 }
+
+/**
+ * Resolves TLS settings from the currently active cluster and user in the
+ * kubeconfig, reading file-based certs if necessary.
+ */
+function resolveTLSOpts(kc: k8s.KubeConfig): {
+  rejectUnauthorized?: boolean;
+  ca?: Buffer;
+  cert?: Buffer;
+  key?: Buffer;
+} {
+  const cluster = kc.getCurrentCluster();
+  const user = kc.getCurrentUser();
+  const opts: { rejectUnauthorized?: boolean; ca?: Buffer; cert?: Buffer; key?: Buffer } = {};
+
+  if (cluster?.skipTLSVerify) opts.rejectUnauthorized = false;
+
+  if (cluster?.caData) {
+    opts.ca = Buffer.from(cluster.caData, "base64");
+  } else if (cluster?.caFile) {
+    try { opts.ca = fs.readFileSync(cluster.caFile); } catch { /* file unreadable */ }
+  }
+
+  if (user?.certData) {
+    opts.cert = Buffer.from(user.certData, "base64");
+  } else if (user?.certFile) {
+    try { opts.cert = fs.readFileSync(user.certFile); } catch { /* file unreadable */ }
+  }
+
+  if (user?.keyData) {
+    opts.key = Buffer.from(user.keyData, "base64");
+  } else if (user?.keyFile) {
+    try { opts.key = fs.readFileSync(user.keyFile); } catch { /* file unreadable */ }
+  }
+
+  return opts;
+}
+
+/**
+ * @kubernetes/client-node uses `node-fetch` internally, passing TLS settings
+ * via an `https.Agent`. Bun intercepts the `node-fetch` import and replaces it
+ * with its own built-in fetch, which ignores the `agent` option entirely.
+ *
+ * This library uses bun's native fetch with its `tls` option instead, so TLS
+ * configuration (custom CA certs, insecure-skip-tls-verify, client certs) is
+ * correctly applied.
+ */
+class BunFetchHttpLibrary implements k8s.PromiseHttpLibrary {
+  constructor(private readonly tls: { rejectUnauthorized?: boolean; ca?: Buffer; cert?: Buffer; key?: Buffer }) {}
+
+  async send(request: k8s.RequestContext): Promise<k8s.ResponseContext> {
+    const init: RequestInit & { tls?: typeof this.tls } = {
+      method: request.getHttpMethod().toString(),
+      body: request.getBody() as BodyInit,
+      headers: request.getHeaders() as HeadersInit,
+      signal: request.getSignal(),
+    };
+
+    if (Object.values(this.tls).some((v) => v !== undefined)) {
+      init.tls = this.tls;
+    }
+
+    const resp = await fetch(request.getUrl(), init);
+    const headers: Record<string, string> = {};
+    resp.headers.forEach((value, name) => { headers[name] = value; });
+
+    return new k8s.ResponseContext(resp.status, headers, {
+      text: () => resp.text(),
+      binary: () => resp.arrayBuffer().then((b) => Buffer.from(b)),
+    });
+  }
+}
+
+/**
+ * Creates an API client and replaces its internal http library with
+ * `BunFetchHttpLibrary` so that TLS settings from the kubeconfig are honoured
+ * when the service runs under bun.
+ */
+function makeApiClient<T extends k8s.ApiType>(kc: k8s.KubeConfig, ApiClass: k8s.ApiConstructor<T>): T {
+  const client = kc.makeApiClient(ApiClass);
+  const tlsOpts = resolveTLSOpts(kc);
+
+  if (Object.values(tlsOpts).some((v) => v !== undefined)) {
+    const lib = k8s.wrapHttpLibrary(new BunFetchHttpLibrary(tlsOpts));
+    // ObjectXxxApi wraps ObservableXxxApi (.api) which holds .configuration
+    const inner = (client as unknown as { api?: { configuration?: { httpApi?: unknown } } }).api;
+    if (inner?.configuration) inner.configuration.httpApi = lib;
+  }
+
+  return client;
+}
+
 
 function statusFromPod(pod: Record<string, unknown>): string {
   const status = (pod as { status?: { phase?: string } }).status;
@@ -82,13 +172,11 @@ export const KubernetesClient = {
     namespace: string,
     kind: K8sResourceKind,
   ): Promise<K8sResourceSummary[]> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const k8s = require("@kubernetes/client-node") as typeof import("@kubernetes/client-node");
-    const kc = buildKubeConfig(cfg) as InstanceType<typeof k8s.KubeConfig>;
-    const coreApi = kc.makeApiClient(k8s.CoreV1Api);
-    const appsApi = kc.makeApiClient(k8s.AppsV1Api);
-    const networkApi = kc.makeApiClient(k8s.NetworkingV1Api);
-    const batchApi = kc.makeApiClient(k8s.BatchV1Api);
+    const kc = buildKubeConfig(cfg);
+    const coreApi = makeApiClient(kc, k8s.CoreV1Api);
+    const appsApi = makeApiClient(kc, k8s.AppsV1Api);
+    const networkApi = makeApiClient(kc, k8s.NetworkingV1Api);
+    const batchApi = makeApiClient(kc, k8s.BatchV1Api);
 
     type AnyObj = { metadata?: { name?: string; namespace?: string; creationTimestamp?: string; labels?: Record<string, string> }; status?: unknown };
     let items: AnyObj[] = [];
@@ -208,11 +296,9 @@ export const KubernetesClient = {
     kind: K8sResourceKind,
     name: string,
   ): Promise<unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const k8s = require("@kubernetes/client-node") as typeof import("@kubernetes/client-node");
-    const kc = buildKubeConfig(cfg) as InstanceType<typeof k8s.KubeConfig>;
-    const coreApi = kc.makeApiClient(k8s.CoreV1Api);
-    const appsApi = kc.makeApiClient(k8s.AppsV1Api);
+    const kc = buildKubeConfig(cfg);
+    const coreApi = makeApiClient(kc, k8s.CoreV1Api);
+    const appsApi = makeApiClient(kc, k8s.AppsV1Api);
 
     switch (kind) {
       case "pods": return (await coreApi.readNamespacedPod({ name, namespace }));
@@ -231,10 +317,8 @@ export const KubernetesClient = {
     container?: string,
     tailLines = 200,
   ): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const k8s = require("@kubernetes/client-node") as typeof import("@kubernetes/client-node");
-    const kc = buildKubeConfig(cfg) as InstanceType<typeof k8s.KubeConfig>;
-    const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+    const kc = buildKubeConfig(cfg);
+    const coreApi = makeApiClient(kc, k8s.CoreV1Api);
     const result = await coreApi.readNamespacedPodLog({
       name: podName,
       namespace,
@@ -245,10 +329,8 @@ export const KubernetesClient = {
   },
 
   async listNamespaces(cfg: K8sConnectionConfig): Promise<string[]> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const k8s = require("@kubernetes/client-node") as typeof import("@kubernetes/client-node");
-    const kc = buildKubeConfig(cfg) as InstanceType<typeof k8s.KubeConfig>;
-    const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+    const kc = buildKubeConfig(cfg);
+    const coreApi = makeApiClient(kc, k8s.CoreV1Api);
     const result = await coreApi.listNamespace();
     return (result.items ?? []).map((n) => n.metadata?.name ?? "").filter(Boolean);
   },

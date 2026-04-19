@@ -4,6 +4,8 @@
  * Wraps Dockerode to list containers, images, networks, and volumes
  * for a remote Docker host described by an environment connection_config.
  */
+import Docker from "dockerode";
+import logger from "../utils/logger";
 
 export interface DockerConnectionConfig {
   type: "docker";
@@ -23,12 +25,21 @@ export interface DockerContainerSummary {
   ports: string[];
 }
 
-function buildDockerClient(cfg: DockerConnectionConfig): unknown {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Docker = require("dockerode") as typeof import("dockerode");
+function buildDockerClient(cfg: DockerConnectionConfig): Docker {
+  logger.debug({ cfg }, "Building Docker client with config");
 
   if (!cfg.host) {
     return new Docker();
+  }
+
+  if (cfg.host.startsWith("unix://")) {
+    const socketPath = cfg.host.replace("unix://", "");
+    // docker-cli.sock is a Docker Desktop management socket, not the Engine API.
+    // Fall back to the standard Engine API socket to avoid 404 errors.
+    const engineSocket = socketPath.endsWith("docker-cli.sock")
+      ? "/var/run/docker.sock"
+      : socketPath;
+    return new Docker({ socketPath: engineSocket });
   }
 
   // Parse tcp:// host
@@ -56,8 +67,7 @@ function formatPorts(ports: Array<{ PublicPort?: number; PrivatePort?: number; T
 
 export const DockerClient = {
   async listContainers(cfg: DockerConnectionConfig): Promise<DockerContainerSummary[]> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const docker = buildDockerClient(cfg) as import("dockerode");
+    const docker = buildDockerClient(cfg);
     const containers = await docker.listContainers({ all: true });
     return containers.map((c) => ({
       id: c.Id.slice(0, 12),
@@ -71,15 +81,13 @@ export const DockerClient = {
   },
 
   async getContainer(cfg: DockerConnectionConfig, id: string): Promise<unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const docker = buildDockerClient(cfg) as import("dockerode");
+    const docker = buildDockerClient(cfg);
     const container = docker.getContainer(id);
     return container.inspect();
   },
 
   async getContainerLogs(cfg: DockerConnectionConfig, id: string, tail = 200): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const docker = buildDockerClient(cfg) as import("dockerode");
+    const docker = buildDockerClient(cfg);
     const container = docker.getContainer(id);
     const stream = await container.logs({ stdout: true, stderr: true, tail });
     // dockerode returns a Buffer for non-multiplexed streams
@@ -87,31 +95,28 @@ export const DockerClient = {
   },
 
   async listImages(cfg: DockerConnectionConfig): Promise<unknown[]> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const docker = buildDockerClient(cfg) as import("dockerode");
+    const docker = buildDockerClient(cfg);
     return docker.listImages({ all: false });
   },
 
   async listNetworks(cfg: DockerConnectionConfig): Promise<unknown[]> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const docker = buildDockerClient(cfg) as import("dockerode");
+    const docker = buildDockerClient(cfg);
     return docker.listNetworks();
   },
 
   async listVolumes(cfg: DockerConnectionConfig): Promise<unknown[]> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const docker = buildDockerClient(cfg) as import("dockerode");
+    const docker = buildDockerClient(cfg);
     const r = await docker.listVolumes();
     return r.Volumes ?? [];
   },
 
   async testConnection(cfg: DockerConnectionConfig): Promise<{ ok: boolean; version?: string }> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const docker = buildDockerClient(cfg) as import("dockerode");
+      const docker = buildDockerClient(cfg);
       const info = await docker.version();
       return { ok: true, version: (info as { Version?: string }).Version };
-    } catch {
+    } catch (e){
+      logger.error({ err: e }, "Docker connection test failed");
       return { ok: false };
     }
   },

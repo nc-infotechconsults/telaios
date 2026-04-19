@@ -6,7 +6,7 @@ import type { RegisterDto, LoginDto } from "../schemas/auth.schema";
 
 const repo = () => AppDataSource.getRepository(User);
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || '';
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET environment variable is required");
 }
@@ -21,7 +21,7 @@ export function signToken(user: User): string {
 }
 
 export function verifyToken(token: string): { sub: string; email: string; system_role: string } {
-  return jwt.verify(token, JWT_SECRET) as { sub: string; email: string; system_role: string };
+  return jwt.verify(token, JWT_SECRET) as unknown as { sub: string; email: string; system_role: string };
 }
 
 export function sanitizeUser(user: User) {
