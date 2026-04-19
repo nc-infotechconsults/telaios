@@ -19,6 +19,7 @@ import {
 import { listDockerImages, removeDockerImage } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerImage } from "../../types";
+import DockerImageDetail from "./DockerImageDetail";
 
 interface Props {
   environmentId: string;
@@ -36,6 +37,7 @@ export default function DockerImageList({ environmentId }: Props) {
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DockerImage | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   const load = useCallback(async () => {
@@ -87,54 +89,79 @@ export default function DockerImageList({ environmentId }: Props) {
           <p className="text-sm">No images found</p>
         </div>
       ) : (
-        <Table aria-label="Docker images" removeWrapper>
-          <TableHeader>
-            <TableColumn>REPOSITORY / TAG</TableColumn>
-            <TableColumn>IMAGE ID</TableColumn>
-            <TableColumn>SIZE</TableColumn>
-            <TableColumn>CREATED</TableColumn>
-            <TableColumn>ACTIONS</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {images.map((img) => (
-              <TableRow key={img.id}>
-                <TableCell>
-                  {img.tags.length > 0 ? (
-                    <div className="flex flex-col gap-0.5">
-                      {img.tags.map((t) => (
-                        <span key={t} className="text-xs font-mono">{t}</span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-default-400 italic">&lt;none&gt;</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs font-mono text-default-400">{img.id.slice(0, 12)}</span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs">{formatSize(img.size)}</span>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-default-400">{new Date(img.created).toLocaleDateString()}</span>
-                </TableCell>
-                <TableCell>
-                  <Tooltip content="Remove image" color="danger">
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      color="danger"
-                      isLoading={removing === img.id}
-                      onPress={() => { setDeleteTarget(img); onOpen(); }}
-                    >
-                      Remove
-                    </Button>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="flex gap-4">
+          {/* Table side */}
+          <div className={`min-w-0 overflow-auto ${selectedId ? "flex-1" : "w-full"}`}>
+            <Table aria-label="Docker images" removeWrapper>
+              <TableHeader>
+                <TableColumn>REPOSITORY / TAG</TableColumn>
+                <TableColumn>IMAGE ID</TableColumn>
+                <TableColumn>SIZE</TableColumn>
+                <TableColumn>CREATED</TableColumn>
+                <TableColumn>ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {images.map((img) => (
+                  <TableRow
+                    key={img.id}
+                    className={`cursor-pointer ${selectedId === img.id ? "bg-default-100" : ""}`}
+                    onClick={() => setSelectedId((prev) => (prev === img.id ? null : img.id))}
+                  >
+                    <TableCell>
+                      {img.tags.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {img.tags.map((t) => (
+                            <span key={t} className="text-xs font-mono">{t}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-default-400 italic">&lt;none&gt;</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs font-mono text-default-400">{img.id.slice(0, 12)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs">{formatSize(img.size)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-default-400">{new Date(img.created).toLocaleDateString()}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Tooltip content="Remove image" color="danger">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            isLoading={removing === img.id}
+                            onPress={() => { setDeleteTarget(img); onOpen(); }}
+                          >
+                            Remove
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Detail panel */}
+          {selectedId && (() => {
+            const selected = images.find((img) => img.id === selectedId);
+            return selected ? (
+              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+                <DockerImageDetail
+                  environmentId={environmentId}
+                  image={selected}
+                  onClose={() => setSelectedId(null)}
+                />
+              </div>
+            ) : null;
+          })()}
+        </div>
       )}
 
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="sm">

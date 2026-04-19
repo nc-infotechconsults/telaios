@@ -20,6 +20,7 @@ import {
 import { listDockerVolumes, removeDockerVolume } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerVolume } from "../../types";
+import DockerVolumeDetail from "./DockerVolumeDetail";
 
 interface Props {
   environmentId: string;
@@ -30,6 +31,7 @@ export default function DockerVolumeList({ environmentId }: Props) {
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DockerVolume | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   const load = useCallback(async () => {
@@ -81,50 +83,75 @@ export default function DockerVolumeList({ environmentId }: Props) {
           <p className="text-sm">No volumes found</p>
         </div>
       ) : (
-        <Table aria-label="Docker volumes" removeWrapper>
-          <TableHeader>
-            <TableColumn>NAME</TableColumn>
-            <TableColumn>DRIVER</TableColumn>
-            <TableColumn>SCOPE</TableColumn>
-            <TableColumn>MOUNTPOINT</TableColumn>
-            <TableColumn>CREATED</TableColumn>
-            <TableColumn>ACTIONS</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {volumes.map((vol) => (
-              <TableRow key={vol.name}>
-                <TableCell>
-                  <p className="text-sm font-medium font-mono truncate max-w-[200px]">{vol.name}</p>
-                </TableCell>
-                <TableCell>
-                  <Chip size="sm" variant="flat">{vol.driver}</Chip>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-default-400">{vol.scope}</span>
-                </TableCell>
-                <TableCell>
-                  <p className="text-xs font-mono text-default-400 truncate max-w-[200px]">{vol.mountpoint}</p>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-default-400">{new Date(vol.created).toLocaleDateString()}</span>
-                </TableCell>
-                <TableCell>
-                  <Tooltip content="Remove volume" color="danger">
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      color="danger"
-                      isLoading={removing === vol.name}
-                      onPress={() => { setDeleteTarget(vol); onOpen(); }}
-                    >
-                      Remove
-                    </Button>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="flex gap-4">
+          {/* Table side */}
+          <div className={`min-w-0 overflow-auto ${selectedName ? "flex-1" : "w-full"}`}>
+            <Table aria-label="Docker volumes" removeWrapper>
+              <TableHeader>
+                <TableColumn>NAME</TableColumn>
+                <TableColumn>DRIVER</TableColumn>
+                <TableColumn>SCOPE</TableColumn>
+                <TableColumn>MOUNTPOINT</TableColumn>
+                <TableColumn>CREATED</TableColumn>
+                <TableColumn>ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {volumes.map((vol) => (
+                  <TableRow
+                    key={vol.name}
+                    className={`cursor-pointer ${selectedName === vol.name ? "bg-default-100" : ""}`}
+                    onClick={() => setSelectedName((prev) => (prev === vol.name ? null : vol.name))}
+                  >
+                    <TableCell>
+                      <p className="text-sm font-medium font-mono truncate max-w-[200px]">{vol.name}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Chip size="sm" variant="flat">{vol.driver}</Chip>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-default-400">{vol.scope}</span>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-xs font-mono text-default-400 truncate max-w-[200px]">{vol.mountpoint}</p>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-default-400">{new Date(vol.created).toLocaleDateString()}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Tooltip content="Remove volume" color="danger">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            isLoading={removing === vol.name}
+                            onPress={() => { setDeleteTarget(vol); onOpen(); }}
+                          >
+                            Remove
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Detail panel */}
+          {selectedName && (() => {
+            const selected = volumes.find((v) => v.name === selectedName);
+            return selected ? (
+              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+                <DockerVolumeDetail
+                  environmentId={environmentId}
+                  volume={selected}
+                  onClose={() => setSelectedName(null)}
+                />
+              </div>
+            ) : null;
+          })()}
+        </div>
       )}
 
       <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="sm">

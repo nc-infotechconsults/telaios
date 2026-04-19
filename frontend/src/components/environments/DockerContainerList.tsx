@@ -27,6 +27,7 @@ import {
 } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerContainer, DockerContainerState } from "../../types";
+import DockerContainerDetail from "./DockerContainerDetail";
 
 interface Props {
   environmentId: string;
@@ -45,6 +46,7 @@ export default function DockerContainerList({ environmentId }: Props) {
   const [containers, setContainers] = useState<DockerContainer[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Log viewer state
   const [logContainerId, setLogContainerId] = useState<string | null>(null);
@@ -140,110 +142,133 @@ export default function DockerContainerList({ environmentId }: Props) {
           <p className="text-sm">No containers found</p>
         </div>
       ) : (
-        <Table aria-label="Docker containers" removeWrapper>
-          <TableHeader>
-            <TableColumn>NAME</TableColumn>
-            <TableColumn>IMAGE</TableColumn>
-            <TableColumn>STATE</TableColumn>
-            <TableColumn>STATUS</TableColumn>
-            <TableColumn>PORTS</TableColumn>
-            <TableColumn>ACTIONS</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {containers.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell>
-                  <p className="text-sm font-medium truncate max-w-[200px]">{c.name}</p>
-                  <p className="text-xs text-default-400 font-mono">{c.id.slice(0, 12)}</p>
-                </TableCell>
-                <TableCell>
-                  <p className="text-xs font-mono truncate max-w-[200px]">{c.image}</p>
-                </TableCell>
-                <TableCell>
-                  <Chip size="sm" variant="flat" color={STATE_COLOR[c.state] ?? "default"}>
-                    {c.state}
-                  </Chip>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-default-400">{c.status}</span>
-                </TableCell>
-                <TableCell>
-                  {c.ports.length > 0 ? (
-                    <div className="flex flex-col gap-0.5">
-                      {c.ports.slice(0, 3).map((p, i) => (
-                        <span key={i} className="text-xs font-mono">
-                          {p.host != null ? `${p.host}:` : ""}{p.container}/{p.protocol}
-                        </span>
-                      ))}
-                      {c.ports.length > 3 && (
-                        <span className="text-xs text-default-400">+{c.ports.length - 3} more</span>
+        <div className="flex gap-4">
+          {/* Table side */}
+          <div className={`min-w-0 overflow-auto ${selectedId ? "flex-1" : "w-full"}`}>
+            <Table aria-label="Docker containers" removeWrapper>
+              <TableHeader>
+                <TableColumn>NAME</TableColumn>
+                <TableColumn>IMAGE</TableColumn>
+                <TableColumn>STATE</TableColumn>
+                <TableColumn>STATUS</TableColumn>
+                <TableColumn>PORTS</TableColumn>
+                <TableColumn>ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {containers.map((c) => (
+                  <TableRow
+                    key={c.id}
+                    className={`cursor-pointer ${selectedId === c.id ? "bg-default-100" : ""}`}
+                    onClick={() => setSelectedId((prev) => (prev === c.id ? null : c.id))}
+                  >
+                    <TableCell>
+                      <p className="text-sm font-medium truncate max-w-[200px]">{c.name}</p>
+                      <p className="text-xs text-default-400 font-mono">{c.id.slice(0, 12)}</p>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-xs font-mono truncate max-w-[200px]">{c.image}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Chip size="sm" variant="flat" color={STATE_COLOR[c.state] ?? "default"}>
+                        {c.state}
+                      </Chip>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-default-400">{c.status}</span>
+                    </TableCell>
+                    <TableCell>
+                      {c.ports.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {c.ports.slice(0, 3).map((p, i) => (
+                            <span key={i} className="text-xs font-mono">
+                              {p.host != null ? `${p.host}:` : ""}{p.container}/{p.protocol}
+                            </span>
+                          ))}
+                          {c.ports.length > 3 && (
+                            <span className="text-xs text-default-400">+{c.ports.length - 3} more</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-default-400">-</span>
                       )}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-default-400">-</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    {c.state !== "running" ? (
-                      <Tooltip content="Start">
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="success"
-                          isLoading={actionLoading === c.id}
-                          onPress={() => handleAction(c.id, "start")}
-                        >
-                          Start
-                        </Button>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip content="Stop">
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="warning"
-                          isLoading={actionLoading === c.id}
-                          onPress={() => handleAction(c.id, "stop")}
-                        >
-                          Stop
-                        </Button>
-                      </Tooltip>
-                    )}
-                    <Tooltip content="Restart">
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        isLoading={actionLoading === c.id}
-                        onPress={() => handleAction(c.id, "restart")}
-                      >
-                        Restart
-                      </Button>
-                    </Tooltip>
-                    <Tooltip content="View logs">
-                      <Button size="sm" variant="flat" onPress={() => handleViewLogs(c.id)}>
-                        Logs
-                      </Button>
-                    </Tooltip>
-                    <Tooltip content="Remove" color="danger">
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        color="danger"
-                        onPress={() => {
-                          setDeleteTarget(c);
-                          onDeleteOpen();
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </Tooltip>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {c.state !== "running" ? (
+                          <Tooltip content="Start">
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="success"
+                              isLoading={actionLoading === c.id}
+                              onPress={() => handleAction(c.id, "start")}
+                            >
+                              Start
+                            </Button>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip content="Stop">
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="warning"
+                              isLoading={actionLoading === c.id}
+                              onPress={() => handleAction(c.id, "stop")}
+                            >
+                              Stop
+                            </Button>
+                          </Tooltip>
+                        )}
+                        <Tooltip content="Restart">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            isLoading={actionLoading === c.id}
+                            onPress={() => handleAction(c.id, "restart")}
+                          >
+                            Restart
+                          </Button>
+                        </Tooltip>
+                        <Tooltip content="View logs">
+                          <Button size="sm" variant="flat" onPress={() => handleViewLogs(c.id)}>
+                            Logs
+                          </Button>
+                        </Tooltip>
+                        <Tooltip content="Remove" color="danger">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            onPress={() => {
+                              setDeleteTarget(c);
+                              onDeleteOpen();
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Detail panel */}
+          {selectedId && (() => {
+            const selected = containers.find((c) => c.id === selectedId);
+            return selected ? (
+              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+                <DockerContainerDetail
+                  environmentId={environmentId}
+                  container={selected}
+                  onClose={() => setSelectedId(null)}
+                />
+              </div>
+            ) : null;
+          })()}
+        </div>
       )}
 
       {/* Log viewer modal */}
