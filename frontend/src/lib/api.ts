@@ -14,6 +14,12 @@ import type {
   Settings,
   User,
   Document,
+  DocumentFolder,
+  DocumentVersion,
+  DocumentTag,
+  DocumentComment,
+  DocumentActivityItem,
+  DocumentTemplate,
   Workspace,
   WorkspaceConfig,
   Environment,
@@ -336,6 +342,9 @@ export const testLlm = (data: { provider: string; model: string; apiKey?: string
 export const listDocuments = (projectId: string): Promise<Document[]> =>
   DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents`).then((r) => r.data);
 
+export const getDocument = (projectId: string, documentId: string): Promise<Document> =>
+  http.get<Document>(`/projects/${projectId}/documents/${documentId}`).then((r) => r.data);
+
 export const uploadDocument = (projectId: string, file: File): Promise<Document> => {
   if (DEMO) {
     return delay<Document>({
@@ -350,6 +359,8 @@ export const uploadDocument = (projectId: string, file: File): Promise<Document>
       status: "processing",
       error_message: null,
       metadata: null,
+      folder_id: null,
+      current_version_id: null,
       uploaded_by: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -367,6 +378,136 @@ export const getDocumentDownloadUrl = (projectId: string, id: string): Promise<s
   DEMO
     ? delay("")
     : http.get<{ url: string }>(`/projects/${projectId}/documents/${id}/download`).then((r) => r.data.url);
+
+export const updateDocumentContent = (projectId: string, id: string, content: string): Promise<Document> =>
+  DEMO
+    ? delay({} as Document)
+    : http.put<Document>(`/projects/${projectId}/documents/${id}/content`, { content }).then((r) => r.data);
+
+// ─── Document Folders ─────────────────────────────────────────────────────────
+
+export const listFolders = (projectId: string, parentFolderId?: string | null): Promise<DocumentFolder[]> =>
+  DEMO ? delay([]) : http.get<DocumentFolder[]>(`/projects/${projectId}/folders`, { params: parentFolderId ? { parent_folder_id: parentFolderId } : undefined }).then((r) => r.data);
+
+export const listAllFolders = (projectId: string): Promise<DocumentFolder[]> =>
+  DEMO ? delay([]) : http.get<DocumentFolder[]>(`/projects/${projectId}/folders/all`).then((r) => r.data);
+
+export const createFolder = (projectId: string, data: { name: string; parent_folder_id?: string | null }): Promise<DocumentFolder> =>
+  DEMO
+    ? delay<DocumentFolder>({
+        id: `folder-${Date.now()}`,
+        project_id: projectId,
+        parent_folder_id: data.parent_folder_id ?? null,
+        name: data.name,
+        path: `/${data.name}`,
+        created_by: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http.post<DocumentFolder>(`/projects/${projectId}/folders`, data).then((r) => r.data);
+
+export const patchFolder = (projectId: string, folderId: string, data: { name?: string; parent_folder_id?: string | null }): Promise<DocumentFolder> =>
+  http.patch<DocumentFolder>(`/projects/${projectId}/folders/${folderId}`, data).then((r) => r.data);
+
+export const deleteFolder = (projectId: string, folderId: string): Promise<void> =>
+  http.delete(`/projects/${projectId}/folders/${folderId}`).then(() => undefined);
+
+// ─── Document Versions ────────────────────────────────────────────────────────
+
+export const listVersions = (projectId: string, documentId: string): Promise<DocumentVersion[]> =>
+  DEMO ? delay([]) : http.get<DocumentVersion[]>(`/projects/${projectId}/documents/${documentId}/versions`).then((r) => r.data);
+
+export const uploadVersion = (projectId: string, documentId: string, file: File, changeDescription?: string): Promise<DocumentVersion> => {
+  const form = new FormData();
+  form.append("file", file);
+  if (changeDescription) form.append("change_description", changeDescription);
+  return http.post<DocumentVersion>(`/projects/${projectId}/documents/${documentId}/versions`, form).then((r) => r.data);
+};
+
+export const getVersionDownloadUrl = (projectId: string, documentId: string, versionId: string): Promise<string> =>
+  http.get<{ url: string }>(`/projects/${projectId}/documents/${documentId}/versions/${versionId}/download`).then((r) => r.data.url);
+
+// ─── Document Tags ────────────────────────────────────────────────────────────
+
+export const listTags = (projectId: string): Promise<DocumentTag[]> =>
+  DEMO ? delay([]) : http.get<DocumentTag[]>(`/projects/${projectId}/tags`).then((r) => r.data);
+
+export const createTag = (projectId: string, data: { name: string; color?: string }): Promise<DocumentTag> =>
+  http.post<DocumentTag>(`/projects/${projectId}/tags`, data).then((r) => r.data);
+
+export const deleteTag = (projectId: string, tagId: string): Promise<void> =>
+  http.delete(`/projects/${projectId}/tags/${tagId}`).then(() => undefined);
+
+export const getDocumentTags = (projectId: string, documentId: string): Promise<DocumentTag[]> =>
+  DEMO ? delay([]) : http.get<DocumentTag[]>(`/projects/${projectId}/documents/${documentId}/tags`).then((r) => r.data);
+
+export const assignDocumentTag = (projectId: string, documentId: string, tagId: string): Promise<void> =>
+  http.post(`/projects/${projectId}/documents/${documentId}/tags/${tagId}`).then(() => undefined);
+
+export const unassignDocumentTag = (projectId: string, documentId: string, tagId: string): Promise<void> =>
+  http.delete(`/projects/${projectId}/documents/${documentId}/tags/${tagId}`).then(() => undefined);
+
+// ─── Document Comments ────────────────────────────────────────────────────────
+
+export const listComments = (projectId: string, documentId: string): Promise<DocumentComment[]> =>
+  DEMO ? delay([]) : http.get<DocumentComment[]>(`/projects/${projectId}/documents/${documentId}/comments`).then((r) => r.data);
+
+export const createComment = (projectId: string, documentId: string, data: { content: string; anchor_type?: string; parent_comment_id?: string | null }): Promise<DocumentComment> =>
+  http.post<DocumentComment>(`/projects/${projectId}/documents/${documentId}/comments`, data).then((r) => r.data);
+
+export const patchComment = (projectId: string, documentId: string, commentId: string, data: { content?: string; resolved?: boolean }): Promise<DocumentComment> =>
+  http.patch<DocumentComment>(`/projects/${projectId}/documents/${documentId}/comments/${commentId}`, data).then((r) => r.data);
+
+export const deleteComment = (projectId: string, documentId: string, commentId: string): Promise<void> =>
+  http.delete(`/projects/${projectId}/documents/${documentId}/comments/${commentId}`).then(() => undefined);
+
+// ─── Document Activity ────────────────────────────────────────────────────────
+
+export const listDocumentActivities = (projectId: string, documentId: string): Promise<DocumentActivityItem[]> =>
+  DEMO ? delay([]) : http.get<DocumentActivityItem[]>(`/projects/${projectId}/documents/${documentId}/activity`).then((r) => r.data);
+
+export const listProjectDocumentActivities = (projectId: string): Promise<DocumentActivityItem[]> =>
+  DEMO ? delay([]) : http.get<DocumentActivityItem[]>(`/projects/${projectId}/activity/documents`).then((r) => r.data);
+
+// ─── Document Templates ───────────────────────────────────────────────────────
+
+export const listGlobalTemplates = (): Promise<DocumentTemplate[]> =>
+  DEMO ? delay([]) : http.get<DocumentTemplate[]>("/templates").then((r) => r.data);
+
+export const listProjectTemplates = (projectId: string): Promise<DocumentTemplate[]> =>
+  DEMO ? delay([]) : http.get<DocumentTemplate[]>(`/projects/${projectId}/templates`).then((r) => r.data);
+
+// ─── Document Favorites ───────────────────────────────────────────────────────
+
+export const listFavorites = (projectId: string): Promise<string[]> =>
+  DEMO ? delay([]) : http.get<string[]>(`/projects/${projectId}/favorites`).then((r) => r.data);
+
+export const checkFavorite = (projectId: string, documentId: string): Promise<boolean> =>
+  DEMO ? delay(false) : http.get<{ is_favorite: boolean }>(`/projects/${projectId}/documents/${documentId}/favorite`).then((r) => r.data.is_favorite);
+
+export const addFavorite = (projectId: string, documentId: string): Promise<void> =>
+  http.post(`/projects/${projectId}/documents/${documentId}/favorite`).then(() => undefined);
+
+export const removeFavorite = (projectId: string, documentId: string): Promise<void> =>
+  http.delete(`/projects/${projectId}/documents/${documentId}/favorite`).then(() => undefined);
+
+// ─── Document Search ──────────────────────────────────────────────────────────
+
+export const searchDocuments = (projectId: string, params: { q?: string; type?: string; tag?: string }): Promise<Document[]> =>
+  DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents/search`, { params }).then((r) => r.data);
+
+// ─── Document Trash ───────────────────────────────────────────────────────────
+
+export const listTrash = (projectId: string): Promise<Document[]> =>
+  DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents/trash`).then((r) => r.data);
+
+export const restoreDocument = (projectId: string, documentId: string): Promise<Document> =>
+  http.post<Document>(`/projects/${projectId}/documents/${documentId}/restore`).then((r) => r.data);
+
+// ─── Document with folder update ─────────────────────────────────────────────
+
+export const moveDocument = (projectId: string, documentId: string, folderId: string | null): Promise<Document> =>
+  http.patch<Document>(`/projects/${projectId}/documents/${documentId}`, { metadata: { folder_id: folderId } }).then((r) => r.data);
 
 // ─── Workspaces ───────────────────────────────────────────────────────────────
 
@@ -485,3 +626,32 @@ export const uninstallHelmRelease = (envId: string, releaseName: string): Promis
 export const scanProjectCharts = (envId: string): Promise<Array<{ name: string; version: string; description: string; localPath?: string }>> =>
   http.get(`/environments/${envId}/helm/charts/scan`).then((r) => r.data as Array<{ name: string; version: string; description: string; localPath?: string }>);
 
+
+// ─── Document Copilot ─────────────────────────────────────────────────────────
+
+export interface CopilotSummarizeResult {
+  summary: string;
+  key_points: string[];
+  word_count: number;
+}
+
+export interface CopilotAskResult {
+  answer: string;
+  confidence: number;
+  sources: string[];
+}
+
+export interface CopilotExtractResult {
+  entities: Record<string, unknown>;
+  tables: Array<Record<string, unknown>>;
+  key_values: Record<string, string>;
+}
+
+export const copilotSummarize = (projectId: string, documentId: string): Promise<CopilotSummarizeResult> =>
+  http.post<CopilotSummarizeResult>(`/projects/${projectId}/documents/${documentId}/copilot/summarize`).then((r) => r.data);
+
+export const copilotAsk = (projectId: string, documentId: string, question: string): Promise<CopilotAskResult> =>
+  http.post<CopilotAskResult>(`/projects/${projectId}/documents/${documentId}/copilot/ask`, { question }).then((r) => r.data);
+
+export const copilotExtract = (projectId: string, documentId: string): Promise<CopilotExtractResult> =>
+  http.post<CopilotExtractResult>(`/projects/${projectId}/documents/${documentId}/copilot/extract`).then((r) => r.data);

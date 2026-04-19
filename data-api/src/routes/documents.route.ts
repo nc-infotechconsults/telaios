@@ -1,4 +1,5 @@
 import { Router } from "express";
+import express from "express";
 import multer from "multer";
 import * as documentController from "../controllers/document.controller";
 import { requireProjectAccess } from "../middleware/requireProjectAccess.middleware";
@@ -10,6 +11,18 @@ router.get(
   "/:projectId/documents",
   requireProjectAccess("viewer"),
   documentController.listDocuments,
+);
+
+router.get(
+  "/:projectId/documents/trash",
+  requireProjectAccess("viewer"),
+  documentController.listTrash,
+);
+
+router.get(
+  "/:projectId/documents/search",
+  requireProjectAccess("viewer"),
+  documentController.searchDocuments,
 );
 
 router.post(
@@ -37,10 +50,23 @@ router.patch(
   documentController.patchDocument,
 );
 
+router.put(
+  "/:projectId/documents/:id/content",
+  requireProjectAccess("editor"),
+  express.json({ limit: "2mb" }),
+  documentController.updateContent,
+);
+
 router.delete(
   "/:projectId/documents/:id",
   requireProjectAccess("editor"),
   documentController.deleteDocument,
+);
+
+router.post(
+  "/:projectId/documents/:id/restore",
+  requireProjectAccess("editor"),
+  documentController.restoreDocument,
 );
 
 export default router;

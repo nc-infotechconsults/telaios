@@ -66,3 +66,18 @@ export async function deleteDocument(
 ): Promise<void> {
   await repo().softDelete({ id: documentId, project_id: projectId });
 }
+
+export async function listTrashedDocuments(projectId: string): Promise<Document[]> {
+  return repo().find({
+    withDeleted: true,
+    where: { project_id: projectId },
+    order: { created_at: "DESC" },
+  }).then((docs) => docs.filter((d) => d.deleted_at !== null));
+}
+
+export async function restoreDocument(
+  documentId: string,
+  projectId: string,
+): Promise<void> {
+  await repo().restore({ id: documentId, project_id: projectId });
+}

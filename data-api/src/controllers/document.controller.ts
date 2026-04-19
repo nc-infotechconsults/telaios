@@ -105,3 +105,82 @@ export async function deleteDocument(req: Request, res: Response) {
   await documentService.deleteDocument(req.params.id, req.params.projectId);
   res.status(204).send();
 }
+
+export async function listTrash(req: Request, res: Response) {
+  const docs = await documentService.listTrashedDocuments(req.params.projectId);
+  res.json(docs);
+}
+
+export async function restoreDocument(req: Request, res: Response) {
+  await documentService.restoreDocument(req.params.id, req.params.projectId);
+  const doc = await documentService.getDocument(req.params.id, req.params.projectId);
+  if (!doc) return res.status(404).json({ error: "Not found" });
+  return res.json(doc);
+}
+
+export async function updateContent(req: Request, res: Response) {
+  const { content } = req.body as { content?: string };
+  if (typeof content !== "string") {
+    return res.status(400).json({ error: "content (string) is required" });
+  }
+
+  const doc = await documentService.getDocument(req.params.id, req.params.projectId);
+  if (!doc) return res.status(404).json({ error: "Not found" });
+
+  const EDITABLE_TYPES = new Set(["md", "txt", "csv", "json"]);
+  if (!EDITABLE_TYPES.has(doc.file_type)) {
+    return res.status(422).json({ error: `${doc.file_type} files cannot be edited in-browser` });
+  }
+
+  const buffer = Buffer.from(content, "utf-8");
+  const checksum_sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
+
+  await uploadToS3(doc.s3_key, buffer, doc.mime_type);
+
+  const updated = await documentService.patchDocument(req.params.id, req.params.projectId, {
+    size_bytes: buffer.byteLength,
+    checksum_sha256,
+    status: "ready",
+  });
+
+  return res.json(updated);
+}
+
+export async function searchDocuments(req: Request, res: Response) {
+  const { q, type, tag } = req.query as { q?: string; type?: string; tag?: string };
+  const { AppDataSource } = await import("../configs/data-source.config");
+
+  const params: unknown[] = [req.params.projectId];
+  let query = `SELECT DISTINCT d.* FROM documents d`;
+
+  if (tag) {
+    query += ` JOIN document_document_tags ddt ON ddt.document_id = d.id`;
+    query += ` JOIN document_tags dt ON dt.id = ddt.tag_id`;
+  }
+
+  if (q) {
+    query += ` LEFT JOIN document_chunks dc ON dc.document_id = d.id`;
+  }
+
+  query += ` WHERE d.project_id = $1 AND d.deleted_at IS NULL`;
+
+  if (q) {
+    params.push(`%${q}%`);
+    query += ` AND (d.name ILIKE $${params.length} OR dc.content ILIKE $${params.length})`;
+  }
+
+  if (type) {
+    params.push(type);
+    query += ` AND d.file_type = $${params.length}`;
+  }
+
+  if (tag) {
+    params.push(tag);
+    query += ` AND dt.id = $${params.length}`;
+  }
+
+  query += ` ORDER BY d.created_at DESC`;
+
+  const results = await AppDataSource.query(query, params);
+  res.json(results);
+}

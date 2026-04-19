@@ -8,6 +8,7 @@ export const AgentRoleSchema = z.enum([
   "infra",
   "knowledge",
   "custom",
+  "document-copilot",
 ]);
 
 export const AssignAgentSchema = z.object({

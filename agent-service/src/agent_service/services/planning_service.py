@@ -379,10 +379,11 @@ def _scan_repo_structure(root_path: str, max_depth: int = 3) -> str:
 async def _gather_project_context(
     project_id: str, current_plan_id: str
 ) -> Dict[str, Any]:
-    project, all_plans, repos = await asyncio.gather(
+    project, all_plans, repos, documents = await asyncio.gather(
         data_client.get_project(project_id),
         data_client.get_project_plans(project_id),
         data_client.get_project_repositories(project_id),
+        data_client.list_project_documents(project_id),
     )
 
     existing_plans = [
@@ -401,11 +402,23 @@ async def _gather_project_context(
                 structure = "(unable to scan)"
         repo_structures.append({"name": r["name"], "structure": structure})
 
+    # Only surface documents that have been processed (status == "ready")
+    ready_docs = [
+        {
+            "name": d.get("name", ""),
+            "file_type": d.get("file_type", ""),
+            "size_bytes": d.get("size_bytes", 0),
+        }
+        for d in documents
+        if d.get("status") == "ready"
+    ]
+
     return {
         "name": project["name"],
         "description": project.get("description"),
         "existingPlans": existing_plans,
         "repoStructures": repo_structures,
+        "documents": ready_docs,
     }
 
 
@@ -427,6 +440,13 @@ def _build_project_context_text(ctx: Dict[str, Any], plan_title: Optional[str]) 
         lines.append("\nRepository file structure(s):")
         for r in ctx["repoStructures"]:
             lines.append(f"\n### {r['name']}\n```\n{r['structure']}\n```")
+
+    docs = ctx.get("documents", [])
+    if docs:
+        lines.append("\nProject documents (already uploaded and indexed — reference them in task descriptions when relevant):")
+        for d in docs:
+            size_kb = round(d.get("size_bytes", 0) / 1024, 1)
+            lines.append(f"  - {d['name']} ({d.get('file_type', 'unknown')}, {size_kb} KB)")
 
     return "\n".join(lines)
 

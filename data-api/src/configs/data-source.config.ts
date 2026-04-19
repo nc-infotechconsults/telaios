@@ -12,6 +12,7 @@ import {Migration1775941500000} from "../migrations/1775941500000-migration";
 import {Migration1775942000000} from "../migrations/1775942000000-migration";
 import {Migration1775950000000} from "../migrations/1775950000000-migration";
 import {Migration1775960000000} from "../migrations/1775960000000-migration";
+import {Migration1775960100000} from "../migrations/1775960100000-migration";
 import {Migration1775970000000} from "../migrations/1775970000000-migration";
 import {Project} from "../entities/Project.entity";
 import {Repository} from "../entities/Repository.entity";
@@ -31,6 +32,13 @@ import {TaskArtifact} from "../entities/TaskArtifact.entity";
 import {Workspace} from "../entities/Workspace.entity";
 import {Environment} from "../entities/Environment.entity";
 import {HelmRelease} from "../entities/HelmRelease.entity";
+import {DocumentFolder} from "../entities/DocumentFolder.entity";
+import {DocumentVersion} from "../entities/DocumentVersion.entity";
+import {DocumentTag} from "../entities/DocumentTag.entity";
+import {DocumentComment} from "../entities/DocumentComment.entity";
+import {DocumentActivity} from "../entities/DocumentActivity.entity";
+import {DocumentTemplate} from "../entities/DocumentTemplate.entity";
+import {DocumentFavorite} from "../entities/DocumentFavorite.entity";
 
 dotenv.config();
 
@@ -59,6 +67,13 @@ export const AppDataSource = new DataSource({
     Workspace,
     Environment,
     HelmRelease,
+    DocumentFolder,
+    DocumentVersion,
+    DocumentTag,
+    DocumentComment,
+    DocumentActivity,
+    DocumentTemplate,
+    DocumentFavorite,
   ],
   migrations: [
     Migration1775914943523,
@@ -72,6 +87,7 @@ export const AppDataSource = new DataSource({
     Migration1775942000000,
     Migration1775950000000,
     Migration1775960000000,
+    Migration1775960100000,
     Migration1775970000000,
   ],
 });

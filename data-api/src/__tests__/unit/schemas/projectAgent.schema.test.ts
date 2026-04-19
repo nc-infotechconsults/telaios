@@ -10,7 +10,7 @@ describe("AssignAgentSchema", () => {
   });
 
   it("accepts all valid role values", () => {
-    const roles = ["planner", "coder", "reviewer", "tester", "infra", "knowledge", "custom"];
+    const roles = ["planner", "coder", "reviewer", "tester", "infra", "knowledge", "custom", "document-copilot"];
     for (const role of roles) {
       const result = AssignAgentSchema.safeParse({
         agent_profile_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -83,6 +83,16 @@ describe("PatchProjectAgentSchema", () => {
 
   it("accepts valid partial role update", () => {
     const result = PatchProjectAgentSchema.safeParse({ role: "reviewer" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts custom role", () => {
+    const result = PatchProjectAgentSchema.safeParse({ role: "custom" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts document-copilot role", () => {
+    const result = PatchProjectAgentSchema.safeParse({ role: "document-copilot" });
     expect(result.success).toBe(true);
   });
 

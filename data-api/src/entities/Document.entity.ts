@@ -11,6 +11,8 @@ import {
 import type { Relation } from "typeorm";
 import { Project } from "./Project.entity";
 import { User } from "./User.entity";
+import { DocumentFolder } from "./DocumentFolder.entity";
+import { DocumentVersion } from "./DocumentVersion.entity";
 
 export type DocumentFileType =
   | "pdf"
@@ -39,6 +41,20 @@ export class Document {
   @ManyToOne(() => Project, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
   project!: Relation<Project>;
+
+  @Column({ nullable: true })
+  folder_id!: string | null;
+
+  @ManyToOne(() => DocumentFolder, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "folder_id" })
+  folder!: Relation<DocumentFolder> | null;
+
+  @Column({ nullable: true })
+  current_version_id!: string | null;
+
+  @ManyToOne(() => DocumentVersion, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "current_version_id" })
+  current_version!: Relation<DocumentVersion> | null;
 
   @Column()
   name!: string;
