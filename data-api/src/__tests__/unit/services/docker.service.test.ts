@@ -228,7 +228,7 @@ describe("DockerClient.listContainers", () => {
       image: "nginx:latest",
       status: "Up 2 hours",
       state: "running",
-      ports: ["8080:80/tcp"],
+      ports: [{ host: 8080, container: 80, protocol: "tcp" }],
     });
     expect(result[0].created).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
@@ -247,7 +247,7 @@ describe("DockerClient.listContainers", () => {
     ]);
 
     const result = await DockerClient.listContainers(socketCfg);
-    expect(result[0].ports).toEqual(["6379/tcp"]);
+    expect(result[0].ports).toEqual([{ host: null, container: 6379, protocol: "tcp" }]);
   });
 
   it("requests all containers (including stopped)", async () => {

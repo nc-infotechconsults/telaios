@@ -322,7 +322,7 @@ export interface DockerContainer {
   image: string;
   status: string;
   state: DockerContainerState;
-  ports: Array<{ host: number; container: number; protocol: string }>;
+  ports: Array<{ host: number | null; container: number; protocol: string }>;
   created: string;
   command?: string;
 }

@@ -172,7 +172,7 @@ export default function DockerContainerList({ environmentId }: Props) {
                     <div className="flex flex-col gap-0.5">
                       {c.ports.slice(0, 3).map((p, i) => (
                         <span key={i} className="text-xs font-mono">
-                          {p.host}:{p.container}/{p.protocol}
+                          {p.host != null ? `${p.host}:` : ""}{p.container}/{p.protocol}
                         </span>
                       ))}
                       {c.ports.length > 3 && (

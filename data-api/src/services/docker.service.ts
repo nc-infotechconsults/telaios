@@ -15,6 +15,13 @@ export interface DockerConnectionConfig {
   tls_ca?: string;
 }
 
+export interface DockerPortBinding {
+  /** Host (public) port — null when the container port is not bound to the host. */
+  host: number | null;
+  container: number;
+  protocol: string;
+}
+
 export interface DockerContainerSummary {
   id: string;
   name: string;
@@ -22,7 +29,7 @@ export interface DockerContainerSummary {
   status: string;
   state: string;
   created: string;
-  ports: string[];
+  ports: DockerPortBinding[];
 }
 
 export interface DockerImageSummary {
@@ -86,10 +93,16 @@ function buildDockerClient(cfg: DockerConnectionConfig): Docker {
   return new Docker(opts);
 }
 
-function formatPorts(ports: Array<{ PublicPort?: number; PrivatePort?: number; Type?: string }>): string[] {
-  return (ports ?? []).map((p) =>
-    p.PublicPort ? `${p.PublicPort}:${p.PrivatePort}/${p.Type}` : `${p.PrivatePort}/${p.Type}`,
-  );
+function formatPorts(
+  ports: Array<{ PublicPort?: number; PrivatePort?: number; Type?: string }>,
+): DockerPortBinding[] {
+  return (ports ?? [])
+    .filter((p) => p.PrivatePort !== undefined)
+    .map((p) => ({
+      host: p.PublicPort ?? null,
+      container: p.PrivatePort!,
+      protocol: p.Type ?? "tcp",
+    }));
 }
 
 export const DockerClient = {
