@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Button,
   Chip,
@@ -19,9 +20,6 @@ import {
 import { toast } from "../../lib/toast";
 import type { Environment } from "../../types";
 import EnvironmentCreateModal from "./EnvironmentCreateModal";
-import EnvironmentEditModal from "./EnvironmentEditModal";
-import ResourceBrowser from "./ResourceBrowser";
-import HelmReleasesPanel from "./HelmReleasesPanel";
 
 interface Props {
   projectId: string;
@@ -34,18 +32,15 @@ const ENV_STATUS_COLOR: Record<string, "success" | "default" | "danger"> = {
 };
 
 export default function EnvironmentTab({ projectId }: Props) {
+  const navigate = useNavigate();
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [loading, setLoading] = useState(true);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [envToDelete, setEnvToDelete] = useState<Environment | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [envToEdit, setEnvToEdit] = useState<Environment | null>(null);
-  const [expandedEnvId, setExpandedEnvId] = useState<string | null>(null);
-  const [expandedView, setExpandedView] = useState<"resources" | "helm">("resources");
 
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onOpenChange: onCreateOpenChange } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
-  const { isOpen: isEditOpen, onOpen: onEditOpen, onOpenChange: onEditOpenChange } = useDisclosure();
 
   const load = async () => {
     try {
@@ -64,10 +59,6 @@ export default function EnvironmentTab({ projectId }: Props) {
 
   const handleCreate = (env: Environment) => {
     setEnvironments((prev) => [env, ...prev]);
-  };
-
-  const handleUpdate = (env: Environment) => {
-    setEnvironments((prev) => prev.map((e) => (e.id === env.id ? env : e)));
   };
 
   const handleTest = async (env: Environment) => {
@@ -98,7 +89,6 @@ export default function EnvironmentTab({ projectId }: Props) {
     try {
       await deleteEnvironment(envToDelete.id);
       setEnvironments((prev) => prev.filter((e) => e.id !== envToDelete.id));
-      if (expandedEnvId === envToDelete.id) setExpandedEnvId(null);
       toast.success("Environment deleted", envToDelete.name);
       onDeleteOpenChange();
       setEnvToDelete(null);
@@ -139,113 +129,63 @@ export default function EnvironmentTab({ projectId }: Props) {
       ) : (
         <div className="flex flex-col gap-3">
           {environments.map((env) => (
-            <div key={env.id}>
-              <div
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
-                  expandedEnvId === env.id
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-divider hover:border-default-300"
-                }`}
-                onClick={() => setExpandedEnvId(expandedEnvId === env.id ? null : env.id)}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{env.name}</p>
-                  <p className="text-xs text-default-400 mt-0.5">
-                    {env.type}{env.namespace ? ` · ${env.namespace}` : ""} · Created {new Date(env.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-
-                <Chip size="sm" variant="flat" color={ENV_STATUS_COLOR[env.status] ?? "default"}>
-                  {env.status}
-                </Chip>
-
-                <Tooltip content="Test connection">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    isLoading={testingId === env.id}
-                    onPress={() => {
-                      handleTest(env);
-                    }}
-                  >
-                    Test
-                  </Button>
-                </Tooltip>
-
-                <Tooltip content="Edit environment">
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="light"
-                    aria-label={`Edit ${env.name}`}
-                    onPress={() => {
-                      setEnvToEdit(env);
-                      onEditOpen();
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </Button>
-                </Tooltip>
-
-                <Tooltip content="Delete environment" color="danger">
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="light"
-                    color="danger"
-                    aria-label={`Delete environment: ${env.name}`}
-                    onPress={() => {
-                      setEnvToDelete(env);
-                      onDeleteOpen();
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </Button>
-                </Tooltip>
+            <div
+              key={env.id}
+              className="flex items-center gap-4 p-4 rounded-xl border border-divider hover:border-default-300 transition-all cursor-pointer"
+              onClick={() => navigate(`/projects/${projectId}/environments/${env.id}`)}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{env.name}</p>
+                <p className="text-xs text-default-400 mt-0.5">
+                  {env.type === "kubernetes" ? "Kubernetes" : "Docker"}
+                  {env.namespace ? ` · ${env.namespace}` : ""}
+                  {" · Created "}
+                  {new Date(env.created_at).toLocaleDateString()}
+                </p>
               </div>
 
-              {/* Expanded detail panel */}
-              {expandedEnvId === env.id && (
-                <div className="mt-2 ml-4 border-l-2 border-primary/20 pl-4 pb-4">
-                  {/* Sub-tab bar */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <Button
-                      size="sm"
-                      variant={expandedView === "resources" ? "solid" : "flat"}
-                      color={expandedView === "resources" ? "primary" : "default"}
-                      onPress={() => setExpandedView("resources")}
-                    >
-                      Resources
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={expandedView === "helm" ? "solid" : "flat"}
-                      color={expandedView === "helm" ? "primary" : "default"}
-                      onPress={() => setExpandedView("helm")}
-                    >
-                      Helm Releases
-                    </Button>
-                  </div>
+              <Chip size="sm" variant="flat" color={ENV_STATUS_COLOR[env.status] ?? "default"}>
+                {env.status}
+              </Chip>
 
-                  {expandedView === "resources" && (
-                    <ResourceBrowser
-                      environmentId={env.id}
-                      defaultNamespace={env.namespace}
-                      environmentType={env.type}
-                    />
-                  )}
-                  {expandedView === "helm" && (
-                    <HelmReleasesPanel
-                      environmentId={env.id}
-                      projectId={projectId}
-                    />
-                  )}
-                </div>
-              )}
+              <Tooltip content="Test connection">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  isLoading={testingId === env.id}
+                  onPress={(e) => {
+                    e.continuePropagation?.();
+                    handleTest(env);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Test
+                </Button>
+              </Tooltip>
+
+              <Tooltip content="Delete environment" color="danger">
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  color="danger"
+                  aria-label={`Delete environment: ${env.name}`}
+                  onPress={() => {
+                    setEnvToDelete(env);
+                    onDeleteOpen();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </Button>
+              </Tooltip>
+
+              {/* Arrow icon to indicate navigation */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-default-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
             </div>
           ))}
         </div>
@@ -257,14 +197,6 @@ export default function EnvironmentTab({ projectId }: Props) {
         onOpenChange={onCreateOpenChange}
         projectId={projectId}
         onCreate={handleCreate}
-      />
-
-      {/* Edit modal */}
-      <EnvironmentEditModal
-        isOpen={isEditOpen}
-        onOpenChange={onEditOpenChange}
-        environment={envToEdit}
-        onUpdate={handleUpdate}
       />
 
       {/* Delete confirmation */}

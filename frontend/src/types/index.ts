@@ -312,6 +312,48 @@ export interface K8sResource {
   labels: Record<string, string>;
 }
 
+// ── Docker Resources ──────────────────────────────────────────────────────────
+
+export type DockerContainerState = "running" | "exited" | "paused" | "created" | "restarting" | "dead";
+
+export interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  status: string;
+  state: DockerContainerState;
+  ports: Array<{ host: number; container: number; protocol: string }>;
+  created: string;
+  command?: string;
+}
+
+export interface DockerImage {
+  id: string;
+  tags: string[];
+  size: number;
+  created: string;
+  repository?: string;
+}
+
+export interface DockerVolume {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  created: string;
+  scope: string;
+  labels: Record<string, string>;
+}
+
+export interface DockerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  ipam?: { subnet: string; gateway: string };
+  containers: number;
+  created: string;
+}
+
 // ── Documents ─────────────────────────────────────────────────────────────────
 
 export type DocumentFileType = "pdf" | "docx" | "xlsx" | "md" | "txt" | "csv" | "json" | "other";

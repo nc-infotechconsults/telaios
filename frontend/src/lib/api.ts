@@ -26,6 +26,10 @@ import type {
   EnvironmentType,
   HelmRelease,
   K8sResource,
+  DockerContainer,
+  DockerImage,
+  DockerVolume,
+  DockerNetwork,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -625,6 +629,44 @@ export const uninstallHelmRelease = (envId: string, releaseName: string): Promis
 
 export const scanProjectCharts = (envId: string): Promise<Array<{ name: string; version: string; description: string; localPath?: string }>> =>
   http.get(`/environments/${envId}/helm/charts/scan`).then((r) => r.data as Array<{ name: string; version: string; description: string; localPath?: string }>);
+
+// ─── Docker Engine ────────────────────────────────────────────────────────────
+
+export const listDockerContainers = (envId: string): Promise<DockerContainer[]> =>
+  http.get<DockerContainer[]>(`/environments/${envId}/docker/containers`).then((r) => r.data);
+
+export const getDockerContainer = (envId: string, containerId: string): Promise<unknown> =>
+  http.get(`/environments/${envId}/docker/containers/${containerId}`).then((r) => r.data);
+
+export const startDockerContainer = (envId: string, containerId: string): Promise<void> =>
+  http.post(`/environments/${envId}/docker/containers/${containerId}/start`).then(() => undefined);
+
+export const stopDockerContainer = (envId: string, containerId: string): Promise<void> =>
+  http.post(`/environments/${envId}/docker/containers/${containerId}/stop`).then(() => undefined);
+
+export const restartDockerContainer = (envId: string, containerId: string): Promise<void> =>
+  http.post(`/environments/${envId}/docker/containers/${containerId}/restart`).then(() => undefined);
+
+export const removeDockerContainer = (envId: string, containerId: string): Promise<void> =>
+  http.delete(`/environments/${envId}/docker/containers/${containerId}`).then(() => undefined);
+
+export const getDockerContainerLogs = (envId: string, containerId: string): Promise<string> =>
+  http.get(`/environments/${envId}/docker/containers/${containerId}/logs`).then((r) => String(r.data));
+
+export const listDockerImages = (envId: string): Promise<DockerImage[]> =>
+  http.get<DockerImage[]>(`/environments/${envId}/docker/images`).then((r) => r.data);
+
+export const removeDockerImage = (envId: string, imageId: string): Promise<void> =>
+  http.delete(`/environments/${envId}/docker/images/${imageId}`).then(() => undefined);
+
+export const listDockerVolumes = (envId: string): Promise<DockerVolume[]> =>
+  http.get<DockerVolume[]>(`/environments/${envId}/docker/volumes`).then((r) => r.data);
+
+export const removeDockerVolume = (envId: string, volumeName: string): Promise<void> =>
+  http.delete(`/environments/${envId}/docker/volumes/${volumeName}`).then(() => undefined);
+
+export const listDockerNetworks = (envId: string): Promise<DockerNetwork[]> =>
+  http.get<DockerNetwork[]>(`/environments/${envId}/docker/networks`).then((r) => r.data);
 
 
 // ─── Document Copilot ─────────────────────────────────────────────────────────
