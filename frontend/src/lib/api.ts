@@ -30,6 +30,7 @@ import type {
   DockerImage,
   DockerVolume,
   DockerNetwork,
+  DockerVolumeFileEntry,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -667,6 +668,47 @@ export const removeDockerVolume = (envId: string, volumeName: string): Promise<v
 
 export const listDockerNetworks = (envId: string): Promise<DockerNetwork[]> =>
   http.get<DockerNetwork[]>(`/environments/${envId}/docker/networks`).then((r) => r.data);
+
+export const inspectDockerImage = (envId: string, imageId: string): Promise<unknown> =>
+  http.get(`/environments/${envId}/docker/images/${encodeURIComponent(imageId)}/inspect`).then((r) => r.data);
+
+export const inspectDockerNetwork = (envId: string, networkId: string): Promise<unknown> =>
+  http.get(`/environments/${envId}/docker/networks/${encodeURIComponent(networkId)}/inspect`).then((r) => r.data);
+
+export const inspectDockerVolume = (envId: string, volumeName: string): Promise<unknown> =>
+  http.get(`/environments/${envId}/docker/volumes/${encodeURIComponent(volumeName)}/inspect`).then((r) => r.data);
+
+export const listDockerVolumeFiles = (
+  envId: string,
+  volumeName: string,
+  path: string,
+): Promise<DockerVolumeFileEntry[]> =>
+  http
+    .get<DockerVolumeFileEntry[]>(
+      `/environments/${envId}/docker/volumes/${encodeURIComponent(volumeName)}/files`,
+      { params: { path } },
+    )
+    .then((r) => r.data);
+
+export const downloadDockerVolumeFile = async (
+  envId: string,
+  volumeName: string,
+  filePath: string,
+): Promise<void> => {
+  const response = await http.get(
+    `/environments/${envId}/docker/volumes/${encodeURIComponent(volumeName)}/files/download`,
+    { params: { path: filePath }, responseType: "blob" },
+  );
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  const fileName = filePath.split("/").filter(Boolean).pop() ?? "archive";
+  a.href = url;
+  a.download = `${fileName}.tar`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 
 // ─── Document Copilot ─────────────────────────────────────────────────────────
