@@ -147,8 +147,8 @@ export default function EnvironmentDetail() {
 
   const tabs: { key: TabKey; label: string; visible: boolean }[] = [
     { key: "overview", label: "Overview", visible: true },
-    { key: "resources", label: "Resources", visible: true },
-    { key: "helm", label: "Helm Releases", visible: true },
+    { key: "resources", label: "Resources", visible: environment.type === "kubernetes" },
+    { key: "helm", label: "Helm Releases", visible: environment.type === "kubernetes" },
     { key: "docker", label: "Docker", visible: environment.type === "docker" },
   ];
 
@@ -214,7 +214,7 @@ export default function EnvironmentDetail() {
       </div>
 
       {/* Tab content */}
-      <div className={`flex-1 px-5 py-5 ${activeTab === "resources" ? "overflow-hidden" : "overflow-y-auto"}`}>
+      <div className={`flex-1 px-5 py-5 ${activeTab === "resources" || activeTab === "docker" ? "overflow-hidden" : "overflow-y-auto"}`}>
         {activeTab === "overview" && (
           <OverviewTab environment={environment} onTest={handleTest} testing={testing} />
         )}
@@ -328,7 +328,11 @@ function OverviewTab({
         ]);
         setCounts({ pods, deployments, services });
       } else {
-        const containers = await listDockerContainers(environment.id).then((r) => r.length).catch(() => 0);
+        // Use the same API as Resources tab for consistency; fall back to Docker API
+        const ns = environment.namespace ?? "default";
+        const containers = await listEnvironmentResources(environment.id, "containers", ns)
+          .then((r) => r.length)
+          .catch(() => listDockerContainers(environment.id).then((r) => r.length).catch(() => 0));
         setCounts({ containers });
       }
     } catch {
