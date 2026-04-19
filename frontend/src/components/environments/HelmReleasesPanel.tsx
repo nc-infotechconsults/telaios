@@ -8,6 +8,12 @@ import {
   ModalBody,
   ModalFooter,
   Spinner,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
   Tooltip,
   useDisclosure,
 } from "@heroui/react";
@@ -87,7 +93,7 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">Helm Releases</p>
+        <p className="text-sm text-default-500">{releases.length} release{releases.length !== 1 ? "s" : ""}</p>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="flat" onPress={load}>
             Refresh
@@ -106,46 +112,60 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {releases.map((rel) => (
-            <div
-              key={rel.id}
-              className="flex items-center gap-3 p-3 rounded-lg border border-divider hover:border-default-300 transition-all"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{rel.name}</p>
-                <p className="text-xs text-default-400">
-                  {rel.chart_name}
-                  {rel.chart_version ? `@${rel.chart_version}` : ""}
-                  {rel.namespace ? ` · ${rel.namespace}` : ""}
-                  {rel.deployed_at ? ` · ${new Date(rel.deployed_at).toLocaleDateString()}` : ""}
-                </p>
-              </div>
-              <Chip
-                size="sm"
-                variant="flat"
-                color={RELEASE_STATUS_COLOR[rel.status] ?? "default"}
-              >
-                {rel.status}
-              </Chip>
-              {rel.status !== "uninstalled" && (
-                <Tooltip content="Uninstall release" color="danger">
-                  <Button
-                    size="sm"
-                    variant="light"
-                    color="danger"
-                    onPress={() => {
-                      setReleaseToUninstall(rel);
-                      onUninstallOpen();
-                    }}
-                  >
-                    Uninstall
-                  </Button>
-                </Tooltip>
-              )}
-            </div>
-          ))}
-        </div>
+        <Table aria-label="Helm releases" removeWrapper>
+          <TableHeader>
+            <TableColumn>NAME</TableColumn>
+            <TableColumn>CHART</TableColumn>
+            <TableColumn>NAMESPACE</TableColumn>
+            <TableColumn>STATUS</TableColumn>
+            <TableColumn>DEPLOYED</TableColumn>
+            <TableColumn>ACTIONS</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {releases.map((rel) => (
+              <TableRow key={rel.id}>
+                <TableCell>
+                  <p className="text-sm font-medium truncate max-w-[200px]">{rel.name}</p>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs font-mono">
+                    {rel.chart_name}{rel.chart_version ? `@${rel.chart_version}` : ""}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-default-400">{rel.namespace ?? "-"}</span>
+                </TableCell>
+                <TableCell>
+                  <Chip size="sm" variant="flat" color={RELEASE_STATUS_COLOR[rel.status] ?? "default"}>
+                    {rel.status}
+                  </Chip>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-default-400">
+                    {rel.deployed_at ? new Date(rel.deployed_at).toLocaleDateString() : "-"}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {rel.status !== "uninstalled" ? (
+                    <Tooltip content="Uninstall release" color="danger">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        color="danger"
+                        onPress={() => {
+                          setReleaseToUninstall(rel);
+                          onUninstallOpen();
+                        }}
+                      >
+                        Uninstall
+                      </Button>
+                    </Tooltip>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {/* Install modal */}

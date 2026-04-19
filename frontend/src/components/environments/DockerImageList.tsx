@@ -1,0 +1,162 @@
+import { useEffect, useState, useCallback } from "react";
+import {
+  Button,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Spinner,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  Tooltip,
+  useDisclosure,
+} from "@heroui/react";
+import { listDockerImages, removeDockerImage } from "../../lib/api";
+import { toast } from "../../lib/toast";
+import type { DockerImage } from "../../types";
+
+interface Props {
+  environmentId: string;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+export default function DockerImageList({ environmentId }: Props) {
+  const [images, setImages] = useState<DockerImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DockerImage | null>(null);
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setImages(await listDockerImages(environmentId));
+    } catch {
+      toast.error("Failed to load images");
+      setImages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [environmentId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleRemove = async () => {
+    if (!deleteTarget) return;
+    setRemoving(deleteTarget.id);
+    try {
+      await removeDockerImage(environmentId, deleteTarget.id);
+      toast.success("Image removed");
+      setDeleteTarget(null);
+      await load();
+    } catch {
+      toast.error("Failed to remove image");
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" label="Loading images…" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-default-500">{images.length} image{images.length !== 1 ? "s" : ""}</p>
+        <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+      </div>
+
+      {images.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-default-400">
+          <p className="text-sm">No images found</p>
+        </div>
+      ) : (
+        <Table aria-label="Docker images" removeWrapper>
+          <TableHeader>
+            <TableColumn>REPOSITORY / TAG</TableColumn>
+            <TableColumn>IMAGE ID</TableColumn>
+            <TableColumn>SIZE</TableColumn>
+            <TableColumn>CREATED</TableColumn>
+            <TableColumn>ACTIONS</TableColumn>
+          </TableHeader>
+          <TableBody>
+            {images.map((img) => (
+              <TableRow key={img.id}>
+                <TableCell>
+                  {img.tags.length > 0 ? (
+                    <div className="flex flex-col gap-0.5">
+                      {img.tags.map((t) => (
+                        <span key={t} className="text-xs font-mono">{t}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-default-400 italic">&lt;none&gt;</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs font-mono text-default-400">{img.id.slice(0, 12)}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs">{formatSize(img.size)}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-default-400">{new Date(img.created).toLocaleDateString()}</span>
+                </TableCell>
+                <TableCell>
+                  <Tooltip content="Remove image" color="danger">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="danger"
+                      isLoading={removing === img.id}
+                      onPress={() => { setDeleteTarget(img); onOpen(); }}
+                    >
+                      Remove
+                    </Button>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Remove Image</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  Remove image <span className="font-semibold font-mono">{deleteTarget?.id.slice(0, 12)}</span>? This action cannot be undone.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>Cancel</Button>
+                <Button color="danger" isLoading={removing === deleteTarget?.id} onPress={async () => { await handleRemove(); onClose(); }}>
+                  Remove
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </div>
+  );
+}

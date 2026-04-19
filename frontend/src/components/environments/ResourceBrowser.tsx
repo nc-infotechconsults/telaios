@@ -129,7 +129,7 @@ export default function ResourceBrowser({
         <Table aria-label={`${kind} resources`} removeWrapper>
           <TableHeader>
             <TableColumn>NAME</TableColumn>
-            {environmentType === "kubernetes" && <TableColumn>NAMESPACE</TableColumn>}
+            <TableColumn>NAMESPACE</TableColumn>
             <TableColumn>STATUS</TableColumn>
             <TableColumn>AGE</TableColumn>
             <TableColumn>{""}</TableColumn>
@@ -148,11 +148,9 @@ export default function ResourceBrowser({
                 <TableCell>
                   <p className="font-medium text-sm truncate max-w-xs">{res.name}</p>
                 </TableCell>
-                {environmentType === "kubernetes" && (
-                  <TableCell>
-                    <span className="text-xs text-default-400">{res.namespace}</span>
-                  </TableCell>
-                )}
+                <TableCell>
+                  <span className="text-xs text-default-400">{res.namespace ?? "-"}</span>
+                </TableCell>
                 <TableCell>
                   <Chip size="sm" variant="flat" color={STATUS_COLOR[res.status] ?? "default"}>
                     {res.status}

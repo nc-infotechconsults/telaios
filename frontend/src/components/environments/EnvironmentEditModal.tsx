@@ -143,10 +143,10 @@ export default function EnvironmentEditModal({
 
               {/* Connection config - Kubernetes */}
               {type === "kubernetes" && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Update Connection Config</p>
+                <div className="border border-divider rounded-lg p-4">
+                  <p className="text-sm font-medium mb-1">Update Connection Config</p>
                   <p className="text-xs text-default-400 mb-3">
-                    Connection credentials are encrypted. Fill fields below only to update them.
+                    Credentials are encrypted and cannot be displayed. Fill fields below only to replace them.
                   </p>
                   <div className="flex flex-col gap-3">
                     <Textarea
@@ -191,10 +191,10 @@ export default function EnvironmentEditModal({
 
               {/* Connection config - Docker */}
               {type === "docker" && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Update Connection Config</p>
+                <div className="border border-divider rounded-lg p-4">
+                  <p className="text-sm font-medium mb-1">Update Connection Config</p>
                   <p className="text-xs text-default-400 mb-3">
-                    Connection credentials are encrypted. Fill fields below only to update them.
+                    Credentials are encrypted and cannot be displayed. Fill fields below only to replace them.
                   </p>
                   <div className="flex flex-col gap-3">
                     <Input

@@ -144,8 +144,9 @@ export default function EnvironmentCreateModal({
 
               {/* Connection config - Kubernetes */}
               {form.type === "kubernetes" && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Kubernetes Connection</p>
+                <div className="border border-divider rounded-lg p-4">
+                  <p className="text-sm font-medium mb-1">Kubernetes Connection</p>
+                  <p className="text-xs text-default-400 mb-3">Provide a kubeconfig or individual fields. All credentials are encrypted at rest.</p>
                   <div className="flex flex-col gap-3">
                     <Textarea
                       label="Kubeconfig (YAML)"
@@ -190,8 +191,9 @@ export default function EnvironmentCreateModal({
 
               {/* Connection config - Docker */}
               {form.type === "docker" && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Docker Connection</p>
+                <div className="border border-divider rounded-lg p-4">
+                  <p className="text-sm font-medium mb-1">Docker Connection</p>
+                  <p className="text-xs text-default-400 mb-3">Leave empty for local Docker socket. All credentials are encrypted at rest.</p>
                   <div className="flex flex-col gap-3">
                     <Input
                       label="Docker host"
