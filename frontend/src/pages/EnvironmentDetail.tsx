@@ -214,7 +214,7 @@ export default function EnvironmentDetail() {
       </div>
 
       {/* Tab content */}
-      <div className={`flex-1 px-5 py-5 ${activeTab === "resources" || activeTab === "docker" ? "overflow-hidden" : "overflow-y-auto"}`}>
+      <div className={`flex-1 px-5 py-5 ${activeTab === "resources" ? "overflow-hidden" : "overflow-y-auto"}`}>
         {activeTab === "overview" && (
           <OverviewTab environment={environment} onTest={handleTest} testing={testing} />
         )}
