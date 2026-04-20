@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Button, Spinner } from "@heroui/react";
+import { Button, Spinner, useDisclosure } from "@heroui/react";
 import { inspectDockerImage } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerImage } from "../../types";
+import DockerTagImageModal from "./DockerTagImageModal";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -54,14 +55,16 @@ interface Props {
   environmentId: string;
   image: DockerImage;
   onClose: () => void;
+  onRefresh?: () => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type InspectData = Record<string, any>;
 
-export default function DockerImageDetail({ environmentId, image, onClose }: Props) {
+export default function DockerImageDetail({ environmentId, image, onClose, onRefresh }: Props) {
   const [data, setData] = useState<InspectData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isOpen: isTagOpen, onOpen: onTagOpen, onOpenChange: onTagOpenChange } = useDisclosure();
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +88,7 @@ export default function DockerImageDetail({ environmentId, image, onClose }: Pro
   return (
     <div className="flex flex-col gap-1">
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate">
             {image.tags.length > 0 ? image.tags[0] : "<none>"}
@@ -94,6 +97,13 @@ export default function DockerImageDetail({ environmentId, image, onClose }: Pro
         </div>
         <Button size="sm" variant="light" onPress={onClose} className="ml-2 flex-shrink-0">
           ✕
+        </Button>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-1 mb-3">
+        <Button size="sm" variant="flat" onPress={onTagOpen}>
+          Tag
         </Button>
       </div>
 
@@ -200,6 +210,14 @@ export default function DockerImageDetail({ environmentId, image, onClose }: Pro
           </Section>
         </>
       )}
+
+      <DockerTagImageModal
+        environmentId={environmentId}
+        image={image}
+        isOpen={isTagOpen}
+        onOpenChange={onTagOpenChange}
+        onTagged={() => onRefresh?.()}
+      />
     </div>
   );
 }

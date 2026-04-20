@@ -16,10 +16,11 @@ import {
   Tooltip,
   useDisclosure,
 } from "@heroui/react";
-import { listDockerImages, removeDockerImage } from "../../lib/api";
+import { listDockerImages, removeDockerImage, pruneDockerImages } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerImage } from "../../types";
 import DockerImageDetail from "./DockerImageDetail";
+import DockerPullImageModal from "./DockerPullImageModal";
 
 interface Props {
   environmentId: string;
@@ -39,6 +40,13 @@ export default function DockerImageList({ environmentId }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<DockerImage | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+  // Prune
+  const [pruning, setPruning] = useState(false);
+  const { isOpen: isPruneOpen, onOpen: onPruneOpen, onOpenChange: onPruneOpenChange } = useDisclosure();
+
+  // Pull
+  const { isOpen: isPullOpen, onOpen: onPullOpen, onOpenChange: onPullOpenChange } = useDisclosure();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +77,20 @@ export default function DockerImageList({ environmentId }: Props) {
     }
   };
 
+  const handlePrune = async (onClose: () => void) => {
+    setPruning(true);
+    try {
+      const result = await pruneDockerImages(environmentId);
+      await load();
+      toast.success(`Pruned ${result.removed.length} image(s)`);
+      onClose();
+    } catch {
+      toast.error("Failed to prune images");
+    } finally {
+      setPruning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -81,7 +103,15 @@ export default function DockerImageList({ environmentId }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-default-500">{images.length} image{images.length !== 1 ? "s" : ""}</p>
-        <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+        <div className="flex gap-2">
+          <Button size="sm" color="primary" variant="flat" onPress={onPullOpen}>
+            Pull
+          </Button>
+          <Button size="sm" color="warning" variant="flat" onPress={onPruneOpen}>
+            Prune
+          </Button>
+          <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+        </div>
       </div>
 
       {images.length === 0 ? (
@@ -157,6 +187,7 @@ export default function DockerImageList({ environmentId }: Props) {
                   environmentId={environmentId}
                   image={selected}
                   onClose={() => setSelectedId(null)}
+                  onRefresh={load}
                 />
               </div>
             ) : null;
@@ -184,6 +215,36 @@ export default function DockerImageList({ environmentId }: Props) {
           )}
         </ModalContent>
       </Modal>
+
+      {/* Prune confirmation */}
+      <Modal isOpen={isPruneOpen} onOpenChange={onPruneOpenChange} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Prune Images</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  Remove all dangling (untagged) images? This cannot be undone.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose} isDisabled={pruning}>Cancel</Button>
+                <Button color="warning" isLoading={pruning} onPress={() => handlePrune(onClose)}>
+                  Prune
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Pull image modal */}
+      <DockerPullImageModal
+        environmentId={environmentId}
+        isOpen={isPullOpen}
+        onOpenChange={onPullOpenChange}
+        onPulled={load}
+      />
     </div>
   );
 }
