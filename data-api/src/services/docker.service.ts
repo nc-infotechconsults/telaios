@@ -115,6 +115,50 @@ export interface DockerPruneResult {
   reclaimed_bytes: number;
 }
 
+export interface DockerVolumeFileContent {
+  content: string;
+  encoding: "text" | "binary";
+  size: number;
+  path: string;
+}
+
+/** Max file size for content read (1 MB). */
+const MAX_FILE_CONTENT_SIZE = 1024 * 1024;
+
+/**
+ * Build a minimal POSIX ustar tar archive containing one file.
+ * `fileName` is the entry name (no slashes), `data` is the raw file content.
+ */
+function createTarBuffer(fileName: string, data: Buffer): Buffer {
+  const BLOCK = 512;
+  const size = data.length;
+  const header = Buffer.alloc(BLOCK, 0);
+
+  header.write(fileName.slice(0, 99), 0, "utf8");
+  header.write("0000644\0", 100, "ascii");
+  header.write("0000000\0", 108, "ascii");
+  header.write("0000000\0", 116, "ascii");
+  header.write(size.toString(8).padStart(11, "0") + "\0", 124, "ascii");
+  header.write(Math.floor(Date.now() / 1000).toString(8).padStart(11, "0") + "\0", 136, "ascii");
+  header.write("0", 156, "ascii"); // regular file
+  header.write("ustar\0", 257, "ascii");
+  header.write("00", 263, "ascii");
+  header.write("root\0", 265, "ascii");
+  header.write("root\0", 297, "ascii");
+
+  // Compute checksum (treat checksum field as 8 spaces during calculation)
+  header.fill(0x20, 148, 156);
+  let checksum = 0;
+  for (let i = 0; i < BLOCK; i++) checksum += header[i];
+  header.write(checksum.toString(8).padStart(6, "0") + "\0 ", 148, "ascii");
+
+  const padded = Math.ceil(size / BLOCK) * BLOCK || BLOCK;
+  const contentBuf = Buffer.alloc(padded, 0);
+  data.copy(contentBuf);
+
+  return Buffer.concat([header, contentBuf, Buffer.alloc(BLOCK * 2, 0)]);
+}
+
 function buildDockerClient(cfg: DockerConnectionConfig): Docker {
   logger.debug({ cfg }, "Building Docker client with config");
 
@@ -476,6 +520,111 @@ export const DockerClient = {
     } catch (err) {
       await cleanup();
       throw err;
+    }
+  },
+
+  async getVolumeFileContent(
+    cfg: DockerConnectionConfig,
+    volumeName: string,
+    filePath: string,
+  ): Promise<DockerVolumeFileContent> {
+    const docker = buildDockerClient(cfg);
+    await ensureImage(docker, "busybox:latest");
+    const container = await docker.createContainer({
+      Image: "busybox:latest",
+      Cmd: ["sleep", "infinity"],
+      HostConfig: { Binds: [`${volumeName}:/vol:ro`] },
+      Labels: { "swe-temp": "true" },
+    });
+
+    try {
+      await container.start();
+
+      // Get file size via wc -c
+      const sizeExec = await container.exec({
+        Cmd: ["wc", "-c", `/vol${filePath}`],
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      const sizeStream = await sizeExec.start({ hijack: false, stdin: false });
+      const sizeOutput = await new Promise<string>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        (sizeStream as NodeJS.ReadableStream).on("data", (c: Buffer) => chunks.push(c));
+        (sizeStream as NodeJS.ReadableStream).on("end", () => resolve(parseMuxedBuffer(Buffer.concat(chunks))));
+        (sizeStream as NodeJS.ReadableStream).on("error", reject);
+      });
+      const size = parseInt(sizeOutput.trim().split(/\s+/)[0] ?? "0", 10) || 0;
+
+      if (size > MAX_FILE_CONTENT_SIZE) {
+        throw new Error(`File too large to read (${size} bytes); max is ${MAX_FILE_CONTENT_SIZE}`);
+      }
+
+      // Read content via base64 to avoid binary/mux-framing issues
+      const b64Exec = await container.exec({
+        Cmd: ["base64", `/vol${filePath}`],
+        AttachStdout: true,
+        AttachStderr: false,
+      });
+      const b64Stream = await b64Exec.start({ hijack: false, stdin: false });
+      const b64Output = await new Promise<string>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        (b64Stream as NodeJS.ReadableStream).on("data", (c: Buffer) => chunks.push(c));
+        (b64Stream as NodeJS.ReadableStream).on("end", () => resolve(parseMuxedBuffer(Buffer.concat(chunks))));
+        (b64Stream as NodeJS.ReadableStream).on("error", reject);
+      });
+
+      const contentBuf = Buffer.from(b64Output.replace(/\s/g, ""), "base64");
+
+      // Detect binary by scanning for null bytes in the first 8 KB
+      let encoding: "text" | "binary" = "text";
+      for (let i = 0; i < Math.min(contentBuf.length, 8192); i++) {
+        if (contentBuf[i] === 0) { encoding = "binary"; break; }
+      }
+
+      const content = encoding === "binary"
+        ? contentBuf.toString("base64")
+        : contentBuf.toString("utf8");
+
+      return { content, encoding, size: contentBuf.length, path: filePath };
+    } finally {
+      try { await container.stop({ t: 0 }); } catch { /* ignore */ }
+      try { await container.remove({ force: true }); } catch { /* ignore */ }
+    }
+  },
+
+  async updateVolumeFileContent(
+    cfg: DockerConnectionConfig,
+    volumeName: string,
+    filePath: string,
+    content: string,
+  ): Promise<void> {
+    const docker = buildDockerClient(cfg);
+    await ensureImage(docker, "busybox:latest");
+    const container = await docker.createContainer({
+      Image: "busybox:latest",
+      Cmd: ["sleep", "infinity"],
+      HostConfig: { Binds: [`${volumeName}:/vol`] },
+      Labels: { "swe-temp": "true" },
+    });
+
+    try {
+      await container.start();
+
+      const fileName = filePath.split("/").filter(Boolean).pop() ?? "file";
+      const dir = filePath.lastIndexOf("/") > 0
+        ? filePath.substring(0, filePath.lastIndexOf("/"))
+        : "/";
+
+      const contentBuf = Buffer.from(content, "utf8");
+      const tarBuf = createTarBuffer(fileName, contentBuf);
+
+      const { Readable } = await import("stream");
+      const tarStream = Readable.from(tarBuf);
+
+      await (container.putArchive as Function)(tarStream, { path: `/vol${dir}` });
+    } finally {
+      try { await container.stop({ t: 0 }); } catch { /* ignore */ }
+      try { await container.remove({ force: true }); } catch { /* ignore */ }
     }
   },
 

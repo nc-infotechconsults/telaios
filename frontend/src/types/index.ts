@@ -362,6 +362,13 @@ export interface DockerVolumeFileEntry {
   path: string;
 }
 
+export interface DockerVolumeFileContent {
+  content: string;
+  encoding: "text" | "binary";
+  size: number;
+  path: string;
+}
+
 // ── Docker Action Types ───────────────────────────────────────────────────────
 
 export interface DockerPortMapping {

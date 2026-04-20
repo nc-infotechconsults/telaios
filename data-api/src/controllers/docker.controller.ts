@@ -222,6 +222,51 @@ export async function downloadVolumeFile(req: Request, res: Response) {
   }
 }
 
+export async function getVolumeFileContent(req: Request, res: Response) {
+  try {
+    const { path: filePath } = req.query as Record<string, string>;
+
+    if (!filePath) {
+      return res.status(400).json({ error: "path query parameter is required" });
+    }
+    if (!filePath.startsWith("/") || filePath.includes("..")) {
+      return res.status(400).json({ error: "Invalid path: must be absolute and contain no path traversal" });
+    }
+
+    const result = await dockerService.getDockerVolumeFileContent(
+      req.params.id,
+      req.params.volumeName,
+      filePath,
+    );
+    return res.json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function updateVolumeFileContent(req: Request, res: Response) {
+  try {
+    const { path: filePath, content } = req.body as { path?: string; content?: string };
+
+    if (!filePath || content === undefined) {
+      return res.status(400).json({ error: "path and content are required" });
+    }
+    if (!filePath.startsWith("/") || filePath.includes("..")) {
+      return res.status(400).json({ error: "Invalid path: must be absolute and contain no path traversal" });
+    }
+
+    await dockerService.updateDockerVolumeFileContent(
+      req.params.id,
+      req.params.volumeName,
+      filePath,
+      content,
+    );
+    return res.status(204).send();
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
 // ─── Container actions ─────────────────────────────────────────────────────────
 
 export async function createContainer(req: Request, res: Response) {

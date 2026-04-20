@@ -31,6 +31,7 @@ import type {
   DockerVolume,
   DockerNetwork,
   DockerVolumeFileEntry,
+  DockerVolumeFileContent,
   DockerCreateContainerOptions,
   DockerExecResult,
   DockerContainerStats,
@@ -713,6 +714,31 @@ export const downloadDockerVolumeFile = async (
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
+export const getDockerVolumeFileContent = (
+  envId: string,
+  volumeName: string,
+  filePath: string,
+): Promise<DockerVolumeFileContent> =>
+  http
+    .get<DockerVolumeFileContent>(
+      `/environments/${envId}/docker/volumes/${encodeURIComponent(volumeName)}/files/content`,
+      { params: { path: filePath } },
+    )
+    .then((r) => r.data);
+
+export const updateDockerVolumeFileContent = (
+  envId: string,
+  volumeName: string,
+  filePath: string,
+  content: string,
+): Promise<void> =>
+  http
+    .put(
+      `/environments/${envId}/docker/volumes/${encodeURIComponent(volumeName)}/files/content`,
+      { path: filePath, content },
+    )
+    .then(() => undefined);
 
 
 // ─── Docker Actions ───────────────────────────────────────────────────────────

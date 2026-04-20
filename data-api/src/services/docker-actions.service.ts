@@ -10,7 +10,7 @@ import { AppDataSource } from "../configs/data-source.config";
 import { Environment } from "../entities/Environment.entity";
 import { decrypt } from "../utils/crypto.util";
 import { DockerClient } from "./docker.service";
-import type { DockerConnectionConfig, DockerContainerSummary, DockerImageSummary, DockerVolumeSummary, DockerNetworkSummary, DockerVolumeFileEntry, DockerCreateContainerOptions, DockerExecResult, DockerContainerStats, DockerPruneResult } from "./docker.service";
+import type { DockerConnectionConfig, DockerContainerSummary, DockerImageSummary, DockerVolumeSummary, DockerNetworkSummary, DockerVolumeFileEntry, DockerVolumeFileContent, DockerCreateContainerOptions, DockerExecResult, DockerContainerStats, DockerPruneResult } from "./docker.service";
 
 const envRepo = () => AppDataSource.getRepository(Environment);
 
@@ -134,6 +134,25 @@ export async function downloadDockerVolumeFile(
 ): Promise<{ stream: NodeJS.ReadableStream; cleanup: () => Promise<void> }> {
   const { cfg } = await resolveDockerEnv(envId);
   return DockerClient.downloadVolumeFile(cfg, volumeName, filePath);
+}
+
+export async function getDockerVolumeFileContent(
+  envId: string,
+  volumeName: string,
+  filePath: string,
+): Promise<DockerVolumeFileContent> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.getVolumeFileContent(cfg, volumeName, filePath);
+}
+
+export async function updateDockerVolumeFileContent(
+  envId: string,
+  volumeName: string,
+  filePath: string,
+  content: string,
+): Promise<void> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.updateVolumeFileContent(cfg, volumeName, filePath, content);
 }
 
 // ─── Container actions ────────────────────────────────────────────────────────

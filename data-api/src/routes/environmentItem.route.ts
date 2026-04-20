@@ -42,6 +42,8 @@ router.get("/:id/docker/volumes", requireProjectAccess("viewer"), dockerControll
 router.get("/:id/docker/volumes/:volumeName/inspect", requireProjectAccess("viewer"), dockerController.inspectVolume);
 router.get("/:id/docker/volumes/:volumeName/files", requireProjectAccess("viewer"), dockerController.listVolumeFiles);
 router.get("/:id/docker/volumes/:volumeName/files/download", requireProjectAccess("viewer"), dockerController.downloadVolumeFile);
+router.get("/:id/docker/volumes/:volumeName/files/content", requireProjectAccess("viewer"), dockerController.getVolumeFileContent);
+router.put("/:id/docker/volumes/:volumeName/files/content", requireProjectAccess("editor"), dockerController.updateVolumeFileContent);
 router.post("/:id/docker/volumes", requireProjectAccess("editor"), dockerController.createVolume);
 router.post("/:id/docker/volumes/prune", requireProjectAccess("editor"), dockerController.pruneVolumes);
 router.delete("/:id/docker/volumes/:volumeName", requireProjectAccess("editor"), dockerController.removeVolume);
