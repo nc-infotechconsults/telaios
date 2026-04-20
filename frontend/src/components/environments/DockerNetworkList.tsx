@@ -2,6 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Button,
   Chip,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
   Spinner,
   Table,
   TableHeader,
@@ -9,11 +14,14 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  Tooltip,
+  useDisclosure,
 } from "@heroui/react";
-import { listDockerNetworks } from "../../lib/api";
+import { listDockerNetworks, removeDockerNetwork, pruneDockerNetworks } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerNetwork } from "../../types";
 import DockerNetworkDetail from "./DockerNetworkDetail";
+import DockerCreateNetworkModal from "./DockerCreateNetworkModal";
 
 interface Props {
   environmentId: string;
@@ -22,7 +30,19 @@ interface Props {
 export default function DockerNetworkList({ environmentId }: Props) {
   const [networks, setNetworks] = useState<DockerNetwork[]>([]);
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DockerNetwork | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Remove confirmation
+  const { isOpen: isRemoveOpen, onOpen: onRemoveOpen, onOpenChange: onRemoveOpenChange } = useDisclosure();
+
+  // Create
+  const { isOpen: isCreateOpen, onOpen: onCreateOpen, onOpenChange: onCreateOpenChange } = useDisclosure();
+
+  // Prune
+  const [pruning, setPruning] = useState(false);
+  const { isOpen: isPruneOpen, onOpen: onPruneOpen, onOpenChange: onPruneOpenChange } = useDisclosure();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,6 +58,36 @@ export default function DockerNetworkList({ environmentId }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleRemove = async (onClose: () => void) => {
+    if (!deleteTarget) return;
+    setRemoving(deleteTarget.id);
+    try {
+      await removeDockerNetwork(environmentId, deleteTarget.id);
+      toast.success("Network removed", deleteTarget.name);
+      setDeleteTarget(null);
+      await load();
+      onClose();
+    } catch {
+      toast.error("Failed to remove network");
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const handlePrune = async (onClose: () => void) => {
+    setPruning(true);
+    try {
+      const result = await pruneDockerNetworks(environmentId);
+      await load();
+      toast.success(`Pruned ${result.removed.length} network(s)`);
+      onClose();
+    } catch {
+      toast.error("Failed to prune networks");
+    } finally {
+      setPruning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -50,7 +100,11 @@ export default function DockerNetworkList({ environmentId }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-default-500">{networks.length} network{networks.length !== 1 ? "s" : ""}</p>
-        <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+        <div className="flex gap-2">
+          <Button size="sm" color="primary" variant="flat" onPress={onCreateOpen}>Create</Button>
+          <Button size="sm" color="warning" variant="flat" onPress={onPruneOpen}>Prune</Button>
+          <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+        </div>
       </div>
 
       {networks.length === 0 ? (
@@ -69,6 +123,7 @@ export default function DockerNetworkList({ environmentId }: Props) {
                 <TableColumn>SCOPE</TableColumn>
                 <TableColumn>SUBNET</TableColumn>
                 <TableColumn>CONTAINERS</TableColumn>
+                <TableColumn>ACTIONS</TableColumn>
               </TableHeader>
               <TableBody>
                 {networks.map((net) => (
@@ -95,6 +150,21 @@ export default function DockerNetworkList({ environmentId }: Props) {
                     <TableCell>
                       <span className="text-xs">{net.containers}</span>
                     </TableCell>
+                    <TableCell>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Tooltip content="Remove network" color="danger">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            isLoading={removing === net.id}
+                            onPress={() => { setDeleteTarget(net); onRemoveOpen(); }}
+                          >
+                            Remove
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -116,6 +186,58 @@ export default function DockerNetworkList({ environmentId }: Props) {
           })()}
         </div>
       )}
+
+      {/* Remove confirmation */}
+      <Modal isOpen={isRemoveOpen} onOpenChange={onRemoveOpenChange} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Remove Network</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  Remove network <span className="font-semibold">{deleteTarget?.name}</span>? This action cannot be undone.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose} isDisabled={!!removing}>Cancel</Button>
+                <Button color="danger" isLoading={removing === deleteTarget?.id} onPress={() => handleRemove(onClose)}>
+                  Remove
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Prune confirmation */}
+      <Modal isOpen={isPruneOpen} onOpenChange={onPruneOpenChange} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Prune Networks</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  Remove all unused networks? This cannot be undone.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose} isDisabled={pruning}>Cancel</Button>
+                <Button color="warning" isLoading={pruning} onPress={() => handlePrune(onClose)}>
+                  Prune
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Create network modal */}
+      <DockerCreateNetworkModal
+        environmentId={environmentId}
+        isOpen={isCreateOpen}
+        onOpenChange={onCreateOpenChange}
+        onCreated={load}
+      />
     </div>
   );
 }

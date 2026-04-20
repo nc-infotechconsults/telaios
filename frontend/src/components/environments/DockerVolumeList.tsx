@@ -17,10 +17,11 @@ import {
   Tooltip,
   useDisclosure,
 } from "@heroui/react";
-import { listDockerVolumes, removeDockerVolume } from "../../lib/api";
+import { listDockerVolumes, removeDockerVolume, pruneDockerVolumes } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerVolume } from "../../types";
 import DockerVolumeDetail from "./DockerVolumeDetail";
+import DockerCreateVolumeModal from "./DockerCreateVolumeModal";
 
 interface Props {
   environmentId: string;
@@ -33,6 +34,13 @@ export default function DockerVolumeList({ environmentId }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<DockerVolume | null>(null);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+  // Create
+  const { isOpen: isCreateOpen, onOpen: onCreateOpen, onOpenChange: onCreateOpenChange } = useDisclosure();
+
+  // Prune
+  const [pruning, setPruning] = useState(false);
+  const { isOpen: isPruneOpen, onOpen: onPruneOpen, onOpenChange: onPruneOpenChange } = useDisclosure();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +71,20 @@ export default function DockerVolumeList({ environmentId }: Props) {
     }
   };
 
+  const handlePrune = async (onClose: () => void) => {
+    setPruning(true);
+    try {
+      const result = await pruneDockerVolumes(environmentId);
+      await load();
+      toast.success(`Pruned ${result.removed.length} volume(s)`);
+      onClose();
+    } catch {
+      toast.error("Failed to prune volumes");
+    } finally {
+      setPruning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -75,7 +97,11 @@ export default function DockerVolumeList({ environmentId }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-default-500">{volumes.length} volume{volumes.length !== 1 ? "s" : ""}</p>
-        <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+        <div className="flex gap-2">
+          <Button size="sm" color="primary" variant="flat" onPress={onCreateOpen}>Create</Button>
+          <Button size="sm" color="warning" variant="flat" onPress={onPruneOpen}>Prune</Button>
+          <Button size="sm" variant="flat" onPress={load}>Refresh</Button>
+        </div>
       </div>
 
       {volumes.length === 0 ? (
@@ -174,6 +200,36 @@ export default function DockerVolumeList({ environmentId }: Props) {
           )}
         </ModalContent>
       </Modal>
+
+      {/* Prune confirmation */}
+      <Modal isOpen={isPruneOpen} onOpenChange={onPruneOpenChange} size="sm">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Prune Volumes</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600">
+                  Remove all unused volumes? This cannot be undone.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose} isDisabled={pruning}>Cancel</Button>
+                <Button color="warning" isLoading={pruning} onPress={() => handlePrune(onClose)}>
+                  Prune
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Create volume modal */}
+      <DockerCreateVolumeModal
+        environmentId={environmentId}
+        isOpen={isCreateOpen}
+        onOpenChange={onCreateOpenChange}
+        onCreated={load}
+      />
     </div>
   );
 }
