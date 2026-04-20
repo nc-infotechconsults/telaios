@@ -33,6 +33,9 @@ export default function DockerShellPage() {
   useEffect(() => {
     if (!termRef.current || !envId || !containerId) return;
 
+    let disposed = false;
+    let rafId = 0;
+
     // ── Terminal setup ──────────────────────────────────────────────────────
     const term = new Terminal({
       cursorBlink: true,
@@ -56,27 +59,19 @@ export default function DockerShellPage() {
 
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open(termRef.current);
-
-    // Defer first fit to ensure the container has been laid out by the browser.
-    // fit.fit() throws if element dimensions are zero (e.g. first paint).
-    const fitSafe = () => { try { fit.fit(); } catch { /* not yet laid out */ } };
-    requestAnimationFrame(fitSafe);
 
     termInstance.current = term;
     fitAddon.current = fit;
 
-    term.writeln("\x1b[33mConnecting to container shell…\x1b[0m");
-
     // ── WebSocket setup ─────────────────────────────────────────────────────
+    // Start connecting immediately; xterm buffers writes before open() is called.
     const wsUrl = `${WS_BASE}/ws/environments/${envId}/docker/shell/${containerId}?token=${encodeURIComponent(token)}`;
     const socket = new WebSocket(wsUrl);
     socket.binaryType = "arraybuffer";
     ws.current = socket;
 
     socket.onopen = () => {
-      term.clear();
-      // Send initial size
+      // Send initial terminal size (uses xterm defaults 80×24 if open() not yet called)
       socket.send(
         JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }),
       );
@@ -90,7 +85,7 @@ export default function DockerShellPage() {
       }
     };
 
-    socket.onclose = (event) => {
+    socket.onclose = (event: CloseEvent) => {
       term.writeln(`\r\n\x1b[31mConnection closed (${event.code})\x1b[0m`);
     };
 
@@ -105,9 +100,9 @@ export default function DockerShellPage() {
       }
     });
 
-    // Terminal resize → WebSocket resize message
+    // ResizeObserver — attached only after terminal.open() succeeds
     const resizeObserver = new ResizeObserver(() => {
-      fit.fit();
+      try { fit.fit(); } catch { /* element not yet laid out */ }
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(
           JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }),
@@ -115,12 +110,34 @@ export default function DockerShellPage() {
       }
     });
 
-    if (termRef.current) {
-      resizeObserver.observe(termRef.current);
-    }
+    // ── Defer term.open() until element has computed layout dimensions ───────
+    // term.open() on a zero-size element crashes xterm's viewport renderer.
+    // requestAnimationFrame fires after the browser has performed layout,
+    // guaranteeing the flex container has non-zero dimensions.
+    const tryOpen = () => {
+      if (disposed || !termRef.current) return;
+      try {
+        term.open(termRef.current);
+        fit.fit();
+        // Re-send accurate size after fit
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(
+            JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }),
+          );
+        }
+        // Only start observing after the terminal is successfully opened
+        resizeObserver.observe(termRef.current);
+      } catch {
+        // Layout not ready yet — retry on next frame
+        rafId = requestAnimationFrame(tryOpen);
+      }
+    };
+    rafId = requestAnimationFrame(tryOpen);
 
     // Cleanup
     return () => {
+      disposed = true;
+      cancelAnimationFrame(rafId);
       dataDisposable.dispose();
       resizeObserver.disconnect();
       socket.close();
@@ -162,7 +179,7 @@ export default function DockerShellPage() {
         </span>
       </div>
 
-      {/* Terminal */}
+      {/* Terminal — flex:1 fills remaining height after title bar */}
       <div
         ref={termRef}
         style={{ flex: 1, overflow: "hidden", padding: 4 }}
