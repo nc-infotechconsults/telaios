@@ -90,8 +90,10 @@ export const HelmService = {
     repoUrl?: string,
     chartVersion?: string,
   ): Promise<string> {
-    const args = ["install", releaseName, chart, "--namespace", namespace, "--create-namespace", "--output", "json"];
-    if (repoUrl) {
+    const isOci = repoUrl?.startsWith("oci://");
+    const chartArg = isOci ? `${repoUrl}/${chart}` : chart;
+    const args = ["install", releaseName, chartArg, "--namespace", namespace, "--create-namespace", "--output", "json"];
+    if (repoUrl && !isOci) {
       args.push("--repo", repoUrl);
     }
     if (chartVersion) {
@@ -117,8 +119,10 @@ export const HelmService = {
     repoUrl?: string,
     chartVersion?: string,
   ): Promise<string> {
-    const args = ["upgrade", releaseName, chart, "--namespace", namespace, "--install", "--output", "json"];
-    if (repoUrl) {
+    const isOci = repoUrl?.startsWith("oci://");
+    const chartArg = isOci ? `${repoUrl}/${chart}` : chart;
+    const args = ["upgrade", releaseName, chartArg, "--namespace", namespace, "--install", "--output", "json"];
+    if (repoUrl && !isOci) {
       args.push("--repo", repoUrl);
     }
     if (chartVersion) {

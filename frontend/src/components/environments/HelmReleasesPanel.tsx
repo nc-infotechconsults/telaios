@@ -21,6 +21,7 @@ import { listHelmReleases, uninstallHelmRelease } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { HelmRelease } from "../../types";
 import HelmInstallModal from "./HelmInstallModal";
+import HelmUpgradeModal from "./HelmUpgradeModal";
 
 interface Props {
   environmentId: string;
@@ -39,9 +40,11 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
   const [loading, setLoading] = useState(true);
   const [releaseToUninstall, setReleaseToUninstall] = useState<HelmRelease | null>(null);
   const [uninstalling, setUninstalling] = useState(false);
+  const [releaseToUpgrade, setReleaseToUpgrade] = useState<HelmRelease | null>(null);
 
   const { isOpen: isInstallOpen, onOpen: onInstallOpen, onOpenChange: onInstallOpenChange } = useDisclosure();
   const { isOpen: isUninstallOpen, onOpen: onUninstallOpen, onOpenChange: onUninstallOpenChange } = useDisclosure();
+  const { isOpen: isUpgradeOpen, onOpen: onUpgradeOpen, onOpenChange: onUpgradeOpenChange } = useDisclosure();
 
   const load = async () => {
     try {
@@ -60,6 +63,10 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
 
   const handleInstall = (release: HelmRelease) => {
     setReleases((prev) => [release, ...prev]);
+  };
+
+  const handleUpgrade = (updated: HelmRelease) => {
+    setReleases((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   };
 
   const handleUninstall = async () => {
@@ -147,19 +154,34 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
                 </TableCell>
                 <TableCell>
                   {rel.status !== "uninstalled" ? (
-                    <Tooltip content="Uninstall release" color="danger">
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        color="danger"
-                        onPress={() => {
-                          setReleaseToUninstall(rel);
-                          onUninstallOpen();
-                        }}
-                      >
-                        Uninstall
-                      </Button>
-                    </Tooltip>
+                    <div className="flex items-center gap-2">
+                      <Tooltip content="Upgrade release">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="primary"
+                          onPress={() => {
+                            setReleaseToUpgrade(rel);
+                            onUpgradeOpen();
+                          }}
+                        >
+                          Upgrade
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="Uninstall release" color="danger">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          color="danger"
+                          onPress={() => {
+                            setReleaseToUninstall(rel);
+                            onUninstallOpen();
+                          }}
+                        >
+                          Uninstall
+                        </Button>
+                      </Tooltip>
+                    </div>
                   ) : null}
                 </TableCell>
               </TableRow>
@@ -174,6 +196,15 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
         onOpenChange={onInstallOpenChange}
         environmentId={environmentId}
         onInstall={handleInstall}
+      />
+
+      {/* Upgrade modal */}
+      <HelmUpgradeModal
+        isOpen={isUpgradeOpen}
+        onOpenChange={onUpgradeOpenChange}
+        environmentId={environmentId}
+        release={releaseToUpgrade}
+        onUpgrade={handleUpgrade}
       />
 
       {/* Uninstall confirmation */}

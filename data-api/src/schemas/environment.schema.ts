@@ -42,14 +42,15 @@ export const PatchEnvironmentSchema = z.object({
 
 export const HelmReleaseStatusSchema = z.enum(["pending", "deployed", "failed", "uninstalled"]);
 
-// Restrict Helm repo URLs to http/https to prevent the Helm CLI from
+// Restrict Helm repo URLs to http/https/oci to prevent the Helm CLI from
 // fetching local file paths (file://) or other unsafe schemes.
+// Note: oci:// is not a valid URL per the WHATWG spec so we cannot use .url().
 const helmRepoUrl = z
   .string()
-  .url()
+  .min(1)
   .refine(
-    (v) => v.startsWith("http://") || v.startsWith("https://"),
-    { message: "Helm repo URL must use http or https" }
+    (v) => v.startsWith("http://") || v.startsWith("https://") || v.startsWith("oci://"),
+    { message: "Helm repo URL must use http, https, or oci" }
   );
 
 export const InstallHelmChartSchema = z.object({

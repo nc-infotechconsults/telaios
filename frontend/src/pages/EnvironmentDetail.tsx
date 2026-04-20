@@ -23,7 +23,7 @@ import {
 import { toast } from "../lib/toast";
 import type { Environment, K8sResource } from "../types";
 import EnvironmentEditModal from "../components/environments/EnvironmentEditModal";
-import ResourceBrowser from "../components/environments/ResourceBrowser";
+import K8sResourceExplorer from "../components/environments/K8sResourceExplorer";
 import ResourceDetailPanel from "../components/environments/ResourceDetailPanel";
 import HelmReleasesPanel from "../components/environments/HelmReleasesPanel";
 import DockerDashboard from "../components/environments/DockerDashboard";
@@ -220,12 +220,11 @@ export default function EnvironmentDetail() {
         )}
         {activeTab === "resources" && (
           <div className="flex gap-0 h-full -mx-5 -my-5">
-            {/* Left: resource list */}
-            <div className={`overflow-y-auto px-5 py-5 ${selectedResource ? "w-[60%] border-r-0" : "w-full"}`}>
-              <ResourceBrowser
+            {/* Left: K8s resource explorer (nav + list) */}
+            <div className={`overflow-hidden ${selectedResource ? "w-[60%] border-r border-divider" : "w-full"}`}>
+              <K8sResourceExplorer
                 environmentId={environment.id}
                 defaultNamespace={environment.namespace}
-                environmentType={environment.type}
                 onSelectResource={handleSelectResource}
                 selectedResourceName={selectedResource?.name}
               />

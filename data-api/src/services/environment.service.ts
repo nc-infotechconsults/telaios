@@ -2,11 +2,18 @@ import { AppDataSource } from "../configs/data-source.config";
 import { Environment } from "../entities/Environment.entity";
 import { HelmRelease } from "../entities/HelmRelease.entity";
 import { encrypt, decrypt } from "../utils/crypto.util";
-import type { CreateEnvironmentDto, PatchEnvironmentDto, InstallHelmChartDto } from "../schemas/environment.schema";
+import type { CreateEnvironmentDto, PatchEnvironmentDto, InstallHelmChartDto, UpgradeHelmChartDto } from "../schemas/environment.schema";
 import { KubernetesClient } from "./kubernetes.service";
 import { DockerClient } from "./docker.service";
 import { HelmService } from "./helm.service";
-import type { K8sResourceKind } from "./kubernetes.service";
+import type { K8sResourceKind, K8sPVCFileEntry, K8sConnectionConfig } from "./kubernetes.service";
+
+export class PVCConflictError extends Error {
+  constructor(public readonly conflicting_pod: string) {
+    super(`PVC is mounted by running pod: ${conflicting_pod}`);
+    this.name = "PVCConflictError";
+  }
+}
 
 const envRepo = () => AppDataSource.getRepository(Environment);
 const releaseRepo = () => AppDataSource.getRepository(HelmRelease);
@@ -185,14 +192,23 @@ export async function installHelmChart(
   deployedBy?: string,
 ): Promise<HelmRelease> {
   const ns = dto.namespace ?? "default";
-  const releaseNotes = await HelmService.install(
-    dto.release_name,
-    dto.chart_name,
-    ns,
-    dto.values_override as Record<string, unknown> | undefined,
-    dto.chart_repo_url,
-    dto.chart_version,
-  );
+
+  let releaseNotes: string | undefined;
+  let helmStatus: "deployed" | "failed" = "deployed";
+
+  try {
+    releaseNotes = await HelmService.install(
+      dto.release_name,
+      dto.chart_name,
+      ns,
+      dto.values_override as Record<string, unknown> | undefined,
+      dto.chart_repo_url,
+      dto.chart_version,
+    );
+  } catch (err) {
+    helmStatus = "failed";
+    releaseNotes = err instanceof Error ? err.message : String(err);
+  }
 
   const release = releaseRepo().create({
     environment_id: environmentId,
@@ -203,12 +219,18 @@ export async function installHelmChart(
     chart_version: dto.chart_version,
     namespace: ns,
     values_override: dto.values_override as Record<string, unknown> | undefined,
-    status: "deployed",
+    status: helmStatus,
     release_notes: releaseNotes,
     deployed_by: deployedBy,
     deployed_at: new Date(),
   });
-  return releaseRepo().save(release);
+  const saved = await releaseRepo().save(release);
+
+  if (helmStatus === "failed") {
+    throw new Error(releaseNotes);
+  }
+
+  return saved;
 }
 
 export async function listHelmReleases(environmentId: string): Promise<HelmRelease[]> {
@@ -218,21 +240,148 @@ export async function listHelmReleases(environmentId: string): Promise<HelmRelea
   });
 }
 
+export async function upgradeHelmRelease(
+  environmentId: string,
+  releaseName: string,
+  dto: UpgradeHelmChartDto,
+  deployedBy?: string,
+): Promise<HelmRelease | null> {
+  const release = await releaseRepo().findOneBy({ environment_id: environmentId, name: releaseName });
+  if (!release) return null;
+
+  const ns = dto.namespace ?? release.namespace ?? "default";
+  const chart = dto.chart_name ?? release.chart_name;
+  const repoUrl = dto.chart_repo_url ?? release.chart_repo_url;
+  const chartVersion = dto.chart_version ?? release.chart_version;
+  const valuesOverride = (dto.values_override as Record<string, unknown> | undefined) ?? release.values_override;
+
+  let releaseNotes: string | undefined;
+  let helmStatus: "deployed" | "failed" = "deployed";
+
+  try {
+    releaseNotes = await HelmService.upgrade(
+      releaseName,
+      chart,
+      ns,
+      valuesOverride,
+      repoUrl,
+      chartVersion,
+    );
+  } catch (err) {
+    helmStatus = "failed";
+    releaseNotes = err instanceof Error ? err.message : String(err);
+  }
+
+  const updateFields: Record<string, unknown> = {
+    chart_repo_url: repoUrl,
+    chart_name: chart,
+    chart_version: chartVersion,
+    namespace: ns,
+    status: helmStatus,
+    release_notes: releaseNotes,
+    deployed_by: deployedBy,
+    deployed_at: new Date(),
+  };
+  if (valuesOverride !== undefined) {
+    updateFields.values_override = valuesOverride;
+  }
+  // Cast needed: TypeORM's _QueryDeepPartialEntity<T> doesn't accept
+  // Record<string, unknown> for jsonb columns due to a TypeORM typing quirk.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await releaseRepo().update(release.id, updateFields as any);
+
+  const updated = await releaseRepo().findOneBy({ id: release.id });
+
+  if (helmStatus === "failed") {
+    throw new Error(releaseNotes);
+  }
+
+  return updated;
+}
+
 export async function uninstallHelmRelease(
   environmentId: string,
   releaseName: string,
 ): Promise<void> {
   const release = await releaseRepo().findOneBy({ environment_id: environmentId, name: releaseName });
   if (release) {
-    try {
-      await HelmService.uninstall(releaseName, release.namespace ?? "default");
-    } catch {
-      // best effort
-    }
+    await HelmService.uninstall(releaseName, release.namespace ?? "default");
     await releaseRepo().update(release.id, { status: "uninstalled" });
   }
 }
 
 export async function scanProjectCharts(projectId: string) {
   return HelmService.scanProjectForCharts(projectId);
+}
+
+// ─── PVC File Browser ─────────────────────────────────────────────────────────
+
+async function resolveK8sEnv(id: string) {
+  const env = await envRepo().findOneBy({ id });
+  if (!env) throw new Error("Environment not found");
+  const cfg = parseConnectionConfig(env);
+  if (!cfg) throw new Error("No connection config set");
+  if (env.type !== "kubernetes") throw new Error("Not a Kubernetes environment");
+  return { env, cfg };
+}
+
+async function assertNoPVCConflict(
+  cfg: K8sConnectionConfig,
+  namespace: string,
+  pvcName: string,
+) {
+  const accessModes = await KubernetesClient.getPVCAccessModes(cfg, namespace, pvcName);
+  if (accessModes.includes("ReadWriteOnce")) {
+    const conflicting = await KubernetesClient.getPodsUsingPVC(cfg, namespace, pvcName);
+    if (conflicting.length > 0) throw new PVCConflictError(conflicting[0]);
+  }
+}
+
+export async function listPVCFiles(
+  id: string,
+  namespace: string,
+  pvcName: string,
+  dirPath: string,
+): Promise<K8sPVCFileEntry[]> {
+  const { cfg } = await resolveK8sEnv(id);
+  const k8sCfg = asCfg<K8sConnectionConfig>(cfg);
+  await assertNoPVCConflict(k8sCfg, namespace, pvcName);
+  return KubernetesClient.listPVCFiles(k8sCfg, namespace, pvcName, dirPath);
+}
+
+export async function getPVCFileContent(
+  id: string,
+  namespace: string,
+  pvcName: string,
+  filePath: string,
+): Promise<{ content: string; encoding: "text" | "binary"; size: number }> {
+  const { cfg } = await resolveK8sEnv(id);
+  const k8sCfg = asCfg<K8sConnectionConfig>(cfg);
+  await assertNoPVCConflict(k8sCfg, namespace, pvcName);
+  return KubernetesClient.getPVCFileContent(k8sCfg, namespace, pvcName, filePath);
+}
+
+export async function updatePVCFileContent(
+  id: string,
+  namespace: string,
+  pvcName: string,
+  filePath: string,
+  content: string,
+): Promise<void> {
+  const { cfg } = await resolveK8sEnv(id);
+  const k8sCfg = asCfg<K8sConnectionConfig>(cfg);
+  await assertNoPVCConflict(k8sCfg, namespace, pvcName);
+  return KubernetesClient.updatePVCFileContent(k8sCfg, namespace, pvcName, filePath, content);
+}
+
+export async function downloadPVCFile(
+  id: string,
+  namespace: string,
+  pvcName: string,
+  filePath: string,
+) {
+  const { cfg } = await resolveK8sEnv(id);
+  const k8sCfg = asCfg<K8sConnectionConfig>(cfg);
+  await assertNoPVCConflict(k8sCfg, namespace, pvcName);
+  return KubernetesClient.downloadPVCFile(k8sCfg, namespace, pvcName, filePath);
 }

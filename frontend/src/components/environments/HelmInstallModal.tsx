@@ -171,10 +171,10 @@ export default function HelmInstallModal({
               />
               <Input
                 label="Chart repository URL"
-                placeholder="https://charts.bitnami.com/bitnami"
+                placeholder="https://charts.bitnami.com/bitnami or oci://ghcr.io/myorg"
                 value={form.chartRepoUrl}
                 onValueChange={(v) => update("chartRepoUrl", v)}
-                description="Required for remote charts"
+                description="HTTP, HTTPS, or OCI registry URL"
               />
               <Input
                 label="Chart version"

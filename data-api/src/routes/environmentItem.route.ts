@@ -18,6 +18,7 @@ router.get("/:id/resources/:kind/:name/logs", requireProjectAccess("viewer"), en
 // Helm
 router.post("/:id/helm/install", requireProjectAccess("editor"), environmentController.installHelmChart);
 router.get("/:id/helm/releases", requireProjectAccess("viewer"), environmentController.listHelmReleases);
+router.put("/:id/helm/releases/:releaseName", requireProjectAccess("editor"), environmentController.upgradeHelmRelease);
 router.delete("/:id/helm/releases/:releaseName", requireProjectAccess("editor"), environmentController.uninstallHelmRelease);
 router.get("/:id/helm/charts/scan", requireProjectAccess("viewer"), environmentController.scanProjectCharts);
 
@@ -52,5 +53,11 @@ router.get("/:id/docker/networks/:networkId/inspect", requireProjectAccess("view
 router.post("/:id/docker/networks", requireProjectAccess("editor"), dockerController.createNetwork);
 router.post("/:id/docker/networks/prune", requireProjectAccess("editor"), dockerController.pruneNetworks);
 router.delete("/:id/docker/networks/:networkId", requireProjectAccess("editor"), dockerController.removeNetwork);
+
+// K8s PVC file browser — /files/download and /files/content BEFORE /files to avoid prefix match
+router.get("/:id/kubernetes/pvcs/:pvcName/files/download", requireProjectAccess("viewer"), environmentController.downloadPVCFile);
+router.get("/:id/kubernetes/pvcs/:pvcName/files/content", requireProjectAccess("viewer"), environmentController.getPVCFileContent);
+router.put("/:id/kubernetes/pvcs/:pvcName/files/content", requireProjectAccess("editor"), environmentController.updatePVCFileContent);
+router.get("/:id/kubernetes/pvcs/:pvcName/files", requireProjectAccess("viewer"), environmentController.listPVCFiles);
 
 export default router;

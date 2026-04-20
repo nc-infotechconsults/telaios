@@ -369,6 +369,23 @@ export interface DockerVolumeFileContent {
   path: string;
 }
 
+// ── Kubernetes PVC File Browser Types ─────────────────────────────────────────
+
+export interface K8sPVCFileEntry {
+  name: string;
+  type: "file" | "directory";
+  size: number;
+  modified: string;
+  path: string;
+}
+
+export interface K8sPVCFileContent {
+  content: string;
+  encoding: "text" | "binary";
+  size: number;
+  path: string;
+}
+
 // ── Docker Action Types ───────────────────────────────────────────────────────
 
 export interface DockerPortMapping {

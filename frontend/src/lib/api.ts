@@ -36,6 +36,8 @@ import type {
   DockerExecResult,
   DockerContainerStats,
   DockerPruneResult,
+  K8sPVCFileEntry,
+  K8sPVCFileContent,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -633,6 +635,19 @@ export const installHelmChart = (
 export const uninstallHelmRelease = (envId: string, releaseName: string): Promise<void> =>
   http.delete(`/environments/${envId}/helm/releases/${releaseName}`).then(() => undefined);
 
+export const upgradeHelmChart = (
+  envId: string,
+  releaseName: string,
+  data: {
+    chart_repo_url?: string;
+    chart_name?: string;
+    chart_version?: string;
+    namespace?: string;
+    values_override?: Record<string, unknown>;
+  },
+): Promise<HelmRelease> =>
+  http.put<HelmRelease>(`/environments/${envId}/helm/releases/${releaseName}`, data).then((r) => r.data);
+
 export const scanProjectCharts = (envId: string): Promise<Array<{ name: string; version: string; description: string; localPath?: string }>> =>
   http.get(`/environments/${envId}/helm/charts/scan`).then((r) => r.data as Array<{ name: string; version: string; description: string; localPath?: string }>);
 
@@ -742,6 +757,71 @@ export const updateDockerVolumeFileContent = (
     )
     .then(() => undefined);
 
+
+// ─── Kubernetes PVC File Browser ──────────────────────────────────────────────
+
+export const listK8sPVCFiles = (
+  envId: string,
+  pvcName: string,
+  namespace: string,
+  path: string,
+): Promise<K8sPVCFileEntry[]> =>
+  http
+    .get<K8sPVCFileEntry[]>(
+      `/environments/${envId}/kubernetes/pvcs/${encodeURIComponent(pvcName)}/files`,
+      { params: { namespace, path } },
+    )
+    .then((r) => r.data);
+
+export const getK8sPVCFileContent = (
+  envId: string,
+  pvcName: string,
+  namespace: string,
+  path: string,
+): Promise<K8sPVCFileContent> =>
+  http
+    .get<K8sPVCFileContent>(
+      `/environments/${envId}/kubernetes/pvcs/${encodeURIComponent(pvcName)}/files/content`,
+      { params: { namespace, path } },
+    )
+    .then((r) => r.data);
+
+export const updateK8sPVCFileContent = (
+  envId: string,
+  pvcName: string,
+  namespace: string,
+  path: string,
+  content: string,
+): Promise<void> =>
+  http
+    .put(
+      `/environments/${envId}/kubernetes/pvcs/${encodeURIComponent(pvcName)}/files/content`,
+      { namespace, path, content },
+    )
+    .then(() => undefined);
+
+export const downloadK8sPVCFile = async (
+  envId: string,
+  pvcName: string,
+  namespace: string,
+  filePath: string,
+  fileName: string,
+): Promise<void> => {
+  const response = await http.get(
+    `/environments/${envId}/kubernetes/pvcs/${encodeURIComponent(pvcName)}/files/download`,
+    { params: { namespace, path: filePath }, responseType: "blob" },
+  );
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+};
 
 // ─── Docker Actions ───────────────────────────────────────────────────────────
 
