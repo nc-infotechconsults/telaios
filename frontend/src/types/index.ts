@@ -362,6 +362,56 @@ export interface DockerVolumeFileEntry {
   path: string;
 }
 
+// ── Docker Action Types ───────────────────────────────────────────────────────
+
+export interface DockerPortMapping {
+  host: number;
+  container: number;
+  protocol?: string;
+}
+
+export interface DockerVolumeMount {
+  source?: string;
+  container_path: string;
+  read_only?: boolean;
+}
+
+export interface DockerCreateContainerOptions {
+  image: string;
+  name?: string;
+  cmd?: string[];
+  env?: Record<string, string>;
+  ports?: DockerPortMapping[];
+  volumes?: DockerVolumeMount[];
+  network?: string;
+  auto_remove?: boolean;
+  start?: boolean;
+}
+
+export interface DockerExecResult {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+}
+
+export interface DockerContainerStats {
+  container_id: string;
+  cpu_percent: number;
+  memory_usage: number;
+  memory_limit: number;
+  memory_percent: number;
+  network_rx: number;
+  network_tx: number;
+  block_read: number;
+  block_write: number;
+  pids: number;
+}
+
+export interface DockerPruneResult {
+  removed: string[];
+  reclaimed_bytes: number;
+}
+
 // ── Documents ─────────────────────────────────────────────────────────────────
 
 export type DocumentFileType = "pdf" | "docx" | "xlsx" | "md" | "txt" | "csv" | "json" | "other";

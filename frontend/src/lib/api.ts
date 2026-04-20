@@ -31,6 +31,10 @@ import type {
   DockerVolume,
   DockerNetwork,
   DockerVolumeFileEntry,
+  DockerCreateContainerOptions,
+  DockerExecResult,
+  DockerContainerStats,
+  DockerPruneResult,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -709,6 +713,79 @@ export const downloadDockerVolumeFile = async (
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
+
+// ─── Docker Actions ───────────────────────────────────────────────────────────
+
+export const createDockerContainer = (
+  envId: string,
+  opts: DockerCreateContainerOptions,
+): Promise<{ id: string }> =>
+  http.post<{ id: string }>(`/environments/${envId}/docker/containers`, opts).then((r) => r.data);
+
+export const execDockerContainer = (
+  envId: string,
+  containerId: string,
+  payload: { cmd: string[]; working_dir?: string; user?: string; timeout_ms?: number },
+): Promise<DockerExecResult> =>
+  http
+    .post<DockerExecResult>(`/environments/${envId}/docker/containers/${containerId}/exec`, payload)
+    .then((r) => r.data);
+
+export const getDockerContainerStats = (
+  envId: string,
+  containerId: string,
+): Promise<DockerContainerStats> =>
+  http
+    .get<DockerContainerStats>(`/environments/${envId}/docker/containers/${containerId}/stats`)
+    .then((r) => r.data);
+
+export const pullDockerImage = (
+  envId: string,
+  payload: { image: string; tag?: string; username?: string; password?: string },
+): Promise<void> =>
+  http.post(`/environments/${envId}/docker/images/pull`, payload).then(() => undefined);
+
+export const tagDockerImage = (
+  envId: string,
+  imageId: string,
+  payload: { repo: string; tag: string },
+): Promise<void> =>
+  http
+    .post(`/environments/${envId}/docker/images/${encodeURIComponent(imageId)}/tag`, payload)
+    .then(() => undefined);
+
+export const pruneDockerImages = (envId: string): Promise<DockerPruneResult> =>
+  http.post<DockerPruneResult>(`/environments/${envId}/docker/images/prune`).then((r) => r.data);
+
+export const createDockerVolume = (
+  envId: string,
+  payload: { name: string; driver?: string; driver_opts?: Record<string, string> },
+): Promise<{ name: string }> =>
+  http.post<{ name: string }>(`/environments/${envId}/docker/volumes`, payload).then((r) => r.data);
+
+export const pruneDockerVolumes = (envId: string): Promise<DockerPruneResult> =>
+  http.post<DockerPruneResult>(`/environments/${envId}/docker/volumes/prune`).then((r) => r.data);
+
+export const createDockerNetwork = (
+  envId: string,
+  payload: {
+    name: string;
+    driver?: string;
+    subnet?: string;
+    gateway?: string;
+    internal?: boolean;
+  },
+): Promise<{ id: string }> =>
+  http.post<{ id: string }>(`/environments/${envId}/docker/networks`, payload).then((r) => r.data);
+
+export const removeDockerNetwork = (envId: string, networkId: string): Promise<void> =>
+  http
+    .delete(`/environments/${envId}/docker/networks/${encodeURIComponent(networkId)}`)
+    .then(() => undefined);
+
+export const pruneDockerNetworks = (envId: string): Promise<DockerPruneResult> =>
+  http.post<DockerPruneResult>(`/environments/${envId}/docker/networks/prune`).then((r) => r.data);
 
 
 // ─── Document Copilot ─────────────────────────────────────────────────────────
