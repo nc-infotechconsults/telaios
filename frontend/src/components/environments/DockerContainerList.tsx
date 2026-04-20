@@ -85,7 +85,8 @@ export default function DockerContainerList({ environmentId }: Props) {
       if (action === "start") await startDockerContainer(environmentId, containerId);
       else if (action === "stop") await stopDockerContainer(environmentId, containerId);
       else await restartDockerContainer(environmentId, containerId);
-      toast.success(`Container ${action}ed`);
+      const pastTense = action === "stop" ? "stopped" : `${action}ed`;
+      toast.success(`Container ${pastTense}`);
       await loadContainers();
     } catch {
       toast.error(`Failed to ${action} container`);

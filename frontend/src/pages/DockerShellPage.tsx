@@ -57,7 +57,11 @@ export default function DockerShellPage() {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(termRef.current);
-    fit.fit();
+
+    // Defer first fit to ensure the container has been laid out by the browser.
+    // fit.fit() throws if element dimensions are zero (e.g. first paint).
+    const fitSafe = () => { try { fit.fit(); } catch { /* not yet laid out */ } };
+    requestAnimationFrame(fitSafe);
 
     termInstance.current = term;
     fitAddon.current = fit;

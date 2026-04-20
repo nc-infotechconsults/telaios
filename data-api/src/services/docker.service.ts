@@ -510,7 +510,9 @@ export const DockerClient = {
     if (user) execOpts.User = user;
 
     const execObj = await container.exec(execOpts as Parameters<typeof container.exec>[0]);
-    const stream = await execObj.start({ hijack: true, stdin: false });
+    // hijack: false for non-interactive (non-TTY) exec; hijack: true causes dockerode
+    // to treat HTTP 101 as an error when there is no TTY.
+    const stream = await execObj.start({ hijack: false, stdin: false });
 
     const output = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
       const chunks: Buffer[] = [];

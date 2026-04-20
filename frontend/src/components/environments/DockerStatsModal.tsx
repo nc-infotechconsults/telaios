@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Button,
   Modal,
@@ -57,9 +57,18 @@ export default function DockerStatsModal({
     }
   };
 
+  // Fetch stats whenever the modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchStats();
+    } else {
+      setStats(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   const handleOpenChange = (open: boolean) => {
-    if (open) fetchStats();
-    else setStats(null);
+    if (!open) setStats(null);
     onOpenChange(open);
   };
 
