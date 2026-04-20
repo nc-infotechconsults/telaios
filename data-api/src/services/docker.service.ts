@@ -67,6 +67,54 @@ export interface DockerVolumeFileEntry {
   path: string;
 }
 
+export interface DockerPortMapping {
+  host: number;
+  container: number;
+  protocol?: string;
+}
+
+export interface DockerVolumeMount {
+  source?: string;
+  container_path: string;
+  read_only?: boolean;
+}
+
+export interface DockerCreateContainerOptions {
+  image: string;
+  name?: string;
+  cmd?: string[];
+  env?: Record<string, string>;
+  ports?: DockerPortMapping[];
+  volumes?: DockerVolumeMount[];
+  network?: string;
+  auto_remove?: boolean;
+  start?: boolean;
+}
+
+export interface DockerExecResult {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+}
+
+export interface DockerContainerStats {
+  container_id: string;
+  cpu_percent: number;
+  memory_usage: number;
+  memory_limit: number;
+  memory_percent: number;
+  network_rx: number;
+  network_tx: number;
+  block_read: number;
+  block_write: number;
+  pids: number;
+}
+
+export interface DockerPruneResult {
+  removed: string[];
+  reclaimed_bytes: number;
+}
+
 function buildDockerClient(cfg: DockerConnectionConfig): Docker {
   logger.debug({ cfg }, "Building Docker client with config");
 
@@ -128,6 +176,30 @@ function parseMuxedBuffer(buf: Buffer): string {
     offset += size;
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * Parse a Docker multiplexed exec stream buffer into separate stdout/stderr.
+ * Stream type 1 = stdout, 2 = stderr.
+ */
+function parseMuxedBufferSplit(buf: Buffer): { stdout: string; stderr: string } {
+  const stdoutChunks: Buffer[] = [];
+  const stderrChunks: Buffer[] = [];
+  let offset = 0;
+  while (offset + 8 <= buf.length) {
+    const streamType = buf.readUInt8(offset);
+    const size = buf.readUInt32BE(offset + 4);
+    offset += 8;
+    if (offset + size > buf.length) break;
+    const chunk = buf.subarray(offset, offset + size);
+    if (streamType === 1) stdoutChunks.push(chunk);
+    else if (streamType === 2) stderrChunks.push(chunk);
+    offset += size;
+  }
+  return {
+    stdout: Buffer.concat(stdoutChunks).toString("utf8"),
+    stderr: Buffer.concat(stderrChunks).toString("utf8"),
+  };
 }
 
 /**
@@ -369,5 +441,271 @@ export const DockerClient = {
       await cleanup();
       throw err;
     }
+  },
+
+  // ─── Container actions ────────────────────────────────────────────────────
+
+  async createContainer(
+    cfg: DockerConnectionConfig,
+    opts: DockerCreateContainerOptions,
+  ): Promise<{ id: string }> {
+    const docker = buildDockerClient(cfg);
+
+    const exposedPorts: Record<string, object> = {};
+    const portBindings: Record<string, Array<{ HostPort: string }>> = {};
+    for (const p of (opts.ports ?? [])) {
+      const proto = p.protocol ?? "tcp";
+      const key = `${p.container}/${proto}`;
+      exposedPorts[key] = {};
+      portBindings[key] = [{ HostPort: String(p.host) }];
+    }
+
+    const binds: string[] = (opts.volumes ?? []).map((v) => {
+      const src = v.source ?? "";
+      const ro = v.read_only ? ":ro" : "";
+      return `${src}:${v.container_path}${ro}`;
+    });
+
+    const envArray: string[] = Object.entries(opts.env ?? {}).map(([k, v]) => `${k}=${v}`);
+
+    const container = await docker.createContainer({
+      name: opts.name,
+      Image: opts.image,
+      Cmd: opts.cmd,
+      Env: envArray.length ? envArray : undefined,
+      ExposedPorts: Object.keys(exposedPorts).length ? exposedPorts : undefined,
+      HostConfig: {
+        PortBindings: Object.keys(portBindings).length ? portBindings : undefined,
+        Binds: binds.length ? binds : undefined,
+        NetworkMode: opts.network,
+        AutoRemove: opts.auto_remove ?? false,
+      },
+    });
+
+    if (opts.start) {
+      await container.start();
+    }
+
+    const inspect = await container.inspect();
+    return { id: (inspect.Id as string).slice(0, 12) };
+  },
+
+  async execContainer(
+    cfg: DockerConnectionConfig,
+    containerId: string,
+    cmd: string[],
+    workingDir?: string,
+    user?: string,
+    timeoutMs = 30_000,
+  ): Promise<DockerExecResult> {
+    const docker = buildDockerClient(cfg);
+    const container = docker.getContainer(containerId);
+
+    const execOpts: Record<string, unknown> = {
+      Cmd: cmd,
+      AttachStdout: true,
+      AttachStderr: true,
+    };
+    if (workingDir) execOpts.WorkingDir = workingDir;
+    if (user) execOpts.User = user;
+
+    const execObj = await container.exec(execOpts as Parameters<typeof container.exec>[0]);
+    const stream = await execObj.start({ hijack: true, stdin: false });
+
+    const output = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const timer = setTimeout(
+        () => reject(new Error(`Exec timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+      (stream as NodeJS.ReadableStream).on("data", (chunk: Buffer) => chunks.push(chunk));
+      (stream as NodeJS.ReadableStream).on("end", () => {
+        clearTimeout(timer);
+        resolve(parseMuxedBufferSplit(Buffer.concat(chunks)));
+      });
+      (stream as NodeJS.ReadableStream).on("error", (err: Error) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    const info = await execObj.inspect();
+    return {
+      stdout: output.stdout,
+      stderr: output.stderr,
+      exit_code: (info as { ExitCode?: number }).ExitCode ?? 0,
+    };
+  },
+
+  async containerStats(cfg: DockerConnectionConfig, id: string): Promise<DockerContainerStats> {
+    const docker = buildDockerClient(cfg);
+    const raw = (await docker.getContainer(id).stats({ stream: false }) as unknown) as Record<string, unknown>;
+
+    type CpuUsage = { total_usage: number; percpu_usage?: number[] };
+    type CpuStats = { cpu_usage: CpuUsage; system_cpu_usage: number; online_cpus?: number };
+    const cpuStats = raw.cpu_stats as CpuStats | undefined;
+    const preCpuStats = raw.precpu_stats as { cpu_usage: { total_usage: number }; system_cpu_usage: number } | undefined;
+
+    let cpu_percent = 0;
+    if (cpuStats && preCpuStats) {
+      const cpuDelta = cpuStats.cpu_usage.total_usage - preCpuStats.cpu_usage.total_usage;
+      const sysDelta = cpuStats.system_cpu_usage - preCpuStats.system_cpu_usage;
+      const cpuCount = cpuStats.online_cpus ?? cpuStats.cpu_usage.percpu_usage?.length ?? 1;
+      if (sysDelta > 0 && cpuDelta > 0) {
+        cpu_percent = (cpuDelta / sysDelta) * cpuCount * 100.0;
+      }
+    }
+
+    const memStats = raw.memory_stats as { usage?: number; limit?: number } | undefined;
+    const memory_usage = memStats?.usage ?? 0;
+    const memory_limit = memStats?.limit ?? 0;
+    const memory_percent = memory_limit > 0 ? (memory_usage / memory_limit) * 100.0 : 0;
+
+    const networks = raw.networks as Record<string, { rx_bytes: number; tx_bytes: number }> | undefined;
+    let network_rx = 0;
+    let network_tx = 0;
+    for (const iface of Object.values(networks ?? {})) {
+      network_rx += iface.rx_bytes ?? 0;
+      network_tx += iface.tx_bytes ?? 0;
+    }
+
+    type BlkioEntry = { op: string; value: number };
+    const blkio = raw.blkio_stats as { io_service_bytes_recursive?: BlkioEntry[] } | undefined;
+    let block_read = 0;
+    let block_write = 0;
+    for (const entry of blkio?.io_service_bytes_recursive ?? []) {
+      if (entry.op === "Read") block_read += entry.value;
+      else if (entry.op === "Write") block_write += entry.value;
+    }
+
+    const pids = (raw.pids_stats as { current?: number } | undefined)?.current ?? 0;
+
+    return {
+      container_id: id,
+      cpu_percent: Math.round(cpu_percent * 100) / 100,
+      memory_usage,
+      memory_limit,
+      memory_percent: Math.round(memory_percent * 100) / 100,
+      network_rx,
+      network_tx,
+      block_read,
+      block_write,
+      pids,
+    };
+  },
+
+  // ─── Image actions ────────────────────────────────────────────────────────
+
+  async pullImage(
+    cfg: DockerConnectionConfig,
+    image: string,
+    tag = "latest",
+    username?: string,
+    password?: string,
+  ): Promise<void> {
+    const docker = buildDockerClient(cfg);
+    const ref = tag ? `${image}:${tag}` : image;
+    const authconfig = username ? { username, password: password ?? "" } : undefined;
+
+    await new Promise<void>((resolve, reject) => {
+      const opts = authconfig ? { authconfig } : {};
+      (docker.pull as Function)(ref, opts, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        if (err) return reject(err);
+        docker.modem.followProgress(stream, (err2: Error | null) => {
+          if (err2) return reject(err2);
+          resolve();
+        });
+      });
+    });
+  },
+
+  async tagImage(
+    cfg: DockerConnectionConfig,
+    imageId: string,
+    repo: string,
+    tag: string,
+  ): Promise<void> {
+    const docker = buildDockerClient(cfg);
+    await docker.getImage(imageId).tag({ repo, tag });
+  },
+
+  async pruneImages(cfg: DockerConnectionConfig): Promise<DockerPruneResult> {
+    const docker = buildDockerClient(cfg);
+    const result = await (docker.pruneImages as Function)({}) as {
+      ImagesDeleted?: Array<{ Deleted?: string; Untagged?: string }>;
+      SpaceReclaimed?: number;
+    };
+    const removed = (result.ImagesDeleted ?? [])
+      .map((d) => d.Deleted ?? d.Untagged ?? "")
+      .filter(Boolean);
+    return { removed, reclaimed_bytes: result.SpaceReclaimed ?? 0 };
+  },
+
+  // ─── Volume actions ───────────────────────────────────────────────────────
+
+  async createVolume(
+    cfg: DockerConnectionConfig,
+    name: string,
+    driver = "local",
+    driverOpts: Record<string, string> = {},
+  ): Promise<{ name: string }> {
+    const docker = buildDockerClient(cfg);
+    const vol = await docker.createVolume({
+      Name: name,
+      Driver: driver,
+      DriverOpts: driverOpts,
+    }) as unknown as { Name: string };
+    return { name: vol.Name };
+  },
+
+  async pruneVolumes(cfg: DockerConnectionConfig): Promise<DockerPruneResult> {
+    const docker = buildDockerClient(cfg);
+    const result = await (docker.pruneVolumes as Function)({}) as {
+      VolumesDeleted?: string[];
+      SpaceReclaimed?: number;
+    };
+    return {
+      removed: result.VolumesDeleted ?? [],
+      reclaimed_bytes: result.SpaceReclaimed ?? 0,
+    };
+  },
+
+  // ─── Network actions ──────────────────────────────────────────────────────
+
+  async createNetwork(
+    cfg: DockerConnectionConfig,
+    name: string,
+    driver = "bridge",
+    subnet?: string,
+    gateway?: string,
+    internal = false,
+  ): Promise<{ id: string }> {
+    const docker = buildDockerClient(cfg);
+    const ipam = subnet
+      ? { Config: [{ Subnet: subnet, ...(gateway ? { Gateway: gateway } : {}) }] }
+      : undefined;
+    const net = await docker.createNetwork({
+      Name: name,
+      Driver: driver,
+      Internal: internal,
+      ...(ipam ? { IPAM: ipam } : {}),
+    });
+    return { id: net.id };
+  },
+
+  async removeNetwork(cfg: DockerConnectionConfig, networkId: string): Promise<void> {
+    const docker = buildDockerClient(cfg);
+    await docker.getNetwork(networkId).remove();
+  },
+
+  async pruneNetworks(cfg: DockerConnectionConfig): Promise<DockerPruneResult> {
+    const docker = buildDockerClient(cfg);
+    const result = await (docker.pruneNetworks as Function)({}) as {
+      NetworksDeleted?: string[];
+    };
+    return {
+      removed: result.NetworksDeleted ?? [],
+      reclaimed_bytes: 0,
+    };
   },
 };

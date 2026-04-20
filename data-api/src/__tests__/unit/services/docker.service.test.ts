@@ -19,6 +19,9 @@ const mockLogs = jest.fn().mockResolvedValue(Buffer.from("log line\n"));
 const mockExecStart = jest.fn();
 const mockExec = jest.fn();
 const mockGetArchive = jest.fn();
+const mockStats = jest.fn().mockResolvedValue({});
+const mockExecInspect = jest.fn().mockResolvedValue({ ExitCode: 0, Running: false });
+const mockExecObj = { start: mockExecStart, inspect: mockExecInspect };
 
 const mockContainer = {
   start: mockStart,
@@ -29,18 +32,21 @@ const mockContainer = {
   logs: mockLogs,
   exec: mockExec,
   getArchive: mockGetArchive,
+  stats: mockStats,
 };
 
 const mockImageInspect = jest.fn().mockResolvedValue({ Id: "sha256:img" });
 const mockRemoveImage = jest.fn().mockResolvedValue(undefined);
-const mockImage = { remove: mockRemoveImage, inspect: mockImageInspect };
+const mockImageTag = jest.fn().mockResolvedValue(undefined);
+const mockImage = { remove: mockRemoveImage, inspect: mockImageInspect, tag: mockImageTag };
 
 const mockVolumeInspect = jest.fn().mockResolvedValue({ Name: "my-volume" });
 const mockRemoveVolume = jest.fn().mockResolvedValue(undefined);
 const mockVolume = { remove: mockRemoveVolume, inspect: mockVolumeInspect };
 
 const mockNetworkInspect = jest.fn().mockResolvedValue({ Id: "net-1" });
-const mockNetwork = { inspect: mockNetworkInspect };
+const mockNetworkRemove = jest.fn().mockResolvedValue(undefined);
+const mockNetwork = { inspect: mockNetworkInspect, remove: mockNetworkRemove };
 
 const mockCreateContainer = jest.fn().mockResolvedValue(mockContainer);
 const mockListContainers = jest.fn().mockResolvedValue([]);
@@ -52,6 +58,13 @@ const mockGetContainer = jest.fn().mockReturnValue(mockContainer);
 const mockGetImage = jest.fn().mockReturnValue(mockImage);
 const mockGetVolume = jest.fn().mockReturnValue(mockVolume);
 const mockGetNetwork = jest.fn().mockReturnValue(mockNetwork);
+const mockPull = jest.fn();
+const mockPruneImages = jest.fn().mockResolvedValue({ ImagesDeleted: [], SpaceReclaimed: 0 });
+const mockCreateVolume = jest.fn().mockResolvedValue({ Name: "new-volume" });
+const mockPruneVolumes = jest.fn().mockResolvedValue({ VolumesDeleted: [], SpaceReclaimed: 0 });
+const mockCreateNetwork = jest.fn().mockResolvedValue({ id: "net-new" });
+const mockPruneNetworks = jest.fn().mockResolvedValue({ NetworksDeleted: [] });
+const mockFollowProgress = jest.fn();
 
 const mockDockerInstance = {
   listContainers: mockListContainers,
@@ -64,6 +77,13 @@ const mockDockerInstance = {
   getVolume: mockGetVolume,
   getNetwork: mockGetNetwork,
   createContainer: mockCreateContainer,
+  pull: mockPull,
+  pruneImages: mockPruneImages,
+  createVolume: mockCreateVolume,
+  pruneVolumes: mockPruneVolumes,
+  createNetwork: mockCreateNetwork,
+  pruneNetworks: mockPruneNetworks,
+  modem: { followProgress: mockFollowProgress },
 };
 
 jest.mock("dockerode", () => {
@@ -87,10 +107,23 @@ beforeEach(() => {
   mockRemoveContainer.mockResolvedValue(undefined);
   mockRemoveImage.mockResolvedValue(undefined);
   mockRemoveVolume.mockResolvedValue(undefined);
+  mockNetworkRemove.mockResolvedValue(undefined);
   mockImageInspect.mockResolvedValue({ Id: "sha256:img" });
   mockVolumeInspect.mockResolvedValue({ Name: "my-volume" });
   mockNetworkInspect.mockResolvedValue({ Id: "net-1" });
   mockCreateContainer.mockResolvedValue(mockContainer);
+  mockStats.mockResolvedValue({});
+  mockExecInspect.mockResolvedValue({ ExitCode: 0, Running: false });
+  mockImageTag.mockResolvedValue(undefined);
+  mockPruneImages.mockResolvedValue({ ImagesDeleted: [], SpaceReclaimed: 0 });
+  mockCreateVolume.mockResolvedValue({ Name: "new-volume" });
+  mockPruneVolumes.mockResolvedValue({ VolumesDeleted: [], SpaceReclaimed: 0 });
+  mockCreateNetwork.mockResolvedValue({ id: "net-new" });
+  mockPruneNetworks.mockResolvedValue({ NetworksDeleted: [] });
+  mockGetContainer.mockReturnValue(mockContainer);
+  mockGetImage.mockReturnValue(mockImage);
+  mockGetVolume.mockReturnValue(mockVolume);
+  mockGetNetwork.mockReturnValue(mockNetwork);
 });
 
 // ---------------------------------------------------------------------------
@@ -549,7 +582,7 @@ describe("DockerClient.listVolumeFiles", () => {
   }
 
   beforeEach(() => {
-    const execObj = { start: mockExecStart };
+    const execObj = { start: mockExecStart, inspect: mockExecInspect };
     mockExec.mockResolvedValue(execObj);
   });
 
@@ -649,5 +682,430 @@ describe("DockerClient.downloadVolumeFile", () => {
 
     expect(mockStop).toHaveBeenCalled();
     expect(mockRemoveContainer).toHaveBeenCalledWith({ force: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createContainer
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.createContainer", () => {
+  beforeEach(() => {
+    mockInspect.mockResolvedValue({ Id: "abc123fullid" });
+  });
+
+  it("creates a container with image and name, returns short id", async () => {
+    const result = await DockerClient.createContainer(dockerCfg, { image: "nginx:latest", name: "my-nginx" });
+
+    expect(mockCreateContainer).toHaveBeenCalledWith(
+      expect.objectContaining({ Image: "nginx:latest", name: "my-nginx" }),
+    );
+    expect(result).toEqual({ id: "abc123fullid" });
+  });
+
+  it("starts the container when start=true", async () => {
+    await DockerClient.createContainer(dockerCfg, { image: "nginx:latest", start: true });
+
+    expect(mockStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start the container when start=false", async () => {
+    await DockerClient.createContainer(dockerCfg, { image: "nginx:latest", start: false });
+
+    expect(mockStart).not.toHaveBeenCalled();
+  });
+
+  it("maps env vars to Env array", async () => {
+    await DockerClient.createContainer(dockerCfg, {
+      image: "nginx:latest",
+      env: { FOO: "bar", BAZ: "qux" },
+    });
+
+    expect(mockCreateContainer).toHaveBeenCalledWith(
+      expect.objectContaining({ Env: expect.arrayContaining(["FOO=bar", "BAZ=qux"]) }),
+    );
+  });
+
+  it("maps port mappings to ExposedPorts and PortBindings", async () => {
+    await DockerClient.createContainer(dockerCfg, {
+      image: "nginx:latest",
+      ports: [{ host: 8080, container: 80, protocol: "tcp" }],
+    });
+
+    expect(mockCreateContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ExposedPorts: { "80/tcp": {} },
+        HostConfig: expect.objectContaining({
+          PortBindings: { "80/tcp": [{ HostPort: "8080" }] },
+        }),
+      }),
+    );
+  });
+
+  it("propagates errors thrown by dockerode", async () => {
+    mockCreateContainer.mockRejectedValue(new Error("no such image"));
+
+    await expect(DockerClient.createContainer(dockerCfg, { image: "missing:latest" })).rejects.toThrow("no such image");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// execContainer
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.execContainer", () => {
+  function makeMuxedBuffer(stdout: string, stderr = ""): Buffer {
+    const parts: Buffer[] = [];
+
+    if (stdout) {
+      const body = Buffer.from(stdout, "utf8");
+      const hdr = Buffer.alloc(8);
+      hdr.writeUInt8(1, 0);
+      hdr.writeUInt32BE(body.length, 4);
+      parts.push(hdr, body);
+    }
+    if (stderr) {
+      const body = Buffer.from(stderr, "utf8");
+      const hdr = Buffer.alloc(8);
+      hdr.writeUInt8(2, 0);
+      hdr.writeUInt32BE(body.length, 4);
+      parts.push(hdr, body);
+    }
+    return Buffer.concat(parts);
+  }
+
+  function makeExecStream(stdout: string, stderr = ""): EventEmitter {
+    const emitter = new EventEmitter();
+    setImmediate(() => {
+      emitter.emit("data", makeMuxedBuffer(stdout, stderr));
+      emitter.emit("end");
+    });
+    return emitter;
+  }
+
+  beforeEach(() => {
+    mockExec.mockResolvedValue(mockExecObj);
+  });
+
+  it("runs the command and returns stdout/stderr/exit_code", async () => {
+    mockExecStart.mockResolvedValue(makeExecStream("hello\n", "err\n"));
+    mockExecInspect.mockResolvedValue({ ExitCode: 0, Running: false });
+
+    const result = await DockerClient.execContainer(dockerCfg, "abc123", ["echo", "hello"]);
+
+    expect(mockGetContainer).toHaveBeenCalledWith("abc123");
+    expect(mockExec).toHaveBeenCalledWith(
+      expect.objectContaining({ Cmd: ["echo", "hello"], AttachStdout: true, AttachStderr: true }),
+    );
+    expect(result.stdout).toBe("hello\n");
+    expect(result.stderr).toBe("err\n");
+    expect(result.exit_code).toBe(0);
+  });
+
+  it("passes working_dir and user to exec options", async () => {
+    mockExecStart.mockResolvedValue(makeExecStream(""));
+    mockExecInspect.mockResolvedValue({ ExitCode: 0 });
+
+    await DockerClient.execContainer(dockerCfg, "abc123", ["ls"], "/app", "root");
+
+    expect(mockExec).toHaveBeenCalledWith(
+      expect.objectContaining({ WorkingDir: "/app", User: "root" }),
+    );
+  });
+
+  it("returns non-zero exit code from inspect", async () => {
+    mockExecStart.mockResolvedValue(makeExecStream("", "command not found\n"));
+    mockExecInspect.mockResolvedValue({ ExitCode: 127 });
+
+    const result = await DockerClient.execContainer(dockerCfg, "abc123", ["badcmd"]);
+
+    expect(result.exit_code).toBe(127);
+    expect(result.stderr).toBe("command not found\n");
+  });
+
+  it("propagates errors from exec.start", async () => {
+    mockExecStart.mockRejectedValue(new Error("exec failed"));
+
+    await expect(DockerClient.execContainer(dockerCfg, "abc123", ["ls"])).rejects.toThrow("exec failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// containerStats
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.containerStats", () => {
+  it("returns zeroed stats when raw data is empty", async () => {
+    mockStats.mockResolvedValue({});
+
+    const result = await DockerClient.containerStats(dockerCfg, "abc123");
+
+    expect(result.container_id).toBe("abc123");
+    expect(result.cpu_percent).toBe(0);
+    expect(result.memory_usage).toBe(0);
+    expect(result.pids).toBe(0);
+  });
+
+  it("calculates CPU percentage from cpu_stats and precpu_stats", async () => {
+    mockStats.mockResolvedValue({
+      cpu_stats: {
+        cpu_usage: { total_usage: 20_000_000, percpu_usage: [5_000_000, 15_000_000] },
+        system_cpu_usage: 1_000_000_000,
+        online_cpus: 2,
+      },
+      precpu_stats: {
+        cpu_usage: { total_usage: 10_000_000 },
+        system_cpu_usage: 900_000_000,
+      },
+    });
+
+    const result = await DockerClient.containerStats(dockerCfg, "abc123");
+
+    // cpuDelta=10M, sysDelta=100M, count=2 → 10M/100M * 2 * 100 = 20%
+    expect(result.cpu_percent).toBe(20);
+  });
+
+  it("sums network rx/tx across all interfaces", async () => {
+    mockStats.mockResolvedValue({
+      networks: {
+        eth0: { rx_bytes: 1000, tx_bytes: 2000 },
+        eth1: { rx_bytes: 500, tx_bytes: 300 },
+      },
+    });
+
+    const result = await DockerClient.containerStats(dockerCfg, "abc123");
+
+    expect(result.network_rx).toBe(1500);
+    expect(result.network_tx).toBe(2300);
+  });
+
+  it("sums block read/write from blkio_stats", async () => {
+    mockStats.mockResolvedValue({
+      blkio_stats: {
+        io_service_bytes_recursive: [
+          { op: "Read", value: 4096 },
+          { op: "Write", value: 8192 },
+          { op: "Read", value: 1024 },
+        ],
+      },
+    });
+
+    const result = await DockerClient.containerStats(dockerCfg, "abc123");
+
+    expect(result.block_read).toBe(5120);
+    expect(result.block_write).toBe(8192);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pullImage
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.pullImage", () => {
+  it("calls docker.pull with image:tag and follows the stream", async () => {
+    mockPull.mockImplementation((_ref: string, _opts: object, cb: Function) => {
+      cb(null, new EventEmitter());
+    });
+    mockFollowProgress.mockImplementation((_stream: unknown, cb: Function) => cb(null, []));
+
+    await DockerClient.pullImage(dockerCfg, "nginx", "latest");
+
+    expect(mockPull).toHaveBeenCalledWith("nginx:latest", {}, expect.any(Function));
+    expect(mockFollowProgress).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes authconfig when username is provided", async () => {
+    mockPull.mockImplementation((_ref: string, opts: { authconfig?: object }, cb: Function) => {
+      cb(null, new EventEmitter());
+    });
+    mockFollowProgress.mockImplementation((_stream: unknown, cb: Function) => cb(null, []));
+
+    await DockerClient.pullImage(dockerCfg, "private/image", "v1", "user", "pass");
+
+    expect(mockPull).toHaveBeenCalledWith(
+      "private/image:v1",
+      { authconfig: { username: "user", password: "pass" } },
+      expect.any(Function),
+    );
+  });
+
+  it("rejects when docker.pull callback provides an error", async () => {
+    mockPull.mockImplementation((_ref: string, _opts: object, cb: Function) => {
+      cb(new Error("pull failed"), null);
+    });
+
+    await expect(DockerClient.pullImage(dockerCfg, "nginx", "latest")).rejects.toThrow("pull failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tagImage
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.tagImage", () => {
+  it("calls image.tag() with repo and tag", async () => {
+    await DockerClient.tagImage(dockerCfg, "sha256:abc", "myrepo/nginx", "v2");
+
+    expect(mockGetImage).toHaveBeenCalledWith("sha256:abc");
+    expect(mockImageTag).toHaveBeenCalledWith({ repo: "myrepo/nginx", tag: "v2" });
+  });
+
+  it("propagates errors from image.tag()", async () => {
+    mockImageTag.mockRejectedValue(new Error("no such image"));
+
+    await expect(DockerClient.tagImage(dockerCfg, "sha256:missing", "repo", "tag")).rejects.toThrow("no such image");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pruneImages
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.pruneImages", () => {
+  it("returns removed ids and reclaimed bytes", async () => {
+    mockPruneImages.mockResolvedValue({
+      ImagesDeleted: [{ Deleted: "sha256:aaa" }, { Untagged: "nginx:old" }],
+      SpaceReclaimed: 10240,
+    });
+
+    const result = await DockerClient.pruneImages(dockerCfg);
+
+    expect(result.removed).toEqual(["sha256:aaa", "nginx:old"]);
+    expect(result.reclaimed_bytes).toBe(10240);
+  });
+
+  it("returns empty arrays when nothing is pruned", async () => {
+    mockPruneImages.mockResolvedValue({ ImagesDeleted: null, SpaceReclaimed: 0 });
+
+    const result = await DockerClient.pruneImages(dockerCfg);
+
+    expect(result.removed).toEqual([]);
+    expect(result.reclaimed_bytes).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createVolume
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.createVolume", () => {
+  it("calls docker.createVolume() and returns the volume name", async () => {
+    mockCreateVolume.mockResolvedValue({ Name: "my-new-vol" });
+
+    const result = await DockerClient.createVolume(dockerCfg, "my-new-vol");
+
+    expect(mockCreateVolume).toHaveBeenCalledWith(
+      expect.objectContaining({ Name: "my-new-vol", Driver: "local" }),
+    );
+    expect(result).toEqual({ name: "my-new-vol" });
+  });
+
+  it("passes custom driver and driver_opts", async () => {
+    mockCreateVolume.mockResolvedValue({ Name: "nfs-vol" });
+
+    await DockerClient.createVolume(dockerCfg, "nfs-vol", "nfs", { "addr": "192.168.1.1" });
+
+    expect(mockCreateVolume).toHaveBeenCalledWith(
+      expect.objectContaining({ Driver: "nfs", DriverOpts: { addr: "192.168.1.1" } }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pruneVolumes
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.pruneVolumes", () => {
+  it("returns removed volume names and reclaimed bytes", async () => {
+    mockPruneVolumes.mockResolvedValue({
+      VolumesDeleted: ["vol-a", "vol-b"],
+      SpaceReclaimed: 512,
+    });
+
+    const result = await DockerClient.pruneVolumes(dockerCfg);
+
+    expect(result.removed).toEqual(["vol-a", "vol-b"]);
+    expect(result.reclaimed_bytes).toBe(512);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createNetwork
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.createNetwork", () => {
+  it("calls docker.createNetwork() and returns the network id", async () => {
+    mockCreateNetwork.mockResolvedValue({ id: "net-new-id" });
+
+    const result = await DockerClient.createNetwork(dockerCfg, "my-net");
+
+    expect(mockCreateNetwork).toHaveBeenCalledWith(
+      expect.objectContaining({ Name: "my-net", Driver: "bridge" }),
+    );
+    expect(result).toEqual({ id: "net-new-id" });
+  });
+
+  it("includes IPAM config when subnet is provided", async () => {
+    mockCreateNetwork.mockResolvedValue({ id: "net-new" });
+
+    await DockerClient.createNetwork(dockerCfg, "custom-net", "bridge", "10.0.0.0/24", "10.0.0.1");
+
+    expect(mockCreateNetwork).toHaveBeenCalledWith(
+      expect.objectContaining({
+        IPAM: { Config: [{ Subnet: "10.0.0.0/24", Gateway: "10.0.0.1" }] },
+      }),
+    );
+  });
+
+  it("sets Internal=true when internal flag is passed", async () => {
+    mockCreateNetwork.mockResolvedValue({ id: "net-internal" });
+
+    await DockerClient.createNetwork(dockerCfg, "internal-net", "bridge", undefined, undefined, true);
+
+    expect(mockCreateNetwork).toHaveBeenCalledWith(
+      expect.objectContaining({ Internal: true }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// removeNetwork
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.removeNetwork", () => {
+  it("calls network.remove() for the given network id", async () => {
+    await DockerClient.removeNetwork(dockerCfg, "net-abc");
+
+    expect(mockGetNetwork).toHaveBeenCalledWith("net-abc");
+    expect(mockNetworkRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates errors thrown by dockerode", async () => {
+    mockNetworkRemove.mockRejectedValue(new Error("active endpoints"));
+
+    await expect(DockerClient.removeNetwork(dockerCfg, "net-abc")).rejects.toThrow("active endpoints");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pruneNetworks
+// ---------------------------------------------------------------------------
+
+describe("DockerClient.pruneNetworks", () => {
+  it("returns removed network ids with reclaimed_bytes=0", async () => {
+    mockPruneNetworks.mockResolvedValue({ NetworksDeleted: ["net-x", "net-y"] });
+
+    const result = await DockerClient.pruneNetworks(dockerCfg);
+
+    expect(result.removed).toEqual(["net-x", "net-y"]);
+    expect(result.reclaimed_bytes).toBe(0);
+  });
+
+  it("returns empty array when nothing pruned", async () => {
+    mockPruneNetworks.mockResolvedValue({ NetworksDeleted: null });
+
+    const result = await DockerClient.pruneNetworks(dockerCfg);
+
+    expect(result.removed).toEqual([]);
   });
 });

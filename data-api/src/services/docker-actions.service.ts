@@ -10,7 +10,7 @@ import { AppDataSource } from "../configs/data-source.config";
 import { Environment } from "../entities/Environment.entity";
 import { decrypt } from "../utils/crypto.util";
 import { DockerClient } from "./docker.service";
-import type { DockerConnectionConfig, DockerContainerSummary, DockerImageSummary, DockerVolumeSummary, DockerNetworkSummary, DockerVolumeFileEntry } from "./docker.service";
+import type { DockerConnectionConfig, DockerContainerSummary, DockerImageSummary, DockerVolumeSummary, DockerNetworkSummary, DockerVolumeFileEntry, DockerCreateContainerOptions, DockerExecResult, DockerContainerStats, DockerPruneResult } from "./docker.service";
 
 const envRepo = () => AppDataSource.getRepository(Environment);
 
@@ -134,4 +134,103 @@ export async function downloadDockerVolumeFile(
 ): Promise<{ stream: NodeJS.ReadableStream; cleanup: () => Promise<void> }> {
   const { cfg } = await resolveDockerEnv(envId);
   return DockerClient.downloadVolumeFile(cfg, volumeName, filePath);
+}
+
+// ─── Container actions ────────────────────────────────────────────────────────
+
+export async function createDockerContainer(
+  envId: string,
+  opts: DockerCreateContainerOptions,
+): Promise<{ id: string }> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.createContainer(cfg, opts);
+}
+
+export async function execDockerContainer(
+  envId: string,
+  containerId: string,
+  cmd: string[],
+  workingDir?: string,
+  user?: string,
+  timeoutMs?: number,
+): Promise<DockerExecResult> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.execContainer(cfg, containerId, cmd, workingDir, user, timeoutMs);
+}
+
+export async function getDockerContainerStats(
+  envId: string,
+  containerId: string,
+): Promise<DockerContainerStats> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.containerStats(cfg, containerId);
+}
+
+// ─── Image actions ────────────────────────────────────────────────────────────
+
+export async function pullDockerImage(
+  envId: string,
+  image: string,
+  tag?: string,
+  username?: string,
+  password?: string,
+): Promise<void> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.pullImage(cfg, image, tag, username, password);
+}
+
+export async function tagDockerImage(
+  envId: string,
+  imageId: string,
+  repo: string,
+  tag: string,
+): Promise<void> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.tagImage(cfg, imageId, repo, tag);
+}
+
+export async function pruneDockerImages(envId: string): Promise<DockerPruneResult> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.pruneImages(cfg);
+}
+
+// ─── Volume actions ───────────────────────────────────────────────────────────
+
+export async function createDockerVolume(
+  envId: string,
+  name: string,
+  driver?: string,
+  driverOpts?: Record<string, string>,
+): Promise<{ name: string }> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.createVolume(cfg, name, driver, driverOpts);
+}
+
+export async function pruneDockerVolumes(envId: string): Promise<DockerPruneResult> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.pruneVolumes(cfg);
+}
+
+// ─── Network actions ──────────────────────────────────────────────────────────
+
+export async function createDockerNetwork(
+  envId: string,
+  name: string,
+  driver?: string,
+  subnet?: string,
+  gateway?: string,
+  internal?: boolean,
+): Promise<{ id: string }> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.createNetwork(cfg, name, driver, subnet, gateway, internal);
+}
+
+export async function removeDockerNetwork(envId: string, networkId: string): Promise<void> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.removeNetwork(cfg, networkId);
+}
+
+export async function pruneDockerNetworks(envId: string): Promise<DockerPruneResult> {
+  const { cfg } = await resolveDockerEnv(envId);
+  return DockerClient.pruneNetworks(cfg);
 }

@@ -221,3 +221,174 @@ export async function downloadVolumeFile(req: Request, res: Response) {
     return handleError(res, err);
   }
 }
+
+// ─── Container actions ─────────────────────────────────────────────────────────
+
+export async function createContainer(req: Request, res: Response) {
+  try {
+    const result = await dockerService.createDockerContainer(req.params.id, req.body);
+    return res.status(201).json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function execContainer(req: Request, res: Response) {
+  try {
+    const { cmd, working_dir, user, timeout_ms } = req.body as {
+      cmd: string[];
+      working_dir?: string;
+      user?: string;
+      timeout_ms?: number;
+    };
+
+    if (!Array.isArray(cmd) || cmd.length === 0) {
+      return res.status(400).json({ error: "cmd must be a non-empty array of strings" });
+    }
+
+    const result = await dockerService.execDockerContainer(
+      req.params.id,
+      req.params.containerId,
+      cmd,
+      working_dir,
+      user,
+      timeout_ms,
+    );
+    return res.json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function containerStats(req: Request, res: Response) {
+  try {
+    const stats = await dockerService.getDockerContainerStats(req.params.id, req.params.containerId);
+    return res.json(stats);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+// ─── Image actions ─────────────────────────────────────────────────────────────
+
+export async function pullImage(req: Request, res: Response) {
+  try {
+    const { image, tag, username, password } = req.body as {
+      image: string;
+      tag?: string;
+      username?: string;
+      password?: string;
+    };
+
+    if (!image) {
+      return res.status(400).json({ error: "image is required" });
+    }
+
+    await dockerService.pullDockerImage(req.params.id, image, tag, username, password);
+    return res.status(204).send();
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function tagImage(req: Request, res: Response) {
+  try {
+    const { repo, tag } = req.body as { repo: string; tag: string };
+
+    if (!repo || !tag) {
+      return res.status(400).json({ error: "repo and tag are required" });
+    }
+
+    await dockerService.tagDockerImage(req.params.id, req.params.imageId, repo, tag);
+    return res.status(204).send();
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function pruneImages(req: Request, res: Response) {
+  try {
+    const result = await dockerService.pruneDockerImages(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+// ─── Volume actions ────────────────────────────────────────────────────────────
+
+export async function createVolume(req: Request, res: Response) {
+  try {
+    const { name, driver, driver_opts } = req.body as {
+      name: string;
+      driver?: string;
+      driver_opts?: Record<string, string>;
+    };
+
+    if (!name) {
+      return res.status(400).json({ error: "name is required" });
+    }
+
+    const result = await dockerService.createDockerVolume(req.params.id, name, driver, driver_opts);
+    return res.status(201).json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function pruneVolumes(req: Request, res: Response) {
+  try {
+    const result = await dockerService.pruneDockerVolumes(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+// ─── Network actions ───────────────────────────────────────────────────────────
+
+export async function createNetwork(req: Request, res: Response) {
+  try {
+    const { name, driver, subnet, gateway, internal } = req.body as {
+      name: string;
+      driver?: string;
+      subnet?: string;
+      gateway?: string;
+      internal?: boolean;
+    };
+
+    if (!name) {
+      return res.status(400).json({ error: "name is required" });
+    }
+
+    const result = await dockerService.createDockerNetwork(
+      req.params.id,
+      name,
+      driver,
+      subnet,
+      gateway,
+      internal,
+    );
+    return res.status(201).json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function removeNetwork(req: Request, res: Response) {
+  try {
+    await dockerService.removeDockerNetwork(req.params.id, req.params.networkId);
+    return res.status(204).send();
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
+
+export async function pruneNetworks(req: Request, res: Response) {
+  try {
+    const result = await dockerService.pruneDockerNetworks(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    return handleError(res, err);
+  }
+}
