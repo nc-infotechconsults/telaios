@@ -5,9 +5,71 @@
  * Delegates business logic to docker-actions.service.
  */
 import type { Request, Response } from "express";
+import { Transform, type TransformCallback } from "stream";
 import * as dockerService from "../services/docker-actions.service";
 import { NotFoundError, InvalidEnvironmentTypeError } from "../services/docker-actions.service";
 import logger from "../utils/logger";
+
+/**
+ * Streaming Transform that extracts the first entry from a POSIX tar stream.
+ *
+ * Docker's `container.getArchive()` always wraps the requested file in a tar
+ * archive.  This transform strips the 512-byte tar header, reads the entry
+ * name and size from it, and forwards only the raw file bytes downstream.
+ *
+ * Usage:
+ *   const extractor = new TarFirstEntryExtract();
+ *   extractor.once("header", ({ name, size }) => { // set HTTP headers here });
+ *   dockerStream.pipe(extractor).pipe(res);
+ */
+class TarFirstEntryExtract extends Transform {
+  private _buf = Buffer.alloc(0);
+  private _parsed = false;
+  private _remaining = 0;
+  entryName = "";
+  entrySize = 0;
+
+  _transform(chunk: Buffer, _enc: string, cb: TransformCallback): void {
+    if (this._parsed) {
+      if (this._remaining > 0) {
+        const take = Math.min(chunk.length, this._remaining);
+        this.push(chunk.slice(0, take));
+        this._remaining -= take;
+      }
+      return cb();
+    }
+
+    this._buf = Buffer.concat([this._buf, chunk]);
+    if (this._buf.length < 512) return cb(); // wait for full header
+
+    const hdr = this._buf.slice(0, 512);
+    const rawName = hdr.slice(0, 100).toString("ascii").replace(/\0/g, "");
+    // ustar prefix field (bytes 345-499) for long paths
+    const prefix = hdr.slice(345, 500).toString("ascii").replace(/\0/g, "");
+    const fullName = prefix ? `${prefix}/${rawName}` : rawName;
+    this.entryName = fullName.split("/").filter(Boolean).pop() ?? rawName;
+    this.entrySize = parseInt(hdr.slice(124, 136).toString().trim(), 8) || 0;
+    this._remaining = this.entrySize;
+    this._parsed = true;
+
+    // Emit 'header' BEFORE pushing any body bytes so callers can set HTTP
+    // response headers before data starts flowing.
+    this.emit("header", { name: this.entryName, size: this.entrySize });
+
+    const rest = this._buf.slice(512);
+    this._buf = Buffer.alloc(0);
+    if (rest.length > 0 && this._remaining > 0) {
+      const take = Math.min(rest.length, this._remaining);
+      this.push(rest.slice(0, take));
+      this._remaining -= take;
+    }
+    cb();
+  }
+
+  _flush(cb: TransformCallback): void {
+    cb();
+  }
+}
 
 function handleError(res: Response, err: unknown): Response {
   if (err instanceof NotFoundError) {
@@ -207,16 +269,35 @@ export async function downloadVolumeFile(req: Request, res: Response) {
       filePath,
     );
 
-    const fileName = filePath.split("/").filter(Boolean).pop() ?? "archive";
-    res.setHeader("Content-Type", "application/x-tar");
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}.tar"`);
+    const fallbackName = filePath.split("/").filter(Boolean).pop() ?? "download";
+    const extractor = new TarFirstEntryExtract();
 
-    stream.pipe(res);
-    stream.on("end", () => { cleanup().catch(() => { /* ignore */ }); });
+    // The 'header' event fires synchronously inside TarFirstEntryExtract._transform
+    // BEFORE any body bytes are pushed, so setting response headers here and
+    // wiring extractor → res via pipe is safe: no body data can reach res before
+    // the headers are written.
+    extractor.once("header", ({ name, size }: { name: string; size: number }) => {
+      const fileName = name || fallbackName;
+      res.setHeader("Content-Type", "application/octet-stream");
+      if (size > 0) res.setHeader("Content-Length", size.toString());
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      extractor.pipe(res);
+    });
+
+    extractor.on("end", () => { cleanup().catch(() => { /* ignore */ }); });
+    extractor.on("error", (err) => {
+      cleanup().catch(() => { /* ignore */ });
+      logger.error({ err }, "Volume file tar extract error");
+      if (!res.headersSent) res.status(500).json({ error: "Stream error during download" });
+    });
+
     stream.on("error", (err) => {
       cleanup().catch(() => { /* ignore */ });
       logger.error({ err }, "Volume file download stream error");
+      if (!res.headersSent) res.status(500).json({ error: "Stream error during download" });
     });
+
+    stream.pipe(extractor);
   } catch (err) {
     return handleError(res, err);
   }

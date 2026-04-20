@@ -706,9 +706,9 @@ export const downloadDockerVolumeFile = async (
   );
   const url = URL.createObjectURL(response.data as Blob);
   const a = document.createElement("a");
-  const fileName = filePath.split("/").filter(Boolean).pop() ?? "archive";
+  const fileName = filePath.split("/").filter(Boolean).pop() ?? "download";
   a.href = url;
-  a.download = `${fileName}.tar`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => {
