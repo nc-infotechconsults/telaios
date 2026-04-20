@@ -203,6 +203,38 @@ function parseMuxedBufferSplit(buf: Buffer): { stdout: string; stderr: string } 
 }
 
 /**
+ * Ensure a Docker image is present locally, pulling it if necessary.
+ * Uses Dockerode's pull + followProgress so the promise resolves only
+ * after the pull completes (or rejects on error / timeout).
+ */
+async function ensureImage(docker: Docker, image: string): Promise<void> {
+  const existing = await docker.listImages({
+    filters: JSON.stringify({ reference: [image] }),
+  });
+  if (existing.length > 0) return;
+
+  logger.info({ image }, "Image not found locally — pulling");
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Timed out pulling image ${image}`)),
+      120_000,
+    );
+    docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+      if (err) {
+        clearTimeout(timer);
+        return reject(err);
+      }
+      docker.modem.followProgress(stream, (pullErr: Error | null) => {
+        clearTimeout(timer);
+        if (pullErr) reject(pullErr);
+        else resolve();
+      });
+    });
+  });
+  logger.info({ image }, "Image pull complete");
+}
+
+/**
  * Parse `ls -la` output into DockerVolumeFileEntry[].
  * Skips "." and ".." entries. Caps result at 500 items.
  */
@@ -381,8 +413,9 @@ export const DockerClient = {
     dirPath: string,
   ): Promise<DockerVolumeFileEntry[]> {
     const docker = buildDockerClient(cfg);
+    await ensureImage(docker, "busybox:latest");
     const container = await docker.createContainer({
-      Image: "busybox",
+      Image: "busybox:latest",
       Cmd: ["sleep", "infinity"],
       HostConfig: { Binds: [`${volumeName}:/vol:ro`] },
       Labels: { "swe-temp": "true" },
@@ -397,7 +430,9 @@ export const DockerClient = {
         AttachStderr: false,
       });
 
-      const stream = await exec.start({ hijack: true, stdin: false });
+      // hijack: false for non-interactive (non-TTY) exec; hijack: true causes
+      // Dockerode to treat HTTP 101 as an error when there is no TTY.
+      const stream = await exec.start({ hijack: false, stdin: false });
 
       const rawOutput = await new Promise<string>((resolve, reject) => {
         const chunks: Buffer[] = [];
@@ -421,8 +456,9 @@ export const DockerClient = {
     filePath: string,
   ): Promise<{ stream: NodeJS.ReadableStream; cleanup: () => Promise<void> }> {
     const docker = buildDockerClient(cfg);
+    await ensureImage(docker, "busybox:latest");
     const container = await docker.createContainer({
-      Image: "busybox",
+      Image: "busybox:latest",
       Cmd: ["sleep", "infinity"],
       HostConfig: { Binds: [`${volumeName}:/vol:ro`] },
       Labels: { "swe-temp": "true" },
