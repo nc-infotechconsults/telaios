@@ -99,6 +99,7 @@ export default function DockerVolumeFileBrowserModal({
   const [editMode, setEditMode] = useState(false);
   const [editorContent, setEditorContent] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
+  const [openingFilePath, setOpeningFilePath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // ─ Reset when modal opens/closes
@@ -153,6 +154,7 @@ export default function DockerVolumeFileBrowserModal({
 
   const handleOpenFile = async (entry: DockerVolumeFileEntry, mode: "view" | "edit") => {
     setLoadingFile(true);
+    setOpeningFilePath(entry.path);
     try {
       const data = await getDockerVolumeFileContent(environmentId, volumeName, entry.path);
       setFileData(data);
@@ -164,6 +166,7 @@ export default function DockerVolumeFileBrowserModal({
       toast.error(message);
     } finally {
       setLoadingFile(false);
+      setOpeningFilePath(null);
     }
   };
 
@@ -304,7 +307,7 @@ export default function DockerVolumeFileBrowserModal({
                                   isIconOnly
                                   className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 min-w-0 text-xs"
                                   title="View"
-                                  isLoading={loadingFile}
+                                  isLoading={loadingFile && openingFilePath === entry.path}
                                   onPress={() => handleOpenFile(entry, "view")}
                                 >
                                   👁
@@ -316,7 +319,7 @@ export default function DockerVolumeFileBrowserModal({
                                   isIconOnly
                                   className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 min-w-0 text-xs"
                                   title="Edit"
-                                  isLoading={loadingFile}
+                                  isLoading={loadingFile && openingFilePath === entry.path}
                                   onPress={() => handleOpenFile(entry, "edit")}
                                 >
                                   ✏️
