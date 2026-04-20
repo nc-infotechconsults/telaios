@@ -16,6 +16,7 @@ import SettingsPage from "./pages/Settings";
 import UsersPage from "./pages/Users";
 import DocumentViewerPage from "./pages/DocumentViewerPage";
 import EnvironmentDetail from "./pages/EnvironmentDetail";
+import DockerShellPage from "./pages/DockerShellPage";
 import LoginPage from "./pages/Login";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
@@ -31,6 +32,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
+                <Route
+                  path="/environments/:envId/docker/shell/:containerId"
+                  element={<DockerShellPage />}
+                />
 
                 {/* Protected routes */}
                 <Route element={<ProtectedRoute />}>
