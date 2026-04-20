@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button, Spinner } from "@heroui/react";
+import { Button, Spinner, useDisclosure } from "@heroui/react";
 import { getDockerContainer } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerContainer } from "../../types";
+import DockerExecModal from "./DockerExecModal";
+import DockerStatsModal from "./DockerStatsModal";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -55,6 +57,8 @@ type InspectData = Record<string, any>;
 export default function DockerContainerDetail({ environmentId, container, onClose }: Props) {
   const [data, setData] = useState<InspectData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isOpen: isExecOpen, onOpen: onExecOpen, onOpenChange: onExecOpenChange } = useDisclosure();
+  const { isOpen: isStatsOpen, onOpen: onStatsOpen, onOpenChange: onStatsOpenChange } = useDisclosure();
 
   useEffect(() => {
     let cancelled = false;
@@ -79,13 +83,48 @@ export default function DockerContainerDetail({ environmentId, container, onClos
   return (
     <div className="flex flex-col gap-1">
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate">{container.name}</p>
           <p className="text-xs font-mono text-default-400">{container.id.slice(0, 12)}</p>
         </div>
         <Button size="sm" variant="light" onPress={onClose} className="ml-2 flex-shrink-0">
           ✕
+        </Button>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-1 mb-3">
+        <Button
+          size="sm"
+          variant="flat"
+          onPress={onExecOpen}
+          isDisabled={container.state !== "running"}
+        >
+          Exec
+        </Button>
+        <Button
+          size="sm"
+          variant="flat"
+          onPress={onStatsOpen}
+          isDisabled={container.state !== "running"}
+        >
+          Stats
+        </Button>
+        <Button
+          size="sm"
+          variant="flat"
+          onPress={() => {
+            const token = localStorage.getItem("swe_auth_token") ?? "";
+            window.open(
+              `/environments/${environmentId}/docker/shell/${container.id}?token=${encodeURIComponent(token)}`,
+              "_blank",
+              "noopener,noreferrer",
+            );
+          }}
+          isDisabled={container.state !== "running"}
+        >
+          Shell
         </Button>
       </div>
 
@@ -196,6 +235,19 @@ export default function DockerContainerDetail({ environmentId, container, onClos
           </Section>
         </>
       )}
+
+      <DockerExecModal
+        environmentId={environmentId}
+        container={container}
+        isOpen={isExecOpen}
+        onOpenChange={onExecOpenChange}
+      />
+      <DockerStatsModal
+        environmentId={environmentId}
+        container={container}
+        isOpen={isStatsOpen}
+        onOpenChange={onStatsOpenChange}
+      />
     </div>
   );
 }

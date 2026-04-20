@@ -28,6 +28,7 @@ import {
 import { toast } from "../../lib/toast";
 import type { DockerContainer, DockerContainerState } from "../../types";
 import DockerContainerDetail from "./DockerContainerDetail";
+import DockerCreateContainerModal from "./DockerCreateContainerModal";
 
 interface Props {
   environmentId: string;
@@ -57,6 +58,9 @@ export default function DockerContainerList({ environmentId }: Props) {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<DockerContainer | null>(null);
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
+
+  // Create container
+  const { isOpen: isCreateOpen, onOpen: onCreateOpen, onOpenChange: onCreateOpenChange } = useDisclosure();
 
   const loadContainers = useCallback(async () => {
     setLoading(true);
@@ -132,9 +136,14 @@ export default function DockerContainerList({ environmentId }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-default-500">{containers.length} container{containers.length !== 1 ? "s" : ""}</p>
-        <Button size="sm" variant="flat" onPress={loadContainers}>
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" color="primary" variant="flat" onPress={onCreateOpen}>
+            Create
+          </Button>
+          <Button size="sm" variant="flat" onPress={loadContainers}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {containers.length === 0 ? (
@@ -333,6 +342,14 @@ export default function DockerContainerList({ environmentId }: Props) {
           )}
         </ModalContent>
       </Modal>
+
+      {/* Create container modal */}
+      <DockerCreateContainerModal
+        environmentId={environmentId}
+        isOpen={isCreateOpen}
+        onOpenChange={onCreateOpenChange}
+        onCreated={loadContainers}
+      />
     </div>
   );
 }
