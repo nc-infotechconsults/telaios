@@ -42,6 +42,9 @@ export default function DockerVolumeList({ environmentId }: Props) {
   const [pruning, setPruning] = useState(false);
   const { isOpen: isPruneOpen, onOpen: onPruneOpen, onOpenChange: onPruneOpenChange } = useDisclosure();
 
+  // Detail modal for small screens (< lg)
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -126,7 +129,11 @@ export default function DockerVolumeList({ environmentId }: Props) {
                   <TableRow
                     key={vol.name}
                     className={`cursor-pointer ${selectedName === vol.name ? "bg-default-100" : ""}`}
-                    onClick={() => setSelectedName((prev) => (prev === vol.name ? null : vol.name))}
+                    onClick={() => {
+                      const next = vol.name === selectedName ? null : vol.name;
+                      setSelectedName(next);
+                      if (next && window.innerWidth < 1024) setDetailOpen(true);
+                    }}
                   >
                     <TableCell>
                       <p className="text-sm font-medium font-mono truncate max-w-[200px]">{vol.name}</p>
@@ -168,7 +175,7 @@ export default function DockerVolumeList({ environmentId }: Props) {
           {selectedName && (() => {
             const selected = volumes.find((v) => v.name === selectedName);
             return selected ? (
-              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+              <div className="hidden lg:block w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
                 <DockerVolumeDetail
                   environmentId={environmentId}
                   volume={selected}
@@ -230,6 +237,37 @@ export default function DockerVolumeList({ environmentId }: Props) {
         onOpenChange={onCreateOpenChange}
         onCreated={load}
       />
+
+      {/* Detail modal for small/tablet screens (< lg) */}
+      {selectedName && (() => {
+        const selected = volumes.find((v) => v.name === selectedName);
+        return selected ? (
+          <Modal
+            isOpen={detailOpen}
+            onOpenChange={(open) => {
+              setDetailOpen(open);
+              if (!open) setSelectedName(null);
+            }}
+            size="2xl"
+            scrollBehavior="inside"
+          >
+            <ModalContent>
+              {(onClose) => (
+                <>
+                  <ModalHeader>Volume Details</ModalHeader>
+                  <ModalBody className="pb-6">
+                    <DockerVolumeDetail
+                      environmentId={environmentId}
+                      volume={selected}
+                      onClose={onClose}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalContent>
+          </Modal>
+        ) : null;
+      })()}
     </div>
   );
 }

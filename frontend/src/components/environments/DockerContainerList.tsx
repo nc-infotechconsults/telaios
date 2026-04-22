@@ -62,6 +62,9 @@ export default function DockerContainerList({ environmentId }: Props) {
   // Create container
   const { isOpen: isCreateOpen, onOpen: onCreateOpen, onOpenChange: onCreateOpenChange } = useDisclosure();
 
+  // Detail modal for small screens (< lg)
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const loadContainers = useCallback(async () => {
     setLoading(true);
     try {
@@ -169,7 +172,11 @@ export default function DockerContainerList({ environmentId }: Props) {
                   <TableRow
                     key={c.id}
                     className={`cursor-pointer ${selectedId === c.id ? "bg-default-100" : ""}`}
-                    onClick={() => setSelectedId((prev) => (prev === c.id ? null : c.id))}
+                    onClick={() => {
+                      const next = c.id === selectedId ? null : c.id;
+                      setSelectedId(next);
+                      if (next && window.innerWidth < 1024) setDetailOpen(true);
+                    }}
                   >
                     <TableCell>
                       <p className="text-sm font-medium truncate max-w-[200px]">{c.name}</p>
@@ -269,7 +276,7 @@ export default function DockerContainerList({ environmentId }: Props) {
           {selectedId && (() => {
             const selected = containers.find((c) => c.id === selectedId);
             return selected ? (
-              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+              <div className="hidden lg:block w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
                 <DockerContainerDetail
                   environmentId={environmentId}
                   container={selected}
@@ -351,6 +358,37 @@ export default function DockerContainerList({ environmentId }: Props) {
         onOpenChange={onCreateOpenChange}
         onCreated={loadContainers}
       />
+
+      {/* Detail modal for small/tablet screens (< lg) */}
+      {selectedId && (() => {
+        const selected = containers.find((c) => c.id === selectedId);
+        return selected ? (
+          <Modal
+            isOpen={detailOpen}
+            onOpenChange={(open) => {
+              setDetailOpen(open);
+              if (!open) setSelectedId(null);
+            }}
+            size="2xl"
+            scrollBehavior="inside"
+          >
+            <ModalContent>
+              {(onClose) => (
+                <>
+                  <ModalHeader>Container Details</ModalHeader>
+                  <ModalBody className="pb-6">
+                    <DockerContainerDetail
+                      environmentId={environmentId}
+                      container={selected}
+                      onClose={onClose}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalContent>
+          </Modal>
+        ) : null;
+      })()}
     </div>
   );
 }

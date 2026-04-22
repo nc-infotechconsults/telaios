@@ -274,7 +274,7 @@ export default function DocumentViewerPage() {
 
         {/* ── Right Sidebar ───────────────────────────────────────────────── */}
         {sidebarOpen && (
-          <div className="w-80 border-l border-divider bg-content1 flex flex-col flex-shrink-0 overflow-hidden">
+          <div className="hidden md:flex w-80 border-l border-divider bg-content1 flex-col flex-shrink-0 overflow-hidden">
             {/* Sidebar tabs */}
             <div className="flex border-b border-divider">
               {(["details", "copilot"] as const).map((tab) => (

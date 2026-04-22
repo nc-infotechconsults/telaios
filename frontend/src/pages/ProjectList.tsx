@@ -245,6 +245,7 @@ export default function ProjectList() {
 
           {/* ── Table ── */}
           {viewMode === "table" && (
+            <div className="overflow-x-auto">
             <Table aria-label="Projects table" removeWrapper>
               <TableHeader>
                 <TableColumn>NAME</TableColumn>
@@ -300,6 +301,7 @@ export default function ProjectList() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </>
       )}

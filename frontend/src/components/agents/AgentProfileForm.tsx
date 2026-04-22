@@ -12,11 +12,12 @@ import {
   Chip,
   Tabs,
   Tab,
+  Switch,
   Spinner,
 } from "@heroui/react";
 import { createAgentProfile, updateAgentProfile, getAgentProfiles, discoverMcpTools } from "../../lib/api";
 import { toast } from "../../lib/toast";
-import type { AgentProfile, McpServer, Skill, JsonSchemaProperty } from "../../types";
+import type { AgentProfile, McpServer, McpToolConfig, McpToolPermission, Skill, JsonSchemaProperty } from "../../types";
 
 interface Props {
   initialData?: AgentProfile;
@@ -969,10 +970,17 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
 
 // ── MCP Tool Selector sub-component ───────────────────────────────────────────
 
+const PERMISSION_OPTIONS: { value: McpToolPermission; label: string }[] = [
+  { value: "read", label: "read" },
+  { value: "write", label: "write" },
+  { value: "execute", label: "execute" },
+  { value: "require-confirmation", label: "confirm" },
+];
+
 /**
- * Allows the user to pick which tools from an MCP server should be exposed
- * to the agent. By default all tools are used. When specific tools are selected,
- * only those are passed to the agent at runtime.
+ * Allows the user to configure per-tool access for an MCP server.
+ * Supports auto-discovery for streamable-http servers and manual entry for stdio.
+ * Each tool can be allowed/denied and tagged with permission levels.
  */
 function McpToolSelector({
   server,
@@ -983,173 +991,164 @@ function McpToolSelector({
   index: number;
   updateMcp: (i: number, update: Partial<McpServer>) => void;
 }) {
-  const [toolNames, setToolNames] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discovered, setDiscovered] = useState(false);
+  const [newToolName, setNewToolName] = useState("");
 
-  const selectedTools = server.selected_tools ?? [];
-  const useAll = selectedTools.length === 0;
+  const tools = server.tools ?? [];
 
-  /** Discover available tools by calling the data-api MCP probe endpoint. */
-  const discoverTools = async () => {
-    setLoading(true);
+  const setTools = (next: McpToolConfig[]) => updateMcp(index, { tools: next });
+
+  const handleDiscover = async () => {
+    setDiscovering(true);
     setError(null);
     try {
-      const names = await discoverMcpTools({
+      const discovered = await discoverMcpTools({
         transport: server.transport,
-        command: server.command,
-        args: server.args,
-        env: server.env,
         url: server.url,
         headers: server.headers,
+        command: server.transport === "stdio" ? server.command : undefined,
+        args: server.transport === "stdio" ? server.args : undefined,
+        env: server.transport === "stdio" ? server.env : undefined,
       });
-      setToolNames(names);
-      setDiscovered(true);
+      if (discovered.length === 0) {
+        setError("The server returned an empty tools list.");
+        return;
+      }
+      const existingMap = new Map(tools.map((t) => [t.name, t]));
+      const merged: McpToolConfig[] = discovered.map((d) =>
+        existingMap.get(d.name) ?? { name: d.name, description: d.description, allowed: true },
+      );
+      setTools(merged);
     } catch {
-      setError("Could not discover tools. Save the server config first and check connectivity.");
+      setError("Could not discover tools. Check the server URL and connectivity.");
     } finally {
-      setLoading(false);
+      setDiscovering(false);
     }
   };
 
-  const handleToggle = (name: string, checked: boolean) => {
-    let next: string[];
-    if (checked) {
-      next = [...selectedTools, name];
-    } else {
-      next = selectedTools.filter((t) => t !== name);
-    }
-    updateMcp(index, { selected_tools: next.length > 0 ? next : undefined });
+  const addManual = () => {
+    const trimmed = newToolName.trim();
+    if (!trimmed || tools.some((t) => t.name === trimmed)) return;
+    setTools([...tools, { name: trimmed, allowed: true }]);
+    setNewToolName("");
   };
 
-  const handleUseAll = () => {
-    updateMcp(index, { selected_tools: undefined });
+  const updateTool = (i: number, patch: Partial<McpToolConfig>) => {
+    setTools(tools.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
   };
 
-  // If the user already has selected_tools stored, show them even without discovering
-  const displayTools = discovered ? toolNames : (selectedTools.length > 0 ? selectedTools : []);
+  const removeTool = (i: number) => setTools(tools.filter((_, idx) => idx !== i));
+
+  const togglePermission = (toolIdx: number, perm: McpToolPermission) => {
+    const current = tools[toolIdx].permissions ?? [];
+    updateTool(toolIdx, {
+      permissions: current.includes(perm) ? current.filter((p) => p !== perm) : [...current, perm],
+    });
+  };
+
+  const allowedCount = tools.filter((t) => t.allowed).length;
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium text-default-600">Tool Selection</p>
+        <p className="text-[11px] font-medium text-default-600">
+          Tool Access
+          {tools.length > 0 && (
+            <span className="ml-1 font-normal text-default-400">
+              ({allowedCount}/{tools.length} allowed)
+            </span>
+          )}
+          {tools.length === 0 && (
+            <span className="ml-1 font-normal text-default-400">(all tools)</span>
+          )}
+        </p>
         <div className="flex items-center gap-1.5">
-          {selectedTools.length > 0 && (
-            <Button size="sm" variant="flat" onPress={handleUseAll} className="h-6 px-2 text-[10px]">
-              Use All
+          {tools.length > 0 && (
+            <Button size="sm" variant="flat" onPress={() => setTools([])} color="danger" className="h-6 px-2 text-[10px]">
+              Clear
             </Button>
           )}
-          <Button size="sm" variant="flat" onPress={discoverTools} isLoading={loading} className="h-6 px-2 text-[10px]">
-            Discover Tools
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={handleDiscover}
+            isLoading={discovering}
+            isDisabled={server.transport === "streamable-http" ? !server.url : !server.command}
+            className="h-6 px-2 text-[10px]"
+          >
+            {discovering ? "Discovering…" : "Fetch tools"}
           </Button>
         </div>
       </div>
 
-      {error && (
-        <p className="text-[11px] text-danger">{error}</p>
-      )}
+      {error && <p className="text-[11px] text-danger">{error}</p>}
 
-      {!discovered && displayTools.length === 0 && !error && (
+      {tools.length === 0 && !error && (
         <p className="text-[11px] text-default-400 italic">
-          {useAll && "All tools from this server will be used. "}Click &quot;Discover Tools&quot; to see available tools and select specific ones.
+          All tools will be used. Click &ldquo;Fetch tools&rdquo; to restrict access.
         </p>
       )}
 
-      {displayTools.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] text-default-400">
-            {useAll
-              ? `${displayTools.length} tools available — all will be used`
-              : `${selectedTools.length} of ${displayTools.length > selectedTools.length ? displayTools.length : selectedTools.length} tools selected`}
-          </p>
-          <div className="max-h-48 overflow-y-auto space-y-1 rounded-lg border border-divider p-2">
-            {displayTools.map((toolName) => (
-              <label
-                key={toolName}
-                className="flex items-center gap-2 py-0.5 px-1 rounded hover:bg-default-100 cursor-pointer transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={useAll || selectedTools.includes(toolName)}
-                  onChange={(e) => {
-                    if (useAll) {
-                      // Switching from "all" to specific: select all except this one if unchecking
-                      const allExcept = displayTools.filter((t) => t !== toolName);
-                      updateMcp(index, { selected_tools: allExcept });
-                    } else {
-                      handleToggle(toolName, e.target.checked);
-                    }
-                  }}
-                  className="accent-primary"
+      {tools.length > 0 && (
+        <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-lg border border-divider p-2">
+          {tools.map((tool, ti) => (
+            <div key={ti} className="flex flex-col gap-1 p-1.5 rounded bg-default-100/50">
+              <div className="flex items-center gap-2">
+                <Switch
+                  size="sm"
+                  isSelected={tool.allowed}
+                  onValueChange={(v) => updateTool(ti, { allowed: v })}
+                  color={tool.allowed ? "success" : "danger"}
+                  aria-label={`${tool.allowed ? "Allow" : "Deny"} ${tool.name}`}
                 />
-                <span className="text-xs font-mono">{toolName}</span>
-              </label>
-            ))}
-          </div>
+                <span className="font-mono text-xs flex-1 truncate">{tool.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeTool(ti)}
+                  className="text-danger text-xs leading-none hover:opacity-70"
+                  aria-label="Remove tool"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1 pl-9">
+                {PERMISSION_OPTIONS.map(({ value, label }) => {
+                  const active = (tool.permissions ?? []).includes(value);
+                  return (
+                    <Chip
+                      key={value}
+                      size="sm"
+                      variant={active ? "solid" : "bordered"}
+                      color={active ? "primary" : "default"}
+                      className="cursor-pointer select-none"
+                      onClick={() => togglePermission(ti, value)}
+                    >
+                      {label}
+                    </Chip>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Manual tool name entry */}
-      {!discovered && (
-        <ManualToolEntry
-          selectedTools={selectedTools}
-          onAdd={(name) => updateMcp(index, { selected_tools: [...selectedTools, name] })}
-          onRemove={(name) => {
-            const next = selectedTools.filter((t) => t !== name);
-            updateMcp(index, { selected_tools: next.length > 0 ? next : undefined });
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-/** Allows manually typing tool names when discovery isn't available. */
-function ManualToolEntry({
-  selectedTools,
-  onAdd,
-  onRemove,
-}: {
-  selectedTools: string[];
-  onAdd: (name: string) => void;
-  onRemove: (name: string) => void;
-}) {
-  const [newTool, setNewTool] = useState("");
-
-  const handleAdd = () => {
-    const trimmed = newTool.trim();
-    if (trimmed && !selectedTools.includes(trimmed)) {
-      onAdd(trimmed);
-      setNewTool("");
-    }
-  };
-
-  return (
-    <div className="space-y-1.5">
+      {/* Manual tool entry (always shown for stdio, shown alongside fetch for http) */}
       <div className="flex items-center gap-1.5">
         <Input
           size="sm"
           placeholder="Tool name (e.g. read_file)"
-          value={newTool}
-          onValueChange={setNewTool}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
-          aria-label="Add tool name"
+          value={newToolName}
+          onValueChange={setNewToolName}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManual(); } }}
+          aria-label="Add tool name manually"
           className="flex-1"
         />
-        <Button size="sm" variant="flat" onPress={handleAdd} className="h-8 px-2 text-[11px]" isDisabled={!newTool.trim()}>
+        <Button size="sm" variant="flat" onPress={addManual} className="h-8 px-2 text-[11px]" isDisabled={!newToolName.trim()}>
           Add
         </Button>
       </div>
-      {selectedTools.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {selectedTools.map((t) => (
-            <Chip key={t} size="sm" variant="flat" color="primary" onClose={() => onRemove(t)}>
-              {t}
-            </Chip>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

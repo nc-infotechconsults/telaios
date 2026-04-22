@@ -108,7 +108,7 @@ function ChevronRightIcon() {
 
 const NAV_ITEMS = [
   { to: "/", end: true, label: "Projects", icon: <BriefcaseIcon /> },
-  { to: "/agents", end: false, label: "Agent Profiles", icon: <BotIcon /> },
+  { to: "/library", end: false, label: "Library", icon: <BotIcon /> },
   { to: "/settings", end: false, label: "Settings", icon: <SettingsIcon /> },
 ];
 

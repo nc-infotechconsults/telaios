@@ -14,6 +14,10 @@ import {Migration1775950000000} from "../migrations/1775950000000-migration";
 import {Migration1775960000000} from "../migrations/1775960000000-migration";
 import {Migration1775960100000} from "../migrations/1775960100000-migration";
 import {Migration1775970000000} from "../migrations/1775970000000-migration";
+import {Migration1776000000000} from "../migrations/1776000000000-migration";
+import {Migration1776000100000} from "../migrations/1776000100000-migration";
+import {Migration1776000200000} from "../migrations/1776000200000-migration";
+import {Migration1776000300000} from "../migrations/1776000300000-migration";
 import {Project} from "../entities/Project.entity";
 import {Repository} from "../entities/Repository.entity";
 import {Plan} from "../entities/Plan.entity";
@@ -22,7 +26,10 @@ import {TaskDependency} from "../entities/TaskDependency.entity";
 import {TaskRepository} from "../entities/TaskRepository.entity";
 import {Message} from "../entities/Message.entity";
 import {Settings} from "../entities/Settings.entity";
-import {AgentProfile} from "../entities/AgentProfile.entity";
+import {LibraryAgent} from "../entities/LibraryAgent.entity";
+import {LibraryMCP} from "../entities/LibraryMCP.entity";
+import {LibrarySkill} from "../entities/LibrarySkill.entity";
+import {LibrarySkillFile} from "../entities/LibrarySkillFile.entity";
 import {User} from "../entities/User.entity";
 import {ProjectMember} from "../entities/ProjectMember.entity";
 import {ProjectAgent} from "../entities/ProjectAgent.entity";
@@ -57,7 +64,10 @@ export const AppDataSource = new DataSource({
     TaskRepository,
     Message,
     Settings,
-    AgentProfile,
+    LibraryAgent,
+    LibraryMCP,
+    LibrarySkill,
+    LibrarySkillFile,
     User,
     ProjectMember,
     ProjectAgent,
@@ -89,6 +99,10 @@ export const AppDataSource = new DataSource({
     Migration1775960000000,
     Migration1775960100000,
     Migration1775970000000,
+    Migration1776000000000,
+    Migration1776000100000,
+    Migration1776000200000,
+    Migration1776000300000,
   ],
 });
 

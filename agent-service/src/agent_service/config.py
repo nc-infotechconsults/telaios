@@ -18,7 +18,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    PORT: int = Field(default=8000, validation_alias=AliasChoices("PORT", "AGENT_SERVICE_PORT"))
+    PORT: int = Field(
+        default=8000, validation_alias=AliasChoices("PORT", "AGENT_SERVICE_PORT")
+    )
     DATA_API_URL: str = "http://localhost:3000"
     DATA_API_KEY: str = ""
     REDIS_URL: str = "redis://localhost:6379"
@@ -51,6 +53,9 @@ class Settings(BaseSettings):
     EMBEDDING_BASE_URL: Optional[str] = None
 
     MAX_CONCURRENT_TASKS: int = 1
+
+    # PostgreSQL connection string — used by LangGraph AsyncPostgresSaver for plan checkpointing
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/sweai"
 
     @field_validator("MAX_CONCURRENT_TASKS", mode="before")
     @classmethod

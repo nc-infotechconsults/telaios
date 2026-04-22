@@ -22,11 +22,9 @@ import {
   createPlan,
   deletePlan,
   getRepositories,
-  getAgentProfiles,
   listProjectAgents,
-  assignProjectAgent,
   removeProjectAgent,
-  patchProjectAgent,
+  updateProjectAgent,
   listProjectMembers,
   addProjectMember,
   patchProjectMember,
@@ -42,7 +40,6 @@ import type {
   Project,
   Plan,
   Repository,
-  AgentProfile,
   ProjectAgent,
   AgentRole,
   ProjectMember,
@@ -55,6 +52,7 @@ import DocumentExplorer from "./DocumentExplorer";
 import ConfirmModal from "../components/common/ConfirmModal";
 import WorkspaceTab from "../components/workspace/WorkspaceTab";
 import EnvironmentTab from "../components/environments/EnvironmentTab";
+import LibraryBrowserModal from "../components/library/LibraryBrowserModal";
 
 type ActiveTab = "plans" | "repos" | "agents" | "members" | "documents" | "workspaces" | "environments";
 
@@ -97,7 +95,6 @@ export default function ProjectDetail() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [agents, setAgents] = useState<ProjectAgent[]>([]);
-  const [agentProfiles, setAgentProfiles] = useState<AgentProfile[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,15 +104,13 @@ export default function ProjectDetail() {
   const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Assign agent modal state
-  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
-  const [selectedRole, setSelectedRole] = useState<AgentRole>("coder");
-  const [assigning, setAssigning] = useState(false);
+  // Agent modal state
   const [agentToRemove, setAgentToRemove] = useState<ProjectAgent | null>(null);
   const [removing, setRemoving] = useState(false);
 
-  // Edit agent role modal state
+  // Edit agent modal state
   const [agentToEdit, setAgentToEdit] = useState<ProjectAgent | null>(null);
+  const [editAgentName, setEditAgentName] = useState<string>("");
   const [editAgentRole, setEditAgentRole] = useState<AgentRole>("coder");
   const [savingAgentRole, setSavingAgentRole] = useState(false);
 
@@ -140,7 +135,7 @@ export default function ProjectDetail() {
 
   const { isOpen: isNewPlanOpen, onOpen: onNewPlanOpen, onOpenChange: onNewPlanOpenChange } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
-  const { isOpen: isAssignOpen, onOpen: onAssignOpen, onOpenChange: onAssignOpenChange } = useDisclosure();
+  const { isOpen: isLibraryOpen, onOpen: onLibraryOpen, onOpenChange: onLibraryOpenChange } = useDisclosure();
   const { isOpen: isRemoveAgentOpen, onOpen: onRemoveAgentOpen, onOpenChange: onRemoveAgentOpenChange } = useDisclosure();
   const { isOpen: isEditAgentOpen, onOpen: onEditAgentOpen, onOpenChange: onEditAgentOpenChange } = useDisclosure();
   const { isOpen: isAddMemberOpen, onOpen: onAddMemberOpen, onOpenChange: onAddMemberOpenChange } = useDisclosure();
@@ -157,17 +152,15 @@ export default function ProjectDetail() {
       getPlans(projectId),
       getRepositories(projectId),
       listProjectAgents(projectId),
-      getAgentProfiles(),
       listProjectMembers(projectId),
       listUsers(),
     ])
-      .then(([projects, allPlans, repos, projectAgents, profiles, projectMembers, users]) => {
+      .then(([projects, allPlans, repos, projectAgents, projectMembers, users]) => {
         const proj = projects.find((p) => p.id === projectId) ?? null;
         setProject(proj);
         setPlans(allPlans);
         setRepositories(repos);
         setAgents(projectAgents);
-        setAgentProfiles(profiles);
         setMembers(projectMembers);
         setAllUsers(users);
       })
@@ -212,33 +205,6 @@ export default function ProjectDetail() {
 
   // ── Agent handlers ─────────────────────────────────────────────────────────
 
-  const handleAssignAgent = async () => {
-    if (!projectId || !selectedProfileId) return;
-    setAssigning(true);
-    try {
-      const assignment = await assignProjectAgent(projectId, {
-        agent_profile_id: selectedProfileId,
-        role: selectedRole,
-      });
-      const profile = agentProfiles.find((p) => p.id === selectedProfileId);
-      setAgents((prev) => {
-        const exists = prev.find((a) => a.id === assignment.id);
-        const enriched = { ...assignment, agent_profile: profile ?? assignment.agent_profile };
-        return exists
-          ? prev.map((a) => (a.id === assignment.id ? enriched : a))
-          : [...prev, enriched];
-      });
-      toast.success("Agent assigned");
-      onAssignOpenChange();
-      setSelectedProfileId("");
-      setSelectedRole("coder");
-    } catch {
-      toast.error("Failed to assign agent");
-    } finally {
-      setAssigning(false);
-    }
-  };
-
   const handleRemoveAgent = async () => {
     if (!projectId || !agentToRemove) return;
     setRemoving(true);
@@ -255,23 +221,22 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleEditAgentRole = async () => {
+  const handleEditAgent = async () => {
     if (!projectId || !agentToEdit) return;
     setSavingAgentRole(true);
     try {
-      const updated = await patchProjectAgent(projectId, agentToEdit.id, { role: editAgentRole });
+      const updated = await updateProjectAgent(projectId, agentToEdit.id, {
+        name: editAgentName,
+        role: editAgentRole,
+      });
       setAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentToEdit.id
-            ? { ...a, ...updated, agent_profile: a.agent_profile }
-            : a,
-        ),
+        prev.map((a) => (a.id === agentToEdit.id ? { ...a, ...updated } : a)),
       );
-      toast.success("Agent role updated");
+      toast.success("Agent updated");
       onEditAgentOpenChange();
       setAgentToEdit(null);
     } catch {
-      toast.error("Failed to update agent role");
+      toast.error("Failed to update agent");
     } finally {
       setSavingAgentRole(false);
     }
@@ -443,8 +408,8 @@ export default function ProjectDetail() {
             </Button>
           )}
           {activeTab === "agents" && (
-            <Button size="sm" color="primary" onPress={onAssignOpen}>
-              + Assign Agent
+            <Button size="sm" color="primary" onPress={onLibraryOpen}>
+              + Add Agent
             </Button>
           )}
           {activeTab === "members" && (
@@ -456,7 +421,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* Tab bar */}
-      <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1">
+      <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1 overflow-x-auto">
         {(["plans", "repos", "agents", "members", "documents", "workspaces", "environments"] as ActiveTab[]).map((tab) => {
           const label =
             tab === "plans"
@@ -565,9 +530,9 @@ export default function ProjectDetail() {
           {agents.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 py-20 text-default-400">
               <p className="text-lg">No agents assigned</p>
-              <p className="text-sm">Assign an agent profile to give this project an AI team member.</p>
-              <Button color="primary" onPress={onAssignOpen}>
-                + Assign Agent
+              <p className="text-sm">Add an agent from the library to give this project an AI team member.</p>
+              <Button color="primary" onPress={onLibraryOpen}>
+                + Add Agent
               </Button>
             </div>
           ) : (
@@ -579,23 +544,24 @@ export default function ProjectDetail() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
-                      {agent.agent_profile?.name ?? agent.agent_profile_id}
+                      {agent.name}
                     </p>
                     <p className="text-xs text-default-400 mt-0.5">
-                      Assigned {new Date(agent.assigned_at).toLocaleDateString()}
+                      Added {new Date(agent.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <Chip size="sm" variant="flat" color={ROLE_COLOR[agent.role] ?? "default"}>
                     {agent.role}
                   </Chip>
-                  <Tooltip content="Edit role">
+                  <Tooltip content="Edit agent">
                     <Button
                       isIconOnly
                       size="sm"
                       variant="light"
-                      aria-label={`Edit role: ${agent.agent_profile?.name ?? agent.agent_profile_id}`}
+                      aria-label={`Edit agent: ${agent.name}`}
                       onPress={() => {
                         setAgentToEdit(agent);
+                        setEditAgentName(agent.name);
                         setEditAgentRole(agent.role);
                         onEditAgentOpen();
                       }}
@@ -610,7 +576,7 @@ export default function ProjectDetail() {
                     size="sm"
                     variant="light"
                     color="danger"
-                    aria-label={`Remove agent: ${agent.agent_profile?.name ?? agent.agent_profile_id}`}
+                    aria-label={`Remove agent: ${agent.name}`}
                     onPress={() => {
                       setAgentToRemove(agent);
                       onRemoveAgentOpen();
@@ -781,50 +747,13 @@ export default function ProjectDetail() {
         </ModalContent>
       </Modal>
 
-      {/* Assign Agent modal */}
-      <Modal isOpen={isAssignOpen} onOpenChange={onAssignOpenChange} size="sm">
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader>Assign Agent</ModalHeader>
-              <ModalBody className="flex flex-col gap-4">
-                <Select
-                  label="Agent profile"
-                  placeholder="Select a profile…"
-                  selectedKeys={selectedProfileId ? new Set([selectedProfileId]) : new Set()}
-                  onSelectionChange={(keys) => setSelectedProfileId(Array.from(keys)[0] as string)}
-                >
-                  {agentProfiles.map((p) => (
-                    <SelectItem key={p.id}>{p.name}</SelectItem>
-                  ))}
-                </Select>
-                <Select
-                  label="Role"
-                  selectedKeys={new Set([selectedRole])}
-                  onSelectionChange={(keys) => setSelectedRole(Array.from(keys)[0] as AgentRole)}
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <SelectItem key={r}>{r}</SelectItem>
-                  ))}
-                </Select>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose} isDisabled={assigning}>
-                  Cancel
-                </Button>
-                <Button
-                  color="primary"
-                  onPress={handleAssignAgent}
-                  isLoading={assigning}
-                  isDisabled={!selectedProfileId}
-                >
-                  Assign
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {/* Library Browser modal — pick an agent to add */}
+      <LibraryBrowserModal
+        isOpen={isLibraryOpen}
+        onOpenChange={onLibraryOpenChange}
+        projectId={projectId ?? ""}
+        onAdded={(agent) => setAgents((prev) => [...prev, agent])}
+      />
 
       {/* Remove Agent confirmation modal */}
       <Modal isOpen={isRemoveAgentOpen} onOpenChange={onRemoveAgentOpenChange} size="sm">
@@ -836,7 +765,7 @@ export default function ProjectDetail() {
                 <p className="text-sm text-default-600">
                   Remove{" "}
                   <span className="font-semibold">
-                    {agentToRemove?.agent_profile?.name ?? "this agent"}
+                    {agentToRemove?.name ?? "this agent"}
                   </span>{" "}
                   from the project?
                 </p>
@@ -854,19 +783,19 @@ export default function ProjectDetail() {
         </ModalContent>
       </Modal>
 
-      {/* Edit Agent Role modal */}
+      {/* Edit Agent modal */}
       <Modal isOpen={isEditAgentOpen} onOpenChange={onEditAgentOpenChange} size="sm">
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>Edit Agent Role</ModalHeader>
-              <ModalBody>
-                <p className="text-sm text-default-500 mb-3">
-                  Change the role for{" "}
-                  <span className="font-semibold">
-                    {agentToEdit?.agent_profile?.name ?? "this agent"}
-                  </span>.
-                </p>
+              <ModalHeader>Edit Agent</ModalHeader>
+              <ModalBody className="flex flex-col gap-4">
+                <Input
+                  autoFocus
+                  label="Name"
+                  value={editAgentName}
+                  onValueChange={setEditAgentName}
+                />
                 <Select
                   label="Role"
                   selectedKeys={new Set([editAgentRole])}
@@ -881,7 +810,7 @@ export default function ProjectDetail() {
                 <Button variant="light" onPress={onClose} isDisabled={savingAgentRole}>
                   Cancel
                 </Button>
-                <Button color="primary" onPress={handleEditAgentRole} isLoading={savingAgentRole}>
+                <Button color="primary" onPress={handleEditAgent} isLoading={savingAgentRole}>
                   Save
                 </Button>
               </ModalFooter>

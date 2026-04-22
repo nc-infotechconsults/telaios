@@ -2,6 +2,15 @@ import { z } from "zod";
 
 export const AgentTypeSchema = z.enum(["langgraph", "opencode", "github-copilot"]);
 
+const McpToolPermissionSchema = z.enum(["read", "write", "execute", "require-confirmation"]);
+
+const McpToolConfigSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  allowed: z.boolean(),
+  permissions: z.array(McpToolPermissionSchema).optional(),
+});
+
 const McpServerSchema = z.object({
   name: z.string(),
   transport: z.enum(["stdio", "streamable-http"]),
@@ -10,7 +19,7 @@ const McpServerSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   url: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
-  selected_tools: z.array(z.string()).optional(),
+  tools: z.array(McpToolConfigSchema).optional(),
 });
 
 const JsonSchemaPropertySchema: z.ZodType<Record<string, unknown>> = z.record(z.string(), z.unknown());

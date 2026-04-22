@@ -15,21 +15,23 @@ async def start_execution(project_id: str, plan_id: str) -> None:
     Bootstrap agent execution for a confirmed plan.
 
     1. Register all agent types
-    2. Load agent profiles for this project
-    3. Load project agents (role → profile mapping)
-    4. Initialise AgentPool with driver instances
-    5. Run the Scheduler
+    2. Load project agents with raw encrypted keys (single call)
+    3. Initialise AgentPool with driver instances (decrypts keys internally)
+    4. Run the Scheduler
     """
-    logger.info("[execution_service] Starting execution for plan %s (project %s)", plan_id, project_id)
+    logger.info(
+        "[execution_service] Starting execution for plan %s (project %s)",
+        plan_id,
+        project_id,
+    )
 
     # 1. Register agent types
     register_all_agents()
 
-    # 2. Load settings + profiles
+    # 2. Load settings + project agents (single raw endpoint)
     try:
         settings = await data_client.get_settings()
-        profiles = await data_client.get_agent_profiles()
-        project_agents = await data_client.get_project_agents(project_id)
+        project_agents_raw = await data_client.get_project_agents_raw(project_id)
         project = await data_client.get_project(project_id)
     except Exception as err:
         logger.error("[execution_service] Failed to load configuration: %s", err)
@@ -37,9 +39,9 @@ async def start_execution(project_id: str, plan_id: str) -> None:
 
     # 3. Build pool
     pool = AgentPool()
-    pool.initialize(profiles)
+    pool.initialize(project_agents_raw)
     pool.register_role_drivers(
-        project_agents,
+        project_agents_raw,
         project_ctx={"id": project_id, "name": project.get("name", project_id)},
     )
 
@@ -48,5 +50,9 @@ async def start_execution(project_id: str, plan_id: str) -> None:
     try:
         await scheduler.run(project_id, plan_id)
     except Exception as err:
-        logger.error("[execution_service] Scheduler raised an error for plan %s: %s", plan_id, err)
+        logger.error(
+            "[execution_service] Scheduler raised an error for plan %s: %s",
+            plan_id,
+            err,
+        )
         raise

@@ -119,7 +119,7 @@ export default function Users() {
       {loadingUsers ? (
         <p className="text-sm text-default-400 animate-pulse">Loading…</p>
       ) : (
-        <div className="bg-content1 border border-divider rounded-2xl overflow-hidden">
+        <div className="bg-content1 border border-divider rounded-2xl overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-divider text-left">

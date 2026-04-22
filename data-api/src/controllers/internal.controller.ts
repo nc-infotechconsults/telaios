@@ -7,7 +7,7 @@ import * as planService from "../services/plan.service";
 import * as taskService from "../services/task.service";
 import * as artifactService from "../services/task_artifact.service";
 import { BulkCreateTaskArtifactsSchema } from "../schemas/task_artifact.schema";
-import * as agentProfileService from "../services/agentProfile.service";
+import * as projectAgentService from "../services/projectAgent.service";
 
 // ─── Status update ────────────────────────────────────────────────────────────
 
@@ -137,13 +137,14 @@ export async function createTaskArtifactsHandler(req: Request, res: Response) {
   return res.status(201).json({ created: created.length, artifacts: created });
 }
 
-// ─── Agent profiles (raw, for agent-service) ──────────────────────────────────
+// ─── Project agents (raw, for agent-service) ─────────────────────────────────
 
 /**
- * Returns agent profiles with raw encrypted keys so the agent-service can
- * decrypt them. Never exposed on any user-facing route.
+ * Returns project agents with raw encrypted llm_api_key values so the
+ * agent-service can decrypt them. Never exposed on any user-facing route.
  */
-export async function listAgentProfilesRawHandler(_req: Request, res: Response) {
-  const profiles = await agentProfileService.listAgentProfilesRaw();
-  return res.json(profiles);
+export async function listProjectAgentsRawHandler(req: Request, res: Response) {
+  const { projectId } = req.params;
+  const agents = await projectAgentService.listProjectAgentsRaw(projectId);
+  return res.json(agents);
 }

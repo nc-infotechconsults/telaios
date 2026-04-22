@@ -195,7 +195,7 @@ export default function EnvironmentDetail() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-5 border-b border-divider">
+      <div className="flex items-center gap-1 px-5 border-b border-divider overflow-x-auto">
         {tabs
           .filter((t) => t.visible)
           .map((t) => (
@@ -219,9 +219,14 @@ export default function EnvironmentDetail() {
           <OverviewTab environment={environment} onTest={handleTest} testing={testing} />
         )}
         {activeTab === "resources" && (
-          <div className="flex gap-0 h-full -mx-5 -my-5">
+          <div className="relative flex gap-0 h-full -mx-5 -my-5">
             {/* Left: K8s resource explorer (nav + list) */}
-            <div className={`overflow-hidden ${selectedResource ? "w-[60%] border-r border-divider" : "w-full"}`}>
+            {/* On mobile, hide list when detail is open; on md+ keep 60/40 split */}
+            <div className={`overflow-hidden ${
+              selectedResource
+                ? "hidden md:flex md:w-[60%] md:border-r md:border-divider"
+                : "flex w-full"
+            }`}>
               <K8sResourceExplorer
                 environmentId={environment.id}
                 defaultNamespace={environment.namespace}
@@ -229,9 +234,11 @@ export default function EnvironmentDetail() {
                 selectedResourceName={selectedResource?.name}
               />
             </div>
-            {/* Right: resource detail */}
+            {/* Right: resource detail
+                Mobile  → full-screen overlay (absolute inset-0 z-10)
+                Desktop → 40% side panel */}
             {selectedResource && (
-              <div className="w-[40%] overflow-y-auto">
+              <div className="absolute inset-0 z-10 bg-background overflow-y-auto md:relative md:inset-auto md:z-auto md:w-[40%]">
                 {detailLoading ? (
                   <div className="flex items-center justify-center py-20">
                     <Spinner size="lg" label="Loading details…" />

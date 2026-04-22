@@ -48,6 +48,9 @@ export default function DockerImageList({ environmentId }: Props) {
   // Pull
   const { isOpen: isPullOpen, onOpen: onPullOpen, onOpenChange: onPullOpenChange } = useDisclosure();
 
+  // Detail modal for small screens (< lg)
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -135,7 +138,11 @@ export default function DockerImageList({ environmentId }: Props) {
                   <TableRow
                     key={img.id}
                     className={`cursor-pointer ${selectedId === img.id ? "bg-default-100" : ""}`}
-                    onClick={() => setSelectedId((prev) => (prev === img.id ? null : img.id))}
+                    onClick={() => {
+                      const next = img.id === selectedId ? null : img.id;
+                      setSelectedId(next);
+                      if (next && window.innerWidth < 1024) setDetailOpen(true);
+                    }}
                   >
                     <TableCell>
                       {img.tags.length > 0 ? (
@@ -182,7 +189,7 @@ export default function DockerImageList({ environmentId }: Props) {
           {selectedId && (() => {
             const selected = images.find((img) => img.id === selectedId);
             return selected ? (
-              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+              <div className="hidden lg:block w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
                 <DockerImageDetail
                   environmentId={environmentId}
                   image={selected}
@@ -245,6 +252,38 @@ export default function DockerImageList({ environmentId }: Props) {
         onOpenChange={onPullOpenChange}
         onPulled={load}
       />
+
+      {/* Detail modal for small/tablet screens (< lg) */}
+      {selectedId && (() => {
+        const selected = images.find((img) => img.id === selectedId);
+        return selected ? (
+          <Modal
+            isOpen={detailOpen}
+            onOpenChange={(open) => {
+              setDetailOpen(open);
+              if (!open) setSelectedId(null);
+            }}
+            size="2xl"
+            scrollBehavior="inside"
+          >
+            <ModalContent>
+              {(onClose) => (
+                <>
+                  <ModalHeader>Image Details</ModalHeader>
+                  <ModalBody className="pb-6">
+                    <DockerImageDetail
+                      environmentId={environmentId}
+                      image={selected}
+                      onClose={onClose}
+                      onRefresh={load}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalContent>
+          </Modal>
+        ) : null;
+      })()}
     </div>
   );
 }

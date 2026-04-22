@@ -11,7 +11,8 @@ import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import PlanningChat from "./pages/PlanningChat";
 import ExecutionDashboard from "./pages/ExecutionDashboard";
-import AgentProfiles from "./pages/AgentProfiles";
+import LibraryPage from "./pages/LibraryPage";
+import LibraryAgentDetail from "./pages/LibraryAgentDetail";
 import SettingsPage from "./pages/Settings";
 import UsersPage from "./pages/Users";
 import DocumentViewerPage from "./pages/DocumentViewerPage";
@@ -46,7 +47,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="/projects/:projectId/execute" element={<ExecutionDashboard />} />
                     <Route path="/projects/:projectId/documents/:documentId" element={<DocumentViewerPage />} />
                     <Route path="/projects/:projectId/environments/:envId" element={<EnvironmentDetail />} />
-                    <Route path="/agents" element={<AgentProfiles />} />
+                    <Route path="/library" element={<LibraryPage />} />
+                    <Route path="/library/agents/:agentId" element={<LibraryAgentDetail />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/users" element={<UsersPage />} />
                   </Route>

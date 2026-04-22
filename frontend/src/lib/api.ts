@@ -8,7 +8,9 @@ import type {
   Message,
   AgentProfile,
   ProjectAgent,
-  AgentRole,
+  LibraryAgent,
+  LibraryMCP,
+  LibrarySkill,
   ProjectMember,
   ProjectRole,
   Settings,
@@ -252,7 +254,7 @@ export const getPlanMessages = (planId: string): Promise<Message[]> =>
 export const getMessages = (projectId: string): Promise<Message[]> =>
   DEMO ? delay(demo.MESSAGES[projectId] ?? []) : http.get<Message[]>(`/messages?project_id=${projectId}`).then((r) => r.data);
 
-// ─── Agent Profiles ──────────────────────────────────────────────────────────
+// ─── Agent Profiles (legacy — retained for settings/admin pages) ──────────────
 
 export const getAgentProfiles = (): Promise<AgentProfile[]> =>
   DEMO ? delay(demo.AGENT_PROFILES) : http.get<AgentProfile[]>("/agent-profiles").then((r) => r.data);
@@ -294,40 +296,152 @@ export const deleteAgentProfile = (id: string): Promise<void> =>
 
 export const discoverMcpTools = (
   serverConfig: Partial<import("../types").McpServer>
-): Promise<string[]> =>
+): Promise<Array<{ name: string; description?: string }>> =>
   DEMO
-    ? delay(["read_file", "write_file", "list_directory"])
+    ? delay([
+        { name: "read_file", description: "Read a file from the filesystem" },
+        { name: "write_file", description: "Write content to a file" },
+        { name: "list_directory", description: "List files in a directory" },
+      ])
     : http
-        .post<{ tools: string[] }>("/agent-profiles/mcp-discover", serverConfig)
+        .post<{ tools: Array<{ name: string; description?: string }> }>("/agent-profiles/mcp-discover", serverConfig)
         .then((r) => r.data.tools ?? []);
+
+// ─── Library Agents ───────────────────────────────────────────────────────────
+
+export const listLibraryAgents = (params?: {
+  q?: string;
+  role?: string;
+  tags?: string;
+  page?: number;
+  limit?: number;
+}): Promise<LibraryAgent[]> =>
+  DEMO
+    ? delay([])
+    : http
+        .get<{ items: LibraryAgent[]; total: number; page: number; limit: number }>("/library/agents", { params })
+        .then((r) => r.data.items);
+
+export const getLibraryAgent = (id: string): Promise<LibraryAgent> =>
+  http.get<LibraryAgent>(`/library/agents/${id}`).then((r) => r.data);
+
+export const createLibraryAgent = (data: Partial<LibraryAgent>): Promise<LibraryAgent> =>
+  http.post<LibraryAgent>("/library/agents", data).then((r) => r.data);
+
+export const updateLibraryAgent = (id: string, data: Partial<LibraryAgent>): Promise<LibraryAgent> =>
+  http.put<LibraryAgent>(`/library/agents/${id}`, data).then((r) => r.data);
+
+export const deleteLibraryAgent = (id: string): Promise<void> =>
+  http.delete(`/library/agents/${id}`).then(() => undefined);
+
+// ─── Library MCPs ─────────────────────────────────────────────────────────────
+
+export const listLibraryMCPs = (params?: { q?: string }): Promise<LibraryMCP[]> =>
+  DEMO
+    ? delay([])
+    : http
+        .get<{ items: LibraryMCP[]; total: number; page: number; limit: number }>("/library/mcps", { params })
+        .then((r) => r.data.items);
+
+export const createLibraryMCP = (data: Partial<LibraryMCP>): Promise<LibraryMCP> =>
+  http.post<LibraryMCP>("/library/mcps", data).then((r) => r.data);
+
+export const updateLibraryMCP = (id: string, data: Partial<LibraryMCP>): Promise<LibraryMCP> =>
+  http.put<LibraryMCP>(`/library/mcps/${id}`, data).then((r) => r.data);
+
+export const deleteLibraryMCP = (id: string): Promise<void> =>
+  http.delete(`/library/mcps/${id}`).then(() => undefined);
+
+// ─── Library Skills ───────────────────────────────────────────────────────────
+
+export const listLibrarySkills = (params?: { q?: string }): Promise<LibrarySkill[]> =>
+  DEMO
+    ? delay([])
+    : http
+        .get<{ items: LibrarySkill[]; total: number; page: number; limit: number }>("/library/skills", { params })
+        .then((r) => r.data.items);
+
+export const getLibrarySkill = (id: string): Promise<LibrarySkill> =>
+  http.get<LibrarySkill>(`/library/skills/${id}`).then((r) => r.data);
+
+export const createLibrarySkill = (data: Partial<LibrarySkill>): Promise<LibrarySkill> =>
+  http.post<LibrarySkill>("/library/skills", data).then((r) => r.data);
+
+export const updateLibrarySkill = (id: string, data: Partial<LibrarySkill>): Promise<LibrarySkill> =>
+  http.put<LibrarySkill>(`/library/skills/${id}`, data).then((r) => r.data);
+
+export const deleteLibrarySkill = (id: string): Promise<void> =>
+  http.delete(`/library/skills/${id}`).then(() => undefined);
+
+/** Trigger a zip download of the full skill package. */
+export const exportLibrarySkill = async (id: string, slug: string): Promise<void> => {
+  const response = await http.get(`/library/skills/${id}/export`, { responseType: "blob" });
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${slug}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 // ─── Project Agents ───────────────────────────────────────────────────────────
 
 export const listProjectAgents = (projectId: string): Promise<ProjectAgent[]> =>
   DEMO ? delay([]) : http.get<ProjectAgent[]>(`/projects/${projectId}/agents`).then((r) => r.data);
 
-export const assignProjectAgent = (
+/** Clone a library agent into the project as an independent copy. */
+export const cloneProjectAgentFromLibrary = (
   projectId: string,
-  data: { agent_profile_id: string; role: AgentRole; scope?: Record<string, unknown> | null },
+  libraryAgentId: string,
 ): Promise<ProjectAgent> =>
   DEMO
     ? delay<ProjectAgent>({
         id: `pa-${Date.now()}`,
         project_id: projectId,
-        agent_profile_id: data.agent_profile_id,
-        agent_profile: {} as AgentProfile,
-        role: data.role,
-        scope: data.scope ?? null,
-        assigned_at: new Date().toISOString(),
+        library_agent_id: libraryAgentId,
+        name: "Agent",
+        role: "coder",
+        system_prompt: null,
+        system_prompt_mode: "append",
+        sub_agents: [],
+        mcp_servers: [],
+        skills: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http
+        .post<ProjectAgent>(`/projects/${projectId}/agents/from-library/${libraryAgentId}`)
+        .then((r) => r.data);
+
+/** Create a custom project agent without a library template. */
+export const createProjectAgent = (
+  projectId: string,
+  data: Partial<Omit<ProjectAgent, "id" | "project_id" | "created_at" | "updated_at">>,
+): Promise<ProjectAgent> =>
+  DEMO
+    ? delay<ProjectAgent>({
+        id: `pa-${Date.now()}`,
+        project_id: projectId,
+        name: data.name ?? "Custom Agent",
+        role: data.role ?? "coder",
+        system_prompt: data.system_prompt ?? null,
+        system_prompt_mode: data.system_prompt_mode ?? "append",
+        sub_agents: data.sub_agents ?? [],
+        mcp_servers: data.mcp_servers ?? [],
+        skills: data.skills ?? [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
     : http.post<ProjectAgent>(`/projects/${projectId}/agents`, data).then((r) => r.data);
 
-export const patchProjectAgent = (
+export const updateProjectAgent = (
   projectId: string,
   agentId: string,
-  data: { role?: AgentRole; scope?: Record<string, unknown> | null },
+  data: Partial<Omit<ProjectAgent, "id" | "project_id" | "created_at" | "updated_at">>,
 ): Promise<ProjectAgent> =>
-  http.patch<ProjectAgent>(`/projects/${projectId}/agents/${agentId}`, data).then((r) => r.data);
+  http.put<ProjectAgent>(`/projects/${projectId}/agents/${agentId}`, data).then((r) => r.data);
 
 export const removeProjectAgent = (projectId: string, agentId: string): Promise<void> =>
   DEMO

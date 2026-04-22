@@ -46,6 +46,9 @@ const MENU_GROUPS: MenuGroup[] = [
   },
 ];
 
+// Flat list of all kinds for the mobile select
+const ALL_KINDS = MENU_GROUPS.flatMap((g) => g.items);
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -82,9 +85,53 @@ export default function K8sResourceExplorer({
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col h-full">
+      {/* ── Mobile controls (< md) ─────────────────────────────────────────── */}
+      <div className="md:hidden flex flex-col gap-2 border-b border-divider px-3 py-3">
+        <div className="flex gap-2">
+          <Select
+            aria-label="Namespace"
+            size="sm"
+            className="flex-1"
+            selectedKeys={[namespace]}
+            disallowEmptySelection
+            onSelectionChange={(keys) => {
+              const next = [...keys][0] as string | undefined;
+              if (next) setNamespace(next);
+            }}
+          >
+            {namespaces.map((ns) => (
+              <SelectItem key={ns}>{ns}</SelectItem>
+            ))}
+          </Select>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => setRefreshSignal((n) => n + 1)}
+          >
+            Refresh
+          </Button>
+        </div>
+        <Select
+          aria-label="Resource type"
+          size="sm"
+          selectedKeys={[selectedKind]}
+          disallowEmptySelection
+          onSelectionChange={(keys) => {
+            const next = [...keys][0] as string | undefined;
+            if (next) setSelectedKind(next);
+          }}
+        >
+          {ALL_KINDS.map((item) => (
+            <SelectItem key={item.kind}>{item.label}</SelectItem>
+          ))}
+        </Select>
+      </div>
+
+      {/* ── Desktop layout (md+) ──────────────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* ── Left nav ──────────────────────────────────────────────────────── */}
-      <div className="w-[220px] flex-shrink-0 border-r border-divider flex flex-col overflow-y-auto">
+      <div className="hidden md:flex w-[220px] flex-shrink-0 border-r border-divider flex-col overflow-y-auto">
         {/* Namespace + refresh controls */}
         <div className="px-3 py-3 border-b border-divider flex flex-col gap-2">
           <Select
@@ -165,6 +212,7 @@ export default function K8sResourceExplorer({
           }}
         />
       )}
+    </div>
     </div>
   );
 }

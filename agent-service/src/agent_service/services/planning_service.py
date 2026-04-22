@@ -5,10 +5,22 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Literal, Optional
+from datetime import datetime, timezone
+from typing import Annotated, Any, Dict, List, Optional
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import StructuredTool
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.types import Command, interrupt
+from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 from agent_service.config import config
 from agent_service.core.llm import build_chat_model
@@ -22,9 +34,39 @@ from agent_service.services.repo_explorer import (
 
 logger = logging.getLogger(__name__)
 
-# ─── Types ────────────────────────────────────────────────────────────────────
+# ─── Checkpointer ─────────────────────────────────────────────────────────────
 
-Phase = Literal["interview", "review"]
+_checkpointer: Any = None
+_graph: Any = None
+
+
+def set_checkpointer(c: Any) -> None:
+    global _checkpointer, _graph
+    _checkpointer = c
+    _graph = _build_graph()
+    logger.info("Planning service: checkpointer set and graph compiled.")
+
+
+def _get_checkpointer() -> Any:
+    return _checkpointer
+
+
+# ─── State ────────────────────────────────────────────────────────────────────
+
+
+class PlannerState(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]
+    plan_id: str
+    project_id: str
+    plan_title: Optional[str]
+    project_context: Optional[Dict[str, Any]]
+    repos: List[Dict[str, Any]]
+    planner_agent: Optional[Dict[str, Any]]
+    phase: str  # "interview" | "review"
+    plan_draft: Optional[Dict[str, Any]]
+
+
+# ─── Domain types ─────────────────────────────────────────────────────────────
 
 
 class PlannedTask:
@@ -33,46 +75,14 @@ class PlannedTask:
         self.description: str = data.get("description", "")
         self.type: str = data.get("type", "general")
         self.execution_order: int = data.get("execution_order", 0)
-        self.depends_on_task_indices: List[int] = data.get("depends_on_task_indices", [])
-        self.recommended_agent_profile_id: Optional[str] = data.get(
-            "recommended_agent_profile_id"
+        self.depends_on_task_indices: List[int] = data.get(
+            "depends_on_task_indices", []
         )
         self.repository_ids: List[str] = data.get("repository_ids", [])
 
 
-class Session:
-    def __init__(
-        self,
-        plan_id: str,
-        project_id: str,
-        plan_title: Optional[str],
-        phase: Phase,
-        messages: List[Dict[str, str]],
-        plan_draft: Optional[Dict[str, Any]],
-        agent_profiles: List[Dict[str, Any]],
-        project_repositories: List[Dict[str, Any]],
-        project_context: Optional[Dict[str, Any]],
-        repo_tools: List[StructuredTool],
-        project_agents: Optional[List[Dict[str, Any]]] = None,
-    ) -> None:
-        self.plan_id = plan_id
-        self.project_id = project_id
-        self.plan_title = plan_title
-        self.phase = phase
-        self.messages = messages
-        self.plan_draft = plan_draft
-        self.agent_profiles = agent_profiles
-        self.project_repositories = project_repositories
-        self.project_context = project_context
-        self.repo_tools = repo_tools
-        self.project_agents: List[Dict[str, Any]] = project_agents or []
-
-
-# In-memory session store keyed by plan_id
-_sessions: Dict[str, Session] = {}
-
-
 # ─── Streaming helpers ────────────────────────────────────────────────────────
+
 
 async def _stream_message_chunks(plan_id: str, text: str) -> None:
     chunks = re.findall(r"\S+\s*", text) or [text]
@@ -81,23 +91,7 @@ async def _stream_message_chunks(plan_id: str, text: str) -> None:
         await asyncio.sleep(0.018)
 
 
-def _saved_task_to_planned(task: Dict[str, Any], all_tasks: List[Dict[str, Any]]) -> PlannedTask:
-    id_to_index = {t["id"]: i for i, t in enumerate(all_tasks)}
-    return PlannedTask(
-        {
-            "title": task["title"],
-            "description": task["description"],
-            "type": task["type"],
-            "execution_order": task["execution_order"],
-            "depends_on_task_indices": [
-                id_to_index[dep_id]
-                for dep_id in task.get("depends_on_task_ids", [])
-                if dep_id in id_to_index
-            ],
-            "recommended_agent_profile_id": task.get("agent_profile_id"),
-            "repository_ids": task.get("repository_ids", []),
-        }
-    )
+# ─── Task persistence ─────────────────────────────────────────────────────────
 
 
 async def _save_draft_tasks(
@@ -112,7 +106,6 @@ async def _save_draft_tasks(
     """
     await data_client.delete_tasks_by_plan(plan_id)
 
-    # Pass 1: create tasks (no deps yet)
     saved = await asyncio.gather(
         *[
             data_client.create_task(
@@ -122,11 +115,8 @@ async def _save_draft_tasks(
                     "description": t.description or "",
                     "type": t.type or "general",
                     "status": "pending",
-                    "execution_order": t.execution_order if t.execution_order is not None else i,
-                    **(
-                        {"agent_profile_id": t.recommended_agent_profile_id}
-                        if t.recommended_agent_profile_id
-                        else {}
+                    "execution_order": (
+                        t.execution_order if t.execution_order is not None else i
                     ),
                     "repository_ids": t.repository_ids or [],
                 }
@@ -135,7 +125,6 @@ async def _save_draft_tasks(
         ]
     )
 
-    # Pass 2: patch dependency links
     id_by_index = [t["id"] for t in saved]
     await asyncio.gather(
         *[
@@ -157,15 +146,13 @@ async def _save_draft_tasks(
     return await data_client.get_plan_tasks(plan_id)
 
 
-def _build_plan_draft_payload(
-    plan_id: str, session: Session, saved_tasks: List[Dict[str, Any]]
+def _build_plan_payload(
+    plan_id: str, state: PlannerState, saved_tasks: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    from datetime import datetime, timezone
-
     return {
         "id": plan_id,
-        "project_id": session.project_id,
-        "title": session.plan_title,
+        "project_id": state["project_id"],
+        "title": state.get("plan_title"),
         "status": "draft",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tasks": saved_tasks,
@@ -173,6 +160,7 @@ def _build_plan_draft_payload(
 
 
 # ─── LLM response parser ──────────────────────────────────────────────────────
+
 
 def _parse_planner_response(text: str) -> Optional[Dict[str, Any]]:
     m = re.search(r"\{[\s\S]*\}", text)
@@ -193,7 +181,10 @@ def _parse_planner_response(text: str) -> Optional[Dict[str, Any]]:
 
 # ─── Repo tools ───────────────────────────────────────────────────────────────
 
-def _build_repo_tools(repos: List[Dict[str, Any]], project_id: str) -> List[StructuredTool]:
+
+def _build_repo_tools(
+    repos: List[Dict[str, Any]], project_id: str
+) -> List[StructuredTool]:
     if not repos:
         return []
 
@@ -231,8 +222,6 @@ def _build_repo_tools(repos: List[Dict[str, Any]], project_id: str) -> List[Stru
         if not local:
             return f'Repository "{repo}" could not be accessed. Available: {repo_names}'
         return search_code(local, pattern, file_glob)
-
-    from pydantic import BaseModel
 
     class ListDirInput(BaseModel):
         repo: str
@@ -281,68 +270,26 @@ def _build_repo_tools(repos: List[Dict[str, Any]], project_id: str) -> List[Stru
     ]
 
 
-# ─── Tool-use loop ────────────────────────────────────────────────────────────
-
-async def _run_tool_loop(
-    llm: Any,
-    tools: List[StructuredTool],
-    messages: List[Dict[str, str]],
-    plan_id: str,
-) -> str:
-    tool_map = {t.name: t for t in tools}
-
-    lc_messages = []
-    for m in messages:
-        if m["role"] == "system":
-            lc_messages.append(SystemMessage(content=m["content"]))
-        elif m["role"] == "user":
-            lc_messages.append(HumanMessage(content=m["content"]))
-        else:
-            lc_messages.append(AIMessage(content=m["content"]))
-
-    llm_with_tools = llm.bind_tools(tools) if tools else llm
-    MAX_ROUNDS = 12
-
-    for _ in range(MAX_ROUNDS):
-        response = await llm_with_tools.ainvoke(lc_messages)
-        ai_msg = response
-        tool_calls = getattr(ai_msg, "tool_calls", []) or []
-
-        if not tool_calls:
-            content = ai_msg.content
-            return content if isinstance(content, str) else json.dumps(content)
-
-        lc_messages.append(ai_msg)
-
-        tool_results: List[ToolMessage] = []
-        for tc in tool_calls:
-            tool = tool_map.get(tc["name"])
-            sse_manager.broadcast(plan_id, {
-                "type": "chat_tool_use",
-                "tool": tc["name"],
-                "input": tc.get("args", {}),
-            })
-            try:
-                result = str(await tool.ainvoke(tc["args"])) if tool else f"Unknown tool: {tc['name']}"
-            except Exception as exc:
-                result = f"Tool error: {exc}"
-            tool_results.append(ToolMessage(content=result, tool_call_id=tc["id"]))
-
-        lc_messages.extend(tool_results)
-
-    final = await llm.ainvoke(lc_messages)
-    content = final.content
-    return content if isinstance(content, str) else json.dumps(content)
-
-
 # ─── Project context ──────────────────────────────────────────────────────────
+
 
 def _scan_repo_structure(root_path: str, max_depth: int = 3) -> str:
     IGNORE = frozenset(
         [
-            ".git", "node_modules", "__pycache__", ".next", "dist", "build",
-            ".venv", "venv", ".mypy_cache", ".pytest_cache", "coverage",
-            ".turbo", ".cache", "vendor",
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".next",
+            "dist",
+            "build",
+            ".venv",
+            "venv",
+            ".mypy_cache",
+            ".pytest_cache",
+            "coverage",
+            ".turbo",
+            ".cache",
+            "vendor",
         ]
     )
 
@@ -358,7 +305,9 @@ def _scan_repo_structure(root_path: str, max_depth: int = 3) -> str:
             )
         except Exception:
             return
-        filtered = [e for e in entries if e.name not in IGNORE and not e.name.startswith(".")]
+        filtered = [
+            e for e in entries if e.name not in IGNORE and not e.name.startswith(".")
+        ]
         cap = filtered[:60]
         for i, entry in enumerate(cap):
             is_last = i == len(cap) - 1
@@ -402,7 +351,6 @@ async def _gather_project_context(
                 structure = "(unable to scan)"
         repo_structures.append({"name": r["name"], "structure": structure})
 
-    # Only surface documents that have been processed (status == "ready")
     ready_docs = [
         {
             "name": d.get("name", ""),
@@ -429,9 +377,11 @@ def _build_project_context_text(ctx: Dict[str, Any], plan_title: Optional[str]) 
         lines.append(f"Description: {ctx['description']}")
 
     if ctx.get("existingPlans"):
-        lines.append("\nExisting plans for this project (do NOT duplicate their scope):")
+        lines.append(
+            "\nExisting plans for this project (do NOT duplicate their scope):"
+        )
         for p in ctx["existingPlans"]:
-            lines.append(f"  - \"{p['title'] or '(untitled)'}\" [{p['status']}]")
+            lines.append(f'  - "{p["title"] or "(untitled)"}" [{p["status"]}]')
 
     if plan_title:
         lines.append(f'\nThis plan is titled: "{plan_title}"')
@@ -443,10 +393,15 @@ def _build_project_context_text(ctx: Dict[str, Any], plan_title: Optional[str]) 
 
     docs = ctx.get("documents", [])
     if docs:
-        lines.append("\nProject documents (already uploaded and indexed — reference them in task descriptions when relevant):")
+        lines.append(
+            "\nProject documents (already uploaded and indexed — "
+            "reference them in task descriptions when relevant):"
+        )
         for d in docs:
             size_kb = round(d.get("size_bytes", 0) / 1024, 1)
-            lines.append(f"  - {d['name']} ({d.get('file_type', 'unknown')}, {size_kb} KB)")
+            lines.append(
+                f"  - {d['name']} ({d.get('file_type', 'unknown')}, {size_kb} KB)"
+            )
 
     return "\n".join(lines)
 
@@ -462,7 +417,7 @@ BASE_SYSTEM = (
 TASK_SCHEMA = (
     '{"title":"string","description":"string","type":"code|test|review|general",'
     '"execution_order":0,"depends_on_task_indices":[],'
-    '"recommended_agent_profile_id":"uuid_or_null","repository_ids":["repo_uuid"]}'
+    '"repository_ids":["repo_uuid"]}'
 )
 
 STRUCTURED_OUTPUT_INSTRUCTIONS = (
@@ -473,7 +428,6 @@ STRUCTURED_OUTPUT_INSTRUCTIONS = (
     f'{{"message":"<brief plan summary for the user>","ready_for_plan":true,"plan":{{"tasks":[{TASK_SCHEMA}]}}}}\n\n'
     "Plan rules:\n"
     "- depends_on_task_indices are 0-based indices into the tasks array\n"
-    "- Assign the best-matching agent profile id for each task (or null)\n"
     "- execution_order starts at 0 and increases"
 )
 
@@ -491,249 +445,72 @@ def _build_greeting(title: Optional[str]) -> str:
     )
 
 
-def _build_message_list(
-    history: List[Dict[str, str]], system_content: str
-) -> List[Dict[str, str]]:
-    base: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
-    if not history:
-        return base
-    # Ensure we don't start with an assistant message (some providers require user-first)
-    messages = list(history)
-    if messages and messages[0]["role"] == "assistant":
-        messages = [{"role": "user", "content": "(session resumed)"}] + messages
-    return base + messages
+# ─── LLM factory ──────────────────────────────────────────────────────────────
 
 
-# ─── Session init ─────────────────────────────────────────────────────────────
-
-async def init_session(plan_id: str) -> None:
-    if plan_id in _sessions:
-        return
-
-    try:
-        plan = await data_client.get_plan(plan_id)
-    except Exception as exc:
-        logger.warning("init_session: could not load plan %s - %s", plan_id, exc)
-        # Fallback: minimal stub session so SSE clients can connect even if the
-        # plan row doesn't exist yet (e.g. rapid re-connection race).
-        _sessions[plan_id] = Session(
-            plan_id=plan_id,
-            project_id="",
-            plan_title=None,
-            phase="interview",
-            messages=[],
-            plan_draft=None,
-            agent_profiles=[],
-            project_repositories=[],
-            project_context=None,
-            repo_tools=[],
-        )
-        return
-    profiles, repos, existing_messages, existing_tasks, project_context, project_agents = await asyncio.gather(
-        data_client.get_agent_profiles(),
-        data_client.get_project_repositories(plan["project_id"]),
-        data_client.get_plan_messages(plan_id),
-        data_client.get_plan_tasks(plan_id),
-        _gather_project_context(plan["project_id"], plan_id),
-        data_client.get_project_agents(plan["project_id"]),
-    )
-
-    is_first_visit = len(existing_messages) == 0
-    is_in_review = plan["status"] == "draft" and len(existing_tasks) > 0
-
-    history = [
-        {"role": m["role"], "content": m["content"]}
-        for m in existing_messages
-        if m["role"] in ("user", "assistant")
-    ]
-
-    greeting = _build_greeting(plan.get("title"))
-    session = Session(
-        plan_id=plan_id,
-        project_id=plan["project_id"],
-        plan_title=plan.get("title"),
-        phase="review" if is_in_review else "interview",
-        messages=history if history else [{"role": "assistant", "content": greeting}],
-        plan_draft=(
-            {"tasks": [_saved_task_to_planned(t, existing_tasks) for t in existing_tasks]}
-            if is_in_review
-            else None
-        ),
-        agent_profiles=profiles,
-        project_repositories=repos,
-        project_context=project_context,
-        repo_tools=_build_repo_tools(repos, plan["project_id"]),
-        project_agents=project_agents,
-    )
-    _sessions[plan_id] = session
-
-    if is_first_visit:
-        await asyncio.sleep(0.15)
-        sse_manager.broadcast(plan_id, {"type": "chat_token", "content": greeting})
-        asyncio.create_task(
-            data_client.save_message(
-                {
-                    "project_id": plan["project_id"],
-                    "plan_id": plan_id,
-                    "role": "assistant",
-                    "content": greeting,
-                }
-            )
-        )
-        sse_manager.broadcast(plan_id, {"type": "chat_end"})
-
-
-# ─── Planner profile helper ───────────────────────────────────────────────────
-
-def _find_planner_profile(session: Session) -> Optional[Dict[str, Any]]:
-    """
-    Return the raw agent-profile dict for the project's 'planner' role, or None.
-
-    Uses the project_agents list stored on the session (populated from the
-    data-api when the session is first created) to find the profile assigned to
-    the 'planner' role via exact role string matching.
-    """
-    profile_map = {p["id"]: p for p in session.agent_profiles}
-
-    for pa in session.project_agents:
-        if pa.get("role") == "planner":
-            profile_id = pa.get("agent_profile_id") or (pa.get("agent_profile") or {}).get("id")
-            if profile_id and profile_id in profile_map:
-                return profile_map[profile_id]
-            # profile may already be embedded
-            embedded = pa.get("agent_profile")
-            if embedded:
-                return embedded
-
-    return None
-
-
-# ─── User message handler ─────────────────────────────────────────────────────
-
-async def handle_user_message(plan_id: str, content: str) -> None:
-    session = _sessions.get(plan_id)
-
-    if not session:
-        plan = await data_client.get_plan(plan_id)
-        profiles, repos, existing_messages, existing_tasks, project_context, project_agents = await asyncio.gather(
-            data_client.get_agent_profiles(),
-            data_client.get_project_repositories(plan["project_id"]),
-            data_client.get_plan_messages(plan_id),
-            data_client.get_plan_tasks(plan_id),
-            _gather_project_context(plan["project_id"], plan_id),
-            data_client.get_project_agents(plan["project_id"]),
-        )
-
-        is_in_review = plan["status"] == "draft" and len(existing_tasks) > 0
-        history = [
-            {"role": m["role"], "content": m["content"]}
-            for m in existing_messages
-            if m["role"] in ("user", "assistant")
-        ]
-        greeting = _build_greeting(plan.get("title"))
-        session = Session(
-            plan_id=plan_id,
-            project_id=plan["project_id"],
-            plan_title=plan.get("title"),
-            phase="review" if is_in_review else "interview",
-            messages=history if history else [{"role": "assistant", "content": greeting}],
-            plan_draft=(
-                {"tasks": [_saved_task_to_planned(t, existing_tasks) for t in existing_tasks]}
-                if is_in_review
-                else None
-            ),
-            agent_profiles=profiles,
-            project_repositories=repos,
-            project_context=project_context,
-            repo_tools=_build_repo_tools(repos, plan["project_id"]),
-            project_agents=project_agents,
-        )
-        _sessions[plan_id] = session
-
-    trimmed = content.strip()
-    session.messages.append({"role": "user", "content": trimmed})
-    await data_client.save_message(
-        {
-            "project_id": session.project_id,
-            "plan_id": plan_id,
-            "role": "user",
-            "content": trimmed,
-        }
-    )
-
-    sse_manager.broadcast(plan_id, {"type": "chat_thinking"})
-
-    settings = await data_client.get_settings()
-
-    # Use the planner profile's LLM settings if one is assigned to this project.
-    planner_profile = _find_planner_profile(session)
-    if planner_profile:
+def _build_llm(
+    settings: Dict[str, Any], planner_agent: Optional[Dict[str, Any]]
+) -> Any:
+    if planner_agent and planner_agent.get("llm_provider"):
         from agent_service.crypto import decrypt as _decrypt
-        raw_key = planner_profile.get("llm_api_key", "")
-        api_key = _decrypt(raw_key) if raw_key else (settings.get("llm_api_key_raw") or "")
-        llm = build_chat_model(
-            provider=planner_profile.get("llm_provider") or settings["llm_provider"],
-            model=planner_profile.get("llm_model") or settings["llm_model"],
+
+        raw_key = planner_agent.get("llm_api_key", "")
+        api_key = (
+            _decrypt(raw_key) if raw_key else (settings.get("llm_api_key_raw") or "")
+        )
+        return build_chat_model(
+            provider=planner_agent.get("llm_provider") or settings["llm_provider"],
+            model=planner_agent.get("llm_model") or settings["llm_model"],
             api_key=api_key,
-            base_url=planner_profile.get("llm_base_url") or settings.get("llm_base_url"),
-            temperature=planner_profile.get("llm_temperature"),
-            max_tokens=planner_profile.get("llm_max_tokens"),
-            top_p=planner_profile.get("llm_top_p"),
-            frequency_penalty=planner_profile.get("llm_frequency_penalty"),
-            presence_penalty=planner_profile.get("llm_presence_penalty"),
+            base_url=planner_agent.get("llm_base_url") or settings.get("llm_base_url"),
+            temperature=planner_agent.get("llm_temperature"),
+            max_tokens=planner_agent.get("llm_max_tokens"),
+            top_p=planner_agent.get("llm_top_p"),
+            frequency_penalty=planner_agent.get("llm_frequency_penalty"),
+            presence_penalty=planner_agent.get("llm_presence_penalty"),
         )
-    else:
-        llm = build_chat_model(
-            provider=settings["llm_provider"],
-            model=settings["llm_model"],
-            api_key=settings.get("llm_api_key_raw") or "",
-            base_url=settings.get("llm_base_url"),
-        )
-
-    if session.phase == "interview":
-        await _run_interview(session, llm, plan_id, planner_profile)
-    else:
-        await _run_review(session, llm, trimmed, plan_id, planner_profile)
-
-
-# ─── Interview phase ──────────────────────────────────────────────────────────
-
-async def _run_interview(session: Session, llm: Any, plan_id: str, planner_profile: Optional[Dict[str, Any]] = None) -> None:
-    profiles_text = (
-        "\n".join(
-            f"- id:{p['id']} name:{p['name']} type:{p.get('agent_type','')} skills:[{','.join(s['name'] for s in p.get('skills',[]))}]"
-            for p in session.agent_profiles
-        )
-        or "None configured yet."
+    return build_chat_model(
+        provider=settings["llm_provider"],
+        model=settings["llm_model"],
+        api_key=settings.get("llm_api_key_raw") or "",
+        base_url=settings.get("llm_base_url"),
     )
 
+
+# ─── System prompt builders ───────────────────────────────────────────────────
+
+
+def _build_interview_system(
+    state: PlannerState,
+    planner_agent: Optional[Dict[str, Any]],
+    tools: List[StructuredTool],
+) -> str:
+    repos = state.get("repos", [])
     repos_text = (
         "\n".join(
-            f"- id:{r['id']} name:{r['name']} url:{r.get('remote_url','(local)')}"
-            for r in session.project_repositories
+            f"- id:{r['id']} name:{r['name']} url:{r.get('remote_url', '(local)')}"
+            for r in repos
         )
         or "None configured yet."
     )
 
     context_block = ""
-    if session.project_context:
+    if state.get("project_context"):
         context_block = "\n\n## Project Context\n" + _build_project_context_text(
-            session.project_context, session.plan_title
+            state["project_context"], state.get("plan_title")
         )
 
-    has_tools = bool(session.repo_tools)
     tools_note = (
         "\n\nYou have tools to explore the repository filesystem (list_directory, read_file, search_code). "
         "Use them proactively to understand the codebase structure, dependencies, and conventions BEFORE asking the user questions. "
         "Only ask the user what you cannot discover from the code."
-        if has_tools
+        if tools
         else ""
     )
 
     base_content = (
         BASE_SYSTEM
         + context_block
-        + f"\n\nAvailable agent profiles:\n{profiles_text}"
         + f"\n\nProject repositories (use these IDs in task repository_ids):\n{repos_text}"
         + tools_note
         + "\n\nUse the project context above to ask targeted follow-up questions and avoid duplicating existing work. "
@@ -742,78 +519,293 @@ async def _run_interview(session: Session, llm: Any, plan_id: str, planner_profi
         + STRUCTURED_OUTPUT_INSTRUCTIONS
     )
 
-    # Apply planner profile system prompt if configured
-    if planner_profile and planner_profile.get("system_prompt"):
-        custom = planner_profile["system_prompt"]
-        mode = planner_profile.get("system_prompt_mode") or "override"
+    if planner_agent and planner_agent.get("system_prompt"):
+        custom = planner_agent["system_prompt"]
+        mode = planner_agent.get("system_prompt_mode") or "override"
         if mode == "override":
-            system_content = custom + STRUCTURED_OUTPUT_INSTRUCTIONS
-        else:
-            system_content = base_content + "\n\n" + custom
-    else:
-        system_content = base_content
+            return custom + STRUCTURED_OUTPUT_INSTRUCTIONS
+        return base_content + "\n\n" + custom
 
-    lc_messages = _build_message_list(session.messages, system_content)
-    text = await _run_tool_loop(llm, session.repo_tools, lc_messages, plan_id)
+    return base_content
 
-    parsed = _parse_planner_response(text)
 
-    if not parsed:
-        session.messages.append({"role": "assistant", "content": text})
-        await _stream_message_chunks(plan_id, text)
-        await data_client.save_message(
-            {"project_id": session.project_id, "plan_id": plan_id, "role": "assistant", "content": text}
+def _build_review_system(
+    state: PlannerState, planner_agent: Optional[Dict[str, Any]]
+) -> str:
+    repos = state.get("repos", [])
+    repos_text = "\n".join(f"- id:{r['id']} name:{r['name']}" for r in repos) or "none"
+
+    context_block = ""
+    if state.get("project_context"):
+        context_block = "\n\n## Project Context\n" + _build_project_context_text(
+            state["project_context"], state.get("plan_title")
         )
-        sse_manager.broadcast(plan_id, {"type": "chat_end"})
-        return
 
-    session.messages.append({"role": "assistant", "content": parsed["message"]})
-    await _stream_message_chunks(plan_id, parsed["message"])
-    await data_client.save_message(
-        {
-            "project_id": session.project_id,
-            "plan_id": plan_id,
-            "role": "assistant",
-            "content": parsed["message"],
-        }
+    base_system = (
+        BASE_SYSTEM
+        + context_block
+        + "\n\nThe user wants to revise the current plan."
+        + f"\n\nCurrent plan:\n{json.dumps(state.get('plan_draft'), indent=2, default=str)}"
+        + f"\n\nAvailable repositories (use these IDs in task repository_ids):\n{repos_text}"
+        + "\n\nApply the user's requested changes and return the updated plan. Always set ready_for_plan to true."
+        + STRUCTURED_OUTPUT_INSTRUCTIONS
     )
 
-    if parsed["ready_for_plan"] and parsed.get("plan"):
-        task_dicts = parsed["plan"].get("tasks", [])
-        planned = [PlannedTask(t) for t in task_dicts]
-        saved_tasks = await _save_draft_tasks(plan_id, planned)
-        session.plan_draft = {"tasks": [_saved_task_to_planned(t, saved_tasks) for t in saved_tasks]}
-        session.phase = "review"
-        sse_manager.broadcast(
-            plan_id,
-            {"type": "plan_draft", "plan": _build_plan_draft_payload(plan_id, session, saved_tasks)},
-        )
+    if planner_agent and planner_agent.get("system_prompt"):
+        custom = planner_agent["system_prompt"]
+        mode = planner_agent.get("system_prompt_mode") or "override"
+        if mode == "override":
+            return custom + STRUCTURED_OUTPUT_INSTRUCTIONS
+        return base_system + "\n\n" + custom
 
+    return base_system
+
+
+# ─── Graph nodes ──────────────────────────────────────────────────────────────
+
+
+async def prepare_node(state: PlannerState) -> Dict[str, Any]:
+    """
+    Load plan context from DB (once) and send greeting on first visit.
+    On reconnect (project_id already in state), returns immediately.
+    """
+    plan_id = state["plan_id"]
+
+    if state.get("project_id"):
+        # Already initialized — reconnect, nothing to do.
+        return {}
+
+    try:
+        plan = await data_client.get_plan(plan_id)
+    except Exception as exc:
+        logger.error("prepare_node: could not load plan %s: %s", plan_id, exc)
+        return {}
+
+    project_id = plan["project_id"]
+    plan_title = plan.get("title")
+
+    repos, project_context, project_agents_raw = await asyncio.gather(
+        data_client.get_project_repositories(project_id),
+        _gather_project_context(project_id, plan_id),
+        data_client.get_project_agents_raw(project_id),
+    )
+
+    planner_agent = next(
+        (pa for pa in project_agents_raw if pa.get("role") == "planner"), None
+    )
+
+    greeting = _build_greeting(plan_title)
+
+    # Save greeting to DB (fire-and-forget)
+    asyncio.create_task(
+        data_client.save_message(
+            {
+                "project_id": project_id,
+                "plan_id": plan_id,
+                "role": "assistant",
+                "content": greeting,
+            }
+        )
+    )
+
+    # Brief pause to let the SSE queue be created before broadcasting.
+    await asyncio.sleep(0.15)
+    sse_manager.broadcast(plan_id, {"type": "chat_token", "content": greeting})
     sse_manager.broadcast(plan_id, {"type": "chat_end"})
 
+    return {
+        "project_id": project_id,
+        "plan_title": plan_title,
+        "repos": repos,
+        "project_context": project_context,
+        "planner_agent": planner_agent,
+        "phase": "interview",
+        "messages": [AIMessage(content=greeting)],
+    }
 
-# ─── Review phase ─────────────────────────────────────────────────────────────
 
-async def _run_review(session: Session, llm: Any, user_content: str, plan_id: str, planner_profile: Optional[Dict[str, Any]] = None) -> None:
-    lower = user_content.lower()
-    is_confirm = (
-        lower in ("confirm", "yes")
-        or lower.startswith("confirm")
-        or "looks good" in lower
-        or "start execution" in lower
-        or "approve" in lower
+async def interview_wait_node(state: PlannerState) -> Dict[str, Any]:
+    """Interrupt: wait for user message during interview phase."""
+    plan_id = state["plan_id"]
+    project_id = state["project_id"]
+
+    user_content: str = interrupt("Waiting for user message")
+    trimmed = user_content.strip()
+
+    asyncio.create_task(
+        data_client.save_message(
+            {
+                "project_id": project_id,
+                "plan_id": plan_id,
+                "role": "user",
+                "content": trimmed,
+            }
+        )
+    )
+    sse_manager.broadcast(plan_id, {"type": "chat_thinking"})
+
+    return {"messages": [HumanMessage(content=trimmed)]}
+
+
+async def planner_node(state: PlannerState) -> Dict[str, Any]:
+    """
+    Run LLM (with repo tools). Returns the AI response.
+    Streams message tokens if this is a final response (no tool calls).
+    """
+    plan_id = state["plan_id"]
+    project_id = state["project_id"]
+
+    settings = await data_client.get_settings()
+    planner_agent = state.get("planner_agent")
+    repos = state.get("repos", [])
+    tools = _build_repo_tools(repos, project_id)
+
+    llm = _build_llm(settings, planner_agent)
+    system_content = _build_interview_system(state, planner_agent, tools)
+    messages = [SystemMessage(content=system_content)] + list(state["messages"])
+
+    llm_with_tools = llm.bind_tools(tools) if tools else llm
+    response = await llm_with_tools.ainvoke(messages)
+
+    tool_calls = getattr(response, "tool_calls", None) or []
+
+    if tool_calls:
+        # Broadcast tool-use events and let tools_node handle execution.
+        for tc in tool_calls:
+            sse_manager.broadcast(
+                plan_id,
+                {
+                    "type": "chat_tool_use",
+                    "tool": tc["name"],
+                    "input": tc.get("args", {}),
+                },
+            )
+    else:
+        # Final response — stream tokens and save to DB.
+        text = (
+            response.content
+            if isinstance(response.content, str)
+            else json.dumps(response.content)
+        )
+        parsed = _parse_planner_response(text)
+        msg_text = parsed["message"] if parsed else text
+
+        asyncio.create_task(
+            data_client.save_message(
+                {
+                    "project_id": project_id,
+                    "plan_id": plan_id,
+                    "role": "assistant",
+                    "content": msg_text,
+                }
+            )
+        )
+        await _stream_message_chunks(plan_id, msg_text)
+
+        # chat_end is sent here unless we're about to emit plan_draft.
+        if not (parsed and parsed.get("ready_for_plan") and parsed.get("plan")):
+            sse_manager.broadcast(plan_id, {"type": "chat_end"})
+
+    return {"messages": [response]}
+
+
+async def tools_node(state: PlannerState) -> Dict[str, Any]:
+    """Execute tool calls from the last AI message."""
+    repos = state.get("repos", [])
+    project_id = state["project_id"]
+
+    tools = _build_repo_tools(repos, project_id)
+    tool_map = {t.name: t for t in tools}
+
+    last_ai = state["messages"][-1]
+    tool_calls = getattr(last_ai, "tool_calls", []) or []
+
+    tool_results: List[ToolMessage] = []
+    for tc in tool_calls:
+        tool = tool_map.get(tc["name"])
+        try:
+            result = (
+                str(await tool.ainvoke(tc["args"]))
+                if tool
+                else f"Unknown tool: {tc['name']}"
+            )
+        except Exception as exc:
+            result = f"Tool error: {exc}"
+        tool_results.append(ToolMessage(content=result, tool_call_id=tc["id"]))
+
+    return {"messages": tool_results}
+
+
+async def save_draft_node(state: PlannerState) -> Dict[str, Any]:
+    """
+    Parse plan from the last AI message, save draft tasks, and broadcast plan_draft.
+    """
+    plan_id = state["plan_id"]
+    project_id = state["project_id"]
+
+    # Find the last non-tool-call AI message.
+    last_ai = next(
+        (
+            m
+            for m in reversed(state["messages"])
+            if isinstance(m, AIMessage) and not getattr(m, "tool_calls", None)
+        ),
+        None,
     )
 
-    if is_confirm:
-        await _confirm_plan(session, plan_id)
-    else:
-        await _refine_plan(session, llm, plan_id, planner_profile)
+    saved_tasks: List[Dict[str, Any]] = []
+
+    if last_ai:
+        text = last_ai.content if isinstance(last_ai.content, str) else ""
+        parsed = _parse_planner_response(text)
+        if parsed and parsed.get("plan"):
+            planned_tasks = [PlannedTask(t) for t in parsed["plan"].get("tasks", [])]
+            saved_tasks = await _save_draft_tasks(plan_id, planned_tasks)
+
+    sse_manager.broadcast(
+        plan_id,
+        {
+            "type": "plan_draft",
+            "plan": _build_plan_payload(plan_id, state, saved_tasks),
+        },
+    )
+    sse_manager.broadcast(plan_id, {"type": "chat_end"})
+
+    return {
+        "phase": "review",
+        "plan_draft": {"tasks": saved_tasks},
+    }
 
 
-async def _confirm_plan(session: Session, plan_id: str) -> None:
-    from datetime import datetime, timezone
+async def review_wait_node(state: PlannerState) -> Dict[str, Any]:
+    """Interrupt: wait for user message during review phase."""
+    plan_id = state["plan_id"]
+    project_id = state["project_id"]
 
+    user_content: str = interrupt("Waiting for review response")
+    trimmed = user_content.strip()
+
+    asyncio.create_task(
+        data_client.save_message(
+            {
+                "project_id": project_id,
+                "plan_id": plan_id,
+                "role": "user",
+                "content": trimmed,
+            }
+        )
+    )
+    sse_manager.broadcast(plan_id, {"type": "chat_thinking"})
+
+    return {"messages": [HumanMessage(content=trimmed)]}
+
+
+async def confirm_node(state: PlannerState) -> Dict[str, Any]:
+    """Confirm plan, mark root tasks as ready, and trigger execution."""
     from agent_service.services.execution_service import start_execution
+
+    plan_id = state["plan_id"]
+    project_id = state["project_id"]
 
     plan = await data_client.update_plan(
         plan_id,
@@ -830,97 +822,247 @@ async def _confirm_plan(session: Session, plan_id: str) -> None:
     )
 
     confirm_msg = "✅ Plan confirmed and saved! Execution will begin shortly."
-    session.messages.append({"role": "assistant", "content": confirm_msg})
-    await _stream_message_chunks(plan_id, confirm_msg)
-    await data_client.save_message(
-        {
-            "project_id": session.project_id,
-            "plan_id": plan_id,
-            "role": "assistant",
-            "content": confirm_msg,
-        }
+    asyncio.create_task(
+        data_client.save_message(
+            {
+                "project_id": project_id,
+                "plan_id": plan_id,
+                "role": "assistant",
+                "content": confirm_msg,
+            }
+        )
     )
+    await _stream_message_chunks(plan_id, confirm_msg)
     sse_manager.broadcast(plan_id, {"type": "plan_confirmed", "plan_id": plan["id"]})
 
-    _sessions.pop(plan_id, None)
-    asyncio.create_task(start_execution(session.project_id, plan["id"]))
+    asyncio.create_task(start_execution(project_id, plan["id"]))
+
+    return {"messages": [AIMessage(content=confirm_msg)]}
 
 
-async def _refine_plan(session: Session, llm: Any, plan_id: str, planner_profile: Optional[Dict[str, Any]] = None) -> None:
-    profiles_text = (
-        "\n".join(
-            f"- id:{p['id']} name:{p['name']} type:{p.get('agent_type','')}"
-            for p in session.agent_profiles
-        )
-        or "none"
+async def refine_node(state: PlannerState) -> Dict[str, Any]:
+    """Generate an updated plan based on user feedback, save and broadcast."""
+    plan_id = state["plan_id"]
+    project_id = state["project_id"]
+
+    settings = await data_client.get_settings()
+    planner_agent = state.get("planner_agent")
+
+    llm = _build_llm(settings, planner_agent)
+    system_content = _build_review_system(state, planner_agent)
+    messages = [SystemMessage(content=system_content)] + list(state["messages"])
+
+    response = await llm.ainvoke(messages)
+    text = (
+        response.content
+        if isinstance(response.content, str)
+        else json.dumps(response.content)
     )
-    repos_text = (
-        "\n".join(
-            f"- id:{r['id']} name:{r['name']}" for r in session.project_repositories
-        )
-        or "none"
-    )
-
-    context_block = ""
-    if session.project_context:
-        context_block = "\n\n## Project Context\n" + _build_project_context_text(
-            session.project_context, session.plan_title
-        )
-
-    base_system = (
-        BASE_SYSTEM
-        + context_block
-        + "\n\nThe user wants to revise the current plan."
-        + f"\n\nCurrent plan:\n{json.dumps(session.plan_draft, indent=2, default=str)}"
-        + f"\n\nAvailable agent profiles:\n{profiles_text}"
-        + f"\n\nAvailable repositories (use these IDs in task repository_ids):\n{repos_text}"
-        + "\n\nApply the user's requested changes and return the updated plan. Always set ready_for_plan to true."
-        + STRUCTURED_OUTPUT_INSTRUCTIONS
-    )
-
-    # Apply planner profile system prompt if configured
-    if planner_profile and planner_profile.get("system_prompt"):
-        custom = planner_profile["system_prompt"]
-        mode = planner_profile.get("system_prompt_mode") or "override"
-        if mode == "override":
-            system_content = custom + STRUCTURED_OUTPUT_INSTRUCTIONS
-        else:
-            system_content = base_system + "\n\n" + custom
-    else:
-        system_content = base_system
-
-    lc_messages = _build_message_list(session.messages, system_content)
-    response = await llm.ainvoke(
-        [SystemMessage(content=m["content"]) if m["role"] == "system" else
-         HumanMessage(content=m["content"]) if m["role"] == "user" else
-         AIMessage(content=m["content"])
-         for m in lc_messages]
-    )
-    text = response.content if isinstance(response.content, str) else json.dumps(response.content)
 
     parsed = _parse_planner_response(text)
+
     if not parsed or not parsed.get("plan"):
-        err = "Sorry, I couldn't parse the updated plan. Please try describing your changes again."
+        err = (
+            "Sorry, I couldn't parse the updated plan. "
+            "Please try describing your changes again."
+        )
         sse_manager.broadcast(plan_id, {"type": "chat_token", "content": err})
         sse_manager.broadcast(plan_id, {"type": "chat_end"})
-        return
+        asyncio.create_task(
+            data_client.save_message(
+                {
+                    "project_id": project_id,
+                    "plan_id": plan_id,
+                    "role": "assistant",
+                    "content": err,
+                }
+            )
+        )
+        return {"messages": [AIMessage(content=err)]}
 
-    task_dicts = parsed["plan"].get("tasks", [])
-    planned = [PlannedTask(t) for t in task_dicts]
-    saved_tasks = await _save_draft_tasks(plan_id, planned)
-    session.plan_draft = {"tasks": [_saved_task_to_planned(t, saved_tasks) for t in saved_tasks]}
-    session.messages.append({"role": "assistant", "content": parsed["message"]})
-    await _stream_message_chunks(plan_id, parsed["message"])
-    await data_client.save_message(
-        {
-            "project_id": session.project_id,
-            "plan_id": plan_id,
-            "role": "assistant",
-            "content": parsed["message"],
-        }
+    planned_tasks = [PlannedTask(t) for t in parsed["plan"].get("tasks", [])]
+    saved_tasks = await _save_draft_tasks(plan_id, planned_tasks)
+    msg_text = parsed["message"]
+
+    asyncio.create_task(
+        data_client.save_message(
+            {
+                "project_id": project_id,
+                "plan_id": plan_id,
+                "role": "assistant",
+                "content": msg_text,
+            }
+        )
     )
+    await _stream_message_chunks(plan_id, msg_text)
+
     sse_manager.broadcast(
         plan_id,
-        {"type": "plan_draft", "plan": _build_plan_draft_payload(plan_id, session, saved_tasks)},
+        {
+            "type": "plan_draft",
+            "plan": _build_plan_payload(plan_id, state, saved_tasks),
+        },
     )
     sse_manager.broadcast(plan_id, {"type": "chat_end"})
+
+    return {
+        "messages": [AIMessage(content=msg_text)],
+        "plan_draft": {"tasks": saved_tasks},
+    }
+
+
+# ─── Routing ──────────────────────────────────────────────────────────────────
+
+
+def route_after_planner(state: PlannerState) -> str:
+    last = state["messages"][-1]
+
+    if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
+        return "tools_node"
+
+    text = last.content if isinstance(last.content, str) else ""
+    parsed = _parse_planner_response(text)
+    if parsed and parsed.get("ready_for_plan") and parsed.get("plan"):
+        return "save_draft_node"
+
+    return "interview_wait_node"
+
+
+def route_after_review(state: PlannerState) -> str:
+    last = state["messages"][-1]
+    if isinstance(last, HumanMessage):
+        lower = last.content.lower().strip()
+        if (
+            lower in ("confirm", "yes")
+            or lower.startswith("confirm")
+            or "looks good" in lower
+            or "start execution" in lower
+            or "approve" in lower
+        ):
+            return "confirm_node"
+    return "refine_node"
+
+
+# ─── Graph construction ───────────────────────────────────────────────────────
+
+
+def _build_graph() -> Any:
+    checkpointer = _get_checkpointer()
+    builder = StateGraph(PlannerState)
+
+    builder.add_node("prepare_node", prepare_node)
+    builder.add_node("interview_wait_node", interview_wait_node)
+    builder.add_node("planner_node", planner_node)
+    builder.add_node("tools_node", tools_node)
+    builder.add_node("save_draft_node", save_draft_node)
+    builder.add_node("review_wait_node", review_wait_node)
+    builder.add_node("confirm_node", confirm_node)
+    builder.add_node("refine_node", refine_node)
+
+    builder.add_edge(START, "prepare_node")
+    builder.add_edge("prepare_node", "interview_wait_node")
+    builder.add_edge("interview_wait_node", "planner_node")
+    builder.add_conditional_edges(
+        "planner_node",
+        route_after_planner,
+        {
+            "tools_node": "tools_node",
+            "save_draft_node": "save_draft_node",
+            "interview_wait_node": "interview_wait_node",
+        },
+    )
+    builder.add_edge("tools_node", "planner_node")
+    builder.add_edge("save_draft_node", "review_wait_node")
+    builder.add_conditional_edges(
+        "review_wait_node",
+        route_after_review,
+        {
+            "confirm_node": "confirm_node",
+            "refine_node": "refine_node",
+        },
+    )
+    builder.add_edge("confirm_node", END)
+    builder.add_edge("refine_node", "review_wait_node")
+
+    return builder.compile(checkpointer=checkpointer)
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────
+
+
+async def init_session(plan_id: str) -> None:
+    """
+    Initialize a planning session for the given plan_id.
+
+    If a LangGraph checkpoint already exists (browser reconnect), returns
+    immediately — the graph is already paused at an interrupt.
+
+    Otherwise, starts the graph in the background so the SSE event_stream
+    queue is created before the greeting is broadcast.
+    """
+    checkpointer = _get_checkpointer()
+    if checkpointer is None:
+        logger.warning(
+            "init_session: checkpointer not ready for plan %s — skipping", plan_id
+        )
+        return
+
+    graph = _graph
+    if graph is None:
+        logger.error("init_session: graph not built for plan %s", plan_id)
+        return
+
+    thread_config = {"configurable": {"thread_id": plan_id}}
+
+    try:
+        checkpoint = await checkpointer.aget(thread_config)
+        if checkpoint is not None:
+            logger.debug(
+                "init_session: checkpoint found for %s — reconnecting", plan_id
+            )
+            return
+    except Exception as exc:
+        logger.warning(
+            "init_session: could not check checkpoint for %s: %s", plan_id, exc
+        )
+
+    initial_state: PlannerState = {
+        "messages": [],
+        "plan_id": plan_id,
+        "project_id": "",
+        "plan_title": None,
+        "project_context": None,
+        "repos": [],
+        "planner_agent": None,
+        "phase": "interview",
+        "plan_draft": None,
+    }
+
+    async def _run() -> None:
+        try:
+            await graph.ainvoke(initial_state, thread_config)
+        except Exception as exc:
+            logger.exception("init_session: graph error for plan %s: %s", plan_id, exc)
+
+    asyncio.create_task(_run())
+
+
+async def handle_user_message(plan_id: str, content: str) -> None:
+    """
+    Resume the planning graph with the user's message.
+
+    Called as an asyncio background task from the chat API.
+    """
+    graph = _graph
+    if graph is None:
+        logger.error("handle_user_message: graph not built for plan %s", plan_id)
+        return
+
+    thread_config = {"configurable": {"thread_id": plan_id}}
+
+    try:
+        await graph.ainvoke(Command(resume=content), thread_config)
+    except Exception as exc:
+        logger.exception(
+            "handle_user_message: graph error for plan %s: %s", plan_id, exc
+        )

@@ -7,7 +7,7 @@ import {
   skipDependentTasksHandler,
   cancelPlanTasksHandler,
   createTaskArtifactsHandler,
-  listAgentProfilesRawHandler,
+  listProjectAgentsRawHandler,
 } from "../controllers/internal.controller";
 
 const router = Router();
@@ -33,7 +33,7 @@ router.post("/plans/:id/cancel-tasks", cancelPlanTasksHandler);
 // POST  /internal/tasks/:id/artifacts   — bulk-create execution artifacts
 router.post("/tasks/:id/artifacts", createTaskArtifactsHandler);
 
-// GET   /internal/agent-profiles        — raw encrypted profiles for agent-service
-router.get("/agent-profiles", listAgentProfilesRawHandler);
+// GET   /internal/project-agents/:projectId — raw encrypted agents for agent-service
+router.get("/project-agents/:projectId", listProjectAgentsRawHandler);
 
 export default router;

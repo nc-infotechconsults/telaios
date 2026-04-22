@@ -44,6 +44,9 @@ export default function DockerNetworkList({ environmentId }: Props) {
   const [pruning, setPruning] = useState(false);
   const { isOpen: isPruneOpen, onOpen: onPruneOpen, onOpenChange: onPruneOpenChange } = useDisclosure();
 
+  // Detail modal for small screens (< lg)
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -130,7 +133,11 @@ export default function DockerNetworkList({ environmentId }: Props) {
                   <TableRow
                     key={net.id}
                     className={`cursor-pointer ${selectedId === net.id ? "bg-default-100" : ""}`}
-                    onClick={() => setSelectedId((prev) => (prev === net.id ? null : net.id))}
+                    onClick={() => {
+                      const next = net.id === selectedId ? null : net.id;
+                      setSelectedId(next);
+                      if (next && window.innerWidth < 1024) setDetailOpen(true);
+                    }}
                   >
                     <TableCell>
                       <p className="text-sm font-medium">{net.name}</p>
@@ -175,7 +182,7 @@ export default function DockerNetworkList({ environmentId }: Props) {
           {selectedId && (() => {
             const selected = networks.find((n) => n.id === selectedId);
             return selected ? (
-              <div className="w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
+              <div className="hidden lg:block w-[400px] flex-shrink-0 border-l border-divider pl-4 overflow-y-auto">
                 <DockerNetworkDetail
                   environmentId={environmentId}
                   network={selected}
@@ -238,6 +245,37 @@ export default function DockerNetworkList({ environmentId }: Props) {
         onOpenChange={onCreateOpenChange}
         onCreated={load}
       />
+
+      {/* Detail modal for small/tablet screens (< lg) */}
+      {selectedId && (() => {
+        const selected = networks.find((n) => n.id === selectedId);
+        return selected ? (
+          <Modal
+            isOpen={detailOpen}
+            onOpenChange={(open) => {
+              setDetailOpen(open);
+              if (!open) setSelectedId(null);
+            }}
+            size="2xl"
+            scrollBehavior="inside"
+          >
+            <ModalContent>
+              {(onClose) => (
+                <>
+                  <ModalHeader>Network Details</ModalHeader>
+                  <ModalBody className="pb-6">
+                    <DockerNetworkDetail
+                      environmentId={environmentId}
+                      network={selected}
+                      onClose={onClose}
+                    />
+                  </ModalBody>
+                </>
+              )}
+            </ModalContent>
+          </Modal>
+        ) : null;
+      })()}
     </div>
   );
 }

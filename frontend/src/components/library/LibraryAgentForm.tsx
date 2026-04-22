@@ -1,0 +1,264 @@
+import { useState } from "react";
+import {
+  Button,
+  Input,
+  Select,
+  SelectItem,
+  Spinner,
+  Textarea,
+} from "@heroui/react";
+import { createLibraryAgent, updateLibraryAgent } from "../../lib/api";
+import { toast } from "../../lib/toast";
+import type { AgentRole, InlineSkill, LibraryAgent, McpServer } from "../../types";
+import SubAgentEditor from "./SubAgentEditor";
+import McpServerEditor from "./McpServerEditor";
+import InlineSkillEditor from "./InlineSkillEditor";
+
+const ROLE_OPTIONS: AgentRole[] = [
+  "planner",
+  "coder",
+  "reviewer",
+  "tester",
+  "infra",
+  "knowledge",
+  "custom",
+];
+
+const PROMPT_MODE_OPTIONS = [
+  { key: "append", label: "Append (extend default)" },
+  { key: "override", label: "Override (replace default)" },
+];
+
+interface Props {
+  initialData?: LibraryAgent;
+  onSaved: (agent: LibraryAgent) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Create / edit form for a LibraryAgent.
+ * When `initialData` is provided the form is in edit mode.
+ */
+export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Props) {
+  const isEdit = !!initialData;
+
+  const [name, setName] = useState(initialData?.name ?? "");
+  const [description, setDescription] = useState(initialData?.description ?? "");
+  const [role, setRole] = useState<AgentRole>(initialData?.role ?? "custom");
+  const [systemPromptMode, setSystemPromptMode] = useState<"append" | "override">(
+    initialData?.system_prompt_mode ?? "append",
+  );
+  const [systemPrompt, setSystemPrompt] = useState(initialData?.system_prompt ?? "");
+  const [llmProvider, setLlmProvider] = useState(initialData?.llm_provider ?? "");
+  const [llmModel, setLlmModel] = useState(initialData?.llm_model ?? "");
+  const [temperature, setTemperature] = useState(
+    initialData?.llm_temperature != null ? String(initialData.llm_temperature) : "",
+  );
+  const [maxTokens, setMaxTokens] = useState(
+    initialData?.llm_max_tokens != null ? String(initialData.llm_max_tokens) : "",
+  );
+  const [tagsRaw, setTagsRaw] = useState((initialData?.tags ?? []).join(", "));
+  const [subAgents, setSubAgents] = useState(initialData?.sub_agents ?? []);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>(initialData?.mcp_servers ?? []);
+  const [skills, setSkills] = useState<InlineSkill[]>(initialData?.skills ?? []);
+
+  const [saving, setSaving] = useState(false);
+
+  const toSlug = (s: string) =>
+    s
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const tags = tagsRaw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload: Partial<LibraryAgent> = {
+        name: name.trim(),
+        ...(!isEdit ? { slug: toSlug(name) } : {}),
+        description: description.trim(),
+        role,
+        system_prompt_mode: systemPromptMode,
+        system_prompt: systemPrompt.trim() || null,
+        ...(llmProvider.trim() ? { llm_provider: llmProvider.trim() } : {}),
+        ...(llmModel.trim() ? { llm_model: llmModel.trim() } : {}),
+        llm_temperature: temperature !== "" ? Number(temperature) : null,
+        llm_max_tokens: maxTokens !== "" ? Number(maxTokens) : null,
+        tags,
+        sub_agents: subAgents,
+        mcp_servers: mcpServers,
+        skills,
+      };
+
+      const saved = isEdit
+        ? await updateLibraryAgent(initialData.id, payload)
+        : await createLibraryAgent(payload);
+
+      toast.success(isEdit ? "Agent updated" : "Agent created", saved.name);
+      onSaved(saved);
+    } catch {
+      toast.error(isEdit ? "Failed to update agent" : "Failed to create agent");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Input
+        autoFocus
+        isRequired
+        label="Name"
+        placeholder="e.g. Senior Python Coder"
+        value={name}
+        onValueChange={setName}
+        isDisabled={saving}
+      />
+
+      <Textarea
+        label="Description"
+        placeholder="What does this agent specialise in?"
+        value={description}
+        onValueChange={setDescription}
+        isDisabled={saving}
+        minRows={2}
+      />
+
+      <div className="flex gap-3">
+        <Select
+          label="Role"
+          selectedKeys={new Set([role])}
+          onSelectionChange={(keys) => setRole(Array.from(keys)[0] as AgentRole)}
+          isDisabled={saving}
+          className="flex-1"
+        >
+          {ROLE_OPTIONS.map((r) => (
+            <SelectItem key={r}>{r}</SelectItem>
+          ))}
+        </Select>
+
+        <Select
+          label="Prompt mode"
+          selectedKeys={new Set([systemPromptMode])}
+          onSelectionChange={(keys) =>
+            setSystemPromptMode(Array.from(keys)[0] as "append" | "override")
+          }
+          isDisabled={saving}
+          className="flex-1"
+        >
+          {PROMPT_MODE_OPTIONS.map((o) => (
+            <SelectItem key={o.key}>{o.label}</SelectItem>
+          ))}
+        </Select>
+      </div>
+
+      <Textarea
+        label="System prompt"
+        placeholder="Instructions for this agent…"
+        value={systemPrompt}
+        onValueChange={setSystemPrompt}
+        isDisabled={saving}
+        minRows={3}
+      />
+
+      <div className="flex gap-3">
+        <Input
+          label="LLM provider"
+          placeholder="e.g. openai"
+          value={llmProvider}
+          onValueChange={setLlmProvider}
+          isDisabled={saving}
+          className="flex-1"
+        />
+        <Input
+          label="LLM model"
+          placeholder="e.g. gpt-4o"
+          value={llmModel}
+          onValueChange={setLlmModel}
+          isDisabled={saving}
+          className="flex-1"
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <Input
+          label="Temperature"
+          placeholder="0.0 – 2.0"
+          type="number"
+          min={0}
+          max={2}
+          step={0.1}
+          value={temperature}
+          onValueChange={setTemperature}
+          isDisabled={saving}
+          className="flex-1"
+        />
+        <Input
+          label="Max tokens"
+          placeholder="e.g. 4096"
+          type="number"
+          min={1}
+          value={maxTokens}
+          onValueChange={setMaxTokens}
+          isDisabled={saving}
+          className="flex-1"
+        />
+      </div>
+
+      <Input
+        label="Tags"
+        placeholder="Comma-separated, e.g. python, testing, security"
+        value={tagsRaw}
+        onValueChange={setTagsRaw}
+        isDisabled={saving}
+      />
+
+      {/* Sub-agents */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-sm font-medium text-foreground">Sub-agents</p>
+        <SubAgentEditor value={subAgents} onChange={setSubAgents} />
+      </div>
+
+      {/* MCP Servers */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-sm font-medium text-foreground">MCP Servers</p>
+        <McpServerEditor value={mcpServers} onChange={setMcpServers} />
+      </div>
+
+      {/* Skills */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-sm font-medium text-foreground">Skills</p>
+        <InlineSkillEditor value={skills} onChange={setSkills} />
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="light" onPress={onCancel} isDisabled={saving}>
+          Cancel
+        </Button>
+        <Button
+          color="primary"
+          onPress={handleSave}
+          isLoading={saving}
+          isDisabled={!name.trim()}
+        >
+          {isEdit ? "Save changes" : "Create agent"}
+        </Button>
+      </div>
+
+      {saving && (
+        <div className="flex justify-center">
+          <Spinner size="sm" />
+        </div>
+      )}
+    </div>
+  );
+}

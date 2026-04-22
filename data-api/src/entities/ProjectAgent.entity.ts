@@ -5,11 +5,16 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
-  DeleteDateColumn,
+  UpdateDateColumn,
 } from "typeorm";
 import type { Relation } from "typeorm";
 import { Project } from "./Project.entity";
-import { AgentProfile } from "./AgentProfile.entity";
+import type {
+  SubAgentEntry,
+  McpServer,
+  InlineSkill,
+  JsonSchema,
+} from "./LibraryAgent.entity";
 
 export type AgentRole =
   | "planner"
@@ -22,10 +27,8 @@ export type AgentRole =
   | "document-copilot";
 
 /**
- * Junction entity — assigns an AgentProfile to a Project with a specific role.
- * Uses a generated UUID PK (unlike ProjectMember which uses a composite PK)
- * because agents may be assigned to the same project more than once with
- * different scopes in the future.
+ * A full independent copy of a library agent scoped to a project.
+ * Created by cloning a LibraryAgent or directly. No live reference to the library after cloning.
  */
 @Entity("project_agents")
 export class ProjectAgent {
@@ -35,19 +38,59 @@ export class ProjectAgent {
   @Column()
   project_id!: string;
 
-  @Column()
-  agent_profile_id!: string;
+  /**
+   * The library agent this was cloned from (informational only — no live sync).
+   * Null for agents created directly without a library template.
+   */
+  @Column({ type: "varchar", nullable: true })
+  library_agent_id!: string | null;
 
   @ManyToOne(() => Project, { onDelete: "CASCADE" })
   @JoinColumn({ name: "project_id" })
   project!: Relation<Project>;
 
-  @ManyToOne(() => AgentProfile, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "agent_profile_id" })
-  agent_profile!: Relation<AgentProfile>;
+  @Column()
+  name!: string;
 
   @Column({ type: "varchar" })
   role!: AgentRole;
+
+  @Column({ type: "text", nullable: true })
+  system_prompt!: string | null;
+
+  @Column({ type: "varchar", default: "append" })
+  system_prompt_mode!: "append" | "override";
+
+  @Column({ type: "varchar", nullable: true })
+  llm_provider!: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  llm_model!: string | null;
+
+  /** Encrypted at rest. Decryption is handled by the agent-service, not the data-api. */
+  @Column({ type: "varchar", nullable: true })
+  llm_api_key!: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  llm_base_url!: string | null;
+
+  @Column({ type: "float", nullable: true })
+  llm_temperature!: number | null;
+
+  @Column({ type: "int", nullable: true })
+  llm_max_tokens!: number | null;
+
+  @Column({ type: "jsonb", default: "[]" })
+  sub_agents!: SubAgentEntry[];
+
+  @Column({ type: "jsonb", default: "[]" })
+  mcp_servers!: McpServer[];
+
+  @Column({ type: "jsonb", default: "[]" })
+  skills!: InlineSkill[];
+
+  @Column({ type: "jsonb", nullable: true })
+  structured_output!: JsonSchema | null;
 
   /**
    * Optional JSON payload that constrains what this agent is allowed to act on
@@ -57,8 +100,8 @@ export class ProjectAgent {
   scope!: Record<string, unknown> | null;
 
   @CreateDateColumn()
-  assigned_at!: Date;
+  created_at!: Date;
 
-  @DeleteDateColumn({ name: "deleted_at", nullable: true })
-  deleted_at!: Date | null;
+  @UpdateDateColumn()
+  updated_at!: Date;
 }

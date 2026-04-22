@@ -11,7 +11,6 @@ import {
 } from "typeorm";
 import type { Relation } from "typeorm";
 import { Plan } from "./Plan.entity";
-import { AgentProfile } from "./AgentProfile.entity";
 import { TaskDependency } from "./TaskDependency.entity";
 import { TaskRepository } from "./TaskRepository.entity";
 import { TaskArtifact } from "./TaskArtifact.entity";
@@ -55,10 +54,6 @@ export class Task {
 
   @Column({ nullable: true })
   agent_profile_id!: string;
-
-  @ManyToOne(() => AgentProfile, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn({ name: "agent_profile_id" })
-  agentProfile!: Relation<AgentProfile>;
 
   @Column({ nullable: true })
   assigned_instance_id!: string;

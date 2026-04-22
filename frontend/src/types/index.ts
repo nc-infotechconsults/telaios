@@ -109,6 +109,21 @@ export interface Message {
   created_at: string;
 }
 
+export type McpToolPermission = "read" | "write" | "execute" | "require-confirmation";
+
+/**
+ * Per-tool configuration stored on an McpServer entry.
+ * When `tools` is undefined or empty the agent sees all tools.
+ */
+export interface McpToolConfig {
+  name: string;
+  description?: string;
+  /** Whether the tool is allowed (true) or blocked (false). Defaults to true. */
+  allowed: boolean;
+  /** Fine-grained permission tags. */
+  permissions?: McpToolPermission[];
+}
+
 export interface McpServer {
   name: string;
   /**
@@ -123,8 +138,8 @@ export interface McpServer {
   // streamable-http
   url?: string;
   headers?: Record<string, string>;
-  /** When set, only these tools are exposed to the agent; empty/undefined = all tools. */
-  selected_tools?: string[];
+  /** Per-tool access config. Undefined/empty = all tools allowed with no restrictions. */
+  tools?: McpToolConfig[];
 }
 
 export interface JsonSchemaProperty {
@@ -159,6 +174,16 @@ export interface Skill {
   outputSchema?: JsonSchema;
   annotations?: McpToolAnnotations;
   instructions: string;
+}
+
+/**
+ * A lightweight skill entry stored directly on an agent definition.
+ * Contains just the SKILL.md content as a string — no JSON schema overhead.
+ */
+export interface InlineSkill {
+  name: string;
+  description: string;
+  content: string;
 }
 
 export interface AgentProfile {
@@ -227,14 +252,119 @@ export type AgentRole =
   | "custom"
   | "document-copilot";
 
+/** A sub-agent wired as a named LangChain tool. */
+export interface SubAgentEntry {
+  agent_id: string;
+  tool_name: string;
+  tool_description: string;
+}
+
+/** An agent template in the community library. */
+export interface LibraryAgent {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  agent_type: "system" | "custom";
+  role: AgentRole;
+  system_prompt: string | null;
+  system_prompt_mode: "append" | "override";
+  llm_provider?: string | null;
+  llm_model?: string | null;
+  llm_temperature?: number | null;
+  llm_max_tokens?: number | null;
+  sub_agents: SubAgentEntry[];
+  mcp_servers: McpServer[];
+  skills: InlineSkill[];
+  structured_output?: JsonSchema | null;
+  tags: string[];
+  published_by?: string | null;
+  usage_count: number;
+  version: string;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A standalone MCP server configuration in the library. */
+export interface LibraryMCP {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  transport: "stdio" | "streamable-http";
+  /** Present when transport = stdio */
+  command?: string | null;
+  args: string[];
+  env: Record<string, string>;
+  /** Present when transport = streamable-http */
+  url?: string | null;
+  headers: Record<string, string>;
+  tags: string[];
+  published_by?: string | null;
+  usage_count: number;
+  version: string;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A supporting file within a skill package (e.g. bash scripts, reference docs). */
+export interface LibrarySkillFile {
+  id: string;
+  skill_id: string;
+  path: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A standalone skill definition in the library. */
+export interface LibrarySkill {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  /** SKILL.md body (frontmatter is generated server-side from other fields). */
+  content: string;
+  tags: string[];
+  published_by?: string | null;
+  usage_count: number;
+  version: string;
+  license?: string | null;
+  compatibility?: string | null;
+  skill_metadata?: Record<string, string> | null;
+  /** Supporting files included in the skill package. Populated on single-item fetch. */
+  files?: LibrarySkillFile[];
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * A project-scoped agent — a full independent copy of a library agent.
+ * No live reference to the library after cloning.
+ */
 export interface ProjectAgent {
   id: string;
   project_id: string;
-  agent_profile_id: string;
-  agent_profile: AgentProfile;
+  /** Source library template (informational only — not a live reference). */
+  library_agent_id?: string | null;
+  name: string;
   role: AgentRole;
-  scope: Record<string, unknown> | null;
-  assigned_at: string;
+  system_prompt?: string | null;
+  system_prompt_mode: "append" | "override";
+  llm_provider?: string | null;
+  llm_model?: string | null;
+  llm_temperature?: number | null;
+  llm_max_tokens?: number | null;
+  sub_agents: SubAgentEntry[];
+  mcp_servers: McpServer[];
+  skills: InlineSkill[];
+  structured_output?: JsonSchema | null;
+  scope?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Workspaces ────────────────────────────────────────────────────────────────

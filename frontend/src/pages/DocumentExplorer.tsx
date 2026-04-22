@@ -50,7 +50,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [folderTreeCollapsed, setFolderTreeCollapsed] = useState(false);
+  const [folderTreeCollapsed, setFolderTreeCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [newFolderName, setNewFolderName] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -347,7 +347,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
             placeholder="Search documents…"
             value={searchQuery}
             onValueChange={setSearchQuery}
-            className="max-w-[200px]"
+            className="w-[100px] sm:max-w-[200px]"
             startContent={
               <svg className="w-4 h-4 text-default-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -394,7 +394,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
               )
             }
           >
-            Upload
+            <span className="hidden sm:inline">Upload</span>
           </Button>
 
           {/* New Folder button */}
@@ -408,7 +408,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
               </svg>
             }
           >
-            New Folder
+            <span className="hidden sm:inline">New Folder</span>
           </Button>
         </div>
 
@@ -459,7 +459,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
 
       {/* Right: Preview Panel */}
       {selectedDoc && (
-        <div className="w-80 flex-shrink-0 border-l border-divider overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-40 bg-background md:static md:inset-auto md:z-auto w-full md:w-80 flex-shrink-0 border-l border-divider overflow-hidden flex flex-col">
           <div className="flex items-center justify-end px-2 py-1 border-b border-divider">
             <button
               onClick={() => setSelectedDoc(null)}

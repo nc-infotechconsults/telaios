@@ -14,7 +14,9 @@ def _make_client() -> httpx.AsyncClient:
     headers: Dict[str, str] = {}
     if config.DATA_API_KEY:
         headers["Authorization"] = f"Bearer {config.DATA_API_KEY}"
-    return httpx.AsyncClient(base_url=config.DATA_API_URL, headers=headers, timeout=30.0)
+    return httpx.AsyncClient(
+        base_url=config.DATA_API_URL, headers=headers, timeout=30.0
+    )
 
 
 # Module-level client — recreated lazily if closed
@@ -54,6 +56,7 @@ async def _delete(path: str) -> Any:
 
 # ── Projects ──────────────────────────────────────────────────────────────────
 
+
 async def get_project(project_id: str) -> Dict[str, Any]:
     return await _get(f"/projects/{project_id}")
 
@@ -70,17 +73,20 @@ async def get_project_agents(project_id: str) -> List[Dict[str, Any]]:
     return await _get(f"/projects/{project_id}/agents")
 
 
+async def get_project_agents_raw(project_id: str) -> List[Dict[str, Any]]:
+    """Returns project agents with raw encrypted llm_api_key for agent-service decryption."""
+    return await _get(f"/internal/project-agents/{project_id}")
+
+
 # ── Settings ──────────────────────────────────────────────────────────────────
+
 
 async def get_settings() -> Dict[str, Any]:
     return await _get("/settings/raw")
 
 
-async def get_agent_profiles() -> List[Dict[str, Any]]:
-    return await _get("/internal/agent-profiles")
-
-
 # ── Plans ─────────────────────────────────────────────────────────────────────
+
 
 async def get_plan(plan_id: str) -> Dict[str, Any]:
     return await _get(f"/plans/{plan_id}")
@@ -100,6 +106,7 @@ async def get_plan_messages(plan_id: str) -> List[Dict[str, Any]]:
 
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 
+
 async def get_plan_tasks(plan_id: str) -> List[Dict[str, Any]]:
     return await _get(f"/tasks?plan_id={plan_id}")
 
@@ -118,11 +125,13 @@ async def delete_tasks_by_plan(plan_id: str) -> Dict[str, Any]:
 
 # ── Messages ──────────────────────────────────────────────────────────────────
 
+
 async def save_message(data: Dict[str, Any]) -> Dict[str, Any]:
     return await _post("/messages", data)
 
 
 # ── Repositories ──────────────────────────────────────────────────────────────
+
 
 async def update_repository_status(
     repo_id: str,
@@ -132,6 +141,7 @@ async def update_repository_status(
 
 
 # ── Documents ─────────────────────────────────────────────────────────────────
+
 
 async def get_document(project_id: str, document_id: str) -> Dict[str, Any]:
     return await _get(f"/projects/{project_id}/documents/{document_id}")
@@ -173,6 +183,7 @@ async def search_document_chunks(
 
 # ── Plan lifecycle (internal) ─────────────────────────────────────────────────
 
+
 async def start_plan_execution(plan_id: str) -> None:
     await _patch(f"/internal/plans/{plan_id}/status", {"status": "executing"})
 
@@ -190,6 +201,7 @@ async def fail_plan_execution(plan_id: str, reason: Optional[str] = None) -> Non
 
 # ── Task propagation (internal) ───────────────────────────────────────────────
 
+
 async def skip_dependent_tasks(task_id: str) -> None:
     await _post(f"/internal/tasks/{task_id}/skip-dependents")
 
@@ -199,6 +211,7 @@ async def cancel_plan_tasks(plan_id: str) -> Dict[str, Any]:
 
 
 # ── Task artifacts (internal) ─────────────────────────────────────────────────
+
 
 async def create_task_artifacts(task_id: str, artifacts: List[Dict[str, Any]]) -> None:
     await _post(f"/internal/tasks/{task_id}/artifacts", {"artifacts": artifacts})
