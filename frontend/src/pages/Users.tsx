@@ -1,9 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import {
+  Button,
+  Card,
+  CardBody,
+  Spinner,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@heroui/react";
 import { useAuth } from "../context/AuthContext";
 import * as api from "../lib/api";
 import { toast } from "../lib/toast";
 import type { User } from "../types";
 import ConfirmModal from "../components/common/ConfirmModal";
+import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
 
 interface CreateUserForm {
   email: string;
@@ -12,6 +25,62 @@ interface CreateUserForm {
 }
 
 const EMPTY_FORM: CreateUserForm = { email: "", display_name: "", password: "" };
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+type PatchData = Partial<Pick<User, "display_name" | "system_role" | "is_active">>;
+
+interface UserControlProps {
+  u: User;
+  patching: string | null;
+  currentUserId: string | undefined;
+  onPatch: (id: string, data: PatchData) => void;
+  onDelete: (u: User) => void;
+}
+
+function RoleSelect({ u, patching, currentUserId, onPatch }: UserControlProps) {
+  return (
+    <select
+      value={u.system_role}
+      disabled={patching === u.id || u.id === currentUserId}
+      onChange={(e) => onPatch(u.id, { system_role: e.target.value as User["system_role"] })}
+      className="text-xs rounded-lg border border-divider bg-background px-2 py-1 text-foreground disabled:opacity-50 cursor-pointer"
+      aria-label={`Role for ${u.display_name}`}
+    >
+      <option value="admin">admin</option>
+      <option value="member">member</option>
+    </select>
+  );
+}
+
+function ActiveToggle({ u, patching, currentUserId, onPatch }: UserControlProps) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={u.is_active}
+      aria-label={`${u.is_active ? "Deactivate" : "Activate"} ${u.display_name}`}
+      disabled={patching === u.id || u.id === currentUserId}
+      onClick={() => onPatch(u.id, { is_active: !u.is_active })}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${
+        u.is_active ? "bg-success" : "bg-default-300"
+      }`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+          u.is_active ? "translate-x-4.5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
 
 export default function Users() {
   const { user: currentUser } = useAuth();
@@ -31,6 +100,11 @@ export default function Users() {
   // Inline edit tracking
   const [patching, setPatching] = useState<string | null>(null);
 
+  // View mode + pagination
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(10);
+
   useEffect(() => {
     if (currentUser?.system_role !== "admin") return;
     setLoadingUsers(true);
@@ -39,6 +113,11 @@ export default function Users() {
       .catch(() => toast.error("Failed to load users"))
       .finally(() => setLoadingUsers(false));
   }, [currentUser]);
+
+  const pagedUsers = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return users.slice(start, start + pageSize);
+  }, [users, page, pageSize]);
 
   if (currentUser?.system_role !== "admin") {
     return (
@@ -49,7 +128,7 @@ export default function Users() {
     );
   }
 
-  async function handlePatch(id: string, data: Partial<Pick<User, "display_name" | "system_role" | "is_active">>) {
+  async function handlePatch(id: string, data: PatchData) {
     setPatching(id);
     try {
       const updated = await api.patchUser(id, data);
@@ -100,97 +179,193 @@ export default function Users() {
     }
   }
 
+  const controlProps: UserControlProps = {
+    u: users[0], // placeholder; overridden per row
+    patching,
+    currentUserId: currentUser?.id,
+    onPatch: handlePatch,
+    onDelete: setDeleteTarget,
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Users</h1>
-          <p className="text-sm text-default-500 mt-0.5">Manage platform users and their roles.</p>
+          <h1 className="text-3xl font-bold">Users</h1>
+          <p className="text-default-400 text-sm mt-1">Manage platform users and their roles.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => { setShowCreate(true); setCreateError(""); setCreateForm(EMPTY_FORM); }}
-          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        <Button
+          color="primary"
+          size="md"
+          onPress={() => { setShowCreate(true); setCreateError(""); setCreateForm(EMPTY_FORM); }}
         >
-          Add User
-        </button>
+          + Add User
+        </Button>
       </div>
 
-      {loadingUsers ? (
-        <p className="text-sm text-default-400 animate-pulse">Loading…</p>
-      ) : (
-        <div className="bg-content1 border border-divider rounded-2xl overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-divider text-left">
-                <th className="px-5 py-3 font-medium text-default-500">Name</th>
-                <th className="px-5 py-3 font-medium text-default-500">Email</th>
-                <th className="px-5 py-3 font-medium text-default-500">Role</th>
-                <th className="px-5 py-3 font-medium text-default-500">Active</th>
-                <th className="px-5 py-3 font-medium text-default-500 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-default-400">No users found.</td>
-                </tr>
-              )}
-              {users.map((u) => (
-                <tr key={u.id} className="border-b border-divider last:border-0 hover:bg-default-50 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-foreground">
-                    {u.display_name}
-                    {u.id === currentUser?.id && (
-                      <span className="ml-2 text-xs text-default-400">(you)</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5 text-default-500">{u.email}</td>
-                  <td className="px-5 py-3.5">
-                    <select
-                      value={u.system_role}
-                      disabled={patching === u.id || u.id === currentUser?.id}
-                      onChange={(e) => handlePatch(u.id, { system_role: e.target.value as User["system_role"] })}
-                      className="text-xs rounded-lg border border-divider bg-background px-2 py-1 text-foreground disabled:opacity-50 cursor-pointer"
-                      aria-label={`Role for ${u.display_name}`}
-                    >
-                      <option value="admin">admin</option>
-                      <option value="member">member</option>
-                    </select>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={u.is_active}
-                      aria-label={`${u.is_active ? "Deactivate" : "Activate"} ${u.display_name}`}
-                      disabled={patching === u.id || u.id === currentUser?.id}
-                      onClick={() => handlePatch(u.id, { is_active: !u.is_active })}
-                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${
-                        u.is_active ? "bg-success" : "bg-default-300"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
-                          u.is_active ? "translate-x-4.5" : "translate-x-0.5"
-                        }`}
-                      />
-                    </button>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      type="button"
-                      disabled={u.id === currentUser?.id}
-                      onClick={() => setDeleteTarget(u)}
-                      className="text-xs text-danger hover:underline disabled:opacity-30 disabled:cursor-not-allowed"
+      {loadingUsers && (
+        <div className="flex justify-center py-16">
+          <Spinner label="Loading users…" />
+        </div>
+      )}
+
+      {!loadingUsers && users.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+          <div className="text-6xl">👥</div>
+          <div>
+            <p className="text-xl font-semibold">No users found</p>
+            <p className="text-default-400 text-sm mt-1 max-w-xs">
+              Add the first user to get started.
+            </p>
+          </div>
+          <Button
+            color="primary"
+            onPress={() => { setShowCreate(true); setCreateError(""); setCreateForm(EMPTY_FORM); }}
+          >
+            Add User
+          </Button>
+        </div>
+      )}
+
+      {!loadingUsers && users.length > 0 && (
+        <>
+          <ViewModeBar
+            mode={viewMode}
+            onModeChange={setViewMode}
+            page={page}
+            pageSize={pageSize}
+            total={users.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+
+          {/* ── Grid ── */}
+          {viewMode === "grid" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pagedUsers.map((u) => (
+                <Card key={u.id} className="clay-card transition-shadow">
+                  <CardBody className="p-5 space-y-4">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-14 h-14 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xl font-bold select-none">
+                        {getInitials(u.display_name)}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-base leading-tight">
+                          {u.display_name}
+                          {u.id === currentUser?.id && (
+                            <span className="ml-1.5 text-xs text-default-400 font-normal">(you)</span>
+                          )}
+                        </div>
+                        <div className="text-sm text-default-400 truncate max-w-[200px]">{u.email}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-divider">
+                      <RoleSelect {...controlProps} u={u} />
+                      <ActiveToggle {...controlProps} u={u} />
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        isDisabled={u.id === currentUser?.id}
+                        onPress={() => setDeleteTarget(u)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* ── List ── */}
+          {viewMode === "list" && (
+            <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+              {pagedUsers.map((u) => (
+                <div key={u.id} className="clay-list-item flex items-center gap-4 px-4 py-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 select-none">
+                    {getInitials(u.display_name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-sm truncate">{u.display_name}</span>
+                      {u.id === currentUser?.id && (
+                        <span className="text-xs text-default-400 shrink-0">(you)</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-default-400 truncate block">{u.email}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <RoleSelect {...controlProps} u={u} />
+                    <ActiveToggle {...controlProps} u={u} />
+                    <Button
+                      size="sm"
+                      variant="light"
+                      color="danger"
+                      isDisabled={u.id === currentUser?.id}
+                      onPress={() => setDeleteTarget(u)}
                     >
                       Delete
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+
+          {/* ── Table ── */}
+          {viewMode === "table" && (
+            <Table aria-label="Users table" removeWrapper>
+              <TableHeader>
+                <TableColumn>USER</TableColumn>
+                <TableColumn>EMAIL</TableColumn>
+                <TableColumn>ROLE</TableColumn>
+                <TableColumn>ACTIVE</TableColumn>
+                <TableColumn>ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {pagedUsers.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 select-none">
+                          {getInitials(u.display_name)}
+                        </div>
+                        <span className="font-medium text-sm">
+                          {u.display_name}
+                          {u.id === currentUser?.id && (
+                            <span className="ml-1 text-xs text-default-400">(you)</span>
+                          )}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-default-500">{u.email}</span>
+                    </TableCell>
+                    <TableCell>
+                      <RoleSelect {...controlProps} u={u} />
+                    </TableCell>
+                    <TableCell>
+                      <ActiveToggle {...controlProps} u={u} />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        isDisabled={u.id === currentUser?.id}
+                        onPress={() => setDeleteTarget(u)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </>
       )}
 
       {/* ── Add User Modal ── */}

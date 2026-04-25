@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -9,6 +9,12 @@ import {
   ModalContent,
   ModalHeader,
   Spinner,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
 } from "@heroui/react";
 
 const SearchIcon = (
@@ -42,6 +48,18 @@ import LibraryAgentForm from "../components/library/LibraryAgentForm";
 import LibraryMCPForm from "../components/library/LibraryMCPForm";
 import LibrarySkillForm from "../components/library/LibrarySkillForm";
 import ConfirmModal from "../components/common/ConfirmModal";
+import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
+
+const ROLE_COLOR: Record<AgentRole, "warning" | "success" | "primary" | "secondary" | "danger" | "default"> = {
+  planner: "primary",
+  coder: "success",
+  reviewer: "warning",
+  tester: "secondary",
+  infra: "danger",
+  knowledge: "default",
+  custom: "default",
+  "document-copilot": "default",
+};
 
 type LibraryTab = "agents" | "mcps" | "skills";
 
@@ -101,6 +119,17 @@ export default function LibraryPage() {
   const [deletingSkill, setDeletingSkill] = useState(false);
   const [exportingSkillId, setExportingSkillId] = useState<string | null>(null);
 
+  // Shared view mode
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  // Per-tab pagination
+  const [agentPage, setAgentPage] = useState(1);
+  const [agentPageSize, setAgentPageSize] = useState<PageSize>(10);
+  const [mcpPage, setMcpPage] = useState(1);
+  const [mcpPageSize, setMcpPageSize] = useState<PageSize>(10);
+  const [skillPage, setSkillPage] = useState(1);
+  const [skillPageSize, setSkillPageSize] = useState<PageSize>(10);
+
   // Load agents on mount
   useEffect(() => {
     if (agentsFetched) return;
@@ -141,7 +170,7 @@ export default function LibraryPage() {
   }, [activeTab, skillsFetched]);
 
   // Filtered agents
-  const filteredAgents = agents.filter((a) => {
+  const filteredAgents = useMemo(() => agents.filter((a) => {
     const matchesRole = agentRoleFilter === "all" || a.role === agentRoleFilter;
     const q = agentSearch.toLowerCase();
     const matchesSearch =
@@ -150,19 +179,35 @@ export default function LibraryPage() {
       a.description?.toLowerCase().includes(q) ||
       a.tags.some((t) => t.toLowerCase().includes(q));
     return matchesRole && matchesSearch;
-  });
+  }), [agents, agentSearch, agentRoleFilter]);
 
   // Filtered MCPs
-  const filteredMcps = mcps.filter((m) => {
+  const filteredMcps = useMemo(() => mcps.filter((m) => {
     const q = mcpSearch.toLowerCase();
     return !q || m.name.toLowerCase().includes(q) || m.description?.toLowerCase().includes(q);
-  });
+  }), [mcps, mcpSearch]);
 
   // Filtered Skills
-  const filteredSkills = skills.filter((s) => {
+  const filteredSkills = useMemo(() => skills.filter((s) => {
     const q = skillSearch.toLowerCase();
     return !q || s.name.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q);
-  });
+  }), [skills, skillSearch]);
+
+  // Paged slices
+  const pagedAgents = useMemo(() => {
+    const start = (agentPage - 1) * agentPageSize;
+    return filteredAgents.slice(start, start + agentPageSize);
+  }, [filteredAgents, agentPage, agentPageSize]);
+
+  const pagedMcps = useMemo(() => {
+    const start = (mcpPage - 1) * mcpPageSize;
+    return filteredMcps.slice(start, start + mcpPageSize);
+  }, [filteredMcps, mcpPage, mcpPageSize]);
+
+  const pagedSkills = useMemo(() => {
+    const start = (skillPage - 1) * skillPageSize;
+    return filteredSkills.slice(start, start + skillPageSize);
+  }, [filteredSkills, skillPage, skillPageSize]);
 
   const handleDeleteAgent = async () => {
     if (!agentToDelete) return;
@@ -345,20 +390,131 @@ export default function LibraryPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredAgents.map((agent) => (
-                <LibraryAgentCard
-                  key={agent.id}
-                  agent={agent}
-                  onView={() => navigate(`/library/agents/${agent.id}`)}
-                  onEdit={() => {
-                    setEditingAgent(agent);
-                    setFormOpen(true);
-                  }}
-                  onDelete={() => setAgentToDelete(agent)}
-                />
-              ))}
-            </div>
+            <>
+              <ViewModeBar
+                mode={viewMode}
+                onModeChange={(m) => { setViewMode(m); setAgentPage(1); }}
+                page={agentPage}
+                pageSize={agentPageSize}
+                total={filteredAgents.length}
+                onPageChange={setAgentPage}
+                onPageSizeChange={(s) => { setAgentPageSize(s); setAgentPage(1); }}
+              />
+
+              {/* ── Grid ── */}
+              {viewMode === "grid" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pagedAgents.map((agent) => (
+                    <LibraryAgentCard
+                      key={agent.id}
+                      agent={agent}
+                      onView={() => navigate(`/library/agents/${agent.id}`)}
+                      onEdit={() => {
+                        setEditingAgent(agent);
+                        setFormOpen(true);
+                      }}
+                      onDelete={() => setAgentToDelete(agent)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* ── List ── */}
+              {viewMode === "list" && (
+                <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+                  {pagedAgents.map((agent) => (
+                    <div key={agent.id} className="clay-list-item flex items-center gap-3 px-4 py-3">
+                      <Chip size="sm" variant="flat" color={ROLE_COLOR[agent.role] ?? "default"} className="shrink-0">
+                        {agent.role}
+                      </Chip>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm block truncate">{agent.name}</span>
+                        {agent.description && (
+                          <span className="text-xs text-default-400 block truncate">{agent.description}</span>
+                        )}
+                      </div>
+                      <div className="hidden sm:flex gap-1 flex-wrap max-w-xs shrink-0">
+                        {agent.tags.slice(0, 3).map((t) => (
+                          <Chip key={t} size="sm" variant="flat" className="text-xs">{t}</Chip>
+                        ))}
+                      </div>
+                      <span className="text-xs text-default-400 shrink-0 hidden md:inline">{agent.usage_count} uses</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button size="sm" variant="bordered" onPress={() => navigate(`/library/agents/${agent.id}`)}>View</Button>
+                        <Button size="sm" variant="bordered" onPress={() => { setEditingAgent(agent); setFormOpen(true); }}>Edit</Button>
+                        <Button size="sm" variant="light" color="danger" onPress={() => setAgentToDelete(agent)}>Delete</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Table ── */}
+              {viewMode === "table" && (
+                <Table aria-label="Agents table" removeWrapper>
+                  <TableHeader>
+                    <TableColumn>NAME</TableColumn>
+                    <TableColumn>ROLE</TableColumn>
+                    <TableColumn>TAGS</TableColumn>
+                    <TableColumn>MCP / SKILLS / SUBS</TableColumn>
+                    <TableColumn>USAGE</TableColumn>
+                    <TableColumn>{""}</TableColumn>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedAgents.map((agent) => (
+                      <TableRow key={agent.id} className="clay-list-item">
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-sm">{agent.name}</p>
+                            {agent.description && (
+                              <p className="text-xs text-default-400 line-clamp-1">{agent.description}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Chip size="sm" variant="flat" color={ROLE_COLOR[agent.role] ?? "default"}>
+                            {agent.role}
+                          </Chip>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {agent.tags.slice(0, 3).map((t) => (
+                              <Chip key={t} size="sm" variant="flat" className="text-xs">{t}</Chip>
+                            ))}
+                            {agent.tags.length > 3 && (
+                              <Chip size="sm" variant="flat" className="text-xs text-default-400">+{agent.tags.length - 3}</Chip>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {agent.mcp_servers.length > 0 && (
+                              <Chip size="sm" variant="bordered">🔌 {agent.mcp_servers.length}</Chip>
+                            )}
+                            {agent.skills.length > 0 && (
+                              <Chip size="sm" variant="bordered">⚡ {agent.skills.length}</Chip>
+                            )}
+                            {agent.sub_agents.length > 0 && (
+                              <Chip size="sm" variant="bordered" color="secondary">🤝 {agent.sub_agents.length}</Chip>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-default-500">{agent.usage_count}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="bordered" onPress={() => navigate(`/library/agents/${agent.id}`)}>View</Button>
+                            <Button size="sm" variant="bordered" onPress={() => { setEditingAgent(agent); setFormOpen(true); }}>Edit</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => setAgentToDelete(agent)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </div>
       )}
@@ -383,54 +539,156 @@ export default function LibraryPage() {
               <p>{mcpsFetched ? "No MCP servers found." : "Loading…"}</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {filteredMcps.map((mcp) => (
-                <div
-                  key={mcp.id}
-                  className="flex flex-col gap-1 p-4 clay-card"
-                >
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                    <p className="font-semibold text-sm flex-1 min-w-0 truncate">{mcp.name}</p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Chip size="sm" variant="flat" className="font-mono">
-                        {mcp.command}
-                      </Chip>
-                      <span className="text-xs text-default-400">{mcp.usage_count} uses</span>
-                      <Button
-                        size="sm"
-                        variant="light"
-                        onPress={() => {
-                          setEditingMcp(mcp);
-                          setMcpFormOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="light"
-                        color="danger"
-                        onPress={() => setMcpToDelete(mcp)}
-                      >
-                        Delete
-                      </Button>
+            <>
+              <ViewModeBar
+                mode={viewMode}
+                onModeChange={(m) => { setViewMode(m); setMcpPage(1); }}
+                page={mcpPage}
+                pageSize={mcpPageSize}
+                total={filteredMcps.length}
+                onPageChange={setMcpPage}
+                onPageSizeChange={(s) => { setMcpPageSize(s); setMcpPage(1); }}
+              />
+
+              {/* ── Grid ── */}
+              {viewMode === "grid" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pagedMcps.map((mcp) => (
+                    <div key={mcp.id} className="flex flex-col gap-2 p-4 clay-card">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{mcp.name}</p>
+                        </div>
+                        <Chip size="sm" variant="flat" className="font-mono shrink-0">{mcp.transport}</Chip>
+                      </div>
+                      {(mcp.command || mcp.url) && (
+                        <p className="text-xs text-default-400 font-mono truncate">{mcp.command ?? mcp.url}</p>
+                      )}
+                      {mcp.description && (
+                        <p className="text-xs text-default-500 line-clamp-2">{mcp.description}</p>
+                      )}
+                      {mcp.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {mcp.tags.map((t) => (
+                            <Chip key={t} size="sm" variant="flat" className="text-xs">{t}</Chip>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 pt-1 border-t border-divider">
+                        <span className="text-xs text-default-400 flex-1">{mcp.usage_count} uses</span>
+                        <Button size="sm" variant="light" onPress={() => { setEditingMcp(mcp); setMcpFormOpen(true); }}>Edit</Button>
+                        <Button size="sm" variant="light" color="danger" onPress={() => setMcpToDelete(mcp)}>Delete</Button>
+                      </div>
                     </div>
-                  </div>
-                  {mcp.description && (
-                    <p className="text-xs text-default-500">{mcp.description}</p>
-                  )}
-                  {mcp.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {mcp.tags.map((t) => (
-                        <Chip key={t} size="sm" variant="flat" className="text-xs">
-                          {t}
-                        </Chip>
-                      ))}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+
+              {/* ── List ── */}
+              {viewMode === "list" && (
+                <div className="flex flex-col gap-3">
+                  {pagedMcps.map((mcp) => (
+                    <div
+                      key={mcp.id}
+                      className="flex flex-col gap-1 p-4 clay-card"
+                    >
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                        <p className="font-semibold text-sm flex-1 min-w-0 truncate">{mcp.name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Chip size="sm" variant="flat" className="font-mono">
+                            {mcp.command ?? mcp.url}
+                          </Chip>
+                          <span className="text-xs text-default-400">{mcp.usage_count} uses</span>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            onPress={() => {
+                              setEditingMcp(mcp);
+                              setMcpFormOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="danger"
+                            onPress={() => setMcpToDelete(mcp)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                      {mcp.description && (
+                        <p className="text-xs text-default-500">{mcp.description}</p>
+                      )}
+                      {mcp.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {mcp.tags.map((t) => (
+                            <Chip key={t} size="sm" variant="flat" className="text-xs">
+                              {t}
+                            </Chip>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Table ── */}
+              {viewMode === "table" && (
+                <Table aria-label="MCP servers table" removeWrapper>
+                  <TableHeader>
+                    <TableColumn>NAME</TableColumn>
+                    <TableColumn>TRANSPORT</TableColumn>
+                    <TableColumn>COMMAND / URL</TableColumn>
+                    <TableColumn>TAGS</TableColumn>
+                    <TableColumn>USAGE</TableColumn>
+                    <TableColumn>{""}</TableColumn>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedMcps.map((mcp) => (
+                      <TableRow key={mcp.id} className="clay-list-item">
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-sm">{mcp.name}</p>
+                            {mcp.description && (
+                              <p className="text-xs text-default-400 line-clamp-1">{mcp.description}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Chip size="sm" variant="flat" className="font-mono">{mcp.transport}</Chip>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs font-mono text-default-500 line-clamp-1">{mcp.command ?? mcp.url ?? "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {mcp.tags.slice(0, 3).map((t) => (
+                              <Chip key={t} size="sm" variant="flat" className="text-xs">{t}</Chip>
+                            ))}
+                            {mcp.tags.length > 3 && (
+                              <Chip size="sm" variant="flat" className="text-xs text-default-400">+{mcp.tags.length - 3}</Chip>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-default-500">{mcp.usage_count}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="bordered" onPress={() => { setEditingMcp(mcp); setMcpFormOpen(true); }}>Edit</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => setMcpToDelete(mcp)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </div>
       )}
@@ -495,60 +753,171 @@ export default function LibraryPage() {
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {filteredSkills.map((skill) => (
-                <div
-                  key={skill.id}
-                  className="flex flex-col gap-1 p-4 clay-card"
-                >
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                     <p className="font-semibold text-sm flex-1 min-w-0 truncate">{skill.name}</p>
-                     <div className="flex items-center gap-2 flex-wrap">
-                       <span className="text-xs text-default-400">{skill.usage_count} uses</span>
-                       <Button
-                         size="sm"
-                         variant="light"
-                         isLoading={exportingSkillId === skill.id}
-                         isDisabled={!!exportingSkillId}
-                         onPress={() => handleExportSkill(skill)}
-                       >
-                         Download
-                       </Button>
-                       <Button
-                         size="sm"
-                         variant="light"
-                         onPress={() => {
-                           setEditingSkill(skill);
-                           setSkillFormOpen(true);
-                         }}
-                       >
-                         Edit
-                       </Button>
-                       <Button
-                         size="sm"
-                         variant="light"
-                         color="danger"
-                         onPress={() => setSkillToDelete(skill)}
-                       >
-                         Delete
-                       </Button>
-                     </div>
-                   </div>
-                  {skill.description && (
-                    <p className="text-xs text-default-500">{skill.description}</p>
-                  )}
-                  {skill.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {skill.tags.map((t) => (
-                        <Chip key={t} size="sm" variant="flat" className="text-xs">
-                          {t}
-                        </Chip>
-                      ))}
+            <>
+              <ViewModeBar
+                mode={viewMode}
+                onModeChange={(m) => { setViewMode(m); setSkillPage(1); }}
+                page={skillPage}
+                pageSize={skillPageSize}
+                total={filteredSkills.length}
+                onPageChange={setSkillPage}
+                onPageSizeChange={(s) => { setSkillPageSize(s); setSkillPage(1); }}
+              />
+
+              {/* ── Grid ── */}
+              {viewMode === "grid" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pagedSkills.map((skill) => (
+                    <div key={skill.id} className="flex flex-col gap-2 p-4 clay-card">
+                      <p className="font-semibold text-sm truncate">{skill.name}</p>
+                      {skill.description && (
+                        <p className="text-xs text-default-500 line-clamp-2">{skill.description}</p>
+                      )}
+                      {skill.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {skill.tags.map((t) => (
+                            <Chip key={t} size="sm" variant="flat" className="text-xs">{t}</Chip>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 pt-1 border-t border-divider text-xs text-default-400">
+                        <span className="flex-1">{skill.usage_count} uses</span>
+                        <span>v{skill.version}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="light"
+                          isLoading={exportingSkillId === skill.id}
+                          isDisabled={!!exportingSkillId}
+                          onPress={() => handleExportSkill(skill)}
+                        >
+                          Download
+                        </Button>
+                        <Button size="sm" variant="light" onPress={() => { setEditingSkill(skill); setSkillFormOpen(true); }}>Edit</Button>
+                        <Button size="sm" variant="light" color="danger" onPress={() => setSkillToDelete(skill)}>Delete</Button>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+
+              {/* ── List ── */}
+              {viewMode === "list" && (
+                <div className="flex flex-col gap-3">
+                  {pagedSkills.map((skill) => (
+                    <div
+                      key={skill.id}
+                      className="flex flex-col gap-1 p-4 clay-card"
+                    >
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                         <p className="font-semibold text-sm flex-1 min-w-0 truncate">{skill.name}</p>
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <span className="text-xs text-default-400">{skill.usage_count} uses</span>
+                           <Button
+                             size="sm"
+                             variant="light"
+                             isLoading={exportingSkillId === skill.id}
+                             isDisabled={!!exportingSkillId}
+                             onPress={() => handleExportSkill(skill)}
+                           >
+                             Download
+                           </Button>
+                           <Button
+                             size="sm"
+                             variant="light"
+                             onPress={() => {
+                               setEditingSkill(skill);
+                               setSkillFormOpen(true);
+                             }}
+                           >
+                             Edit
+                           </Button>
+                           <Button
+                             size="sm"
+                             variant="light"
+                             color="danger"
+                             onPress={() => setSkillToDelete(skill)}
+                           >
+                             Delete
+                           </Button>
+                         </div>
+                       </div>
+                      {skill.description && (
+                        <p className="text-xs text-default-500">{skill.description}</p>
+                      )}
+                      {skill.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {skill.tags.map((t) => (
+                            <Chip key={t} size="sm" variant="flat" className="text-xs">
+                              {t}
+                            </Chip>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Table ── */}
+              {viewMode === "table" && (
+                <Table aria-label="Skills table" removeWrapper>
+                  <TableHeader>
+                    <TableColumn>NAME</TableColumn>
+                    <TableColumn>TAGS</TableColumn>
+                    <TableColumn>VERSION</TableColumn>
+                    <TableColumn>USAGE</TableColumn>
+                    <TableColumn>{""}</TableColumn>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedSkills.map((skill) => (
+                      <TableRow key={skill.id} className="clay-list-item">
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-sm">{skill.name}</p>
+                            {skill.description && (
+                              <p className="text-xs text-default-400 line-clamp-1">{skill.description}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {skill.tags.slice(0, 3).map((t) => (
+                              <Chip key={t} size="sm" variant="flat" className="text-xs">{t}</Chip>
+                            ))}
+                            {skill.tags.length > 3 && (
+                              <Chip size="sm" variant="flat" className="text-xs text-default-400">+{skill.tags.length - 3}</Chip>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-default-500">v{skill.version}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-default-500">{skill.usage_count}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="bordered"
+                              isLoading={exportingSkillId === skill.id}
+                              isDisabled={!!exportingSkillId}
+                              onPress={() => handleExportSkill(skill)}
+                            >
+                              Download
+                            </Button>
+                            <Button size="sm" variant="bordered" onPress={() => { setEditingSkill(skill); setSkillFormOpen(true); }}>Edit</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => setSkillToDelete(skill)}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </div>
       )}
