@@ -6,9 +6,34 @@ import { useAuth } from "../context/AuthContext";
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const COLLAPSED_KEY = "sidebar_collapsed";
 
+// ─── Telaio Logo ─────────────────────────────────────────────────────────────
+
+function TelaioLogo({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 32 32"
+      width={size}
+      height={size}
+      fill="none"
+      aria-hidden="true"
+    >
+      {/* Warp threads (vertical) */}
+      <rect x="7"    y="4" width="3"   height="24" rx="1.5" fill="currentColor" opacity="0.55" />
+      <rect x="14.5" y="4" width="3"   height="24" rx="1.5" fill="currentColor" />
+      <rect x="22"   y="4" width="3"   height="24" rx="1.5" fill="currentColor" opacity="0.55" />
+      {/* Weft threads (horizontal) */}
+      <rect x="4" y="7"  width="24" height="3"   rx="1.5"  fill="currentColor" opacity="0.9" />
+      <rect x="4" y="14" width="24" height="2.5" rx="1.25" fill="currentColor" opacity="0.45" />
+      <rect x="4" y="20" width="24" height="2.5" rx="1.25" fill="currentColor" opacity="0.25" />
+    </svg>
+  );
+}
+
+
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
-function BriefcaseIcon() {
+
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="2" y="7" width="20" height="14" rx="2" />
@@ -281,7 +306,7 @@ export default function Layout() {
       )}
 
       {/* ── Top bar ── */}
-      <header className="h-14 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-divider bg-content1 z-30">
+      <header className="h-14 shrink-0 flex items-center gap-2 px-3 sm:px-4 clay-header z-30">
         {/* Mobile hamburger */}
         <button
           type="button"
@@ -295,8 +320,8 @@ export default function Layout() {
 
         {/* Brand — always visible in topbar */}
         <div className="flex items-center gap-2">
-          <span className="text-primary text-lg leading-none" aria-hidden="true">⚙</span>
-          <span className="font-bold text-sm leading-snug tracking-tight">SWE AI Platform</span>
+          <span className="text-primary"><TelaioLogo size={22} /></span>
+          <span className="font-bold text-sm leading-snug tracking-tight">Telaio</span>
         </div>
 
         {/* Spacer */}
@@ -359,7 +384,7 @@ export default function Layout() {
           id="sidebar-drawer"
           aria-label="Application sidebar"
           className={`
-            fixed top-14 left-0 h-[calc(100%-3.5rem)] z-50 w-64 bg-content1 border-r border-divider
+            fixed top-14 left-0 h-[calc(100%-3.5rem)] z-50 w-64 clay-sidebar
             transform transition-transform duration-300 ease-in-out
             ${drawerOpen ? "translate-x-0" : "-translate-x-full"}
             md:hidden
@@ -372,7 +397,7 @@ export default function Layout() {
         <aside
           aria-label="Application sidebar"
           className={`
-            hidden md:flex flex-col shrink-0 border-r border-divider bg-content1
+            hidden md:flex flex-col shrink-0 clay-sidebar
             transition-[width] duration-200 ease-in-out overflow-hidden
             ${sidebarWidth}
           `}

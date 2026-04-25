@@ -14,7 +14,10 @@ interface AgentStatusBadgeProps {
 
 export function AgentStatusBadge({ status }: AgentStatusBadgeProps) {
   return (
-    <span className={`w-2 h-2 rounded-full inline-block ${status === "idle" ? "bg-success" : "bg-warning"} animate-pulse`} />
+    <span className={`clay-badge ${status === "idle" ? "!bg-success/10 !text-success !border-success/20" : "!bg-warning/10 !text-warning !border-warning/20"}`}>
+      <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1.5 ${status === "idle" ? "bg-success" : "bg-warning"} animate-pulse`} />
+      {status === "idle" ? "Idle" : "Busy"}
+    </span>
   );
 }
 

@@ -44,9 +44,9 @@ export default function PlanDraftCard({
   const isDraft = plan.status === "draft";
 
   return (
-    <div className="w-full rounded-2xl border border-divider overflow-hidden bg-content1 shadow-sm">
+    <div className="w-full clay-card overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-default-100 border-b border-divider">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/8 border-b border-divider/50">
         <span aria-hidden="true" className="text-base">📋</span>
         <span className="font-semibold text-sm">
           Execution Plan{version > 1 ? ` (v${version})` : ""}

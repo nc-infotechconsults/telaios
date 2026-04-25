@@ -1,4 +1,4 @@
-# SWE AI Platform
+# Telaio
 
 A web-based platform for AI-assisted software project planning and autonomous code execution.
 

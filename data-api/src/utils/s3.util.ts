@@ -16,7 +16,7 @@ const s3 = new S3Client({
   forcePathStyle: true, // required for MinIO
 });
 
-const bucket = process.env.S3_BUCKET ?? "swe-ai-documents";
+const bucket = process.env.S3_BUCKET ?? "telaio-documents";
 
 export async function uploadToS3(
   key: string,

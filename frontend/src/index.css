@@ -53,3 +53,141 @@
   border-radius: 6px;
 }
 
+/* ── Claymorphism design system ─────────────────────────────────────────────── */
+
+/* Card surface with depth shadow + subtle gradient */
+.clay-card {
+  border-radius: 20px;
+  background: linear-gradient(160deg, #ffffff 0%, #FEF4EF 100%);
+  border: 1px solid rgba(224, 123, 84, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.06) inset,
+    0 8px 24px rgba(224, 123, 84, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.dark .clay-card {
+  background: linear-gradient(160deg, #2C201A 0%, #231C18 100%);
+  border-color: rgba(224, 123, 84, 0.15);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.3) inset,
+    0 8px 24px rgba(224, 123, 84, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Pill button with 3D push effect on :active */
+.clay-btn {
+  border-radius: 9999px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.15) inset,
+    0 4px 12px rgba(224, 123, 84, 0.35);
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
+}
+
+.clay-btn:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.18) inset,
+    0 6px 16px rgba(224, 123, 84, 0.45);
+}
+
+.clay-btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.1) inset,
+    0 2px 6px rgba(224, 123, 84, 0.25);
+}
+
+/* Inflated text input with inner shadow */
+.clay-input {
+  border-radius: 14px;
+  border: 1px solid rgba(224, 123, 84, 0.2);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.clay-input:focus {
+  outline: none;
+  border-color: rgba(224, 123, 84, 0.5);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.06) inset,
+    0 0 0 3px rgba(224, 123, 84, 0.12);
+}
+
+.dark .clay-input {
+  background: rgba(44, 32, 26, 0.9);
+  border-color: rgba(224, 123, 84, 0.2);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.25) inset,
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .clay-input:focus {
+  border-color: rgba(224, 123, 84, 0.5);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.3) inset,
+    0 0 0 3px rgba(224, 123, 84, 0.15);
+}
+
+/* Rounded tag/chip in pastel clay style */
+.clay-badge {
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  background: rgba(224, 123, 84, 0.12);
+  color: #cc5e35;
+  border: 1px solid rgba(224, 123, 84, 0.2);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 2px 4px rgba(224, 123, 84, 0.12);
+  font-weight: 500;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dark .clay-badge {
+  background: rgba(224, 123, 84, 0.15);
+  color: #EFA67D;
+  border-color: rgba(224, 123, 84, 0.25);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Sidebar with warm clay surface */
+.clay-sidebar {
+  background: linear-gradient(180deg, #fefaf8 0%, #fdf6f0 100%);
+  box-shadow: 2px 0 16px rgba(224, 123, 84, 0.08), 1px 0 0 rgba(224, 123, 84, 0.1);
+  border-right: none !important;
+}
+
+.dark .clay-sidebar {
+  background: linear-gradient(180deg, #231C18 0%, #1e1814 100%);
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.3), 1px 0 0 rgba(224, 123, 84, 0.08);
+}
+
+/* Clay-style header bar */
+.clay-header {
+  background: linear-gradient(90deg, #ffffff 0%, #fefaf8 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 12px rgba(224, 123, 84, 0.1),
+    0 1px 0 rgba(224, 123, 84, 0.12);
+  border-bottom: none !important;
+}
+
+.dark .clay-header {
+  background: linear-gradient(90deg, #231C18 0%, #1e1814 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 2px 12px rgba(0, 0, 0, 0.25),
+    0 1px 0 rgba(224, 123, 84, 0.1);
+}
+

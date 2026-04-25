@@ -31,7 +31,7 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("ALLOWED_ORIGINS", "ALLOWED_ORIGIN"),
     )
-    WORKSPACES_ROOT: str = "/tmp/swe-ai-workspaces"
+    WORKSPACES_ROOT: str = "/tmp/telaio-workspaces"
     AGENT_POOL_SIZE: int = 3
     LLM_PROVIDER: str = "openai"
     LLM_MODEL: str = "gpt-4o"
