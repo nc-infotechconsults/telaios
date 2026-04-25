@@ -45,6 +45,7 @@ import { toast } from "./toast";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const TOKEN_KEY = "swe_auth_token";
+const USER_KEY = "swe_auth_user";
 
 /** Simulated network delay used in demo mode. */
 function delay<T>(data: T, ms = 300): Promise<T> {
@@ -71,6 +72,7 @@ http.interceptors.response.use(
   (err) => {
     if (!DEMO && err.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
       toast.warning("Session expired", "Please log in again");
       setTimeout(() => { window.location.href = "/login"; }, 1500);
     }
