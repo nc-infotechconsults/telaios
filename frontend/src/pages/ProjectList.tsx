@@ -26,6 +26,20 @@ import { toast } from "../lib/toast";
 import type { Project, Repository } from "../types";
 import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
 
+const SearchIcon = (
+  <svg
+    className="w-4 h-4 text-default-400"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    aria-hidden="true"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+  </svg>
+);
+
 const STATUS_COLOR: Record<Project["status"], "default" | "warning" | "success"> = {
   planning: "warning",
   executing: "default",
@@ -134,30 +148,24 @@ export default function ProjectList() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-default-400 text-sm mt-1">Plan and execute software tasks with AI agents</p>
         </div>
-        <div className="flex items-center gap-3">
-          {!loading && (
-            <Input
-              size="sm"
-              placeholder="Search projects…"
-              value={search}
-              onValueChange={setSearch}
-              isClearable
-              onClear={() => setSearch("")}
-              className="w-56"
-              startContent={
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-default-400 shrink-0" aria-hidden="true">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-              }
-            />
-          )}
-          <Button color="primary" size="md" onPress={onOpen}>+ New Project</Button>
-        </div>
+        <Button color="primary" size="md" onPress={onOpen}>+ New Project</Button>
+      </div>
+
+      {/* Search bar */}
+      <div className="mb-6">
+        <Input
+          placeholder="Search projects…"
+          value={search}
+          onValueChange={setSearch}
+          isClearable
+          onClear={() => setSearch("")}
+          startContent={SearchIcon}
+        />
       </div>
 
       {loading && (
