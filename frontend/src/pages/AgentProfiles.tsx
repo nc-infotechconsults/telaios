@@ -134,7 +134,7 @@ export default function AgentProfiles() {
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {pagedProfiles.map((p) => (
-                <Card key={p.id} className="border border-divider hover:border-default/60 transition-colors">
+                <Card key={p.id} className="clay-card transition-shadow">
                   <CardBody className="p-5 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -179,9 +179,9 @@ export default function AgentProfiles() {
 
           {/* ── List ── */}
           {viewMode === "list" && (
-            <div className="flex flex-col divide-y divide-divider rounded-xl border border-divider overflow-hidden">
+            <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
               {pagedProfiles.map((p) => (
-                <div key={p.id} className="flex items-center gap-4 px-4 py-3 hover:bg-default-50 transition-colors">
+                <div key={p.id} className="clay-list-item flex items-center gap-4 px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <span className="font-medium text-sm block truncate">{p.name}</span>
                     {p.description && (
@@ -227,7 +227,7 @@ export default function AgentProfiles() {
               </TableHeader>
               <TableBody>
                 {pagedProfiles.map((p) => (
-                  <TableRow key={p.id} className="hover:bg-default-50 transition-colors">
+                  <TableRow key={p.id} className="clay-list-item">
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm">{p.name}</p>

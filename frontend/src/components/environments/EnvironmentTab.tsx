@@ -131,7 +131,7 @@ export default function EnvironmentTab({ projectId }: Props) {
           {environments.map((env) => (
             <div
               key={env.id}
-              className="flex items-center gap-4 p-4 rounded-xl border border-divider hover:border-default-300 transition-all cursor-pointer"
+              className="clay-list-item flex items-center gap-4 p-4 rounded-xl cursor-pointer"
               onClick={() => navigate(`/projects/${projectId}/environments/${env.id}`)}
             >
               <div className="flex-1 min-w-0">

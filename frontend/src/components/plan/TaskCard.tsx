@@ -37,7 +37,7 @@ export default function TaskCard({ task, profile, repositories, showResult }: Pr
   const taskRepos = (repositories ?? []).filter((r) => (task.repository_ids ?? []).includes(r.id));
 
   return (
-    <div className="p-3 rounded-xl border border-divider bg-content1 space-y-2">
+    <div className="p-3 clay-card space-y-2">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold leading-tight">{task.title}</span>

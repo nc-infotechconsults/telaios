@@ -57,7 +57,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
 
   if (!hasActivity) {
     return (
-      <Card>
+      <Card className="clay-card">
         <CardBody>
           <p className="text-sm text-default-400 italic">No agent activity yet.</p>
         </CardBody>
@@ -71,7 +71,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
 
       {/* Pipeline progress */}
       {pipelineState && (
-        <Card>
+        <Card className="clay-card">
           <CardHeader className="flex items-start justify-between pb-1">
             <span className="text-sm font-semibold">Pipeline</span>
             <Chip
@@ -138,7 +138,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
 
       {/* Recent agent lifecycle events */}
       {agentEvents.length > 0 && (
-        <Card>
+        <Card className="clay-card">
           <CardHeader className="pb-1">
             <span className="text-sm font-semibold">Recent Events</span>
           </CardHeader>

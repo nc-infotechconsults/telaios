@@ -172,7 +172,7 @@ export default function DocumentsTab({ projectId }: Props) {
           {documents.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-center gap-3 p-4 rounded-xl border border-divider hover:border-default-300 transition-all"
+              className="clay-list-item flex items-center gap-3 p-4 rounded-xl"
             >
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate text-sm">{doc.name}</p>

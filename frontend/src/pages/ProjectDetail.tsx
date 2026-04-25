@@ -421,7 +421,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* Tab bar */}
-      <div role="tablist" aria-label="Project sections" className="flex border-b border-divider shrink-0 px-1 overflow-x-auto">
+      <div role="tablist" aria-label="Project sections" className="clay-tab-bar flex border-b border-divider shrink-0 px-1 overflow-x-auto">
         {(["plans", "repos", "agents", "members", "documents", "workspaces", "environments"] as ActiveTab[]).map((tab) => {
           const label =
             tab === "plans"

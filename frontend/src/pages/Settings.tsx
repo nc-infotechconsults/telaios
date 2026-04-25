@@ -79,7 +79,7 @@ export default function SettingsPage() {
     <div className="w-full space-y-4">
       <h1 className="text-2xl font-bold">Settings</h1>
 
-      <Card>
+      <Card className="clay-card">
         <CardHeader className="flex flex-col items-start gap-1">
           <span className="font-semibold">Planning Agent LLM</span>
           <p className="text-xs text-default-400">

@@ -16,7 +16,7 @@ interface Props {
 export default function AgentPoolPanel({ agentProfiles, instances }: Props) {
   if (agentProfiles.length === 0) {
     return (
-      <Card>
+      <Card className="clay-card">
         <CardBody>
           <p className="text-sm text-default-400">No agent profiles configured.</p>
         </CardBody>
@@ -39,7 +39,7 @@ export default function AgentPoolPanel({ agentProfiles, instances }: Props) {
         const busy = profileInstances.filter((i) => i.status === "busy").length;
 
         return (
-          <Card key={profile.id}>
+          <Card key={profile.id} className="clay-card">
             <CardHeader className="flex items-start justify-between pb-1">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-semibold">{profile.name}</span>

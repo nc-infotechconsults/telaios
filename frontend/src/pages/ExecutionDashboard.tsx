@@ -413,7 +413,7 @@ export default function ExecutionDashboard() {
                 </Button>
               </div>
             ) : (
-              <Card className="h-full flex flex-col">
+              <Card className="h-full flex flex-col clay-card">
                 <CardHeader className="flex items-center justify-between pb-0 shrink-0">
                   <span className="text-sm font-medium text-default-500">
                     Task Dependency Plan

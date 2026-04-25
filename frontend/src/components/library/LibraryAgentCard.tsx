@@ -36,7 +36,7 @@ export default function LibraryAgentCard({
   const isSystem = agent.agent_type === "system";
 
   return (
-    <div className="flex flex-col gap-3 p-4 rounded-xl border border-divider bg-content1 hover:border-primary/40 transition-all">
+    <div className="flex flex-col gap-3 p-4 clay-card transition-shadow">
       {/* Header row */}
       <div className="flex items-start gap-2 min-w-0">
         <div className="flex-1 min-w-0">

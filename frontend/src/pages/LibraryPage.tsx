@@ -269,7 +269,7 @@ export default function LibraryPage() {
       </div>
 
       {/* Tab bar */}
-      <div role="tablist" aria-label="Library sections" className="flex border-b border-divider -mt-2">
+      <div role="tablist" aria-label="Library sections" className="clay-tab-bar flex border-b border-divider -mt-2">
         {(["agents", "mcps", "skills"] as LibraryTab[]).map((tab) => (
           <button
             key={tab}
@@ -387,7 +387,7 @@ export default function LibraryPage() {
               {filteredMcps.map((mcp) => (
                 <div
                   key={mcp.id}
-                  className="flex flex-col gap-1 p-4 rounded-xl border border-divider"
+                  className="flex flex-col gap-1 p-4 clay-card"
                 >
                   <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                     <p className="font-semibold text-sm flex-1 min-w-0 truncate">{mcp.name}</p>
@@ -499,7 +499,7 @@ export default function LibraryPage() {
               {filteredSkills.map((skill) => (
                 <div
                   key={skill.id}
-                  className="flex flex-col gap-1 p-4 rounded-xl border border-divider"
+                  className="flex flex-col gap-1 p-4 clay-card"
                 >
                   <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                      <p className="font-semibold text-sm flex-1 min-w-0 truncate">{skill.name}</p>
