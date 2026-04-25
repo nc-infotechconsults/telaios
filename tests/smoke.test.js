@@ -1,5 +1,5 @@
 /**
- * Smoke / Integration tests for SWE AI Platform
+ * Smoke / Integration tests for Telaio
  *
  * Requires all services to be running:
  *   docker compose up   (or npm run dev in each service)
@@ -646,7 +646,7 @@ async function runSSETest() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("SWE AI Platform — Integration Smoke Tests");
+  console.log("Telaio — Integration Smoke Tests");
   console.log(`  Data API:      ${DATA_API}`);
   console.log(`  Agent Service: ${AGENT_URL}`);
   console.log(`  Internal key:  ${INTERNAL_KEY.slice(0, 8)}…`);

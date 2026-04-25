@@ -1,4 +1,4 @@
-# SWE AI Platform — Implementation Plan
+# Telaio — Implementation Plan
 
 ## Problem Statement
 

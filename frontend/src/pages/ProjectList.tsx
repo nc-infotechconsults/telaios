@@ -174,7 +174,7 @@ export default function ProjectList() {
                     key={p.id}
                     isPressable
                     onPress={() => navigate(`/projects/${p.id}`)}
-                    className="group cursor-pointer hover:shadow-lg transition-all border border-divider hover:border-primary/40"
+                    className="group cursor-pointer clay-card hover:shadow-xl transition-all"
                   >
                     <CardBody className="p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">

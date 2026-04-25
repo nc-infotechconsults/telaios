@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# E2E Tests — SWE AI Platform
+# E2E Tests — Telaio
 #
 # Spins up the full platform (Postgres, Redis, MinIO, data-api,
 # agent-service, Vite frontend) and runs:

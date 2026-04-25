@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { TelaioLogo } from "./common/TelaioLogo";
 
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const COLLAPSED_KEY = "sidebar_collapsed";
@@ -281,7 +282,7 @@ export default function Layout() {
       )}
 
       {/* ── Top bar ── */}
-      <header className="h-14 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-divider bg-content1 z-30">
+      <header className="h-14 shrink-0 flex items-center gap-2 px-3 sm:px-4 clay-header z-30">
         {/* Mobile hamburger */}
         <button
           type="button"
@@ -295,8 +296,8 @@ export default function Layout() {
 
         {/* Brand — always visible in topbar */}
         <div className="flex items-center gap-2">
-          <span className="text-primary text-lg leading-none" aria-hidden="true">⚙</span>
-          <span className="font-bold text-sm leading-snug tracking-tight">SWE AI Platform</span>
+          <span className="text-primary"><TelaioLogo size={22} /></span>
+          <span className="font-bold text-sm leading-snug tracking-tight">Telaio</span>
         </div>
 
         {/* Spacer */}
@@ -359,7 +360,7 @@ export default function Layout() {
           id="sidebar-drawer"
           aria-label="Application sidebar"
           className={`
-            fixed top-14 left-0 h-[calc(100%-3.5rem)] z-50 w-64 bg-content1 border-r border-divider
+            fixed top-14 left-0 h-[calc(100%-3.5rem)] z-50 w-64 clay-sidebar
             transform transition-transform duration-300 ease-in-out
             ${drawerOpen ? "translate-x-0" : "-translate-x-full"}
             md:hidden
@@ -372,7 +373,7 @@ export default function Layout() {
         <aside
           aria-label="Application sidebar"
           className={`
-            hidden md:flex flex-col shrink-0 border-r border-divider bg-content1
+            hidden md:flex flex-col shrink-0 clay-sidebar
             transition-[width] duration-200 ease-in-out overflow-hidden
             ${sidebarWidth}
           `}

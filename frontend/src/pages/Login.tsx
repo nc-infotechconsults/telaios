@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { TelaioLogo } from "../components/common/TelaioLogo";
+
 
 export default function Login() {
   const { login } = useAuth();
@@ -28,14 +30,16 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         {/* Brand */}
-        <div className="flex items-center gap-2.5 justify-center mb-8">
-          <span className="text-primary text-3xl leading-none" aria-hidden="true">⚙</span>
-          <span className="font-bold text-xl leading-snug tracking-tight text-foreground">
-            SWE AI Platform
+        <div className="flex items-center gap-3 justify-center mb-8">
+          <span className="text-primary">
+            <TelaioLogo size={36} />
+          </span>
+          <span className="font-bold text-2xl leading-snug tracking-tight text-foreground">
+            Telaio
           </span>
         </div>
 
-        <div className="bg-content1 border border-divider rounded-2xl p-8 shadow-sm">
+        <div className="clay-card p-8">
           <h1 className="text-lg font-semibold text-foreground mb-6">Sign in</h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -50,7 +54,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-divider bg-background text-foreground text-sm placeholder-default-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                className="clay-input w-full px-3 py-2.5 text-foreground text-sm placeholder-default-400"
                 placeholder="you@example.com"
               />
             </div>
@@ -66,7 +70,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-divider bg-background text-foreground text-sm placeholder-default-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
+                className="clay-input w-full px-3 py-2.5 text-foreground text-sm placeholder-default-400"
                 placeholder="••••••••"
               />
             </div>
@@ -80,7 +84,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="clay-btn w-full py-2.5 px-4 bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>

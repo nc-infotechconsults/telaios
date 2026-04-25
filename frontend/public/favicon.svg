@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Loom warp (vertical threads) -->
+  <rect x="7"  y="4" width="3" height="24" rx="1.5" fill="#E07B54" opacity="0.55"/>
+  <rect x="14.5" y="4" width="3" height="24" rx="1.5" fill="#E07B54"/>
+  <rect x="22" y="4" width="3" height="24" rx="1.5" fill="#E07B54" opacity="0.55"/>
+  <!-- Loom weft (horizontal threads crossing the warp) -->
+  <rect x="4"  y="7"  width="24" height="3" rx="1.5" fill="#E07B54" opacity="0.85"/>
+  <rect x="4"  y="14" width="24" height="2.5" rx="1.25" fill="#E07B54" opacity="0.45"/>
+  <rect x="4"  y="20" width="24" height="2.5" rx="1.25" fill="#E07B54" opacity="0.25"/>
+</svg>

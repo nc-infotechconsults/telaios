@@ -69,7 +69,7 @@ class LimitBodySizeMiddleware(BaseHTTPMiddleware):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="SWE AI Platform — Agent Service",
+        title="Telaio — Agent Service",
         version="1.0.0",
         description="LLM-driven planning, multi-agent execution, document processing, SSE streaming.",
         lifespan=lifespan,
