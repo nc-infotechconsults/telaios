@@ -1,15 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Button,
   Input,
   Select,
   SelectItem,
-  Spinner,
   Textarea,
 } from "@heroui/react";
-import { createLibraryAgent, updateLibraryAgent } from "../../lib/api";
+import { createLibraryAgent, updateLibraryAgent, getLlmProviders } from "../../lib/api";
 import { toast } from "../../lib/toast";
-import type { AgentRole, InlineSkill, LibraryAgent, McpServer } from "../../types";
+import type { AgentRole, InlineSkill, LibraryAgent, LlmProviderDefinition, McpServer } from "../../types";
 import SubAgentEditor from "./SubAgentEditor";
 import McpServerEditor from "./McpServerEditor";
 import InlineSkillEditor from "./InlineSkillEditor";
@@ -51,6 +50,11 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
   const [systemPrompt, setSystemPrompt] = useState(initialData?.system_prompt ?? "");
   const [llmProvider, setLlmProvider] = useState(initialData?.llm_provider ?? "");
   const [llmModel, setLlmModel] = useState(initialData?.llm_model ?? "");
+  const [llmProviders, setLlmProviders] = useState<LlmProviderDefinition[]>([]);
+
+  useEffect(() => {
+    getLlmProviders().then(setLlmProviders).catch(() => {});
+  }, []);
   const [temperature, setTemperature] = useState(
     initialData?.llm_temperature != null ? String(initialData.llm_temperature) : "",
   );
@@ -170,22 +174,60 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
       />
 
       <div className="flex gap-3">
-        <Input
+        <Select
           label="LLM provider"
-          placeholder="e.g. openai"
-          value={llmProvider}
-          onValueChange={setLlmProvider}
+          selectedKeys={llmProvider ? [llmProvider] : []}
+          onSelectionChange={(keys) => {
+            const id = Array.from(keys)[0] as string;
+            setLlmProvider(id);
+            setLlmModel("");
+          }}
           isDisabled={saving}
           className="flex-1"
-        />
-        <Input
-          label="LLM model"
-          placeholder="e.g. gpt-4o"
-          value={llmModel}
-          onValueChange={setLlmModel}
-          isDisabled={saving}
-          className="flex-1"
-        />
+          isLoading={llmProviders.length === 0}
+        >
+          {llmProviders.map((p) => (
+            <SelectItem key={p.id} textValue={p.name}>
+              <div className="flex items-center gap-2">
+                <span>{p.name}</span>
+                {p.type === "onprem" && (
+                  <span className="text-[10px] text-default-400 border border-divider rounded px-1">on-prem</span>
+                )}
+              </div>
+            </SelectItem>
+          ))}
+        </Select>
+
+        {(() => {
+          const currentProvider = llmProviders.find((p) => p.id === llmProvider);
+          const isOnPrem = currentProvider?.type === "onprem";
+          if (isOnPrem || !currentProvider) {
+            return (
+              <Input
+                label="LLM model"
+                placeholder={isOnPrem ? "e.g. llama3, mistral" : "e.g. gpt-4o"}
+                value={llmModel}
+                onValueChange={setLlmModel}
+                isDisabled={saving}
+                className="flex-1"
+              />
+            );
+          }
+          return (
+            <Select
+              label="LLM model"
+              selectedKeys={llmModel ? [llmModel] : []}
+              onSelectionChange={(keys) => setLlmModel(Array.from(keys)[0] as string)}
+              isDisabled={saving || currentProvider.models.length === 0}
+              placeholder="Select a model"
+              className="flex-1"
+            >
+              {currentProvider.models.map((m) => (
+                <SelectItem key={m}>{m}</SelectItem>
+              ))}
+            </Select>
+          );
+        })()}
       </div>
 
       <div className="flex gap-3">
@@ -256,7 +298,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
 
       {saving && (
         <div className="flex justify-center">
-          <Spinner size="sm" />
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
     </div>
