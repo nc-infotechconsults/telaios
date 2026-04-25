@@ -13,7 +13,6 @@ import PlanningChat from "./pages/PlanningChat";
 import ExecutionDashboard from "./pages/ExecutionDashboard";
 import LibraryPage from "./pages/LibraryPage";
 import LibraryAgentDetail from "./pages/LibraryAgentDetail";
-import SettingsPage from "./pages/Settings";
 import UsersPage from "./pages/Users";
 import DocumentViewerPage from "./pages/DocumentViewerPage";
 import EnvironmentDetail from "./pages/EnvironmentDetail";
@@ -49,7 +48,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="/projects/:projectId/environments/:envId" element={<EnvironmentDetail />} />
                     <Route path="/library" element={<LibraryPage />} />
                     <Route path="/library/agents/:agentId" element={<LibraryAgentDetail />} />
-                    <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/users" element={<UsersPage />} />
                   </Route>
                 </Route>

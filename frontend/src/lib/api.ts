@@ -13,7 +13,6 @@ import type {
   LibrarySkill,
   ProjectMember,
   ProjectRole,
-  Settings,
   User,
   Document,
   DocumentFolder,
@@ -447,21 +446,6 @@ export const removeProjectAgent = (projectId: string, agentId: string): Promise<
   DEMO
     ? delay(undefined as unknown as void)
     : http.delete(`/projects/${projectId}/agents/${agentId}`).then(() => undefined);
-
-// ─── Settings ────────────────────────────────────────────────────────────────
-
-export const getSettings = (): Promise<Settings> =>
-  DEMO ? delay(demo.SETTINGS) : http.get<Settings>("/settings").then((r) => r.data);
-
-export const updateSettings = (data: Partial<Settings> & { llm_api_key_raw?: string }): Promise<Settings> =>
-  DEMO
-    ? delay<Settings>({ ...demo.SETTINGS, ...data, updated_at: new Date().toISOString() })
-    : http.patch<Settings>("/settings", data).then((r) => r.data);
-
-export const testLlm = (data: { provider: string; model: string; apiKey?: string; baseUrl?: string }): Promise<{ ok: boolean }> =>
-  DEMO
-    ? delay({ ok: true })
-    : axios.post("/agent/test-llm", data).then((r) => r.data);
 
 // ─── Documents ────────────────────────────────────────────────────────────────
 

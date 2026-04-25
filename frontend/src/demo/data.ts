@@ -10,7 +10,6 @@ import type {
   Task,
   Message,
   AgentProfile,
-  Settings,
 } from "../types";
 
 // ─── Projects ───────────────────────────────────────────────────────────────
@@ -565,17 +564,3 @@ export const AGENT_PROFILES: AgentProfile[] = [
     updated_at: "2026-04-01T09:00:00Z",
   },
 ];
-
-// ─── Settings ────────────────────────────────────────────────────────────────
-
-export const SETTINGS: Settings = {
-  id: 1,
-  llm_provider: "openai",
-  llm_model: "gpt-4o",
-  llm_base_url: undefined,
-  has_api_key: true,
-  llm_temperature: 1.0,
-  llm_max_tokens: undefined,
-  llm_top_p: undefined,
-  updated_at: "2026-04-01T00:00:00Z",
-};

@@ -214,20 +214,6 @@ export interface AgentProfile {
   updated_at: string;
 }
 
-export interface Settings {
-  id: number;
-  llm_provider: string;
-  llm_model: string;
-  llm_base_url?: string;
-  has_api_key?: boolean;
-  llm_temperature?: number;
-  llm_max_tokens?: number;
-  llm_top_p?: number;
-  llm_frequency_penalty?: number;
-  llm_presence_penalty?: number;
-  updated_at: string;
-}
-
 /** A plan-draft item that can appear inline in the chat conversation. */
 export type PlanChatItem = {
   type: "plan-draft";
