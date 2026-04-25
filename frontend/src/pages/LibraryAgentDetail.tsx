@@ -112,8 +112,6 @@ export default function LibraryAgentDetail() {
     );
   }
 
-  const isSystem = agent.agent_type === "system";
-
   // ── Edit mode ─────────────────────────────────────────────────────────────
   if (editing) {
     return (
@@ -159,11 +157,9 @@ export default function LibraryAgentDetail() {
         <span className="text-default-300">/</span>
         <span className="text-sm font-medium truncate flex-1">{agent.name}</span>
         <div className="flex gap-2 shrink-0">
-          {!isSystem && (
-            <Button size="sm" variant="flat" startContent={EditIcon} onPress={() => setEditing(true)}>
-              Edit
-            </Button>
-          )}
+          <Button size="sm" variant="flat" startContent={EditIcon} onPress={() => setEditing(true)}>
+            Edit
+          </Button>
           <Button size="sm" color="primary" onPress={() => setAddOpen(true)}>
             + Add to Project
           </Button>
@@ -181,7 +177,6 @@ export default function LibraryAgentDetail() {
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold">{agent.name}</h1>
               <Chip size="sm" variant="flat" color={ROLE_COLOR[agent.role] ?? "default"}>{agent.role}</Chip>
-              {isSystem && <Chip size="sm" variant="flat" color="primary">system</Chip>}
             </div>
             {agent.published_by && (
               <p className="text-sm text-default-400">by {agent.published_by}</p>
