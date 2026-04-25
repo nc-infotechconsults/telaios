@@ -4,6 +4,7 @@ import {
   Input,
   Select,
   SelectItem,
+  Slider,
   Textarea,
 } from "@heroui/react";
 import { createLibraryAgent, updateLibraryAgent, getLlmProviders } from "../../lib/api";
@@ -55,8 +56,8 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
   useEffect(() => {
     getLlmProviders().then(setLlmProviders).catch(() => {});
   }, []);
-  const [temperature, setTemperature] = useState(
-    initialData?.llm_temperature != null ? String(initialData.llm_temperature) : "",
+  const [temperature, setTemperature] = useState<number>(
+    initialData?.llm_temperature ?? 1.0,
   );
   const [maxTokens, setMaxTokens] = useState(
     initialData?.llm_max_tokens != null ? String(initialData.llm_max_tokens) : "",
@@ -94,7 +95,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
         system_prompt: systemPrompt.trim() || null,
         ...(llmProvider.trim() ? { llm_provider: llmProvider.trim() } : {}),
         ...(llmModel.trim() ? { llm_model: llmModel.trim() } : {}),
-        llm_temperature: temperature !== "" ? Number(temperature) : null,
+        llm_temperature: temperature,
         llm_max_tokens: maxTokens !== "" ? Number(maxTokens) : null,
         tags,
         sub_agents: subAgents,
@@ -230,30 +231,50 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
         })()}
       </div>
 
-      <div className="flex gap-3">
-        <Input
-          label="Temperature"
-          placeholder="0.0 – 2.0"
-          type="number"
-          min={0}
-          max={2}
-          step={0.1}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-foreground">Temperature</span>
+          <Input
+            aria-label="Temperature value"
+            type="number"
+            min={0}
+            max={2}
+            step={0.01}
+            value={String(temperature)}
+            onValueChange={(v) => {
+              const n = parseFloat(v);
+              if (!isNaN(n)) setTemperature(Math.min(2, Math.max(0, n)));
+            }}
+            isDisabled={saving}
+            className="w-20"
+            size="sm"
+          />
+        </div>
+        <Slider
+          aria-label="Temperature"
+          step={0.01}
+          minValue={0}
+          maxValue={2}
           value={temperature}
-          onValueChange={setTemperature}
+          onChange={(v) => setTemperature(v as number)}
+          marks={[
+            { value: 0, label: "0" },
+            { value: 1, label: "1" },
+            { value: 2, label: "2" },
+          ]}
           isDisabled={saving}
-          className="flex-1"
-        />
-        <Input
-          label="Max tokens"
-          placeholder="e.g. 4096"
-          type="number"
-          min={1}
-          value={maxTokens}
-          onValueChange={setMaxTokens}
-          isDisabled={saving}
-          className="flex-1"
         />
       </div>
+
+      <Input
+        label="Max tokens"
+        placeholder="e.g. 4096"
+        type="number"
+        min={1}
+        value={maxTokens}
+        onValueChange={setMaxTokens}
+        isDisabled={saving}
+      />
 
       <Input
         label="Tags"
