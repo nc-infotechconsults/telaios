@@ -1,7 +1,7 @@
 import { AppDataSource } from "../configs/data-source.config";
 import { LibraryAgent } from "../entities/LibraryAgent.entity";
-import type { ILike, FindOptionsWhere } from "typeorm";
-import { In } from "typeorm";
+import { encrypt, decrypt } from "../utils/crypto.util";
+import type { FindOptionsWhere } from "typeorm";
 import type {
   CreateLibraryAgentDto,
   PatchLibraryAgentDto,
@@ -9,6 +9,20 @@ import type {
 } from "../schemas/libraryAgent.schema";
 
 const repo = () => AppDataSource.getRepository(LibraryAgent);
+
+function encryptSensitive(body: Record<string, unknown>) {
+  const out = { ...body };
+  if (out.llm_api_key) out.llm_api_key = encrypt(out.llm_api_key as string);
+  return out;
+}
+
+function sanitize(a: LibraryAgent) {
+  return {
+    ...a,
+    has_llm_api_key: !!(a.llm_api_key && decrypt(a.llm_api_key)),
+    llm_api_key: undefined,
+  };
+}
 
 export async function listLibraryAgents(query: LibraryAgentQueryDto) {
   const { q, role, tags, page, limit } = query;
@@ -33,15 +47,17 @@ export async function listLibraryAgents(query: LibraryAgentQueryDto) {
   }
 
   const [items, total] = await qb.getManyAndCount();
-  return { items, total, page, limit };
+  return { items: items.map(sanitize), total, page, limit };
 }
 
 export async function getLibraryAgent(id: string) {
-  return repo().findOne({ where: { id, deleted_at: undefined as unknown as null } });
+  const a = await repo().findOne({ where: { id, deleted_at: undefined as unknown as null } });
+  return a ? sanitize(a) : null;
 }
 
 export async function getLibraryAgentBySlug(slug: string) {
-  return repo().findOne({ where: { slug, deleted_at: undefined as unknown as null } });
+  const a = await repo().findOne({ where: { slug, deleted_at: undefined as unknown as null } });
+  return a ? sanitize(a) : null;
 }
 
 export async function createLibraryAgent(
@@ -53,25 +69,26 @@ export async function createLibraryAgent(
     throw Object.assign(new Error(`Slug '${dto.slug}' is already taken`), { statusCode: 409 });
   }
 
+  const data = encryptSensitive(dto as Record<string, unknown>);
   const agent = repo().create({
-    ...dto,
+    ...data,
     published_by: publishedBy ?? null,
     agent_type: "custom",
   });
-  return repo().save(agent);
+  return sanitize(await repo().save(agent));
 }
 
 export async function updateLibraryAgent(id: string, dto: PatchLibraryAgentDto) {
   const agent = await repo().findOne({ where: { id } });
   if (!agent) return null;
 
-  // Allow editing both system and custom agents; promote system→custom on edit
   if (agent.agent_type === "system") {
     agent.agent_type = "custom";
   }
 
-  Object.assign(agent, dto);
-  return repo().save(agent);
+  const data = encryptSensitive(dto as Record<string, unknown>);
+  Object.assign(agent, data);
+  return sanitize(await repo().save(agent));
 }
 
 export async function deleteLibraryAgent(id: string) {

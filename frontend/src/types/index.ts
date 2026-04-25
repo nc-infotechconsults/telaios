@@ -285,6 +285,7 @@ export interface LibraryAgent {
   llm_model?: string | null;
   llm_temperature?: number | null;
   llm_max_tokens?: number | null;
+  has_llm_api_key?: boolean;
   sub_agents: SubAgentEntry[];
   mcp_servers: McpServer[];
   skills: InlineSkill[];

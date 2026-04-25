@@ -50,6 +50,7 @@ export const CreateLibraryAgentSchema = z.object({
   system_prompt_mode: z.enum(["append", "override"]).optional(),
   llm_provider: z.string().nullable().optional(),
   llm_model: z.string().nullable().optional(),
+  llm_api_key: z.string().nullable().optional(),
   llm_temperature: z.number().min(0).max(2).nullable().optional(),
   llm_max_tokens: z.number().int().positive().nullable().optional(),
   sub_agents: z.array(SubAgentEntrySchema).optional(),

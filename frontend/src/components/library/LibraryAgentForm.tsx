@@ -51,6 +51,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
   const [systemPrompt, setSystemPrompt] = useState(initialData?.system_prompt ?? "");
   const [llmProvider, setLlmProvider] = useState(initialData?.llm_provider ?? "");
   const [llmModel, setLlmModel] = useState(initialData?.llm_model ?? "");
+  const [llmApiKey, setLlmApiKey] = useState("");
   const [llmProviders, setLlmProviders] = useState<LlmProviderDefinition[]>([]);
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
         .map((t) => t.trim())
         .filter(Boolean);
 
-      const payload: Partial<LibraryAgent> = {
+      const payload: Partial<LibraryAgent> & { llm_api_key?: string } = {
         name: name.trim(),
         ...(!isEdit ? { slug: toSlug(name) } : {}),
         description: description.trim(),
@@ -95,6 +96,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
         system_prompt: systemPrompt.trim() || null,
         ...(llmProvider.trim() ? { llm_provider: llmProvider.trim() } : {}),
         ...(llmModel.trim() ? { llm_model: llmModel.trim() } : {}),
+        ...(llmApiKey.trim() ? { llm_api_key: llmApiKey.trim() } : {}),
         llm_temperature: temperature,
         llm_max_tokens: maxTokens !== "" ? Number(maxTokens) : null,
         tags,
@@ -231,6 +233,30 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
           );
         })()}
       </div>
+
+      {/* BYOK API key — only for cloud providers that require a key */}
+      {(() => {
+        const currentProvider = llmProviders.find((p) => p.id === llmProvider);
+        if (!currentProvider || currentProvider.type === "onprem") return null;
+        return (
+          <Input
+            label="API key (BYOK)"
+            placeholder={
+              initialData?.has_llm_api_key ? "••••••••  (saved — leave blank to keep)" : "Enter API key…"
+            }
+            type="password"
+            value={llmApiKey}
+            onValueChange={setLlmApiKey}
+            isDisabled={saving}
+            description="Stored encrypted. Leave blank to keep existing key."
+            endContent={
+              initialData?.has_llm_api_key && !llmApiKey ? (
+                <span className="text-xs text-success">saved</span>
+              ) : undefined
+            }
+          />
+        );
+      })()}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">

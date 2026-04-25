@@ -87,6 +87,9 @@ export class LibraryAgent {
   @Column({ type: "int", nullable: true })
   llm_max_tokens!: number | null;
 
+  @Column({ type: "text", nullable: true })
+  llm_api_key!: string | null;
+
   @Column({ type: "jsonb", default: "[]" })
   sub_agents!: SubAgentEntry[];
 
