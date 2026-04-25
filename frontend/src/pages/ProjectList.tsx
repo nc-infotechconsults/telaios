@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
@@ -50,6 +50,7 @@ const REPO_STATUS_COLOR: Record<
 
 export default function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [total, setTotal] = useState(0);
   const [reposByProject, setReposByProject] = useState<Record<string, Repository[]>>({});
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -63,51 +64,48 @@ export default function ProjectList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const filteredProjects = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.description ?? "").toLowerCase().includes(q)
-    );
-  }, [projects, search]);
+  // Debounce search and reset page together
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchProjects = () => {
+  // Fetch from server whenever query params change
+  useEffect(() => {
     setLoading(true);
-    getProjects()
-      .then((projs) => {
-        setProjects(projs);
-        Promise.all(
-          projs.map((p) =>
+    getProjects({ q: debouncedSearch || undefined, page, limit: pageSize })
+      .then(({ items, total: t }) => {
+        setProjects(items);
+        setTotal(t);
+        setReposByProject({});
+        return Promise.all(
+          items.map((p) =>
             getRepositories(p.id)
               .then((repos) => ({ projectId: p.id, repos }))
               .catch(() => ({ projectId: p.id, repos: [] as Repository[] }))
           )
-        ).then((results) => {
-          const byProject: Record<string, Repository[]> = {};
-          results.forEach(({ projectId, repos }) => {
-            byProject[projectId] = repos;
-          });
-          setReposByProject(byProject);
+        );
+      })
+      .then((results) => {
+        const byProject: Record<string, Repository[]> = {};
+        results.forEach(({ projectId, repos }) => {
+          byProject[projectId] = repos;
         });
+        setReposByProject(byProject);
       })
       .catch((error: unknown) => {
         console.error("Failed to load projects", error);
         toast.error("Failed to load projects");
         setProjects([]);
-        setReposByProject({});
+        setTotal(0);
       })
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { fetchProjects(); }, []);
-
-  const pagedProjects = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredProjects.slice(start, start + pageSize);
-  }, [filteredProjects, page, pageSize]);
+  }, [debouncedSearch, page, pageSize]);
 
   const handleCreate = async (onClose: () => void) => {
     if (!name.trim()) return;
@@ -142,14 +140,14 @@ export default function ProjectList() {
           <p className="text-default-400 text-sm mt-1">Plan and execute software tasks with AI agents</p>
         </div>
         <div className="flex items-center gap-3">
-          {projects.length > 0 && (
+          {!loading && (
             <Input
               size="sm"
               placeholder="Search projects…"
               value={search}
-              onValueChange={(v) => { setSearch(v); setPage(1); }}
+              onValueChange={setSearch}
               isClearable
-              onClear={() => { setSearch(""); setPage(1); }}
+              onClear={() => setSearch("")}
               className="w-56"
               startContent={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-default-400 shrink-0" aria-hidden="true">
@@ -168,7 +166,7 @@ export default function ProjectList() {
         </div>
       )}
 
-      {!loading && projects.length === 0 && (
+      {!loading && total === 0 && !debouncedSearch && (
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <div className="text-6xl">🚀</div>
           <div>
@@ -181,25 +179,25 @@ export default function ProjectList() {
         </div>
       )}
 
-      {!loading && projects.length > 0 && (
+      {!loading && (total > 0 || debouncedSearch) && (
         <>
           <ViewModeBar
             mode={viewMode}
             onModeChange={setViewMode}
             page={page}
             pageSize={pageSize}
-            total={filteredProjects.length}
+            total={total}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
           />
 
-          {filteredProjects.length === 0 && (
+          {total === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
-              <p className="text-default-400 text-sm">No projects match <strong>&ldquo;{search}&rdquo;</strong></p>
+              <p className="text-default-400 text-sm">No projects match <strong>&ldquo;{debouncedSearch}&rdquo;</strong></p>
               <button
                 type="button"
                 className="text-xs text-primary hover:underline"
-                onClick={() => { setSearch(""); setPage(1); }}
+                onClick={() => setSearch("")}
               >
                 Clear search
               </button>
@@ -207,9 +205,9 @@ export default function ProjectList() {
           )}
 
           {/* ── Grid ── */}
-          {filteredProjects.length > 0 && viewMode === "grid" && (
+          {projects.length > 0 && viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pagedProjects.map((p) => {
+              {projects.map((p) => {
                 const repos = reposByProject[p.id] ?? [];
                 return (
                   <Card
@@ -251,9 +249,9 @@ export default function ProjectList() {
           )}
 
           {/* ── List ── */}
-          {filteredProjects.length > 0 && viewMode === "list" && (
+          {projects.length > 0 && viewMode === "list" && (
             <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
-              {pagedProjects.map((p) => {
+              {projects.map((p) => {
                 const repos = reposByProject[p.id] ?? [];
                 return (
                   <button
@@ -286,7 +284,7 @@ export default function ProjectList() {
           )}
 
           {/* ── Table ── */}
-          {filteredProjects.length > 0 && viewMode === "table" && (
+          {projects.length > 0 && viewMode === "table" && (
             <div className="clay-card overflow-hidden">
             <Table
               aria-label="Projects table"
@@ -301,7 +299,7 @@ export default function ProjectList() {
                 <TableColumn>{""}</TableColumn>
               </TableHeader>
               <TableBody>
-                {pagedProjects.map((p) => {
+                {projects.map((p) => {
                   const repos = reposByProject[p.id] ?? [];
                   return (
                     <TableRow key={p.id} className="cursor-pointer">

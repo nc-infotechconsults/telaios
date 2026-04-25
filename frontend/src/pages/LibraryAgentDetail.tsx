@@ -75,7 +75,7 @@ export default function LibraryAgentDetail() {
     if (!addOpen || projects.length > 0) return;
     setProjectsLoading(true);
     getProjects()
-      .then(setProjects)
+      .then(({ items }) => setProjects(items))
       .catch(() => toast.error("Failed to load projects"))
       .finally(() => setProjectsLoading(false));
   }, [addOpen, projects.length]);

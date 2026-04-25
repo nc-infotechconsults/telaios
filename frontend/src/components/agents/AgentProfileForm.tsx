@@ -18,6 +18,7 @@ import {
 import { createAgentProfile, updateAgentProfile, getAgentProfiles, discoverMcpTools, getLlmProviders } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { AgentProfile, McpServer, McpToolConfig, McpToolPermission, Skill, JsonSchemaProperty, LlmProviderDefinition } from "../../types";
+import { McpToolBody } from "../McpToolBody";
 
 interface Props {
   initialData?: AgentProfile;
@@ -1035,14 +1036,6 @@ function McpToolSelector({
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newToolName, setNewToolName] = useState("");
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-
-  const toggleExpand = (i: number) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
-      return next;
-    });
 
   const tools = server.tools ?? [];
 
@@ -1068,8 +1061,8 @@ function McpToolSelector({
       const merged: McpToolConfig[] = discovered.map((d) => {
         const existing = existingMap.get(d.name);
         return existing
-          ? { ...existing, description: d.description, inputSchema: d.inputSchema }
-          : { name: d.name, description: d.description, inputSchema: d.inputSchema, allowed: true };
+          ? { ...existing, description: d.description, inputSchema: d.inputSchema, annotations: d.annotations }
+          : { name: d.name, description: d.description, inputSchema: d.inputSchema, annotations: d.annotations, allowed: true };
       });
       setTools(merged);
     } catch {
@@ -1143,92 +1136,63 @@ function McpToolSelector({
       )}
 
       {tools.length > 0 && (
-        <div className="max-h-72 overflow-y-auto space-y-1.5 rounded-lg border border-divider p-2">
-          {tools.map((tool, ti) => {
-            const props = tool.inputSchema
-              ? (tool.inputSchema.properties as Record<string, { type?: string; description?: string }> | undefined) ?? {}
-              : {};
-            const required = new Set<string>((tool.inputSchema?.required as string[] | undefined) ?? []);
-            const paramEntries = Object.entries(props);
-            const hasParams = paramEntries.length > 0;
-            const isExpanded = expanded.has(ti);
-            return (
-              <div key={ti} className="flex flex-col gap-1 p-1.5 rounded bg-default-100/50">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    size="sm"
-                    isSelected={tool.allowed}
-                    onValueChange={(v) => updateTool(ti, { allowed: v })}
-                    color={tool.allowed ? "success" : "danger"}
-                    aria-label={`${tool.allowed ? "Allow" : "Deny"} ${tool.name}`}
-                  />
-                  <span className="font-mono text-xs flex-1 truncate">{tool.name}</span>
-                  {hasParams && (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpand(ti)}
-                      className="text-[10px] text-default-400 hover:text-default-600 leading-none px-1"
-                      aria-label={isExpanded ? "Hide parameters" : "Show parameters"}
-                    >
-                      {isExpanded ? "▲ params" : "▼ params"}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeTool(ti)}
-                    className="text-danger text-xs leading-none hover:opacity-70"
-                    aria-label="Remove tool"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Description — always visible */}
-                {tool.description && (
-                  <p className="pl-9 text-[11px] text-default-500 italic leading-relaxed">{tool.description}</p>
-                )}
-
-                {/* Parameters — behind expand toggle */}
-                {hasParams && isExpanded && (
-                  <div className="pl-9 space-y-0.5 pb-1">
-                    <p className="text-[10px] font-semibold text-default-400 uppercase tracking-wide">Parameters</p>
-                    {paramEntries.map(([pname, def]) => (
-                      <div key={pname} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px]">
-                        <span className="font-mono text-default-700">{pname}</span>
-                        {def.type && (
-                          <span className="text-[10px] px-1 rounded bg-primary-100 text-primary-700">{def.type}</span>
-                        )}
-                        {required.has(pname) && (
-                          <span className="text-[10px] text-danger font-medium">required</span>
-                        )}
-                        {def.description && (
-                          <span className="text-default-400">— {def.description}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-1 pl-9">
-                  {PERMISSION_OPTIONS.map(({ value, label }) => {
-                    const active = (tool.permissions ?? []).includes(value);
-                    return (
-                      <Chip
-                        key={value}
-                        size="sm"
-                        variant={active ? "solid" : "bordered"}
-                        color={active ? "primary" : "default"}
-                        className="cursor-pointer select-none"
-                        onClick={() => togglePermission(ti, value)}
-                      >
-                        {label}
-                      </Chip>
-                    );
-                  })}
-                </div>
+        <div className="max-h-[32rem] overflow-y-auto space-y-2 pr-0.5">
+          {tools.map((tool, ti) => (
+            <div
+              key={ti}
+              className="rounded-xl border border-divider bg-background/40 p-3 space-y-3"
+            >
+              {/* Header */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  size="sm"
+                  isSelected={tool.allowed}
+                  onValueChange={(v) => updateTool(ti, { allowed: v })}
+                  color={tool.allowed ? "success" : "danger"}
+                  aria-label={`${tool.allowed ? "Allow" : "Deny"} ${tool.name}`}
+                />
+                <span className="font-mono text-xs font-semibold flex-1 truncate">{tool.name}</span>
+                <Chip
+                  size="sm"
+                  variant="flat"
+                  color={tool.allowed ? "success" : "danger"}
+                  className="shrink-0 h-5 text-[10px]"
+                >
+                  {tool.allowed ? "allowed" : "blocked"}
+                </Chip>
+                <button
+                  type="button"
+                  onClick={() => removeTool(ti)}
+                  className="text-default-400 hover:text-danger transition-colors"
+                  aria-label="Remove tool"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
-            );
-          })}
+
+              {/* Body: description + input schema + behavior */}
+              <McpToolBody tool={tool} />
+
+              {/* Permissions */}
+              <div className="flex flex-wrap gap-1 pt-1 border-t border-divider">
+                {PERMISSION_OPTIONS.map(({ value, label }) => {
+                  const active = (tool.permissions ?? []).includes(value);
+                  return (
+                    <Chip
+                      key={value}
+                      size="sm"
+                      variant={active ? "solid" : "bordered"}
+                      color={active ? "primary" : "default"}
+                      className="cursor-pointer select-none"
+                      onClick={() => togglePermission(ti, value)}
+                    >
+                      {label}
+                    </Chip>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

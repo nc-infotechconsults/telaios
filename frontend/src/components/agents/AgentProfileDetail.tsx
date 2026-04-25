@@ -1,5 +1,6 @@
 import { Chip, Code } from "@heroui/react";
 import type { AgentProfile, McpServer, McpToolConfig, Skill } from "../../types";
+import { McpToolBody } from "../McpToolBody";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,52 +40,17 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 // ─── MCP tool card ────────────────────────────────────────────────────────────
 
 function ToolCard({ tool }: { tool: McpToolConfig }) {
-  const props =
-    tool.inputSchema &&
-    typeof tool.inputSchema.properties === "object" &&
-    tool.inputSchema.properties !== null
-      ? (tool.inputSchema.properties as Record<string, { type?: unknown; description?: string }>)
-      : null;
-  const required = Array.isArray(tool.inputSchema?.required)
-    ? (tool.inputSchema!.required as string[])
-    : [];
-
   return (
-    <div className="rounded-xl border border-divider bg-background/40 p-3 space-y-1">
+    <div className="rounded-xl border border-divider bg-background/40 p-3 space-y-3">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-xs font-semibold text-default-700">{tool.name}</span>
-        <Chip
-          size="sm"
-          variant="flat"
-          color={tool.allowed ? "success" : "danger"}
-        >
+        <span className="font-mono text-xs font-semibold text-default-700 flex-1 truncate">
+          {tool.name}
+        </span>
+        <Chip size="sm" variant="flat" color={tool.allowed ? "success" : "danger"}>
           {tool.allowed ? "allowed" : "blocked"}
         </Chip>
       </div>
-      {tool.description && (
-        <p className="text-xs text-default-500 italic">{tool.description}</p>
-      )}
-      {props && Object.keys(props).length > 0 && (
-        <div className="mt-2 space-y-1">
-          <span className="text-xs text-default-400 font-medium">Parameters</span>
-          {Object.entries(props).map(([name, prop]) => (
-            <div key={name} className="flex items-center gap-1.5 text-xs pl-2">
-              <span className="font-mono text-default-600">{name}</span>
-              {prop.type != null && (
-                <Chip size="sm" variant="bordered" className="h-4 text-[10px]">
-                  {String(prop.type)}
-                </Chip>
-              )}
-              {required.includes(name) && (
-                <Chip size="sm" color="warning" variant="flat" className="h-4 text-[10px]">required</Chip>
-              )}
-              {prop.description && (
-                <span className="text-default-400 truncate">{prop.description}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <McpToolBody tool={tool} />
     </div>
   );
 }

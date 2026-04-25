@@ -1,10 +1,14 @@
 import type { Request, Response } from "express";
-import { CreateProjectSchema, PatchProjectSchema } from "../schemas/project.schema";
+import { CreateProjectSchema, PatchProjectSchema, ProjectQuerySchema } from "../schemas/project.schema";
 import * as projectService from "../services/project.service";
 
-export async function listProjects(_req: Request, res: Response) {
-  const projects = await projectService.listProjects();
-  res.json(projects);
+export async function listProjects(req: Request, res: Response) {
+  const parsed = ProjectQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid query parameters", issues: parsed.error.issues });
+  }
+  const result = await projectService.listProjects(parsed.data);
+  return res.json(result);
 }
 
 export async function createProject(req: Request, res: Response) {

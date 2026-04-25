@@ -144,6 +144,8 @@ export interface McpToolConfig {
   description?: string;
   /** JSON Schema for the tool's input parameters (from MCP tools/list). */
   inputSchema?: Record<string, unknown>;
+  /** Behavioral hints returned by the MCP server (readOnly, destructive, etc.). */
+  annotations?: McpToolAnnotations;
   /** Whether the tool is allowed (true) or blocked (false). Defaults to true. */
   allowed: boolean;
   /** Fine-grained permission tags. */

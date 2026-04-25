@@ -155,8 +155,8 @@ export default function ProjectDetail() {
       listProjectMembers(projectId),
       listUsers(),
     ])
-      .then(([projects, allPlans, repos, projectAgents, projectMembers, users]) => {
-        const proj = projects.find((p) => p.id === projectId) ?? null;
+      .then(([projectsResult, allPlans, repos, projectAgents, projectMembers, users]) => {
+        const proj = projectsResult.items.find((p) => p.id === projectId) ?? null;
         setProject(proj);
         setPlans(allPlans);
         setRepositories(repos);

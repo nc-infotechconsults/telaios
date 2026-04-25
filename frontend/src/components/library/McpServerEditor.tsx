@@ -15,6 +15,7 @@ import {
 import { discoverMcpTools, listLibraryMCPs } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { LibraryMCP, McpServer, McpToolConfig, McpToolPermission } from "../../types";
+import { McpToolBody } from "../McpToolBody";
 
 interface Props {
   value: McpServer[];
@@ -157,7 +158,8 @@ function ToolRow({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 p-2 rounded border border-divider bg-default-100/50">
+    <div className="rounded-xl border border-divider bg-background/40 p-3 space-y-3">
+      {/* Header */}
       <div className="flex items-center gap-2">
         <Switch
           size="sm"
@@ -166,18 +168,32 @@ function ToolRow({
           aria-label={`${tool.allowed ? "Allow" : "Deny"} ${tool.name}`}
           color={tool.allowed ? "success" : "danger"}
         />
-        <span className="font-mono text-xs font-medium flex-1 truncate">{tool.name}</span>
-        {tool.description && (
-          <span className="text-xs text-default-400 truncate max-w-[140px]" title={tool.description}>
-            {tool.description}
-          </span>
-        )}
-        <Button isIconOnly size="sm" variant="light" color="danger" aria-label="Remove tool" onPress={onRemove}>
+        <span className="font-mono text-xs font-semibold flex-1 truncate">{tool.name}</span>
+        <Chip
+          size="sm"
+          variant="flat"
+          color={tool.allowed ? "success" : "danger"}
+          className="shrink-0 h-5 text-[10px]"
+        >
+          {tool.allowed ? "allowed" : "blocked"}
+        </Chip>
+        <Button
+          isIconOnly
+          size="sm"
+          variant="light"
+          color="danger"
+          aria-label="Remove tool"
+          onPress={onRemove}
+        >
           <TrashIcon />
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-1 pl-9">
+      {/* Body: description + input schema + behavior */}
+      <McpToolBody tool={tool} />
+
+      {/* Permissions */}
+      <div className="flex flex-wrap gap-1 pt-1 border-t border-divider">
         {PERMISSION_OPTIONS.map(({ value, label }) => {
           const active = (tool.permissions ?? []).includes(value);
           return (
@@ -232,7 +248,7 @@ function ToolsPanel({
       // Merge: preserve existing config for known tools, add new ones
       const existingMap = new Map(tools.map((t) => [t.name, t]));
       const merged: McpToolConfig[] = discovered.map((d) =>
-        existingMap.get(d.name) ?? { name: d.name, description: d.description, allowed: true },
+        existingMap.get(d.name) ?? { name: d.name, description: d.description, inputSchema: d.inputSchema, annotations: d.annotations, allowed: true },
       );
       setTools(merged);
       toast.success(`${discovered.length} tools discovered`);

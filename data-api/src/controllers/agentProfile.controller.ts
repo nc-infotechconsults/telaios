@@ -42,6 +42,13 @@ interface DiscoveredTool {
   name: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+  annotations?: {
+    title?: string;
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
 }
 
 interface JsonRpcMessage {
@@ -125,6 +132,7 @@ async function discoverStdioTools(
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
+          annotations: t.annotations,
         }));
         resolve(tools);
       } catch (err) {
@@ -202,6 +210,7 @@ export async function discoverMcpTools(req: Request, res: Response) {
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema,
+        annotations: t.annotations,
       }));
 
       return res.json({ tools });

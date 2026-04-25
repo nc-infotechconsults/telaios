@@ -1,7 +1,7 @@
 import { AppDataSource } from "../configs/data-source.config";
 import { Project } from "../entities/Project.entity";
 import { addMember } from "./projectMember.service";
-import type { CreateProjectDto, PatchProjectDto } from "../schemas/project.schema";
+import type { CreateProjectDto, PatchProjectDto, ProjectQueryDto } from "../schemas/project.schema";
 
 const repo = () => AppDataSource.getRepository(Project);
 
@@ -11,8 +11,20 @@ function isValidUuid(id: string | undefined): id is string {
   return !!id && UUID_REGEX.test(id);
 }
 
-export async function listProjects(): Promise<Project[]> {
-  return repo().find({ order: { created_at: "DESC" } });
+export async function listProjects(query: ProjectQueryDto): Promise<{ items: Project[]; total: number; page: number; limit: number }> {
+  const { q, page, limit } = query;
+  const qb = AppDataSource.getRepository(Project)
+    .createQueryBuilder("p")
+    .orderBy("p.created_at", "DESC")
+    .skip((page - 1) * limit)
+    .take(limit);
+
+  if (q) {
+    qb.where("p.name ILIKE :q OR p.description ILIKE :q", { q: `%${q}%` });
+  }
+
+  const [items, total] = await qb.getManyAndCount();
+  return { items, total, page, limit };
 }
 
 export async function createProject(dto: CreateProjectDto, creatorId?: string): Promise<Project> {

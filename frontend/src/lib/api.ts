@@ -106,8 +106,16 @@ export const deleteUser = (id: string): Promise<void> =>
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
-export const getProjects = (): Promise<Project[]> =>
-  DEMO ? delay(demo.PROJECTS) : http.get<Project[]>("/projects").then((r) => r.data);
+export const getProjects = (params?: {
+  q?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ items: Project[]; total: number; page: number; limit: number }> =>
+  DEMO
+    ? delay({ items: demo.PROJECTS, total: demo.PROJECTS.length, page: 1, limit: 20 })
+    : http
+        .get<{ items: Project[]; total: number; page: number; limit: number }>("/projects", { params })
+        .then((r) => r.data);
 
 export const createProject = (data: Partial<Project>): Promise<Project> =>
   DEMO
@@ -314,15 +322,15 @@ export const deleteAgentProfile = (id: string): Promise<void> =>
 
 export const discoverMcpTools = (
   serverConfig: Partial<import("../types").McpServer>
-): Promise<Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>> =>
+): Promise<Array<{ name: string; description?: string; inputSchema?: Record<string, unknown>; annotations?: import("../types").McpToolAnnotations }>> =>
   DEMO
     ? delay([
-        { name: "read_file", description: "Read a file from the filesystem", inputSchema: { type: "object", properties: { path: { type: "string", description: "Absolute or relative path to the file" }, encoding: { type: "string", description: "Character encoding (default: utf-8)" } }, required: ["path"] } },
-        { name: "write_file", description: "Write content to a file", inputSchema: { type: "object", properties: { path: { type: "string", description: "Target file path" }, content: { type: "string", description: "Content to write" } }, required: ["path", "content"] } },
-        { name: "list_directory", description: "List files in a directory", inputSchema: { type: "object", properties: { path: { type: "string", description: "Directory path to list" } }, required: ["path"] } },
+        { name: "read_file", description: "Read a file from the filesystem", inputSchema: { type: "object", properties: { path: { type: "string", description: "Absolute or relative path to the file" }, encoding: { type: "string", description: "Character encoding (default: utf-8)" } }, required: ["path"] }, annotations: { readOnlyHint: true } },
+        { name: "write_file", description: "Write content to a file", inputSchema: { type: "object", properties: { path: { type: "string", description: "Target file path" }, content: { type: "string", description: "Content to write" } }, required: ["path", "content"] }, annotations: { destructiveHint: true } },
+        { name: "list_directory", description: "List files in a directory", inputSchema: { type: "object", properties: { path: { type: "string", description: "Directory path to list" } }, required: ["path"] }, annotations: { readOnlyHint: true, idempotentHint: true } },
       ])
     : http
-        .post<{ tools: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }> }>("/agent-profiles/mcp-discover", serverConfig)
+        .post<{ tools: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown>; annotations?: import("../types").McpToolAnnotations }> }>("/agent-profiles/mcp-discover", serverConfig)
         .then((r) => r.data.tools ?? []);
 
 // ─── Library Agents ───────────────────────────────────────────────────────────
