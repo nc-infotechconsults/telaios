@@ -725,3 +725,15 @@ export type WsEvent =
   | { type: "document_updated"; document_id: string; name: string }
   | { type: "document_deleted"; document_id: string }
   | { type: "document_processing_complete"; document_id: string; name: string };
+
+// ─── LLM Providers ───────────────────────────────────────────────────────────
+
+export interface LlmProviderDefinition {
+  id: string;
+  name: string;
+  type: "cloud" | "onprem";
+  models: string[];
+  needs_api_key: boolean;
+  needs_base_url: boolean;
+  openai_compat: boolean;
+}

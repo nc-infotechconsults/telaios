@@ -15,9 +15,9 @@ import {
   Switch,
   Spinner,
 } from "@heroui/react";
-import { createAgentProfile, updateAgentProfile, getAgentProfiles, discoverMcpTools } from "../../lib/api";
+import { createAgentProfile, updateAgentProfile, getAgentProfiles, discoverMcpTools, getLlmProviders } from "../../lib/api";
 import { toast } from "../../lib/toast";
-import type { AgentProfile, McpServer, McpToolConfig, McpToolPermission, Skill, JsonSchemaProperty } from "../../types";
+import type { AgentProfile, McpServer, McpToolConfig, McpToolPermission, Skill, JsonSchemaProperty, LlmProviderDefinition } from "../../types";
 
 interface Props {
   initialData?: AgentProfile;
@@ -25,9 +25,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const PROVIDERS = ["openai", "anthropic", "ollama", "vllm", "lmstudio"];
 const AGENT_TYPES: AgentProfile["agent_type"][] = ["langgraph", "opencode", "github-copilot"];
-const OPENAI_COMPAT = ["openai", "vllm", "lmstudio"];
 const SCHEMA_TYPES = ["string", "number", "integer", "boolean", "array", "object"];
 
 /** A single row in the inputSchema / outputSchema property editor. */
@@ -135,17 +133,24 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
   const [allProfiles, setAllProfiles] = useState<AgentProfile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
 
+  // LLM providers from server
+  const [llmProviders, setLlmProviders] = useState<LlmProviderDefinition[]>([]);
+
   // Tab state
   const [activeTab, setActiveTab] = useState("general");
 
-  const needsBaseUrl = ["ollama", "vllm", "lmstudio"].includes(llmProvider);
-  const showPenalties = OPENAI_COMPAT.includes(llmProvider);
+  const currentProvider = llmProviders.find((p) => p.id === llmProvider);
+  const needsBaseUrl = currentProvider?.needs_base_url ?? ["ollama", "vllm", "lmstudio"].includes(llmProvider);
+  const showPenalties = currentProvider?.openai_compat ?? ["openai", "vllm", "lmstudio"].includes(llmProvider);
+  const isOnPrem = currentProvider?.type === "onprem";
 
-  // Load all profiles for sub-agent picker
+  // Load all profiles and LLM providers on mount
   useEffect(() => {
     setLoadingProfiles(true);
-    getAgentProfiles()
-      .then(setAllProfiles)
+    Promise.all([
+      getAgentProfiles().then(setAllProfiles),
+      getLlmProviders().then(setLlmProviders),
+    ])
       .catch(() => {})
       .finally(() => setLoadingProfiles(false));
   }, []);
@@ -391,12 +396,48 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
       </p>
       <Select
         label="Provider"
-        selectedKeys={[llmProvider]}
-        onSelectionChange={(keys) => setLlmProvider(Array.from(keys)[0] as string)}
+        selectedKeys={llmProvider ? [llmProvider] : []}
+        onSelectionChange={(keys) => {
+          const id = Array.from(keys)[0] as string;
+          setLlmProvider(id);
+          // Clear model when switching provider so the user picks a valid one
+          setLlmModel("");
+        }}
+        isLoading={llmProviders.length === 0}
       >
-        {PROVIDERS.map((p) => <SelectItem key={p}>{p}</SelectItem>)}
+        {llmProviders.map((p) => (
+          <SelectItem key={p.id} textValue={p.name}>
+            <div className="flex items-center gap-2">
+              <span>{p.name}</span>
+              {p.type === "onprem" && (
+                <span className="text-[10px] text-default-400 border border-divider rounded px-1">on-prem</span>
+              )}
+            </div>
+          </SelectItem>
+        ))}
       </Select>
-      <Input label="Model" placeholder="gpt-4o" value={llmModel} onValueChange={setLlmModel} />
+
+      {isOnPrem ? (
+        <Input
+          label="Model"
+          placeholder="e.g. llama3, mistral, phi3"
+          value={llmModel}
+          onValueChange={setLlmModel}
+          description="Enter the model name as it appears in your local server."
+        />
+      ) : (
+        <Select
+          label="Model"
+          selectedKeys={llmModel ? [llmModel] : []}
+          onSelectionChange={(keys) => setLlmModel(Array.from(keys)[0] as string)}
+          isDisabled={!currentProvider || currentProvider.models.length === 0}
+          placeholder={currentProvider ? "Select a model" : "Select a provider first"}
+        >
+          {(currentProvider?.models ?? []).map((m) => (
+            <SelectItem key={m}>{m}</SelectItem>
+          ))}
+        </Select>
+      )}
       <Input
         label="API Key"
         type="password"

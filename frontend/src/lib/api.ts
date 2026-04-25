@@ -40,6 +40,7 @@ import type {
   DockerPruneResult,
   K8sPVCFileEntry,
   K8sPVCFileContent,
+  LlmProviderDefinition,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -265,6 +266,11 @@ export const getPlanMessages = (planId: string): Promise<Message[]> =>
 
 export const getMessages = (projectId: string): Promise<Message[]> =>
   DEMO ? delay(demo.MESSAGES[projectId] ?? []) : http.get<Message[]>(`/messages?project_id=${projectId}`).then((r) => r.data);
+
+// ─── LLM Providers ───────────────────────────────────────────────────────────
+
+export const getLlmProviders = (): Promise<LlmProviderDefinition[]> =>
+  DEMO ? delay([]) : http.get<LlmProviderDefinition[]>("/llm/providers").then((r) => r.data);
 
 // ─── Agent Profiles (legacy — retained for settings/admin pages) ──────────────
 
