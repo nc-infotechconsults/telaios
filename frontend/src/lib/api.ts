@@ -180,12 +180,14 @@ export const createRepository = (projectId: string, data: Partial<Repository>): 
         id: `repo-${Date.now()}`,
         project_id: projectId,
         name: data.name ?? "new-repo",
-        source_type: data.source_type ?? "remote",
+        provider_type: data.provider_type ?? "git",
         remote_url: data.remote_url,
         branch: data.branch ?? "main",
         auth_type: data.auth_type ?? "none",
         has_credentials: false,
-        local_path: data.local_path,
+        bucket_name: data.bucket_name,
+        region: data.region,
+        endpoint: data.endpoint,
         status: "unconfigured",
         updated_at: new Date().toISOString(),
       })
@@ -204,7 +206,7 @@ export const deleteRepository = (projectId: string, id: string): Promise<void> =
 
 export const testRepository = (
   projectId: string,
-  data: Pick<Repository, "source_type" | "remote_url" | "branch" | "auth_type" | "local_path"> & { credentials?: string }
+  data: Pick<Repository, "provider_type" | "remote_url" | "branch" | "auth_type" | "bucket_name" | "region" | "endpoint"> & { credentials?: string }
 ): Promise<RepositoryTestResult> =>
   DEMO
     ? delay<RepositoryTestResult>({ ok: true, code: "OK", message: "Demo: repository reachable", default_branch: data.branch ?? "main" })
@@ -466,7 +468,7 @@ export const listDocuments = (projectId: string): Promise<Document[]> =>
 export const getDocument = (projectId: string, documentId: string): Promise<Document> =>
   http.get<Document>(`/projects/${projectId}/documents/${documentId}`).then((r) => r.data);
 
-export const uploadDocument = (projectId: string, file: File): Promise<Document> => {
+export const uploadDocument = (projectId: string, file: File, folderId?: string | null): Promise<Document> => {
   if (DEMO) {
     return delay<Document>({
       id: `doc-${Date.now()}`,
@@ -480,7 +482,7 @@ export const uploadDocument = (projectId: string, file: File): Promise<Document>
       status: "processing",
       error_message: null,
       metadata: null,
-      folder_id: null,
+      folder_id: folderId ?? null,
       current_version_id: null,
       uploaded_by: null,
       created_at: new Date().toISOString(),
@@ -489,6 +491,7 @@ export const uploadDocument = (projectId: string, file: File): Promise<Document>
   }
   const form = new FormData();
   form.append("file", file);
+  if (folderId) form.append("folder_id", folderId);
   return http.post<Document>(`/projects/${projectId}/documents`, form).then((r) => r.data);
 };
 

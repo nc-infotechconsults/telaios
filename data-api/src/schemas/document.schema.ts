@@ -27,6 +27,7 @@ export const CreateDocumentSchema = z.object({
   checksum_sha256: z.string().min(1),
   status: DocumentStatusSchema.optional().default("uploading"),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().default(null),
+  folder_id: z.string().uuid().nullable().optional().default(null),
 });
 
 export const PatchDocumentStatusSchema = z.object({

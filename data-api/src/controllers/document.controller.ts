@@ -41,6 +41,8 @@ export async function uploadDocument(req: Request, res: Response) {
 
   await uploadToS3(s3_key, buffer, mimetype);
 
+  const folderId = req.body?.folder_id ?? null;
+
   const parsed = CreateDocumentSchema.safeParse({
     name: originalname,
     file_type,
@@ -49,6 +51,7 @@ export async function uploadDocument(req: Request, res: Response) {
     size_bytes: size,
     checksum_sha256,
     status: "processing",
+    folder_id: folderId || null,
   });
 
   if (!parsed.success) {

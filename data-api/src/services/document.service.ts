@@ -28,6 +28,7 @@ export async function createDocument(
       checksum_sha256: dto.checksum_sha256,
       status: dto.status ?? "uploading",
       metadata: dto.metadata ?? null,
+      folder_id: dto.folder_id ?? null,
     }),
   );
 }

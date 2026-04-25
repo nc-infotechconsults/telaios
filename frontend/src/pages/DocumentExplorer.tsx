@@ -229,7 +229,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
     const file = e.target.files[0];
     setUploading(true);
     try {
-      await uploadDocument(projectId, file);
+      await uploadDocument(projectId, file, activeSection === "all" ? currentFolderId : null);
       toast.success(`"${file.name}" uploaded`);
       await loadData();
     } catch {
