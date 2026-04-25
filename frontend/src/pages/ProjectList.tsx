@@ -62,6 +62,17 @@ export default function ProjectList() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
+  const [search, setSearch] = useState("");
+
+  const filteredProjects = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.description ?? "").toLowerCase().includes(q)
+    );
+  }, [projects, search]);
 
   const fetchProjects = () => {
     setLoading(true);
@@ -95,8 +106,8 @@ export default function ProjectList() {
 
   const pagedProjects = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return projects.slice(start, start + pageSize);
-  }, [projects, page, pageSize]);
+    return filteredProjects.slice(start, start + pageSize);
+  }, [filteredProjects, page, pageSize]);
 
   const handleCreate = async (onClose: () => void) => {
     if (!name.trim()) return;
@@ -130,7 +141,25 @@ export default function ProjectList() {
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-default-400 text-sm mt-1">Plan and execute software tasks with AI agents</p>
         </div>
-        <Button color="primary" size="md" onPress={onOpen}>+ New Project</Button>
+        <div className="flex items-center gap-3">
+          {projects.length > 0 && (
+            <Input
+              size="sm"
+              placeholder="Search projects…"
+              value={search}
+              onValueChange={(v) => { setSearch(v); setPage(1); }}
+              isClearable
+              onClear={() => { setSearch(""); setPage(1); }}
+              className="w-56"
+              startContent={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-default-400 shrink-0" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              }
+            />
+          )}
+          <Button color="primary" size="md" onPress={onOpen}>+ New Project</Button>
+        </div>
       </div>
 
       {loading && (
@@ -159,13 +188,26 @@ export default function ProjectList() {
             onModeChange={setViewMode}
             page={page}
             pageSize={pageSize}
-            total={projects.length}
+            total={filteredProjects.length}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
           />
 
+          {filteredProjects.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+              <p className="text-default-400 text-sm">No projects match <strong>&ldquo;{search}&rdquo;</strong></p>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => { setSearch(""); setPage(1); }}
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+
           {/* ── Grid ── */}
-          {viewMode === "grid" && (
+          {filteredProjects.length > 0 && viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {pagedProjects.map((p) => {
                 const repos = reposByProject[p.id] ?? [];
@@ -209,7 +251,7 @@ export default function ProjectList() {
           )}
 
           {/* ── List ── */}
-          {viewMode === "list" && (
+          {filteredProjects.length > 0 && viewMode === "list" && (
             <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
               {pagedProjects.map((p) => {
                 const repos = reposByProject[p.id] ?? [];
@@ -244,7 +286,7 @@ export default function ProjectList() {
           )}
 
           {/* ── Table ── */}
-          {viewMode === "table" && (
+          {filteredProjects.length > 0 && viewMode === "table" && (
             <div className="clay-card overflow-hidden">
             <Table
               aria-label="Projects table"
