@@ -55,6 +55,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isOpen: isFolderModalOpen, onOpen: openFolderModal, onClose: closeFolderModal } = useDisclosure();
 
   // Build breadcrumb path from current folder
@@ -92,16 +93,35 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
       setFolders(foldersData);
       setDocuments(docsData);
       setFavoriteIds(favsData);
+      return docsData;
     } catch {
       toast.error("Failed to load documents");
+      return [];
     } finally {
       setLoading(false);
     }
   }, [projectId]);
 
+  // Poll while any document is still in processing/uploading state
+  const schedulePoll = useCallback((docs: Document[]) => {
+    if (pollRef.current) clearTimeout(pollRef.current);
+    const needsPoll = docs.some((d) => d.status === "processing" || d.status === "uploading");
+    if (!needsPoll || !projectId) return;
+    pollRef.current = setTimeout(async () => {
+      try {
+        const updated = await listDocuments(projectId);
+        setDocuments(updated);
+        schedulePoll(updated);
+      } catch {
+        // silently retry on next poll cycle
+      }
+    }, 3000);
+  }, [projectId]);
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData().then((docs) => { if (docs) schedulePoll(docs); });
+    return () => { if (pollRef.current) clearTimeout(pollRef.current); };
+  }, [loadData, schedulePoll]);
 
   // Handle section changes
   useEffect(() => {
@@ -231,7 +251,8 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
     try {
       await uploadDocument(projectId, file, activeSection === "all" ? currentFolderId : null);
       toast.success(`"${file.name}" uploaded`);
-      await loadData();
+      const updated = await loadData();
+      if (updated) schedulePoll(updated);
     } catch {
       toast.error("Upload failed");
     } finally {

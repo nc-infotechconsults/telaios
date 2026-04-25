@@ -159,6 +159,12 @@ function GridCard({
           {doc.status}
         </Chip>
       </div>
+
+      {doc.status === "error" && doc.error_message && (
+        <p className="text-[10px] text-danger text-center line-clamp-2 leading-tight" title={doc.error_message}>
+          {doc.error_message}
+        </p>
+      )}
     </div>
   );
 }
@@ -192,7 +198,14 @@ function ListRow({
     >
       <div className="flex items-center gap-2.5 min-w-0">
         <FileTypeIcon fileType={doc.file_type} size="sm" />
-        <span className="text-sm font-medium text-foreground truncate">{doc.name}</span>
+        <div className="min-w-0">
+          <span className="text-sm font-medium text-foreground truncate block">{doc.name}</span>
+          {doc.status === "error" && doc.error_message && (
+            <span className="text-[10px] text-danger truncate block" title={doc.error_message}>
+              {doc.error_message}
+            </span>
+          )}
+        </div>
       </div>
       <span className="text-xs text-default-400 uppercase">{doc.file_type}</span>
       <span className="text-xs text-default-400">{formatBytes(doc.size_bytes)}</span>
