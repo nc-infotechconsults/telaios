@@ -4,7 +4,7 @@ const VIEWS: { mode: ViewMode; label: string; icon: string }[] = [
   {
     mode: "grid",
     label: "Grid",
-    icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="3" width="8" height="8" rx="1.5"/>
       <rect x="13" y="3" width="8" height="8" rx="1.5"/>
       <rect x="3" y="13" width="8" height="8" rx="1.5"/>
@@ -14,13 +14,13 @@ const VIEWS: { mode: ViewMode; label: string; icon: string }[] = [
   {
     mode: "list",
     label: "List",
-    icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    icon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="8" y1="6" x2="21" y2="6"/>
       <line x1="8" y1="12" x2="21" y2="12"/>
       <line x1="8" y1="18" x2="21" y2="18"/>
-      <circle cx="3.5" cy="6" r="1.5" fill="currentColor" stroke="none"/>
-      <circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-      <circle cx="3.5" cy="18" r="1.5" fill="currentColor" stroke="none"/>
+      <circle cx="3.5" cy="6" r="1.5"/>
+      <circle cx="3.5" cy="12" r="1.5"/>
+      <circle cx="3.5" cy="18" r="1.5"/>
     </svg>`,
   },
   {

@@ -36,6 +36,16 @@ export const PatchRepositorySchema = z.object({
   error_message: z.string().optional(),
 });
 
+export const TestRepositorySchema = z.object({
+  source_type: RepositorySourceTypeSchema,
+  remote_url: z.string().optional(),
+  branch: z.string().optional(),
+  auth_type: RepositoryAuthTypeSchema.optional(),
+  credentials: z.string().optional(),
+  local_path: z.string().optional(),
+});
+
 export type RepositorySourceTypeDto = z.infer<typeof RepositorySourceTypeSchema>;
 export type CreateRepositoryDto = z.infer<typeof CreateRepositorySchema>;
 export type PatchRepositoryDto = z.infer<typeof PatchRepositorySchema>;
+export type TestRepositoryDto = z.infer<typeof TestRepositorySchema>;
