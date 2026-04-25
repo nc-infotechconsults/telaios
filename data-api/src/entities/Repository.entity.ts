@@ -12,6 +12,7 @@ import type { Relation } from "typeorm";
 import { Project } from "./Project.entity";
 import { TaskRepository } from "./TaskRepository.entity";
 
+export type RepositoryProviderType = "github" | "gitlab" | "bitbucket" | "git" | "s3";
 export type RepositoryAuthType = "none" | "token" | "ssh";
 export type RepositoryStatus =
   | "unconfigured"
@@ -46,11 +47,17 @@ export class Repository {
   @Column({ nullable: true })
   credentials!: string;
 
-  @Column({ type: "varchar", default: "remote" })
-  source_type!: string;
+  @Column({ type: "varchar", default: "git" })
+  provider_type!: RepositoryProviderType;
 
   @Column({ nullable: true })
-  local_path!: string;
+  bucket_name!: string;
+
+  @Column({ nullable: true })
+  region!: string;
+
+  @Column({ nullable: true })
+  endpoint!: string;
 
   @Column({ type: "varchar", default: "unconfigured" })
   status!: RepositoryStatus;

@@ -1,7 +1,8 @@
 import { spawn } from "child_process";
-import { mkdtemp, writeFile, rm, access, constants } from "fs/promises";
+import { mkdtemp, writeFile, rm } from "fs/promises";
 import path from "path";
 import os from "os";
+import { S3Client, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { AppDataSource } from "../configs/data-source.config";
 import { Repository } from "../entities/Repository.entity";
 import { encrypt, decrypt } from "../utils/crypto.util";
@@ -74,39 +75,45 @@ function sanitizeOutput(text: string, sensitiveValues: string[]): string {
   return result.trim();
 }
 
-async function testLocalRepository(localPath: string): Promise<RepoTestResult> {
-  if (!localPath) {
-    return { ok: false, code: "INVALID_PATH", message: "Local path is required" };
-  }
-  if (!path.isAbsolute(localPath)) {
-    return { ok: false, code: "INVALID_PATH", message: "Path must be absolute" };
-  }
-  const normalized = path.normalize(localPath);
-  if (normalized.split(path.sep).includes("..")) {
-    return { ok: false, code: "INVALID_PATH", message: "Path contains invalid traversal" };
-  }
+async function testS3Repository(dto: TestRepositoryDto): Promise<RepoTestResult> {
+  const { bucket_name, region, endpoint, credentials } = dto;
 
+  if (!bucket_name) return { ok: false, code: "INVALID_PATH", message: "Bucket name is required" };
+  if (!credentials) return { ok: false, code: "AUTH_FAILED", message: "S3 credentials are required" };
+
+  let creds: { access_key_id: string; secret_access_key: string };
   try {
-    await access(normalized, constants.R_OK);
+    creds = JSON.parse(credentials) as { access_key_id: string; secret_access_key: string };
   } catch {
-    return { ok: false, code: "INVALID_PATH", message: "Path does not exist or is not readable" };
+    return { ok: false, code: "AUTH_FAILED", message: "Invalid credentials format" };
   }
 
+  const client = new S3Client({
+    region: region || "us-east-1",
+    endpoint: endpoint || undefined,
+    forcePathStyle: !!endpoint,
+    credentials: {
+      accessKeyId: creds.access_key_id,
+      secretAccessKey: creds.secret_access_key,
+    },
+  });
+
   try {
-    const result = await runGitCommand(
-      ["-C", normalized, "rev-parse", "--is-inside-work-tree"],
-      { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-      10_000
-    );
-    if (result.code === 0 && result.stdout.trim() === "true") {
-      return { ok: true, code: "OK", message: "Valid local Git repository" };
+    await client.send(new HeadBucketCommand({ Bucket: bucket_name }));
+    return { ok: true, code: "OK", message: `Bucket "${bucket_name}" is accessible` };
+  } catch (err: unknown) {
+    const name = (err as { name?: string }).name;
+    if (name === "NoSuchBucket" || name === "NotFound") {
+      return { ok: false, code: "NETWORK_ERROR", message: `Bucket "${bucket_name}" does not exist` };
     }
-    return { ok: false, code: "NOT_A_REPO", message: "Path exists but is not a Git repository" };
-  } catch (err) {
-    if (err instanceof Error && err.message === "TIMEOUT") {
-      return { ok: false, code: "TIMEOUT", message: "Git command timed out" };
+    if (name === "InvalidAccessKeyId" || name === "SignatureDoesNotMatch" || name === "InvalidClientTokenId") {
+      return { ok: false, code: "AUTH_FAILED", message: "Invalid AWS credentials" };
     }
-    return { ok: false, code: "UNKNOWN_ERROR", message: "Failed to check repository" };
+    if (name === "AccessDenied" || name === "Forbidden") {
+      return { ok: false, code: "AUTH_FAILED", message: "Access denied. Check bucket permissions." };
+    }
+    const msg = (err as Error).message ?? "Unknown error";
+    return { ok: false, code: "UNKNOWN_ERROR", message: msg };
   }
 }
 
@@ -259,6 +266,6 @@ export async function deleteRepository(id: string): Promise<void> {
 }
 
 export async function testRepository(dto: TestRepositoryDto): Promise<RepoTestResult> {
-  if (dto.source_type === "local") return testLocalRepository(dto.local_path ?? "");
+  if (dto.provider_type === "s3") return testS3Repository(dto);
   return testRemoteRepository(dto);
 }

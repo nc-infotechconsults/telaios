@@ -3,7 +3,7 @@ import { z } from "zod";
 export const RepositoryAuthTypeSchema = z.enum(["none", "token", "ssh"]);
 export const RepositoryStatusSchema = z.enum(["unconfigured", "cloning", "ready", "error"]);
 
-export const RepositorySourceTypeSchema = z.enum(["remote", "local"]);
+export const RepositoryProviderTypeSchema = z.enum(["github", "gitlab", "bitbucket", "git", "s3"]);
 
 // Restrict name to safe filesystem characters — prevents path traversal when
 // directory names are derived from this field (e.g. /workspaces/<project>/<name>).
@@ -16,36 +16,42 @@ const safeName = z
 
 export const CreateRepositorySchema = z.object({
   name: safeName,
-  source_type: RepositorySourceTypeSchema.optional(),
+  provider_type: RepositoryProviderTypeSchema.optional(),
   remote_url: z.string().optional(),
   branch: z.string().optional(),
   auth_type: RepositoryAuthTypeSchema.optional(),
   credentials: z.string().optional(),
-  local_path: z.string().optional(),
+  bucket_name: z.string().optional(),
+  region: z.string().optional(),
+  endpoint: z.string().optional(),
 });
 
 export const PatchRepositorySchema = z.object({
   name: safeName.optional(),
-  source_type: RepositorySourceTypeSchema.optional(),
+  provider_type: RepositoryProviderTypeSchema.optional(),
   remote_url: z.string().optional(),
   branch: z.string().optional(),
   auth_type: RepositoryAuthTypeSchema.optional(),
   credentials: z.string().optional(),
-  local_path: z.string().optional(),
+  bucket_name: z.string().optional(),
+  region: z.string().optional(),
+  endpoint: z.string().optional(),
   status: RepositoryStatusSchema.optional(),
   error_message: z.string().optional(),
 });
 
 export const TestRepositorySchema = z.object({
-  source_type: RepositorySourceTypeSchema,
+  provider_type: RepositoryProviderTypeSchema,
   remote_url: z.string().optional(),
   branch: z.string().optional(),
   auth_type: RepositoryAuthTypeSchema.optional(),
   credentials: z.string().optional(),
-  local_path: z.string().optional(),
+  bucket_name: z.string().optional(),
+  region: z.string().optional(),
+  endpoint: z.string().optional(),
 });
 
-export type RepositorySourceTypeDto = z.infer<typeof RepositorySourceTypeSchema>;
+export type RepositoryProviderTypeDto = z.infer<typeof RepositoryProviderTypeSchema>;
 export type CreateRepositoryDto = z.infer<typeof CreateRepositorySchema>;
 export type PatchRepositoryDto = z.infer<typeof PatchRepositorySchema>;
 export type TestRepositoryDto = z.infer<typeof TestRepositorySchema>;

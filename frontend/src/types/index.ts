@@ -36,17 +36,23 @@ export interface ProjectMember {
   user: Pick<User, "id" | "email" | "display_name">;
 }
 
+export type RepositoryProviderType = "github" | "gitlab" | "bitbucket" | "git" | "s3";
+
 export interface Repository {
   id: string;
   project_id: string;
   name: string;
-  source_type: "remote" | "local";
+  provider_type: RepositoryProviderType;
+  // Git fields
   remote_url?: string;
   branch?: string;
   auth_type: "none" | "token" | "ssh";
   has_credentials: boolean;
-  local_path?: string;
-  local_clone_path?: string;
+  // S3 fields
+  bucket_name?: string;
+  region?: string;
+  endpoint?: string;
+  // Common
   status: RepoStatus;
   error_message?: string;
   updated_at: string;

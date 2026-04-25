@@ -71,7 +71,7 @@ export const HelmService = {
     const charts: HelmChart[] = [];
 
     for (const repo of repos) {
-      const basePath = repo.local_path ?? path.join(WORKSPACES_ROOT, projectId, repo.name);
+      const basePath = path.join(WORKSPACES_ROOT, projectId, repo.name);
       try {
         await walkForCharts(basePath, basePath, charts, repo.name);
       } catch {
