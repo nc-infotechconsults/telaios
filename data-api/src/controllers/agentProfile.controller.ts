@@ -41,6 +41,7 @@ export async function deleteAgentProfile(req: Request, res: Response) {
 interface DiscoveredTool {
   name: string;
   description?: string;
+  inputSchema?: Record<string, unknown>;
 }
 
 interface JsonRpcMessage {
@@ -123,6 +124,7 @@ async function discoverStdioTools(
         const tools: DiscoveredTool[] = (result?.tools ?? []).map((t) => ({
           name: t.name,
           description: t.description,
+          inputSchema: t.inputSchema,
         }));
         resolve(tools);
       } catch (err) {
@@ -199,6 +201,7 @@ export async function discoverMcpTools(req: Request, res: Response) {
       const tools: DiscoveredTool[] = (json.result?.tools ?? []).map((t) => ({
         name: t.name,
         description: t.description,
+        inputSchema: t.inputSchema,
       }));
 
       return res.json({ tools });

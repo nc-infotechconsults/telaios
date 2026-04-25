@@ -296,15 +296,15 @@ export const deleteAgentProfile = (id: string): Promise<void> =>
 
 export const discoverMcpTools = (
   serverConfig: Partial<import("../types").McpServer>
-): Promise<Array<{ name: string; description?: string }>> =>
+): Promise<Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>> =>
   DEMO
     ? delay([
-        { name: "read_file", description: "Read a file from the filesystem" },
-        { name: "write_file", description: "Write content to a file" },
-        { name: "list_directory", description: "List files in a directory" },
+        { name: "read_file", description: "Read a file from the filesystem", inputSchema: { type: "object", properties: { path: { type: "string", description: "Absolute or relative path to the file" }, encoding: { type: "string", description: "Character encoding (default: utf-8)" } }, required: ["path"] } },
+        { name: "write_file", description: "Write content to a file", inputSchema: { type: "object", properties: { path: { type: "string", description: "Target file path" }, content: { type: "string", description: "Content to write" } }, required: ["path", "content"] } },
+        { name: "list_directory", description: "List files in a directory", inputSchema: { type: "object", properties: { path: { type: "string", description: "Directory path to list" } }, required: ["path"] } },
       ])
     : http
-        .post<{ tools: Array<{ name: string; description?: string }> }>("/agent-profiles/mcp-discover", serverConfig)
+        .post<{ tools: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }> }>("/agent-profiles/mcp-discover", serverConfig)
         .then((r) => r.data.tools ?? []);
 
 // ─── Library Agents ───────────────────────────────────────────────────────────

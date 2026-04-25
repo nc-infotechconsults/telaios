@@ -118,6 +118,8 @@ export type McpToolPermission = "read" | "write" | "execute" | "require-confirma
 export interface McpToolConfig {
   name: string;
   description?: string;
+  /** JSON Schema for the tool's input parameters (from MCP tools/list). */
+  inputSchema?: Record<string, unknown>;
   /** Whether the tool is allowed (true) or blocked (false). Defaults to true. */
   allowed: boolean;
   /** Fine-grained permission tags. */
