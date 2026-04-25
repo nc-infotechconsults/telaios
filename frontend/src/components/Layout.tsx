@@ -104,6 +104,32 @@ const NAV_ITEMS = [
   { to: "/library", end: false, label: "Library", icon: <BotIcon /> },
 ];
 
+// ─── Collapsed tooltip ────────────────────────────────────────────────────────
+
+function CollapsedTooltip({ label }: { label: string }) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  return (
+    <span
+      className="absolute inset-0"
+      onMouseEnter={(e) => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        setPos({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+      }}
+      onMouseLeave={() => setPos(null)}
+    >
+      {pos && (
+        <span
+          style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateY(-50%)", zIndex: 9999 }}
+          className="px-2 py-1 rounded-md text-xs font-medium bg-foreground text-background whitespace-nowrap shadow-md pointer-events-none"
+        >
+          {label}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ─── Sidebar nav link ─────────────────────────────────────────────────────────
 
 function SideNavLink({
@@ -117,7 +143,7 @@ function SideNavLink({
       end={end}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-xl text-sm font-medium transition-colors group relative
+        `flex items-center gap-3 rounded-xl text-sm font-medium transition-colors relative
         ${collapsed ? "justify-center px-0 py-2.5 mx-1" : "px-3 py-2.5"}
         ${isActive
           ? "bg-primary/10 text-primary"
@@ -130,16 +156,7 @@ function SideNavLink({
           <span className="shrink-0">{icon}</span>
           {!collapsed && <span>{label}</span>}
           {!collapsed && isActive && <span className="sr-only">(current page)</span>}
-          {/* Tooltip when collapsed */}
-          {collapsed && (
-            <span className="
-              pointer-events-none absolute left-full ml-2 px-2 py-1 rounded-md text-xs font-medium
-              bg-foreground text-background whitespace-nowrap opacity-0 group-hover:opacity-100
-              transition-opacity z-50 shadow-md
-            ">
-              {label}
-            </span>
-          )}
+          {collapsed && <CollapsedTooltip label={label} />}
         </>
       )}
     </NavLink>
@@ -221,7 +238,7 @@ export default function Layout() {
       )}
 
       {/* Navigation */}
-      <nav aria-label="Main navigation" className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+      <nav aria-label="Main navigation" className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
         {NAV_ITEMS.map((item) => (
           <SideNavLink
             key={item.to}
