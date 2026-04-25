@@ -1104,13 +1104,13 @@ function McpToolSelector({
       {tools.length > 0 && (
         <div className="max-h-72 overflow-y-auto space-y-1.5 rounded-lg border border-divider p-2">
           {tools.map((tool, ti) => {
-            const hasDetails = !!(tool.description || tool.inputSchema);
-            const isExpanded = expanded.has(ti);
             const props = tool.inputSchema
               ? (tool.inputSchema.properties as Record<string, { type?: string; description?: string }> | undefined) ?? {}
               : {};
             const required = new Set<string>((tool.inputSchema?.required as string[] | undefined) ?? []);
             const paramEntries = Object.entries(props);
+            const hasParams = paramEntries.length > 0;
+            const isExpanded = expanded.has(ti);
             return (
               <div key={ti} className="flex flex-col gap-1 p-1.5 rounded bg-default-100/50">
                 <div className="flex items-center gap-2">
@@ -1122,14 +1122,14 @@ function McpToolSelector({
                     aria-label={`${tool.allowed ? "Allow" : "Deny"} ${tool.name}`}
                   />
                   <span className="font-mono text-xs flex-1 truncate">{tool.name}</span>
-                  {hasDetails && (
+                  {hasParams && (
                     <button
                       type="button"
                       onClick={() => toggleExpand(ti)}
                       className="text-[10px] text-default-400 hover:text-default-600 leading-none px-1"
-                      aria-label={isExpanded ? "Collapse details" : "Show details"}
+                      aria-label={isExpanded ? "Hide parameters" : "Show parameters"}
                     >
-                      {isExpanded ? "▲" : "▼"}
+                      {isExpanded ? "▲ params" : "▼ params"}
                     </button>
                   )}
                   <button
@@ -1142,30 +1142,29 @@ function McpToolSelector({
                   </button>
                 </div>
 
-                {isExpanded && hasDetails && (
-                  <div className="pl-9 space-y-1.5 pb-1">
-                    {tool.description && (
-                      <p className="text-[11px] text-default-500 italic leading-relaxed">{tool.description}</p>
-                    )}
-                    {paramEntries.length > 0 && (
-                      <div className="space-y-0.5">
-                        <p className="text-[10px] font-semibold text-default-400 uppercase tracking-wide">Parameters</p>
-                        {paramEntries.map(([pname, def]) => (
-                          <div key={pname} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px]">
-                            <span className="font-mono text-default-700">{pname}</span>
-                            {def.type && (
-                              <span className="text-[10px] px-1 rounded bg-primary-100 text-primary-700">{def.type}</span>
-                            )}
-                            {required.has(pname) && (
-                              <span className="text-[10px] text-danger font-medium">required</span>
-                            )}
-                            {def.description && (
-                              <span className="text-default-400">— {def.description}</span>
-                            )}
-                          </div>
-                        ))}
+                {/* Description — always visible */}
+                {tool.description && (
+                  <p className="pl-9 text-[11px] text-default-500 italic leading-relaxed">{tool.description}</p>
+                )}
+
+                {/* Parameters — behind expand toggle */}
+                {hasParams && isExpanded && (
+                  <div className="pl-9 space-y-0.5 pb-1">
+                    <p className="text-[10px] font-semibold text-default-400 uppercase tracking-wide">Parameters</p>
+                    {paramEntries.map(([pname, def]) => (
+                      <div key={pname} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px]">
+                        <span className="font-mono text-default-700">{pname}</span>
+                        {def.type && (
+                          <span className="text-[10px] px-1 rounded bg-primary-100 text-primary-700">{def.type}</span>
+                        )}
+                        {required.has(pname) && (
+                          <span className="text-[10px] text-danger font-medium">required</span>
+                        )}
+                        {def.description && (
+                          <span className="text-default-400">— {def.description}</span>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
 
