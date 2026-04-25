@@ -3,6 +3,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CreateBucketCommand,
+  HeadBucketCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -55,4 +57,16 @@ export function buildS3Key(
   filename: string,
 ): string {
   return `projects/${projectId}/documents/${documentId}/${filename}`;
+}
+
+/**
+ * Ensures the configured S3 bucket exists, creating it if it does not.
+ * Safe to call on every startup — no-ops if the bucket already exists.
+ */
+export async function ensureBucketExists(): Promise<void> {
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+  } catch {
+    await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+  }
 }
