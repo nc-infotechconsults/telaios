@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { CreateRepositorySchema, PatchRepositorySchema } from "../schemas/repository.schema";
+import { CreateRepositorySchema, PatchRepositorySchema, TestRepositorySchema } from "../schemas/repository.schema";
 import * as repositoryService from "../services/repository.service";
 
 export async function listRepositories(req: Request, res: Response) {
@@ -45,4 +45,13 @@ export async function patchRepositoryById(req: Request, res: Response) {
   const updated = await repositoryService.patchRepositoryById(req.params.id, parsed.data);
   if (!updated) return res.status(404).json({ error: "Not found" });
   return res.json(updated);
+}
+
+export async function testRepository(req: Request, res: Response) {
+  const parsed = TestRepositorySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation error", issues: parsed.error.issues });
+  }
+  const result = await repositoryService.testRepository(parsed.data);
+  return res.json(result);
 }

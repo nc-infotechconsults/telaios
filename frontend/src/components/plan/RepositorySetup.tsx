@@ -9,8 +9,8 @@ import {
   CardBody,
   useDisclosure,
 } from "@heroui/react";
-import { createRepository, updateRepository, deleteRepository } from "../../lib/api";
-import type { Repository } from "../../types";
+import { createRepository, updateRepository, deleteRepository, testRepository } from "../../lib/api";
+import type { Repository, RepositoryTestResult } from "../../types";
 import ConfirmModal from "../common/ConfirmModal";
 
 interface Props {
@@ -59,6 +59,8 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<RepositoryTestResult | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Repository | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
@@ -71,6 +73,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
     setForm(EMPTY_FORM);
     setCredential("");
     setEditingId(null);
+    setTestResult(null);
     setShowForm(true);
   }
 
@@ -85,6 +88,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
     });
     setCredential("");
     setEditingId(repo.id);
+    setTestResult(null);
     setShowForm(true);
   }
 
@@ -93,7 +97,26 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
     setForm(EMPTY_FORM);
     setCredential("");
     setEditingId(null);
+    setTestResult(null);
   }
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await testRepository(projectId, {
+        source_type: form.source_type,
+        remote_url: form.remote_url || undefined,
+        branch: form.branch || undefined,
+        auth_type: form.auth_type,
+        local_path: form.local_path || undefined,
+        credentials: credential || undefined,
+      });
+      setTestResult(result);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!isFormValid) return;
@@ -280,13 +303,14 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                   key={type}
                   type="button"
                   aria-pressed={form.source_type === type}
-                  onClick={() =>
+                  onClick={() => {
                     setForm((f) => ({
                       ...f,
                       source_type: type,
                       auth_type: type === "local" ? "none" : f.auth_type,
-                    }))
-                  }
+                    }));
+                    setTestResult(null);
+                  }}
                   className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     form.source_type === type
                       ? "bg-primary text-primary-foreground"
@@ -318,7 +342,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                     placeholder="https://github.com/org/repo.git"
                     size="sm"
                     value={form.remote_url}
-                    onValueChange={(v) => setForm((f) => ({ ...f, remote_url: v }))}
+                    onValueChange={(v) => { setForm((f) => ({ ...f, remote_url: v })); setTestResult(null); }}
                     isRequired
                     className="col-span-2"
                   />
@@ -327,18 +351,19 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                     placeholder="main"
                     size="sm"
                     value={form.branch}
-                    onValueChange={(v) => setForm((f) => ({ ...f, branch: v }))}
+                    onValueChange={(v) => { setForm((f) => ({ ...f, branch: v })); setTestResult(null); }}
                   />
                   <Select
                     label="Authentication"
                     size="sm"
                     selectedKeys={[form.auth_type]}
-                    onSelectionChange={(keys) =>
+                    onSelectionChange={(keys) => {
                       setForm((f) => ({
                         ...f,
                         auth_type: (Array.from(keys)[0] as Repository["auth_type"]) ?? "none",
-                      }))
-                    }
+                      }));
+                      setTestResult(null);
+                    }}
                   >
                     <SelectItem key="none">None (public repo)</SelectItem>
                     <SelectItem key="token">Personal Access Token</SelectItem>
@@ -352,7 +377,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                     type="password"
                     size="sm"
                     value={credential}
-                    onValueChange={setCredential}
+                    onValueChange={(v) => { setCredential(v); setTestResult(null); }}
                     placeholder={
                       form.auth_type === "token"
                         ? "ghp_..."
@@ -375,24 +400,64 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                 placeholder="/home/user/projects/my-repo"
                 size="sm"
                 value={form.local_path}
-                onValueChange={(v) => setForm((f) => ({ ...f, local_path: v }))}
+                onValueChange={(v) => { setForm((f) => ({ ...f, local_path: v })); setTestResult(null); }}
                 description="Absolute path to the repository on the agent's host machine"
                 isRequired
                 classNames={{ input: "font-mono" }}
               />
             )}
 
-            <div className="flex gap-2 pt-1">
+            {/* Test result feedback */}
+            {testResult && (
+              <div
+                className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm border ${
+                  testResult.ok
+                    ? "bg-success-50 border-success-200 text-success-700"
+                    : "bg-danger-50 border-danger-200 text-danger-700"
+                }`}
+                role="status"
+                aria-live="polite"
+              >
+                {testResult.ok ? (
+                  <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                )}
+                <span>
+                  {testResult.message}
+                  {testResult.ok && testResult.default_branch && (
+                    <span className="ml-1 opacity-70">
+                      (default branch: <span className="font-mono">{testResult.default_branch}</span>)
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1 flex-wrap">
               <Button
                 size="sm"
                 color="primary"
                 isLoading={saving}
-                isDisabled={!isFormValid}
+                isDisabled={!isFormValid || testing}
                 onPress={handleSave}
               >
                 {editingId ? "Save Changes" : "Add Repository"}
               </Button>
-              <Button size="sm" variant="light" isDisabled={saving} onPress={cancelForm}>
+              <Button
+                size="sm"
+                variant="bordered"
+                isLoading={testing}
+                isDisabled={!isFormValid || saving}
+                onPress={handleTest}
+              >
+                Test Connection
+              </Button>
+              <Button size="sm" variant="light" isDisabled={saving || testing} onPress={cancelForm}>
                 Cancel
               </Button>
             </div>

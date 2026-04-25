@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   Project,
   Repository,
+  RepositoryTestResult,
   Plan,
   Task,
   TaskArtifact,
@@ -200,6 +201,14 @@ export const updateRepository = (projectId: string, id: string, data: Partial<Re
 
 export const deleteRepository = (projectId: string, id: string): Promise<void> =>
   DEMO ? delay(undefined as unknown as void) : http.delete(`/projects/${projectId}/repositories/${id}`).then(() => undefined);
+
+export const testRepository = (
+  projectId: string,
+  data: Pick<Repository, "source_type" | "remote_url" | "branch" | "auth_type" | "local_path"> & { credentials?: string }
+): Promise<RepositoryTestResult> =>
+  DEMO
+    ? delay<RepositoryTestResult>({ ok: true, code: "OK", message: "Demo: repository reachable", default_branch: data.branch ?? "main" })
+    : http.post<RepositoryTestResult>(`/projects/${projectId}/repositories/test`, data).then((r) => r.data);
 
 // ─── Plans ───────────────────────────────────────────────────────────────────
 

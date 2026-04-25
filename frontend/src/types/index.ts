@@ -52,6 +52,24 @@ export interface Repository {
   updated_at: string;
 }
 
+export type RepoTestCode =
+  | "OK"
+  | "INVALID_URL"
+  | "INVALID_PATH"
+  | "TIMEOUT"
+  | "AUTH_FAILED"
+  | "BRANCH_NOT_FOUND"
+  | "NOT_A_REPO"
+  | "NETWORK_ERROR"
+  | "UNKNOWN_ERROR";
+
+export interface RepositoryTestResult {
+  ok: boolean;
+  code: RepoTestCode;
+  message: string;
+  default_branch?: string;
+}
+
 export interface Plan {
   id: string;
   project_id: string;
