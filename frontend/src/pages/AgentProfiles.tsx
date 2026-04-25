@@ -22,6 +22,7 @@ import { getAgentProfiles, deleteAgentProfile } from "../lib/api";
 import { toast } from "../lib/toast";
 import type { AgentProfile } from "../types";
 import AgentProfileForm from "../components/agents/AgentProfileForm";
+import AgentProfileDetail from "../components/agents/AgentProfileDetail";
 import ConfirmModal from "../components/common/ConfirmModal";
 import ViewModeBar, { type ViewMode, type PageSize } from "../components/common/ViewModeBar";
 
@@ -37,10 +38,13 @@ const TYPE_LABEL: Record<AgentProfile["agent_type"], string> = {
   "github-copilot": "GitHub Copilot",
 };
 
+type ModalMode = "edit" | "view" | null;
+
 export default function AgentProfiles() {
   const [profiles, setProfiles] = useState<AgentProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<AgentProfile | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<AgentProfile | null>(null);
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [isNew, setIsNew] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AgentProfile | null>(null);
@@ -64,8 +68,9 @@ export default function AgentProfiles() {
     return profiles.slice(start, start + pageSize);
   }, [profiles, page, pageSize]);
 
-  const handleEdit = (profile: AgentProfile) => { setEditing(profile); setIsNew(false); onOpen(); };
-  const handleNew = () => { setEditing(null); setIsNew(true); onOpen(); };
+  const handleView = (profile: AgentProfile) => { setSelectedProfile(profile); setModalMode("view"); onOpen(); };
+  const handleEdit = (profile: AgentProfile) => { setSelectedProfile(profile); setModalMode("edit"); setIsNew(false); onOpen(); };
+  const handleNew = () => { setSelectedProfile(null); setModalMode("edit"); setIsNew(true); onOpen(); };
   const handleDelete = (profile: AgentProfile) => { setDeleteTarget(profile); onDeleteOpen(); };
 
   const confirmDelete = async () => {
@@ -168,6 +173,7 @@ export default function AgentProfiles() {
                       )}
                     </div>
                     <div className="flex gap-2 pt-1 border-t border-divider">
+                      <Button size="sm" variant="light" className="flex-1" aria-label={`View ${p.name}`} onPress={() => handleView(p)}>View</Button>
                       <Button size="sm" variant="light" className="flex-1" aria-label={`Edit ${p.name}`} onPress={() => handleEdit(p)}>Edit</Button>
                       <Button size="sm" variant="light" color="danger" className="flex-1" aria-label={`Delete ${p.name}`} isLoading={deletingId === p.id} onPress={() => handleDelete(p)}>Delete</Button>
                     </div>
@@ -207,6 +213,7 @@ export default function AgentProfiles() {
                     <Chip size="sm" color={TYPE_COLOR[p.agent_type]} variant="flat">
                       {TYPE_LABEL[p.agent_type]}
                     </Chip>
+                    <Button size="sm" variant="bordered" onPress={() => handleView(p)}>View</Button>
                     <Button size="sm" variant="bordered" onPress={() => handleEdit(p)}>Edit</Button>
                     <Button size="sm" variant="light" color="danger" isLoading={deletingId === p.id} onPress={() => handleDelete(p)}>Delete</Button>
                   </div>
@@ -266,6 +273,7 @@ export default function AgentProfiles() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button size="sm" variant="bordered" onPress={() => handleView(p)}>View</Button>
                         <Button size="sm" variant="bordered" onPress={() => handleEdit(p)}>Edit</Button>
                         <Button size="sm" variant="light" color="danger" isLoading={deletingId === p.id} onPress={() => handleDelete(p)}>Delete</Button>
                       </div>
@@ -283,15 +291,31 @@ export default function AgentProfiles() {
           {(onClose) => (
             <>
               <ModalHeader className="flex flex-col gap-1">
-                <span>{isNew ? "New Agent Profile" : "Edit Agent Profile"}</span>
-                <span className="text-sm text-default-400 font-normal">
-                  {isNew ? "Configure the LLM, tools, and skills for this agent" : `Editing: ${editing?.name}`}
-                </span>
+                {modalMode === "view" ? (
+                  <span>Agent Profile Details</span>
+                ) : (
+                  <>
+                    <span>{isNew ? "New Agent Profile" : "Edit Agent Profile"}</span>
+                    <span className="text-sm text-default-400 font-normal">
+                      {isNew ? "Configure the LLM, tools, and skills for this agent" : `Editing: ${selectedProfile?.name}`}
+                    </span>
+                  </>
+                )}
               </ModalHeader>
               <ModalBody className="pb-2">
-                <AgentProfileForm initialData={editing ?? undefined} onSaved={() => handleSaved(!!editing)} onCancel={onClose} />
+                {modalMode === "view" && selectedProfile ? (
+                  <AgentProfileDetail profile={selectedProfile} allProfiles={profiles} />
+                ) : (
+                  <AgentProfileForm initialData={selectedProfile ?? undefined} onSaved={() => handleSaved(!!selectedProfile)} onCancel={onClose} />
+                )}
               </ModalBody>
-              <ModalFooter className="pt-0" />
+              <ModalFooter className="pt-0">
+                {modalMode === "view" && (
+                  <Button variant="bordered" onPress={() => { setModalMode("edit"); setIsNew(false); }}>
+                    Edit
+                  </Button>
+                )}
+              </ModalFooter>
             </>
           )}
         </ModalContent>
