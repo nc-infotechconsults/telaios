@@ -15,10 +15,10 @@ export class Migration1776000400000 implements MigrationInterface {
   name = "Migration1776000400000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const [{ count }] = await queryRunner.query<[{ count: string }]>(
+    const rows = await queryRunner.query(
       `SELECT COUNT(*) AS count FROM "users"`
-    );
-    if (Number(count) > 0) return;
+    ) as Array<{ count: string }>;
+    if (Number(rows[0].count) > 0) return;
 
     const email = process.env.ADMIN_EMAIL ?? "admin@telaio.dev";
     const password = process.env.ADMIN_PASSWORD ?? "admin1234";

@@ -26,6 +26,7 @@ import tasksRouter from "./routes/tasks.route";
 import messagesRouter from "./routes/messages.route";
 import settingsRouter from "./routes/settings.route";
 import libraryRouter from "./routes/library.route";
+import agentProfilesRouter from "./routes/agentProfiles.route";
 import workspacesRouter from "./routes/workspaces.route";
 import workspaceItemRouter from "./routes/workspaceItem.route";
 import environmentsRouter from "./routes/environments.route";
@@ -82,6 +83,7 @@ app.use("/tasks", tasksRouter);
 app.use("/messages", messagesRouter);
 app.use("/settings", settingsRouter);
 app.use("/library", libraryRouter);
+app.use("/agent-profiles", agentProfilesRouter);
 app.use("/workspaces", workspaceItemRouter);
 app.use("/environments", environmentItemRouter);
 
