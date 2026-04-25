@@ -1,59 +1,117 @@
 # Telaio
 
-A web-based platform for AI-assisted software project planning and autonomous code execution.
+Telaio is an AI-assisted software delivery platform with a React frontend, a Bun-powered data API, and a Python agent service that plans and executes work across connected repositories.
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `frontend/` | Vite + React web app |
+| `data-api/` | Bun + Express + TypeORM API backed by PostgreSQL |
+| `agent-service/` | Python 3.12 + FastAPI + LangGraph agent runtime |
+| `packages/shared/` | Shared JavaScript package(s) used by the Bun workspaces |
+| `tests/` | Root smoke tests for the running stack |
 
 ## Architecture
 
-- **Frontend**: Vite + React (CSR), TypeScript, HeroUI, React Flow
-- **Data API**: TypeScript + Express + TypeORM + PostgreSQL
-- **Agent Service**: TypeScript + Express + LangGraph.js
-- **Coding Agents**: LangGraph.js driver (default), OpenCode SDK, GitHub Copilot SDK
-- **Real-time**: WebSockets
-- **Cache/PubSub**: Redis
+- **Frontend**: Vite + React + TypeScript
+- **Data API**: Bun + Express + TypeORM + PostgreSQL
+- **Agent service**: Python + FastAPI + LangGraph
+- **Realtime and coordination**: Redis, SSE, background workers
+- **Document storage**: MinIO / S3-compatible storage
 
-## Quick Start
+The frontend talks to the data API and agent service. The data API owns persistence and project metadata, while the Python agent service handles planning, orchestration, document processing, and agent execution.
+
+Standalone IDE code is no longer kept in this repository. IDE capabilities should be provided through Theia integration instead.
+
+## Prerequisites
+
+- **Bun** for the JavaScript workspaces
+- **Python 3.12** for `agent-service/`
+- **Docker Compose** for local infrastructure or full-stack containerized runs
+
+## Environment setup
 
 ```bash
 cp .env.example .env
-# Edit .env with your LLM API keys and encryption key
-docker compose up
 ```
 
-Services:
-- Frontend: http://localhost:5173
-- Data API: http://localhost:3000
-- Agent Service: http://localhost:8000
+Fill in the secrets and API keys before starting the services.
 
-## Development (without Docker)
+## Local development
 
-### Data API
+### 1. Start local infrastructure
+
 ```bash
-cd data-api
-npm install
-npm run migration:run
-npm run dev
+bun run docker:dev
 ```
 
-### Agent Service
+This brings up PostgreSQL, Redis, and MinIO from `docker-compose.dev.yml`.
+
+### 2. Install dependencies
+
 ```bash
-cd agent-service
-npm install
-npm run dev
+bun install
+bun run apps:install
+bun run agent:install
 ```
 
-### Frontend
+### 3. Run the services
+
+Use separate terminals:
+
 ```bash
-cd frontend
-npm install
-npm run dev
+bun run data:dev
+bun run agent:dev
+bun run frontend:dev
 ```
 
-## Features
+The main endpoints are:
 
-- Conversational AI planning agent (LangGraph.js state machine)
-- Dependency-ordered execution plan with DAG visualization (React Flow)
-- Multi-repo project support (distributed/microservice architectures)
-- Pluggable coding agent drivers: LangGraph.js, OpenCode SDK, GitHub Copilot SDK
-- Configurable agent profiles with MCP tools and Claude Skills
-- Multi-provider LLM support: OpenAI, Anthropic, vLLM, Ollama, LM Studio
-- Runtime LLM configuration via web UI (no restart needed)
+| Service | URL |
+| --- | --- |
+| Frontend | http://localhost:5173 |
+| Data API | http://localhost:3000 |
+| Agent service | http://localhost:8000 |
+| MinIO API | http://localhost:9000 |
+| MinIO Console | http://localhost:9001 |
+
+## Docker
+
+To run the main application stack in containers:
+
+```bash
+docker compose up --build
+```
+
+`docker-compose.yml` starts PostgreSQL, Redis, MinIO, `data-api`, `agent-service`, and `frontend`.
+
+## Common root commands
+
+| Command | Purpose |
+| --- | --- |
+| `bun run apps:install` | Install dependencies for the Bun workspaces |
+| `bun run agent:install` | Install Python agent-service dependencies |
+| `bun run data:dev` | Start the data API |
+| `bun run agent:dev` | Start the Python agent service with reload |
+| `bun run frontend:dev` | Start the frontend |
+| `bun run docker:postgres` | Start only PostgreSQL |
+| `bun run docker:redis` | Start only Redis |
+| `bun run docker:dev` | Start PostgreSQL, Redis, and MinIO |
+| `bun run build` | Build the Bun workspaces and install the Python package |
+| `bun run test` | Run the root smoke tests in `tests/` |
+
+## Testing
+
+```bash
+bun run test
+cd data-api && bun run test
+bun run agent:test
+cd frontend && bun run test:e2e
+```
+
+## Notes
+
+- The JavaScript applications are managed from the root Bun workspace.
+- `agent-service/` is intentionally separate from the Bun workspaces and uses Python packaging.
+- If you are working inside a subproject, check for a local `README.md` or `AGENTS.md` first.

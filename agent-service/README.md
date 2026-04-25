@@ -42,10 +42,10 @@ pip install -e ".[dev]"
 uvicorn agent_service.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Or via the root workspace:
+Or via the repository root:
 
 ```bash
-bun run agent-py:dev
+bun run agent:dev
 ```
 
 ## Environment Variables

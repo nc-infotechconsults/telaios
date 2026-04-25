@@ -2,6 +2,7 @@
   "name": "telaio",
   "private": true,
   "version": "0.1.0",
+  "description": "Root workspace for Telaio's Bun-managed apps and Python agent service",
   "workspaces": [
     "packages/*",
     "frontend",
@@ -26,10 +27,7 @@
     "docker:redis": "docker compose -f docker-compose.dev.yml up -d redis",
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
     "test": "bun run --filter=./tests test",
-    "build": "bun run --filter='*' build",
+    "build": "bun run apps:build && bun run agent:build",
     "typecheck": "bun run --filter='*' typecheck"
-  },
-  "devDependencies": {
-    "vite": "^8.0.5"
   }
 }
