@@ -224,7 +224,12 @@ export default function AgentProfiles() {
 
           {/* ── Table ── */}
           {viewMode === "table" && (
-            <Table aria-label="Agent profiles table" removeWrapper>
+            <div className="clay-card overflow-hidden">
+            <Table
+              aria-label="Agent profiles table"
+              removeWrapper
+              classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+            >
               <TableHeader>
                 <TableColumn>NAME</TableColumn>
                 <TableColumn>TYPE</TableColumn>
@@ -282,6 +287,7 @@ export default function AgentProfiles() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </>
       )}

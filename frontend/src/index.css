@@ -258,6 +258,22 @@
   background: rgba(224, 123, 84, 0.08);
 }
 
+/* Table header cell — warm clay tint */
+.clay-table-th {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border-bottom: 1px solid rgba(224, 123, 84, 0.12) !important;
+  font-size: 0.675rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.dark .clay-table-th {
+  background: rgba(35, 28, 24, 0.65) !important;
+}
+
 /* User chat bubble — clay depth on the primary-coloured bubble */
 .clay-bubble-user {
   box-shadow:

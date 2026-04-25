@@ -149,11 +149,11 @@ export default function WorkspaceTab({ projectId, repositories }: Props) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
           {workspaces.map((ws) => (
             <div
               key={ws.id}
-              className="clay-list-item flex items-center gap-4 p-4 rounded-xl"
+              className="clay-list-item flex items-center gap-4 px-4 py-3"
             >
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{ws.name}</p>

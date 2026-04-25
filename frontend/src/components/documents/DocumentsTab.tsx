@@ -168,11 +168,11 @@ export default function DocumentsTab({ projectId }: Props) {
           <p className="text-sm">Upload files to give your agents project knowledge.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
           {documents.map((doc) => (
             <div
               key={doc.id}
-              className="clay-list-item flex items-center gap-3 p-4 rounded-xl"
+              className="clay-list-item flex items-center gap-3 px-4 py-3"
             >
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate text-sm">{doc.name}</p>

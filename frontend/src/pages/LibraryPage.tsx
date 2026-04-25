@@ -449,7 +449,12 @@ export default function LibraryPage() {
 
               {/* ── Table ── */}
               {viewMode === "table" && (
-                <Table aria-label="Agents table" removeWrapper>
+                <div className="clay-card overflow-hidden">
+                <Table
+                  aria-label="Agents table"
+                  removeWrapper
+                  classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+                >
                   <TableHeader>
                     <TableColumn>NAME</TableColumn>
                     <TableColumn>ROLE</TableColumn>
@@ -511,6 +516,7 @@ export default function LibraryPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </>
           )}
@@ -584,51 +590,27 @@ export default function LibraryPage() {
 
               {/* ── List ── */}
               {viewMode === "list" && (
-                <div className="flex flex-col gap-3">
+                <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
                   {pagedMcps.map((mcp) => (
-                    <div
-                      key={mcp.id}
-                      className="flex flex-col gap-1 p-4 clay-card"
-                    >
-                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                        <p className="font-semibold text-sm flex-1 min-w-0 truncate">{mcp.name}</p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Chip size="sm" variant="flat" className="font-mono">
-                            {mcp.command ?? mcp.url}
-                          </Chip>
-                          <span className="text-xs text-default-400">{mcp.usage_count} uses</span>
-                          <Button
-                            size="sm"
-                            variant="light"
-                            onPress={() => {
-                              setEditingMcp(mcp);
-                              setMcpFormOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="light"
-                            color="danger"
-                            onPress={() => setMcpToDelete(mcp)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
+                    <div key={mcp.id} className="clay-list-item flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm block truncate">{mcp.name}</span>
+                        {(mcp.command || mcp.url) && (
+                          <span className="text-xs font-mono text-default-400 block truncate">{mcp.command ?? mcp.url}</span>
+                        )}
+                        {mcp.description && (
+                          <span className="text-xs text-default-400 block truncate">{mcp.description}</span>
+                        )}
                       </div>
-                      {mcp.description && (
-                        <p className="text-xs text-default-500">{mcp.description}</p>
-                      )}
-                      {mcp.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {mcp.tags.map((t) => (
-                            <Chip key={t} size="sm" variant="flat" className="text-xs">
-                              {t}
-                            </Chip>
-                          ))}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {mcp.tags.slice(0, 2).map((t) => (
+                          <Chip key={t} size="sm" variant="flat" className="text-xs hidden sm:flex">{t}</Chip>
+                        ))}
+                        <Chip size="sm" variant="flat" className="font-mono shrink-0">{mcp.transport}</Chip>
+                        <span className="text-xs text-default-400 hidden md:inline">{mcp.usage_count} uses</span>
+                        <Button size="sm" variant="bordered" onPress={() => { setEditingMcp(mcp); setMcpFormOpen(true); }}>Edit</Button>
+                        <Button size="sm" variant="light" color="danger" onPress={() => setMcpToDelete(mcp)}>Delete</Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -636,7 +618,12 @@ export default function LibraryPage() {
 
               {/* ── Table ── */}
               {viewMode === "table" && (
-                <Table aria-label="MCP servers table" removeWrapper>
+                <div className="clay-card overflow-hidden">
+                <Table
+                  aria-label="MCP servers table"
+                  removeWrapper
+                  classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+                >
                   <TableHeader>
                     <TableColumn>NAME</TableColumn>
                     <TableColumn>TRANSPORT</TableColumn>
@@ -647,7 +634,7 @@ export default function LibraryPage() {
                   </TableHeader>
                   <TableBody>
                     {pagedMcps.map((mcp) => (
-                      <TableRow key={mcp.id} className="clay-list-item">
+                      <TableRow key={mcp.id}>
                         <TableCell>
                           <div>
                             <p className="font-medium text-sm">{mcp.name}</p>
@@ -685,6 +672,7 @@ export default function LibraryPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </>
           )}
@@ -802,57 +790,25 @@ export default function LibraryPage() {
 
               {/* ── List ── */}
               {viewMode === "list" && (
-                <div className="flex flex-col gap-3">
+                <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
                   {pagedSkills.map((skill) => (
-                    <div
-                      key={skill.id}
-                      className="flex flex-col gap-1 p-4 clay-card"
-                    >
-                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                         <p className="font-semibold text-sm flex-1 min-w-0 truncate">{skill.name}</p>
-                         <div className="flex items-center gap-2 flex-wrap">
-                           <span className="text-xs text-default-400">{skill.usage_count} uses</span>
-                           <Button
-                             size="sm"
-                             variant="light"
-                             isLoading={exportingSkillId === skill.id}
-                             isDisabled={!!exportingSkillId}
-                             onPress={() => handleExportSkill(skill)}
-                           >
-                             Download
-                           </Button>
-                           <Button
-                             size="sm"
-                             variant="light"
-                             onPress={() => {
-                               setEditingSkill(skill);
-                               setSkillFormOpen(true);
-                             }}
-                           >
-                             Edit
-                           </Button>
-                           <Button
-                             size="sm"
-                             variant="light"
-                             color="danger"
-                             onPress={() => setSkillToDelete(skill)}
-                           >
-                             Delete
-                           </Button>
-                         </div>
-                       </div>
-                      {skill.description && (
-                        <p className="text-xs text-default-500">{skill.description}</p>
-                      )}
-                      {skill.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {skill.tags.map((t) => (
-                            <Chip key={t} size="sm" variant="flat" className="text-xs">
-                              {t}
-                            </Chip>
-                          ))}
-                        </div>
-                      )}
+                    <div key={skill.id} className="clay-list-item flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm block truncate">{skill.name}</span>
+                        {skill.description && (
+                          <span className="text-xs text-default-400 block truncate">{skill.description}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {skill.tags.slice(0, 2).map((t) => (
+                          <Chip key={t} size="sm" variant="flat" className="text-xs hidden sm:flex">{t}</Chip>
+                        ))}
+                        <span className="text-xs text-default-400 hidden md:inline">v{skill.version}</span>
+                        <span className="text-xs text-default-400">{skill.usage_count} uses</span>
+                        <Button size="sm" variant="light" isLoading={exportingSkillId === skill.id} isDisabled={!!exportingSkillId} onPress={() => handleExportSkill(skill)}>Download</Button>
+                        <Button size="sm" variant="bordered" onPress={() => { setEditingSkill(skill); setSkillFormOpen(true); }}>Edit</Button>
+                        <Button size="sm" variant="light" color="danger" onPress={() => setSkillToDelete(skill)}>Delete</Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -860,7 +816,12 @@ export default function LibraryPage() {
 
               {/* ── Table ── */}
               {viewMode === "table" && (
-                <Table aria-label="Skills table" removeWrapper>
+                <div className="clay-card overflow-hidden">
+                <Table
+                  aria-label="Skills table"
+                  removeWrapper
+                  classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+                >
                   <TableHeader>
                     <TableColumn>NAME</TableColumn>
                     <TableColumn>TAGS</TableColumn>
@@ -870,7 +831,7 @@ export default function LibraryPage() {
                   </TableHeader>
                   <TableBody>
                     {pagedSkills.map((skill) => (
-                      <TableRow key={skill.id} className="clay-list-item">
+                      <TableRow key={skill.id}>
                         <TableCell>
                           <div>
                             <p className="font-medium text-sm">{skill.name}</p>
@@ -897,15 +858,7 @@ export default function LibraryPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button
-                              size="sm"
-                              variant="bordered"
-                              isLoading={exportingSkillId === skill.id}
-                              isDisabled={!!exportingSkillId}
-                              onPress={() => handleExportSkill(skill)}
-                            >
-                              Download
-                            </Button>
+                            <Button size="sm" variant="bordered" isLoading={exportingSkillId === skill.id} isDisabled={!!exportingSkillId} onPress={() => handleExportSkill(skill)}>Download</Button>
                             <Button size="sm" variant="bordered" onPress={() => { setEditingSkill(skill); setSkillFormOpen(true); }}>Edit</Button>
                             <Button size="sm" variant="light" color="danger" onPress={() => setSkillToDelete(skill)}>Delete</Button>
                           </div>
@@ -914,6 +867,7 @@ export default function LibraryPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </>
           )}

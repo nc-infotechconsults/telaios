@@ -210,7 +210,7 @@ export default function ProjectList() {
 
           {/* ── List ── */}
           {viewMode === "list" && (
-            <div className="flex flex-col divide-y divide-divider rounded-xl border border-divider overflow-hidden">
+            <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
               {pagedProjects.map((p) => {
                 const repos = reposByProject[p.id] ?? [];
                 return (
@@ -218,7 +218,7 @@ export default function ProjectList() {
                     key={p.id}
                     type="button"
                     onClick={() => navigate(`/projects/${p.id}`)}
-                    className="flex items-center gap-4 px-4 py-3 hover:bg-default-50 transition-colors text-left w-full group"
+                    className="clay-list-item flex items-center gap-4 px-4 py-3 text-left w-full group"
                   >
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-sm group-hover:text-primary transition-colors truncate block">
@@ -245,8 +245,12 @@ export default function ProjectList() {
 
           {/* ── Table ── */}
           {viewMode === "table" && (
-            <div className="overflow-x-auto">
-            <Table aria-label="Projects table" removeWrapper>
+            <div className="clay-card overflow-hidden">
+            <Table
+              aria-label="Projects table"
+              removeWrapper
+              classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+            >
               <TableHeader>
                 <TableColumn>NAME</TableColumn>
                 <TableColumn>STATUS</TableColumn>
@@ -258,7 +262,7 @@ export default function ProjectList() {
                 {pagedProjects.map((p) => {
                   const repos = reposByProject[p.id] ?? [];
                   return (
-                    <TableRow key={p.id} className="cursor-pointer hover:bg-default-50 transition-colors">
+                    <TableRow key={p.id} className="cursor-pointer">
                       <TableCell>
                         <div>
                           <p className="font-medium text-sm">{p.name}</p>

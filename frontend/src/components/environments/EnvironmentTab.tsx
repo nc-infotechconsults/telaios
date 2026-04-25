@@ -127,11 +127,11 @@ export default function EnvironmentTab({ projectId }: Props) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
           {environments.map((env) => (
             <div
               key={env.id}
-              className="clay-list-item flex items-center gap-4 p-4 rounded-xl cursor-pointer"
+              className="clay-list-item flex items-center gap-4 px-4 py-3 cursor-pointer"
               onClick={() => navigate(`/projects/${projectId}/environments/${env.id}`)}
             >
               <div className="flex-1 min-w-0">

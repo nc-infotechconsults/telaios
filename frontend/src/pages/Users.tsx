@@ -316,7 +316,12 @@ export default function Users() {
 
           {/* ── Table ── */}
           {viewMode === "table" && (
-            <Table aria-label="Users table" removeWrapper>
+            <div className="clay-card overflow-hidden">
+            <Table
+              aria-label="Users table"
+              removeWrapper
+              classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+            >
               <TableHeader>
                 <TableColumn>USER</TableColumn>
                 <TableColumn>EMAIL</TableColumn>
@@ -364,6 +369,7 @@ export default function Users() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </>
       )}
