@@ -109,8 +109,9 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
 
       toast.success(isEdit ? "Agent updated" : "Agent created", saved.name);
       onSaved(saved);
-    } catch {
-      toast.error(isEdit ? "Failed to update agent" : "Failed to create agent");
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message;
+      toast.error(isEdit ? "Failed to update agent" : "Failed to create agent", msg);
     } finally {
       setSaving(false);
     }

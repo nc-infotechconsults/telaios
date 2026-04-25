@@ -65,8 +65,9 @@ export async function updateLibraryAgent(id: string, dto: PatchLibraryAgentDto) 
   const agent = await repo().findOne({ where: { id } });
   if (!agent) return null;
 
+  // Allow editing both system and custom agents; promote system→custom on edit
   if (agent.agent_type === "system") {
-    throw Object.assign(new Error("System agents cannot be modified"), { statusCode: 403 });
+    agent.agent_type = "custom";
   }
 
   Object.assign(agent, dto);
@@ -76,10 +77,6 @@ export async function updateLibraryAgent(id: string, dto: PatchLibraryAgentDto) 
 export async function deleteLibraryAgent(id: string) {
   const agent = await repo().findOne({ where: { id } });
   if (!agent) return false;
-
-  if (agent.agent_type === "system") {
-    throw Object.assign(new Error("System agents cannot be deleted"), { statusCode: 403 });
-  }
 
   await repo().softDelete(id);
   return true;
