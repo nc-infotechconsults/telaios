@@ -569,7 +569,10 @@ async def prepare_node(state: PlannerState) -> Dict[str, Any]:
     Load plan context from DB (once) and send greeting on first visit.
     On reconnect (project_id already in state), returns immediately.
     """
-    plan_id = state["plan_id"]
+    plan_id = state.get("plan_id")
+    if not plan_id:
+        logger.error("prepare_node: plan_id missing from state — graph started without initial state")
+        return {}
 
     if state.get("project_id"):
         # Already initialized — reconnect, nothing to do.
@@ -1058,7 +1061,28 @@ async def handle_user_message(plan_id: str, content: str) -> None:
         logger.error("handle_user_message: graph not built for plan %s", plan_id)
         return
 
+    checkpointer = _get_checkpointer()
     thread_config = {"configurable": {"thread_id": plan_id}}
+
+    # Guard: refuse to resume if no checkpoint exists. Without a checkpoint
+    # LangGraph starts a fresh run with an empty state, which crashes prepare_node.
+    if checkpointer is not None:
+        try:
+            checkpoint = await checkpointer.aget(thread_config)
+            if checkpoint is None:
+                logger.error(
+                    "handle_user_message: no checkpoint for plan %s — session not "
+                    "initialised (SSE stream may not have been opened yet)",
+                    plan_id,
+                )
+                return
+        except Exception as exc:
+            logger.warning(
+                "handle_user_message: could not verify checkpoint for %s: %s",
+                plan_id,
+                exc,
+            )
+            # fall through and attempt the resume anyway
 
     try:
         await graph.ainvoke(Command(resume=content), thread_config)

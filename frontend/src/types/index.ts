@@ -740,3 +740,85 @@ export interface LlmProviderDefinition {
   needs_base_url: boolean;
   openai_compat: boolean;
 }
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export type AnalyticsPeriod = "7d" | "30d" | "90d";
+
+export interface DailyThroughput {
+  date: string;
+  done: number;
+  created: number;
+}
+
+export interface AgentStat {
+  agent_profile_id: string | null;
+  total: number;
+  done: number;
+  failed: number;
+  avg_duration_minutes: number | null;
+}
+
+export interface BlockedTask {
+  id: string;
+  title: string;
+  plan_id: string;
+  started_at: string;
+}
+
+export interface ProjectAnalytics {
+  task_status_counts: Record<string, number>;
+  daily_throughput: DailyThroughput[];
+  agent_stats: AgentStat[];
+  blocked_tasks: BlockedTask[];
+}
+
+export interface OrgProjectSummary {
+  project_id: string;
+  project_name: string;
+  project_status: string;
+  project_created_at: string;
+  total_tasks: number;
+  done_tasks: number;
+  failed_tasks: number;
+  in_progress_tasks: number;
+  last_activity: string | null;
+}
+
+export interface DocStat {
+  document_id: string;
+  document_name: string;
+  file_type: string;
+  total_events: number;
+  viewed: number;
+  edited: number;
+  commented: number;
+  agent_events: number;
+  human_events: number;
+}
+
+export interface DocDailyActivity {
+  date: string;
+  total: number;
+  agent_events: number;
+  human_events: number;
+}
+
+export interface RecentDocEvent {
+  id: string;
+  document_id: string;
+  document_name: string;
+  action: string;
+  user_id: string | null;
+  user_name: string | null;
+  created_at: string;
+}
+
+export interface DocumentAnalytics {
+  top_documents: DocStat[];
+  daily_activity: DocDailyActivity[];
+  recent_events: RecentDocEvent[];
+  total_events: number;
+  total_agent_events: number;
+  total_human_events: number;
+}

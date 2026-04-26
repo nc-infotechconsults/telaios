@@ -31,6 +31,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     # Embeddings
     "fastembed>=0.4.0",
+    "langchain-voyageai>=0.3.0",
     # S3 (MinIO)
     "aioboto3>=13.0.0",
     # Git

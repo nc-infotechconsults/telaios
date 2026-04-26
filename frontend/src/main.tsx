@@ -14,6 +14,7 @@ import ExecutionDashboard from "./pages/ExecutionDashboard";
 import LibraryPage from "./pages/LibraryPage";
 import LibraryAgentDetail from "./pages/LibraryAgentDetail";
 import UsersPage from "./pages/Users";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import DocumentViewerPage from "./pages/DocumentViewerPage";
 import EnvironmentDetail from "./pages/EnvironmentDetail";
 import DockerShellPage from "./pages/DockerShellPage";
@@ -49,6 +50,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="/library" element={<LibraryPage />} />
                     <Route path="/library/agents/:agentId" element={<LibraryAgentDetail />} />
                     <Route path="/users" element={<UsersPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
                   </Route>
                 </Route>
               </Routes>

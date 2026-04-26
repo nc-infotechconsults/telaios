@@ -41,6 +41,10 @@ import type {
   K8sPVCFileEntry,
   K8sPVCFileContent,
   LlmProviderDefinition,
+  ProjectAnalytics,
+  OrgProjectSummary,
+  AnalyticsPeriod,
+  DocumentAnalytics,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -1050,3 +1054,37 @@ export const copilotAsk = (projectId: string, documentId: string, question: stri
 
 export const copilotExtract = (projectId: string, documentId: string): Promise<CopilotExtractResult> =>
   http.post<CopilotExtractResult>(`/projects/${projectId}/documents/${documentId}/copilot/extract`).then((r) => r.data);
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export const getProjectAnalytics = (
+  projectId: string,
+  period: AnalyticsPeriod = "7d"
+): Promise<ProjectAnalytics> =>
+  DEMO
+    ? Promise.resolve({
+        task_status_counts: { pending: 3, ready: 2, in_progress: 1, done: 10, failed: 2, cancelled: 0, skipped: 1 },
+        daily_throughput: Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (6 - i));
+          return { date: d.toISOString().slice(0, 10), done: Math.floor(Math.random() * 4), created: Math.floor(Math.random() * 3) };
+        }),
+        agent_stats: [],
+        blocked_tasks: [],
+      })
+    : http.get<ProjectAnalytics>(`/projects/${projectId}/analytics`, { params: { period } }).then((r) => r.data);
+
+export const getOrgAnalytics = (): Promise<OrgProjectSummary[]> =>
+  DEMO
+    ? Promise.resolve([])
+    : http.get<OrgProjectSummary[]>("/analytics").then((r) => r.data);
+
+export const getProjectDocAnalytics = (
+  projectId: string,
+  period: AnalyticsPeriod = "7d"
+): Promise<DocumentAnalytics> =>
+  DEMO
+    ? Promise.resolve({ top_documents: [], daily_activity: [], recent_events: [], total_events: 0, total_agent_events: 0, total_human_events: 0 })
+    : http
+        .get<DocumentAnalytics>(`/projects/${projectId}/analytics/documents`, { params: { period } })
+        .then((r) => r.data);
+

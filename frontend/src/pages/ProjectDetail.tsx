@@ -52,9 +52,10 @@ import DocumentExplorer from "./DocumentExplorer";
 import ConfirmModal from "../components/common/ConfirmModal";
 import WorkspaceTab from "../components/workspace/WorkspaceTab";
 import EnvironmentTab from "../components/environments/EnvironmentTab";
+import AnalyticsTab from "../components/analytics/AnalyticsTab";
 import LibraryBrowserModal from "../components/library/LibraryBrowserModal";
 
-type ActiveTab = "plans" | "repos" | "agents" | "members" | "documents" | "workspaces" | "environments";
+type ActiveTab = "plans" | "repos" | "agents" | "members" | "documents" | "workspaces" | "environments" | "analytics";
 
 const STATUS_COLOR: Record<string, "warning" | "success" | "primary" | "default"> = {
   draft: "warning",
@@ -422,7 +423,7 @@ export default function ProjectDetail() {
 
       {/* Tab bar */}
       <div role="tablist" aria-label="Project sections" className="clay-tab-bar flex border-b border-divider shrink-0 px-1 overflow-x-auto">
-        {(["plans", "repos", "agents", "members", "documents", "workspaces", "environments"] as ActiveTab[]).map((tab) => {
+        {(["plans", "repos", "agents", "members", "documents", "workspaces", "environments", "analytics"] as ActiveTab[]).map((tab) => {
           const label =
             tab === "plans"
               ? `Plans (${plans.length})`
@@ -436,6 +437,8 @@ export default function ProjectDetail() {
               ? "Workspaces"
               : tab === "environments"
               ? "Environments"
+              : tab === "analytics"
+              ? "Analytics"
               : "Documents";
           return (
             <button
@@ -682,6 +685,12 @@ export default function ProjectDetail() {
       {activeTab === "environments" && projectId && (
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <EnvironmentTab projectId={projectId} />
+        </div>
+      )}
+
+      {activeTab === "analytics" && projectId && (
+        <div className="flex-1 overflow-y-auto">
+          <AnalyticsTab projectId={projectId} />
         </div>
       )}
 

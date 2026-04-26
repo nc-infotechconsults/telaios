@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # Optional separate API key / base URL for embeddings
     EMBEDDING_API_KEY: Optional[str] = None
     EMBEDDING_BASE_URL: Optional[str] = None
+    # Embedding provider: "openai" | "voyage" | "" (auto-detect from key)
+    # When using Voyage AI, set EMBEDDING_MODEL to the desired Voyage model
+    # (e.g. "voyage-3-lite" for 512-dim or "voyage-3" for 1024-dim) and
+    # set EMBEDDING_DIMENSION in data-api to the matching value.
+    EMBEDDING_PROVIDER: str = ""
 
     MAX_CONCURRENT_TASKS: int = 1
 

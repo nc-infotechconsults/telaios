@@ -32,6 +32,8 @@ import workspacesRouter from "./routes/workspaces.route";
 import workspaceItemRouter from "./routes/workspaceItem.route";
 import environmentsRouter from "./routes/environments.route";
 import environmentItemRouter from "./routes/environmentItem.route";
+import analyticsRouter from "./routes/analytics.route";
+import * as analyticsController from "./controllers/analytics.controller";
 import { patchRepositoryById } from "./controllers/repository.controller";
 import { authenticate } from "./middleware/authenticate.middleware";
 import logger from "./utils/logger";
@@ -74,6 +76,8 @@ app.use("/projects", documentCopilotRouter);
 app.use(documentTemplatesRouter);
 app.use("/projects", workspacesRouter);
 app.use("/projects", environmentsRouter);
+app.use("/projects", analyticsRouter);
+app.get("/analytics", analyticsController.getOrgAnalytics);
 app.use("/internal", internalRouter);
 
 // Standalone repository PATCH — used by agent-service to update clone status without project_id

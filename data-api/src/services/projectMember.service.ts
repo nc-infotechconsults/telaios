@@ -40,16 +40,27 @@ export async function addMember(projectId: string, dto: AddMemberDto) {
   const existing = await repo().findOneBy({ user_id: dto.user_id, project_id: projectId });
   if (existing) {
     existing.role = dto.role;
-    return repo().save(existing);
+    await repo().save(existing);
+  } else {
+    await repo().save(repo().create({ user_id: dto.user_id, project_id: projectId, role: dto.role }));
   }
-  return repo().save(repo().create({ user_id: dto.user_id, project_id: projectId, role: dto.role }));
+  return repo().findOne({
+    where: { user_id: dto.user_id, project_id: projectId },
+    relations: ["user"],
+    select: { user_id: true, project_id: true, role: true, joined_at: true, user: SAFE_USER_SELECT },
+  });
 }
 
 export async function patchMember(projectId: string, userId: string, dto: PatchMemberDto) {
   const member = await repo().findOneBy({ user_id: userId, project_id: projectId });
   if (!member) return null;
   member.role = dto.role;
-  return repo().save(member);
+  await repo().save(member);
+  return repo().findOne({
+    where: { user_id: userId, project_id: projectId },
+    relations: ["user"],
+    select: { user_id: true, project_id: true, role: true, joined_at: true, user: SAFE_USER_SELECT },
+  });
 }
 
 export async function removeMember(projectId: string, userId: string): Promise<void> {
