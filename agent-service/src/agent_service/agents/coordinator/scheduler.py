@@ -31,8 +31,14 @@ class Scheduler:
     and dispatches them to agent drivers respecting ``MAX_CONCURRENT_TASKS``.
     """
 
-    def __init__(self, pool: AgentPool) -> None:
+    def __init__(self, pool: AgentPool, project_agents: Optional[List[dict]] = None) -> None:
         self._pool = pool
+        # Map from project agent ID → library_agent_id (for usage_count increment).
+        self._library_agent_id_by_profile: Dict[str, str] = {
+            pa["id"]: pa["library_agent_id"]
+            for pa in (project_agents or [])
+            if pa.get("library_agent_id")
+        }
 
     async def run(self, project_id: str, plan_id: str) -> None:
         await data_client.update_plan(plan_id, {"status": "executing"})
@@ -380,6 +386,15 @@ class Scheduler:
 
         if result.success:
             completed_ids.add(task["id"])
+            # Increment usage_count for the source library agent (best-effort).
+            profile_id = task.get("agent_profile_id")
+            if profile_id:
+                lib_id = self._library_agent_id_by_profile.get(profile_id)
+                if lib_id:
+                    try:
+                        await data_client.increment_library_agent_usage(lib_id)
+                    except Exception as err:
+                        logger.warning("[Scheduler] increment_library_agent_usage failed: %s", err)
         else:
             dependents = self._get_transitive_dependents(task["id"], all_tasks, terminal_ids)
             if dependents:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
+from typing import Any, Callable, Coroutine, Dict, Optional
 
 
 _BUILTIN_TOOLS = [
@@ -54,9 +54,15 @@ _BUILTIN_TOOLS = [
     },
 ]
 
+# Type alias for a custom tool handler: receives (args: dict) and returns {"text": str, "is_error": bool}
+CustomToolHandler = Callable[[Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any]]]
+
 
 async def _dispatch_tool(
-    tool_name: str, args: dict, workspaces: dict[str, str]
+    tool_name: str,
+    args: dict,
+    workspaces: dict[str, str],
+    custom_handlers: Optional[Dict[str, CustomToolHandler]] = None,
 ) -> dict:
     primary_workspace = next(iter(workspaces.values()), "/tmp")
 
@@ -106,6 +112,10 @@ async def _dispatch_tool(
 
         if tool_name == "finish":
             return {"text": str(args.get("summary", "")), "is_error": False}
+
+        # Dispatch to custom handler (e.g. sub-agent tools)
+        if custom_handlers and tool_name in custom_handlers:
+            return await custom_handlers[tool_name](args)
 
         return {"text": f"Unknown tool: {tool_name}", "is_error": True}
     except Exception as exc:

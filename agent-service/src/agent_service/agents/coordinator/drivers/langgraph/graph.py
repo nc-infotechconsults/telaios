@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Dict, Optional
 
 from langchain_core.messages import AIMessage as _AI, HumanMessage, SystemMessage, ToolMessage as _TM
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from .state import _CodingState
-from .tools import _dispatch_tool
+from .tools import CustomToolHandler, _dispatch_tool
 
 
-def build_graph(bound_llm: Any, all_tools: list) -> CompiledStateGraph:
+def build_graph(
+    bound_llm: Any,
+    all_tools: list,
+    custom_handlers: Optional[Dict[str, CustomToolHandler]] = None,
+) -> CompiledStateGraph:
     """Compile a think→act LangGraph for a single coding task."""
 
     async def think(state: _CodingState) -> dict:
@@ -62,7 +66,9 @@ def build_graph(bound_llm: Any, all_tools: list) -> CompiledStateGraph:
 
         tool_messages: list[dict] = []
         for call in tool_calls:
-            result = await _dispatch_tool(call["name"], call.get("args", {}), state["workspaces"])
+            result = await _dispatch_tool(
+                call["name"], call.get("args", {}), state["workspaces"], custom_handlers
+            )
             text = result["text"]
             is_error = result["is_error"]
 

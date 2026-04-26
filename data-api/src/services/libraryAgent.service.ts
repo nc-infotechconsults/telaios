@@ -98,3 +98,9 @@ export async function deleteLibraryAgent(id: string) {
   await repo().softDelete(id);
   return true;
 }
+
+export async function incrementUsageCount(id: string): Promise<boolean> {
+  const result = await AppDataSource.getRepository(LibraryAgent)
+    .increment({ id }, "usage_count", 1);
+  return (result.affected ?? 0) > 0;
+}

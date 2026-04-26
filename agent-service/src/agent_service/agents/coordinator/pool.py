@@ -16,6 +16,15 @@ from agent_service.core.types import McpServer, Skill
 from agent_service.crypto import decrypt
 
 
+def _normalize_prompt_mode(raw: str | None) -> str:
+    """Normalize data-api 'append'/'override' to agent-service 'extend'/'override'.
+    Entity default is 'append', which maps to 'extend' in agent-service terminology.
+    """
+    if raw == "append":
+        return "extend"
+    return raw or "extend"
+
+
 @dataclass
 class AgentProfileConfig:
     id: str
@@ -29,13 +38,13 @@ class AgentProfileConfig:
     skills: List[Skill] = field(default_factory=list)
     # ── Configurable agent fields ─────────────────────────────────────────────
     system_prompt: Optional[str] = None
-    system_prompt_mode: str = "override"  # "override" | "extend"
+    system_prompt_mode: str = "extend"  # "extend" (=entity "append") | "override"
     llm_temperature: Optional[float] = None
     llm_max_tokens: Optional[int] = None
     llm_top_p: Optional[float] = None
     llm_frequency_penalty: Optional[float] = None
     llm_presence_penalty: Optional[float] = None
-    sub_agent_ids: List[str] = field(default_factory=list)
+    sub_agents: List[Dict] = field(default_factory=list)
     structured_output: Optional[Dict] = None
 
 
@@ -66,13 +75,13 @@ class AgentPool:
                 mcp_servers=mcp_servers,
                 skills=skills,
                 system_prompt=pa.get("system_prompt"),
-                system_prompt_mode=pa.get("system_prompt_mode") or "override",
+                system_prompt_mode=_normalize_prompt_mode(pa.get("system_prompt_mode")),
                 llm_temperature=pa.get("llm_temperature"),
                 llm_max_tokens=pa.get("llm_max_tokens"),
                 llm_top_p=pa.get("llm_top_p"),
                 llm_frequency_penalty=pa.get("llm_frequency_penalty"),
                 llm_presence_penalty=pa.get("llm_presence_penalty"),
-                sub_agent_ids=pa.get("sub_agent_ids") or [],
+                sub_agents=pa.get("sub_agents") or [],
                 structured_output=pa.get("structured_output"),
             )
             driver = self._build_driver(p)
@@ -109,12 +118,12 @@ class AgentPool:
                 "llmApiKey": api_key,
                 "llmBaseUrl": pa.get("llm_base_url"),
                 "systemPrompt": pa.get("system_prompt"),
-                "systemPromptMode": pa.get("system_prompt_mode") or "override",
+                "systemPromptMode": _normalize_prompt_mode(pa.get("system_prompt_mode")),
                 "llmTemperature": pa.get("llm_temperature"),
                 "llmMaxTokens": pa.get("llm_max_tokens"),
                 "mcpServers": [s.model_dump() for s in mcp_servers],
                 "skills": [s.model_dump() for s in skills],
-                "subAgentIds": pa.get("sub_agent_ids") or [],
+                "subAgents": pa.get("sub_agents") or [],
                 "structuredOutput": pa.get("structured_output"),
             }
 
@@ -168,4 +177,23 @@ class AgentPool:
             system_prompt=profile.system_prompt,
             system_prompt_mode=profile.system_prompt_mode,
             structured_output=profile.structured_output,
+            sub_agents=profile.sub_agents,
         )
+
+    def finalize_sub_agent_tools(self) -> None:
+        """Compile sub-agent tools for all LangGraphDrivers that reference other agents.
+
+        Must be called after both ``initialize()`` and ``register_role_drivers()``
+        so that every referenced sub-agent driver is already present in self._drivers.
+        """
+        from agent_service.agents.coordinator.drivers.langgraph.sub_agent_tools import (
+            build_sub_agent_tools,
+        )
+
+        for driver in self._drivers.values():
+            if not isinstance(driver, LangGraphDriver):
+                continue
+            if not driver._sub_agents:
+                continue
+            tool_defs, handlers = build_sub_agent_tools(driver._sub_agents, self)
+            driver.set_sub_agent_tools(tool_defs, handlers)

@@ -83,7 +83,7 @@ def _build_interview_system(
 
     if planner_agent and planner_agent.get("system_prompt"):
         custom = planner_agent["system_prompt"]
-        mode = planner_agent.get("system_prompt_mode") or "override"
+        mode = planner_agent.get("system_prompt_mode") or "append"
         if mode == "override":
             return custom + STRUCTURED_OUTPUT_INSTRUCTIONS
         return base_content + "\n\n" + custom
@@ -115,7 +115,7 @@ def _build_review_system(
 
     if planner_agent and planner_agent.get("system_prompt"):
         custom = planner_agent["system_prompt"]
-        mode = planner_agent.get("system_prompt_mode") or "override"
+        mode = planner_agent.get("system_prompt_mode") or "append"
         if mode == "override":
             return custom + STRUCTURED_OUTPUT_INSTRUCTIONS
         return base_system + "\n\n" + custom

@@ -6,7 +6,6 @@ import { ProjectMember } from "../../entities/ProjectMember.entity";
 import { Repository } from "../../entities/Repository.entity";
 import { Task } from "../../entities/Task.entity";
 import { Message } from "../../entities/Message.entity";
-import { AgentProfile } from "../../entities/AgentProfile.entity";
 import { Document } from "../../entities/Document.entity";
 import type { DocumentFileType, DocumentStatus } from "../../entities/Document.entity";
 import { Workspace } from "../../entities/Workspace.entity";
@@ -70,10 +69,6 @@ export async function createTestMessage(projectId: string, planId?: string): Pro
   return repo.save(repo.create({ project_id: projectId, plan_id: planId ?? null, role: "user", content: "Hello" }));
 }
 
-export async function createTestAgentProfile(): Promise<AgentProfile> {
-  const repo = AppDataSource.getRepository(AgentProfile);
-  return repo.save(repo.create({ name: "Test Agent", agent_type: "langgraph" }));
-}
 
 export interface DocumentOpts {
   name?: string;

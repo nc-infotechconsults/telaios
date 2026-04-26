@@ -15,11 +15,19 @@ function encryptKey(dto: Record<string, unknown>) {
   return out;
 }
 
-export async function listProjectAgents(projectId: string): Promise<ProjectAgent[]> {
-  return repo().find({
+type SafeProjectAgent = Omit<ProjectAgent, "llm_api_key"> & { has_llm_api_key: boolean };
+
+function sanitize(agent: ProjectAgent): SafeProjectAgent {
+  const { llm_api_key, ...rest } = agent as ProjectAgent & { llm_api_key: string | null };
+  return { ...rest, has_llm_api_key: !!llm_api_key };
+}
+
+export async function listProjectAgents(projectId: string): Promise<SafeProjectAgent[]> {
+  const agents = await repo().find({
     where: { project_id: projectId },
     order: { created_at: "ASC" },
   });
+  return agents.map(sanitize);
 }
 
 /**
@@ -40,7 +48,7 @@ export async function listProjectAgentsRaw(projectId: string): Promise<ProjectAg
 export async function cloneFromLibrary(
   projectId: string,
   libraryAgentId: string,
-): Promise<ProjectAgent> {
+): Promise<SafeProjectAgent> {
   const template = await libraryRepo().findOne({ where: { id: libraryAgentId } });
   if (!template) {
     throw Object.assign(new Error("Library agent not found"), { statusCode: 404 });
@@ -66,29 +74,29 @@ export async function cloneFromLibrary(
     scope: null,
   });
 
-  return repo().save(agent);
+  return sanitize(await repo().save(agent));
 }
 
 export async function createProjectAgent(
   projectId: string,
   dto: CreateProjectAgentDto,
-): Promise<ProjectAgent> {
+): Promise<SafeProjectAgent> {
   const data = encryptKey(dto as Record<string, unknown>);
   const agent = repo().create({ ...data, project_id: projectId } as Partial<ProjectAgent>);
-  return repo().save(agent);
+  return sanitize(await repo().save(agent));
 }
 
 export async function updateProjectAgent(
   projectId: string,
   agentId: string,
   dto: PatchProjectAgentDto,
-): Promise<ProjectAgent | null> {
+): Promise<SafeProjectAgent | null> {
   const agent = await repo().findOneBy({ id: agentId, project_id: projectId });
   if (!agent) return null;
 
   const data = encryptKey(dto as Record<string, unknown>);
   Object.assign(agent, data);
-  return repo().save(agent);
+  return sanitize(await repo().save(agent));
 }
 
 export async function removeProjectAgent(

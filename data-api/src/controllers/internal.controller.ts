@@ -8,6 +8,7 @@ import * as taskService from "../services/task.service";
 import * as artifactService from "../services/task_artifact.service";
 import { BulkCreateTaskArtifactsSchema } from "../schemas/task_artifact.schema";
 import * as projectAgentService from "../services/projectAgent.service";
+import * as libraryAgentService from "../services/libraryAgent.service";
 
 // ─── Status update ────────────────────────────────────────────────────────────
 
@@ -147,4 +148,13 @@ export async function listProjectAgentsRawHandler(req: Request, res: Response) {
   const { projectId } = req.params;
   const agents = await projectAgentService.listProjectAgentsRaw(projectId);
   return res.json(agents);
+}
+
+// ─── Library agent usage_count ────────────────────────────────────────────────
+
+export async function incrementLibraryAgentUsageHandler(req: Request, res: Response) {
+  const { id } = req.params;
+  const ok = await libraryAgentService.incrementUsageCount(id);
+  if (!ok) return res.status(404).json({ error: "Library agent not found" });
+  return res.status(204).end();
 }

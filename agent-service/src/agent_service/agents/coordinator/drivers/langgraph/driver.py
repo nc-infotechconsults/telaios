@@ -15,7 +15,7 @@ from agent_service.core.schema_utils import build_pydantic_model_from_schema
 from agent_service.core.types import Skill
 
 from .state import _CodingState
-from .tools import _BUILTIN_TOOLS
+from .tools import CustomToolHandler, _BUILTIN_TOOLS
 from .graph import build_graph
 
 
@@ -40,15 +40,28 @@ class LangGraphDriver:
         llm: BaseChatModel,
         skills: List[Skill],
         system_prompt: Optional[str] = None,
-        system_prompt_mode: str = "override",
+        system_prompt_mode: str = "extend",
         structured_output: Optional[Dict] = None,
+        sub_agents: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         self._llm = llm
         self._skills = skills
         self._system_prompt = system_prompt
         self._system_prompt_mode = system_prompt_mode
         self._structured_output = structured_output
+        self._sub_agents: List[Dict[str, Any]] = sub_agents or []
+        self._sub_agent_tool_defs: List[Dict[str, Any]] = []
+        self._sub_agent_handlers: Dict[str, CustomToolHandler] = {}
         self._status: AgentStatus = "idle"
+
+    def set_sub_agent_tools(
+        self,
+        tool_defs: List[Dict[str, Any]],
+        handlers: Dict[str, CustomToolHandler],
+    ) -> None:
+        """Inject compiled sub-agent tool definitions and dispatch handlers."""
+        self._sub_agent_tool_defs = tool_defs
+        self._sub_agent_handlers = handlers
 
     async def get_status(self) -> AgentStatus:
         return self._status
@@ -64,7 +77,8 @@ class LangGraphDriver:
             }
             for s in self._skills
         ]
-        all_tools = _BUILTIN_TOOLS + skill_tools
+        all_tools = _BUILTIN_TOOLS + skill_tools + self._sub_agent_tool_defs
+        all_handlers: Dict[str, CustomToolHandler] = {**self._sub_agent_handlers}
 
         bound_llm = self._llm.bind_tools(all_tools) if hasattr(self._llm, "bind_tools") else self._llm
 
@@ -86,13 +100,13 @@ class LangGraphDriver:
         # Compose the effective system prompt using the profile's setting.
         if self._system_prompt and self._system_prompt_mode == "override":
             system_prompt = f"{workspace_block}{task_block}" + self._system_prompt
-        elif self._system_prompt and self._system_prompt_mode == "extend":
+        elif self._system_prompt and self._system_prompt_mode in ("extend", "append"):
             system_prompt = builtin_prompt + "\n\n" + self._system_prompt
         else:
             system_prompt = builtin_prompt
 
         try:
-            graph = build_graph(bound_llm, all_tools)
+            graph = build_graph(bound_llm, all_tools, all_handlers or None)
             initial_state: _CodingState = {
                 "messages": [
                     {"role": "system", "content": system_prompt},

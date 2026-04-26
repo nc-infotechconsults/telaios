@@ -1,0 +1,23 @@
+# TelaiOS
+TelaiOS is a cutting-edge agentic software development operating system designed to revolutionize the way software is developed and managed. It aims to enhance productivity, collaboration, and management in software development processes, making it an ideal choice for teams that need an all-in-one platform to manage the entire software development lifecycle starting from planning to execution.
+
+## Main features
+- **Agentic Architecture**: TelaiOS is built on an agentic architecture, allowing for modular and scalable software development. It leverages artificial intelligence to enhance the software development process. It provides a structured agent workflow along side the HITL (Human in the Loop) approach to ensure that human expertise is integrated into the project evolution, leading to more efficient and effective outcomes.
+- **Collaborative Environment**: TelaiOS fosters collaboration among the stakeholders of the platform by offering a library of agents, MCP servers and skill to reuse accross the several project connected.
+- **Project Management**: TelaiOS provides robust project management tools that allow teams to plan, track, and manage their software development projects effectively. It includes features such as task management, progress tracking, repository connection and documentation.
+
+## Agent Workflow
+The agent workflow in TelaiOS is designed to facilitate efficient software development. It consists of the following stages:
+1. **Planning**: In this stage, the user define project goals with the help of a specialized planning agent which brainstorm with the user to correctly define the tasks to perform in order to reach the plan goal. It has visibility on the source repositories and documentation connected to the project, so it can suggest the best way to achieve the goal.
+2. **Orchestrator**: After the plan definition an orchestration agent coordinates the execution of tasks by assigning them to the appropriate development agents. These agents are responsible for writing code, creating documentation, and performing other development tasks. 
+3. **Developer**: The developer agents are responsible for executing the tasks assigned by the orchestrator. They implement the specification received in the task and test case which ensure the correct implementation.
+4. **Reviewer**: The reviewer agents are responsible for evaluating the work done by the developer agents. They ensure that the code meets quality standards, follows best practices, and aligns with the project requirements.
+5. **Tester**: The tester agents are responsible for evaluating the work done by the developer agents. They ensure that the code meets quality standards, follows best practices, and aligns with the project requirements.
+6. **Documentation**: The documentation agents are responsible for creating and maintaining project documentation. They ensure that all documentation is accurate, up-to-date with the repo state and accessible to all stakeholders.
+7. **Infrastructure**: The infrastructure agents are responsible for managing the underlying infrastructure required for the software development process. They ensure that the development environment is properly configured, resources are allocated efficiently, and the system remains stable and secure.
+
+All these agents are always be active on every project, but the user can customise the specification in the library or can create new agents to the specific role.
+
+
+## Agent specification
+All project set up on TelaiOS have at least the agents described in the workflow, but the user can create custom agents to perform specific tasks or override the existing ones. After that an agent is connected on a project it has a deep copy of the agent specification and can futher customised without affecting the library specification. The specification includes details such as the agent's purpose, input and output formats, decision-making processes, and any specific rules or constraints that govern its behavior. By adhering to a well-defined specification, agents can effectively collaborate and contribute to the overall software development process in TelaiOS. When running in a production environment the agent is executed in a containerised environment in order to provide a secure and isolate execution environment. The agent can be executed in a local environment for testing and development purposes, but the production environment is designed to ensure the security and stability of the system while allowing for scalability and flexibility in agent execution.

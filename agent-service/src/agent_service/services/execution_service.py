@@ -44,9 +44,10 @@ async def start_execution(project_id: str, plan_id: str) -> None:
         project_agents_raw,
         project_ctx={"id": project_id, "name": project.get("name", project_id)},
     )
+    pool.finalize_sub_agent_tools()
 
     # 4. Run scheduler
-    scheduler = Scheduler(pool)
+    scheduler = Scheduler(pool, project_agents_raw)
     try:
         await scheduler.run(project_id, plan_id)
     except Exception as err:

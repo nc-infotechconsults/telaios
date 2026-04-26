@@ -8,6 +8,7 @@ import {
   cancelPlanTasksHandler,
   createTaskArtifactsHandler,
   listProjectAgentsRawHandler,
+  incrementLibraryAgentUsageHandler,
 } from "../controllers/internal.controller";
 
 const router = Router();
@@ -35,5 +36,8 @@ router.post("/tasks/:id/artifacts", createTaskArtifactsHandler);
 
 // GET   /internal/project-agents/:projectId — raw encrypted agents for agent-service
 router.get("/project-agents/:projectId", listProjectAgentsRawHandler);
+
+// PATCH /internal/library-agents/:id/usage-count — increment usage_count atomically
+router.patch("/library-agents/:id/usage-count", incrementLibraryAgentUsageHandler);
 
 export default router;

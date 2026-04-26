@@ -378,6 +378,8 @@ export interface ProjectAgent {
   skills: InlineSkill[];
   structured_output?: JsonSchema | null;
   scope?: string | null;
+  /** True if an encrypted API key is stored; the key itself is never returned. */
+  has_llm_api_key: boolean;
   created_at: string;
   updated_at: string;
 }

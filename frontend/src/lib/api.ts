@@ -438,6 +438,7 @@ export const cloneProjectAgentFromLibrary = (
         sub_agents: [],
         mcp_servers: [],
         skills: [],
+        has_llm_api_key: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -461,6 +462,7 @@ export const createProjectAgent = (
         sub_agents: data.sub_agents ?? [],
         mcp_servers: data.mcp_servers ?? [],
         skills: data.skills ?? [],
+        has_llm_api_key: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

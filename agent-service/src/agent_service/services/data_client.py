@@ -215,3 +215,10 @@ async def cancel_plan_tasks(plan_id: str) -> Dict[str, Any]:
 
 async def create_task_artifacts(task_id: str, artifacts: List[Dict[str, Any]]) -> None:
     await _post(f"/internal/tasks/{task_id}/artifacts", {"artifacts": artifacts})
+
+
+# ── Library agent usage_count ─────────────────────────────────────────────────
+
+
+async def increment_library_agent_usage(library_agent_id: str) -> None:
+    await _patch(f"/internal/library-agents/{library_agent_id}/usage-count", {})

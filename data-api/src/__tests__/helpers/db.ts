@@ -47,7 +47,6 @@ export async function clearAllTables(): Promise<void> {
       documents,
       settings,
       projects,
-      agent_profiles,
       users
     RESTART IDENTITY CASCADE
   `);
