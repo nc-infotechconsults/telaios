@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
@@ -10,6 +9,7 @@ from agent_service.core.agent_framework.base_agent import BaseAgent, AgentResult
 from agent_service.core.agent_framework.context import AgentContext
 from agent_service.core.agent_framework.event_bus import get_agent_event_bus
 from agent_service.core.llm import build_chat_model
+from agent_service.core.schema_utils import build_pydantic_model_from_schema
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 
@@ -178,64 +178,21 @@ class ConfigurableAgent(BaseAgent):
 
     @staticmethod
     def _build_pydantic_model_from_schema(schema: Dict[str, Any], model_name: str = "DynamicModel"):
-        """Build a Pydantic model dynamically from a JSON Schema dict."""
-        from pydantic import create_model
-        from pydantic import Field as PydanticField
-
-        properties = schema.get("properties") or {}
-        required_fields = set(schema.get("required") or [])
-        type_map = {"string": str, "number": float, "integer": int, "boolean": bool}
-
-        field_defs: Dict[str, Any] = {}
-        for field_name, prop in properties.items():
-            type_str = prop.get("type", "string")
-            if isinstance(type_str, list):
-                type_str = type_str[0]
-            annotation = type_map.get(type_str, str)
-            default = ... if field_name in required_fields else None
-            field_defs[field_name] = (
-                Optional[annotation] if default is None else annotation,
-                PydanticField(default, description=prop.get("description", "")),
-            )
-
-        return create_model(model_name, **field_defs) if field_defs else create_model(model_name)
+        """Delegate to the shared schema utility (kept for backward compatibility)."""
+        return build_pydantic_model_from_schema(schema, model_name)
 
     def _build_skill_tools(self) -> List[StructuredTool]:
         """Convert the profile's skills list into LangChain StructuredTools."""
-        from pydantic import create_model
-        from pydantic import Field as PydanticField
-
         tools: list[StructuredTool] = []
         for skill in self._config.skills:
             name = skill.get("name", "")
             description = skill.get("description", "")
             instructions = skill.get("instructions", "")
             input_schema = skill.get("inputSchema") or {}
-            properties = input_schema.get("properties") or {}
-            required_fields = set(input_schema.get("required") or [])
 
-            # Build a pydantic model from the inputSchema properties
-            field_defs: Dict[str, Any] = {}
-            for field_name, prop in properties.items():
-                annotation = str  # default
-                type_str = prop.get("type", "string")
-                if isinstance(type_str, list):
-                    type_str = type_str[0]
-                type_map = {"string": str, "number": float, "integer": int, "boolean": bool}
-                annotation = type_map.get(type_str, str)
-                default = ... if field_name in required_fields else None
-                field_defs[field_name] = (Optional[annotation] if default is None else annotation, PydanticField(default, description=prop.get("description", "")))
-
-            if field_defs:
-                input_model = create_model(f"{name}_input", **field_defs)
-            else:
-                input_model = create_model(f"{name}_input")
-
+            input_model = build_pydantic_model_from_schema(input_schema, f"{name}_input")
             full_desc = f"{description}\n\nInstructions:\n{instructions}" if instructions else description
 
-            # The skill doesn't implement real execution — it records that the
-            # tool was called and returns a placeholder result that the LLM can
-            # use to reason about what happened.
             # Capture `name` by default argument to avoid closure-over-loop bug.
             async def _skill_call(_name: str = name, **kwargs: Any) -> str:
                 return f"Skill '{_name}' invoked with args: {json.dumps(kwargs)}"

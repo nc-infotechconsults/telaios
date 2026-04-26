@@ -35,7 +35,7 @@ class AgentProfileConfig:
     llm_top_p: Optional[float] = None
     llm_frequency_penalty: Optional[float] = None
     llm_presence_penalty: Optional[float] = None
-    sub_agents: List[dict] = field(default_factory=list)
+    sub_agent_ids: List[str] = field(default_factory=list)
     structured_output: Optional[Dict] = None
 
 
@@ -69,7 +69,10 @@ class AgentPool:
                 system_prompt_mode=pa.get("system_prompt_mode") or "override",
                 llm_temperature=pa.get("llm_temperature"),
                 llm_max_tokens=pa.get("llm_max_tokens"),
-                sub_agents=pa.get("sub_agents") or [],
+                llm_top_p=pa.get("llm_top_p"),
+                llm_frequency_penalty=pa.get("llm_frequency_penalty"),
+                llm_presence_penalty=pa.get("llm_presence_penalty"),
+                sub_agent_ids=pa.get("sub_agent_ids") or [],
                 structured_output=pa.get("structured_output"),
             )
             driver = self._build_driver(p)
@@ -111,7 +114,7 @@ class AgentPool:
                 "llmMaxTokens": pa.get("llm_max_tokens"),
                 "mcpServers": [s.model_dump() for s in mcp_servers],
                 "skills": [s.model_dump() for s in skills],
-                "subAgents": pa.get("sub_agents") or [],
+                "subAgentIds": pa.get("sub_agent_ids") or [],
                 "structuredOutput": pa.get("structured_output"),
             }
 

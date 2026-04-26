@@ -4,22 +4,25 @@ import asyncio
 import json
 import logging
 import os
-import re
 from typing import Dict, List, Optional, Set
-from urllib.parse import urlparse
 
 from agent_service.agents.coordinator.drivers.base import AgentArtifact, AgentTask
+from agent_service.agents.coordinator.git_ops import (
+    build_clone_url,
+    clone_or_pull,
+    commit_and_push,
+    git_env,
+    is_safe_repo_name,
+)
 from agent_service.agents.coordinator.pool import AgentPool
 from agent_service.config import config
 from agent_service.core.redis import get_redis
-from agent_service.crypto import decrypt
 from agent_service.services import data_client, sse_manager
 from agent_service.services.orchestration_service import OrchestrationService
 
 logger = logging.getLogger(__name__)
 
 TERMINAL_STATUSES = frozenset({"done", "failed", "skipped", "cancelled"})
-_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_.\-]+$")
 
 
 class Scheduler:
@@ -101,36 +104,6 @@ class Scheduler:
 
     # ── Repository management ─────────────────────────────────────────────────
 
-    def _build_clone_url(self, repo: dict) -> str:
-        """Return the plain remote URL — without embedded credentials."""
-        return repo["remote_url"]
-
-    def _git_env(self, repo: dict) -> Optional[Dict[str, str]]:
-        """
-        Build a git environment that injects credentials via GIT_CONFIG_COUNT
-        instead of embedding tokens in the clone URL (which would expose them
-        in process listings and kernel audit logs).
-
-        Uses the git credential helper via config rather than URL embedding.
-        """
-        if repo.get("auth_type") == "token" and repo.get("credentials"):
-            token = decrypt(repo["credentials"])
-            if not token:
-                return None
-            parsed = urlparse(repo["remote_url"])
-            host = parsed.hostname or ""
-            # Use git's insteadOf and extraheader approach via env-level config.
-            # GIT_CONFIG_COUNT / GIT_CONFIG_KEY_N / GIT_CONFIG_VALUE_N are
-            # available since git 2.31 and keep credentials out of argv.
-            return {
-                **os.environ,
-                "GIT_TERMINAL_PROMPT": "0",
-                "GIT_CONFIG_COUNT": "1",
-                "GIT_CONFIG_KEY_0": f"http.{parsed.scheme}://{host}/.extraheader",
-                "GIT_CONFIG_VALUE_0": f"Authorization: Bearer {token}",
-            }
-        return None
-
     async def _clone_repositories(
         self, project_id: str, repositories: List[dict]
     ) -> Dict[str, str]:
@@ -138,7 +111,7 @@ class Scheduler:
 
         for repo in repositories:
             repo_name = repo["name"]
-            if not _SAFE_NAME_RE.match(repo_name):
+            if not is_safe_repo_name(repo_name):
                 logger.error(
                     "[Scheduler] Rejecting repository with unsafe name %r — contains path traversal characters",
                     repo_name,
@@ -153,9 +126,6 @@ class Scheduler:
                 continue
 
             local_path = os.path.join(config.WORKSPACES_ROOT, project_id, repo_name)
-            clone_url = self._build_clone_url(repo)
-            git_env = self._git_env(repo)
-
             self._emit(project_id, {
                 "type": "repo_status",
                 "repo_id": repo["id"],
@@ -164,29 +134,16 @@ class Scheduler:
             })
 
             try:
-                proc = await asyncio.create_subprocess_exec(
-                    "git", "clone", clone_url, local_path,
-                    "--branch", repo.get("branch") or "main",
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.PIPE,
-                    env=git_env,
+                await clone_or_pull(
+                    clone_url=build_clone_url(repo),
+                    local_path=local_path,
+                    branch=repo.get("branch") or "main",
+                    env=git_env(repo),
                 )
-                _, stderr = await proc.communicate()
-                if proc.returncode != 0:
-                    # Repo already cloned — pull
-                    pull = await asyncio.create_subprocess_exec(
-                        "git", "-C", local_path, "pull",
-                        stdout=asyncio.subprocess.DEVNULL,
-                        stderr=asyncio.subprocess.DEVNULL,
-                        env=git_env,
-                    )
-                    await pull.wait()
-
                 await data_client.update_repository_status(
                     repo["id"], {"status": "ready", "local_path": local_path}
                 )
                 workspace_map[repo["id"]] = local_path
-
                 self._emit(project_id, {
                     "type": "repo_status",
                     "repo_id": repo["id"],
@@ -218,34 +175,13 @@ class Scheduler:
             if not local_path or not repo:
                 continue
             try:
-                # Stage and commit any uncommitted changes
-                status_proc = await asyncio.create_subprocess_exec(
-                    "git", "-C", local_path, "status", "--porcelain",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.DEVNULL,
+                await commit_and_push(
+                    local_path=local_path,
+                    branch=repo.get("branch") or "main",
+                    push_url=build_clone_url(repo),
+                    env=git_env(repo),
+                    commit_msg=f'chore: agent result for task "{task["title"]}"',
                 )
-                stdout, _ = await status_proc.communicate()
-                if stdout.strip():
-                    for cmd in [
-                        ["git", "-C", local_path, "config", "user.email", "agent@swe-ai.local"],
-                        ["git", "-C", local_path, "config", "user.name", "SWE AI Agent"],
-                        ["git", "-C", local_path, "add", "."],
-                        ["git", "-C", local_path, "commit", "-m", f'chore: agent result for task "{task["title"]}"'],
-                    ]:
-                        p = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-                        await p.wait()
-
-                push_url = self._build_clone_url(repo)
-                git_env = self._git_env(repo)
-                branch = repo.get("branch") or "main"
-                push_proc = await asyncio.create_subprocess_exec(
-                    "git", "-C", local_path, "push", push_url, branch,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                    env=git_env,
-                )
-                await push_proc.wait()
-
                 self._emit(project_id, {
                     "type": "repo_status",
                     "repo_id": repo["id"],
