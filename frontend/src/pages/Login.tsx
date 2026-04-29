@@ -35,7 +35,7 @@ export default function Login() {
             <TelaioLogo size={36} />
           </span>
           <span className="font-bold text-2xl leading-snug tracking-tight text-foreground">
-            Telaio
+            Telaios
           </span>
         </div>
 

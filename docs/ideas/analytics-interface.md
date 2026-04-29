@@ -1,4 +1,4 @@
-# Telaio Analytics Interface
+# Telaios Analytics Interface
 
 ## Problem Statement
 

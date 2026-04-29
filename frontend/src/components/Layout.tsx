@@ -316,7 +316,7 @@ export default function Layout() {
         {/* Brand — always visible in topbar */}
         <div className="flex items-center gap-2">
           <span className="text-primary"><TelaioLogo size={22} /></span>
-          <span className="font-bold text-sm leading-snug tracking-tight">Telaio</span>
+          <span className="font-bold text-sm leading-snug tracking-tight">Telaios</span>
         </div>
 
         {/* Spacer */}

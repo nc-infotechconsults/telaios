@@ -1,0 +1,66 @@
+name: Feature Request
+description: Suggest a new feature or improvement for Telaios
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a feature! Check the [Roadmap](https://github.com/nc-infotechconsults/telaios#roadmap) in the README first to see if it's already planned.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the problem or gap you are experiencing. A clear statement of the "job to be done" helps us evaluate the request.
+      placeholder: "As a [user], I need [capability] so that [outcome]."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the feature or improvement you would like to see. Be as specific as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds? Why is your proposal better?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area of the platform does this affect?
+      multiple: true
+      options:
+        - Frontend / UI
+        - Data API
+        - Agent Service / LLM
+        - Planning & Execution
+        - Documents & RAG
+        - Workspaces & Environments
+        - Infrastructure / DevOps
+        - Developer Experience
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context, mockups, references, or links that help explain the request.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this has not been requested before.
+          required: true
+        - label: I checked the README Roadmap section and this is not already planned.
+          required: false
