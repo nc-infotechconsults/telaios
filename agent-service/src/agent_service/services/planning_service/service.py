@@ -10,14 +10,13 @@ from langgraph.types import Command
 from .nodes import (
     confirm_node,
     interview_wait_node,
-    planner_node,
     prepare_node,
+    react_planner_node,
     refine_node,
     review_wait_node,
     route_after_planner,
     route_after_review,
     save_draft_node,
-    tools_node,
 )
 from .state import PlannerState
 
@@ -37,8 +36,7 @@ def _build_graph() -> Any:
 
     builder.add_node("prepare_node", prepare_node)
     builder.add_node("interview_wait_node", interview_wait_node)
-    builder.add_node("planner_node", planner_node)
-    builder.add_node("tools_node", tools_node)
+    builder.add_node("react_planner_node", react_planner_node)
     builder.add_node("save_draft_node", save_draft_node)
     builder.add_node("review_wait_node", review_wait_node)
     builder.add_node("confirm_node", confirm_node)
@@ -46,17 +44,15 @@ def _build_graph() -> Any:
 
     builder.add_edge(START, "prepare_node")
     builder.add_edge("prepare_node", "interview_wait_node")
-    builder.add_edge("interview_wait_node", "planner_node")
+    builder.add_edge("interview_wait_node", "react_planner_node")
     builder.add_conditional_edges(
-        "planner_node",
+        "react_planner_node",
         route_after_planner,
         {
-            "tools_node": "tools_node",
             "save_draft_node": "save_draft_node",
             "interview_wait_node": "interview_wait_node",
         },
     )
-    builder.add_edge("tools_node", "planner_node")
     builder.add_edge("save_draft_node", "review_wait_node")
     builder.add_conditional_edges(
         "review_wait_node",

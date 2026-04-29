@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command, interrupt
 
 from agent_service.services import data_client, sse_manager
@@ -104,8 +105,13 @@ async def interview_wait_node(state: PlannerState) -> Dict[str, Any]:
     return {"messages": [HumanMessage(content=trimmed)]}
 
 
-async def planner_node(state: PlannerState) -> Dict[str, Any]:
-    """Run LLM (with repo tools). Streams message tokens if final response."""
+async def react_planner_node(state: PlannerState) -> Dict[str, Any]:
+    """Run a create_react_agent sub-execution for one planner turn.
+
+    Uses no checkpointer (ephemeral) — the outer graph already persists state
+    via AsyncPostgresSaver.  Only the new messages produced during this turn
+    are returned so the outer add_messages reducer appends them correctly.
+    """
     plan_id = state["plan_id"]
     project_id = state["project_id"]
 
@@ -116,66 +122,54 @@ async def planner_node(state: PlannerState) -> Dict[str, Any]:
 
     llm = _build_llm(settings, planner_agent)
     system_content = _build_interview_system(state, planner_agent, tools)
-    messages = [SystemMessage(content=system_content)] + list(state["messages"])
 
-    llm_with_tools = llm.bind_tools(tools) if tools else llm
-    response = await llm_with_tools.ainvoke(messages)
+    sub_graph = create_react_agent(llm, tools, prompt=system_content)
 
-    tool_calls = getattr(response, "tool_calls", None) or []
+    old_count = len(state["messages"])
+    # Pass the accumulated conversation to the sub-agent.
+    result = await sub_graph.ainvoke({"messages": list(state["messages"])})
 
-    if tool_calls:
-        for tc in tool_calls:
-            sse_manager.broadcast(plan_id, {
-                "type": "chat_tool_use",
-                "tool": tc["name"],
-                "input": tc.get("args", {}),
-            })
-    else:
-        text = response.content if isinstance(response.content, str) else json.dumps(response.content)
-        parsed = _parse_planner_response(text)
-        msg_text = parsed["message"] if parsed else text
+    new_messages = result["messages"][old_count:]
 
-        asyncio.create_task(
-            data_client.save_message({
-                "project_id": project_id,
-                "plan_id": plan_id,
-                "role": "assistant",
-                "content": msg_text,
-            })
-        )
-        await _stream_message_chunks(plan_id, msg_text)
+    # Broadcast SSE events for tool use and the final text reply.
+    await _broadcast_new_messages(plan_id, project_id, new_messages)
 
-        if not (parsed and parsed.get("ready_for_plan") and parsed.get("plan")):
-            sse_manager.broadcast(plan_id, {"type": "chat_end"})
-
-    return {"messages": [response]}
+    return {"messages": new_messages}
 
 
-async def tools_node(state: PlannerState) -> Dict[str, Any]:
-    """Execute tool calls from the last AI message."""
-    repos = state.get("repos", [])
-    project_id = state["project_id"]
+async def _broadcast_new_messages(
+    plan_id: str,
+    project_id: str,
+    messages: List[Any],
+) -> None:
+    """Emit SSE events and persist assistant messages for a list of new messages."""
+    for msg in messages:
+        if isinstance(msg, AIMessage):
+            tool_calls = getattr(msg, "tool_calls", []) or []
+            if tool_calls:
+                for tc in tool_calls:
+                    sse_manager.broadcast(plan_id, {
+                        "type": "chat_tool_use",
+                        "tool": tc["name"],
+                        "input": tc.get("args", {}),
+                    })
+            else:
+                text = msg.content if isinstance(msg.content, str) else json.dumps(msg.content)
+                parsed = _parse_planner_response(text)
+                msg_text = parsed["message"] if parsed else text
 
-    tools = _build_repo_tools(repos, project_id)
-    tool_map = {t.name: t for t in tools}
+                asyncio.create_task(
+                    data_client.save_message({
+                        "project_id": project_id,
+                        "plan_id": plan_id,
+                        "role": "assistant",
+                        "content": msg_text,
+                    })
+                )
+                await _stream_message_chunks(plan_id, msg_text)
 
-    last_ai = state["messages"][-1]
-    tool_calls = getattr(last_ai, "tool_calls", []) or []
-
-    tool_results: List[ToolMessage] = []
-    for tc in tool_calls:
-        tool = tool_map.get(tc["name"])
-        try:
-            result = (
-                str(await tool.ainvoke(tc["args"]))
-                if tool
-                else f"Unknown tool: {tc['name']}"
-            )
-        except Exception as exc:
-            result = f"Tool error: {exc}"
-        tool_results.append(ToolMessage(content=result, tool_call_id=tc["id"]))
-
-    return {"messages": tool_results}
+                if not (parsed and parsed.get("ready_for_plan") and parsed.get("plan")):
+                    sse_manager.broadcast(plan_id, {"type": "chat_end"})
 
 
 async def save_draft_node(state: PlannerState) -> Dict[str, Any]:
@@ -330,9 +324,8 @@ async def refine_node(state: PlannerState) -> Dict[str, Any]:
 def route_after_planner(state: PlannerState) -> str:
     last = state["messages"][-1]
 
-    if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
-        return "tools_node"
-
+    # react_planner_node handles its own tool loop — we only see the final AIMessage.
+    # If it contains a ready_for_plan signal, go to save_draft; otherwise loop back.
     text = last.content if isinstance(last.content, str) else ""
     parsed = _parse_planner_response(text)
     if parsed and parsed.get("ready_for_plan") and parsed.get("plan"):
