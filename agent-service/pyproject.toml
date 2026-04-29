@@ -22,8 +22,9 @@ dependencies = [
     # LangChain / LangGraph
     "langchain-core>=0.3.0",
     "langchain-openai>=0.2.0",
-    "langchain-anthropic>=0.3.0",
     "langgraph>=0.2.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-community>=0.4.1",
     "langgraph-checkpoint-postgres>=2.0.0",
     # Document extraction
     "pymupdf>=1.24.0",

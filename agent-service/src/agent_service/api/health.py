@@ -5,38 +5,9 @@ from fastapi.responses import JSONResponse
 
 from agent_service.api.deps import ApiKeyDep
 
-router = APIRouter()
+router = APIRouter(prefix="/health")
 
 
-@router.get("/health")
+@router.get("")
 async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
-
-
-@router.post("/test-llm")
-async def test_llm(_auth: ApiKeyDep) -> JSONResponse:
-    """
-    Quick connectivity test for the configured LLM.
-    Returns the model's response to a trivial prompt.
-    """
-    from agent_service.services import data_client
-    from agent_service.core.llm import build_chat_model
-    from langchain_core.messages import HumanMessage
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    try:
-        settings = await data_client.get_settings()
-        llm = build_chat_model(
-            provider=settings["llm_provider"],
-            model=settings["llm_model"],
-            api_key=settings.get("llm_api_key_raw") or "",
-            base_url=settings.get("llm_base_url"),
-        )
-        response = await llm.ainvoke([HumanMessage(content='Say "hello" in one word.')])
-        content = response.content if isinstance(response.content, str) else str(response.content)
-        return JSONResponse({"status": "ok", "response": content})
-    except Exception as err:
-        logger.error("LLM connectivity check failed: %s", err)
-        return JSONResponse({"status": "error", "error": "LLM connectivity check failed"}, status_code=500)
