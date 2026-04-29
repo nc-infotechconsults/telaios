@@ -210,4 +210,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 
 ## License
 
-Telaios is released under the [MIT License](LICENSE). © 2026 NC Infotech Consults.
+Telaios is released under the [MIT License](LICENSE). © 2026 Infotech Consults.
