@@ -1,23 +1,19 @@
 from __future__ import annotations
 
 import json
-import re
+import os
 from typing import List, Literal, Optional
 
+from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.tools import StructuredTool
+from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel
 
 from agent_service.core.agent_framework.base_agent import BaseAgent, AgentResult as BaseAgentResult
 from agent_service.core.agent_framework.context import AgentContext
 from agent_service.core.agent_framework.event_bus import get_agent_event_bus
 from agent_service.core.llm import build_chat_model
-from agent_service.agents.infra.template_gen import (
-    InfraTemplate,
-    InfraTemplateRequest,
-    build_infra_prompt,
-    detect_stack,
-    write_templates,
-)
-from langchain_core.messages import HumanMessage, SystemMessage
+from agent_service.agents.infra.template_gen import detect_stack
 
 
 class InfraAgentConfig(BaseModel):
@@ -39,6 +35,25 @@ class InfraAgentConfig(BaseModel):
     port: int = 3000
 
 
+_BUILTIN_SYSTEM = """\
+You are an expert DevOps engineer and infrastructure architect.
+
+Generate production-ready infrastructure-as-code files for the following:
+- Technology stack: {stack}
+- Target(s): {target_list}
+- Application port: {port}
+- Additional context: {context}
+
+Requirements:
+- Follow best practices for each target (multi-stage Dockerfile, resource limits in k8s, etc.)
+- Include security best practices (non-root user in Docker, readiness probes in k8s, etc.)
+- Add helpful comments explaining key configuration choices
+
+Use the `write_file` tool to write each file to the workspace.
+Use the `read_file` tool if you need to inspect existing files first.
+Write all required files, then stop."""
+
+
 def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
     """Return the effective system prompt based on mode and user-supplied prompt."""
     if not custom:
@@ -46,6 +61,49 @@ def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
     if mode == "override":
         return custom
     return f"{builtin}\n\n{custom}"
+
+
+def _build_workspace_tools(workspace_path: str) -> List[StructuredTool]:
+    """Build write_file and read_file tools scoped to workspace_path."""
+    safe_root = os.path.realpath(workspace_path)
+
+    class WriteFileInput(BaseModel):
+        path: str
+        content: str
+
+    class ReadFileInput(BaseModel):
+        path: str
+
+    async def write_file(path: str, content: str) -> str:
+        requested = os.path.realpath(os.path.join(safe_root, path))
+        if not requested.startswith(safe_root + os.sep):
+            return "Error: path is outside the workspace."
+        os.makedirs(os.path.dirname(requested), exist_ok=True)
+        with open(requested, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        return f"Written: {path}"
+
+    async def read_file(path: str) -> str:
+        requested = os.path.realpath(os.path.join(safe_root, path))
+        if not requested.startswith(safe_root + os.sep):
+            return "Error: path is outside the workspace."
+        with open(requested, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+
+    return [
+        StructuredTool.from_function(
+            coroutine=write_file,
+            name="write_file",
+            description="Write (or overwrite) a file in the workspace.",
+            args_schema=WriteFileInput,
+        ),
+        StructuredTool.from_function(
+            coroutine=read_file,
+            name="read_file",
+            description="Read the contents of a workspace file.",
+            args_schema=ReadFileInput,
+        ),
+    ]
 
 
 class InfraAgent(BaseAgent):
@@ -76,36 +134,36 @@ class InfraAgent(BaseAgent):
         for repo_name, local_path in (ctx.workspaces or {}).items():
             stack = await detect_stack(local_path)
 
-            req = InfraTemplateRequest(
-                stack=stack,
-                target=self._config.target,
-                port=self._config.port,
-                context=ctx.task.description if ctx.task else None,
+            targets = (
+                ["docker", "docker-compose", "kubernetes", "ci-github-actions"]
+                if self._config.target == "all"
+                else [self._config.target]
             )
-            prompt = build_infra_prompt(req)
+            builtin_prompt = _BUILTIN_SYSTEM.format(
+                stack=stack,
+                target_list=", ".join(targets),
+                port=self._config.port,
+                context=ctx.task.description if ctx.task else "standard web application",
+            )
+            system_prompt = _compose_prompt(
+                builtin_prompt,
+                self._config.systemPrompt,
+                self._config.systemPromptMode,
+            )
 
-            templates: list[InfraTemplate] = []
+            tools = _build_workspace_tools(local_path)
+            graph = create_react_agent(self._llm, tools, prompt=system_prompt)
+
+            user_msg = (
+                f"Generate infrastructure files for the {stack} project in repository: {repo_name}. "
+                f"Task context: {ctx.task.description if ctx.task else 'Standard web application deployment.'}"
+            )
+
             try:
-                response = await self._llm.ainvoke([
-                    SystemMessage(content=_compose_prompt(prompt, self._config.systemPrompt, self._config.systemPromptMode)),
-                    HumanMessage(
-                        content=(
-                            f"Generate infrastructure files for the {stack} project in repository: {repo_name}. "
-                            f"Task context: {ctx.task.description if ctx.task else 'Standard web application deployment.'}"
-                        )
-                    ),
-                ])
-                content = response.content if isinstance(response.content, str) else json.dumps(response.content)
-                json_match = re.search(r"\[[\s\S]*\]", content)
-                raw_templates = json.loads(json_match.group(0) if json_match else content)
-                templates = [
-                    InfraTemplate(
-                        path=t["path"],
-                        content=t["content"],
-                        description=t.get("description"),
-                    )
-                    for t in raw_templates
-                ]
+                result = await graph.ainvoke(
+                    {"messages": [HumanMessage(content=user_msg)]},
+                    {"recursion_limit": 50},
+                )
             except Exception as err:
                 await bus.publish("infra.failed", {
                     "agentId": self.id,
@@ -119,7 +177,15 @@ class InfraAgent(BaseAgent):
                 )
                 return
 
-            written = await write_templates(local_path, templates)
+            # Collect paths written via write_file ToolMessages.
+            written = [
+                msg.content[len("Written: "):]
+                for msg in result.get("messages", [])
+                if isinstance(msg, ToolMessage)
+                and getattr(msg, "name", None) == "write_file"
+                and isinstance(msg.content, str)
+                and msg.content.startswith("Written: ")
+            ]
             all_written.extend(f"{repo_name}/{f}" for f in written)
 
         self._result = BaseAgentResult(
