@@ -2,7 +2,7 @@
   "name": "telaios",
   "private": true,
   "version": "0.1.0",
-  "description": "Root workspace for Telaios's Bun-managed apps and Python agent service",
+  "description": "Root workspace for TelaiOS's Bun-managed apps and Python agent service",
   "workspaces": [
     "packages/*",
     "frontend",

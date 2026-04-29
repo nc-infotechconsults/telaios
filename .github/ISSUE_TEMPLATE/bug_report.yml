@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug or unexpected behaviour in Telaios
+description: Report a bug or unexpected behaviour in TelaiOS
 title: "bug: "
 labels: ["bug", "triage"]
 body:

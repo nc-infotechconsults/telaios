@@ -1,6 +1,6 @@
-# Contributing to Telaios
+# Contributing to TelaiOS
 
-Thank you for your interest in contributing to **Telaios**! This document explains how to get involved, from reporting bugs to submitting code.
+Thank you for your interest in contributing to **TelaiOS**! This document explains how to get involved, from reporting bugs to submitting code.
 
 ---
 
@@ -194,4 +194,4 @@ chore: bump langchain-openai to 0.3.1
 
 ---
 
-Thank you for contributing to Telaios! 🎉
+Thank you for contributing to TelaiOS! 🎉

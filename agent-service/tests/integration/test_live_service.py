@@ -407,7 +407,7 @@ def test_openapi_json_accessible(http):
     r = http.get(f"{AGENT_BASE}/openapi.json")
     assert r.status_code == 200
     schema = r.json()
-    assert schema["info"]["title"] == "Telaios — Agent Service"
+    assert schema["info"]["title"] == "TelaiOS — Agent Service"
     # Verify all our endpoints are documented
     paths = schema["paths"]
     assert "/health" in paths

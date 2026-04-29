@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agent-service"
 version = "1.0.0"
-description = "Telaios — Agent Service (Python)"
+description = "TelaiOS — Agent Service (Python)"
 requires-python = ">=3.12"
 dependencies = [
     # Web framework

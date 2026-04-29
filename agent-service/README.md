@@ -1,6 +1,6 @@
 # agent-service
 
-Python implementation of the Telaios Agent Service.
+Python implementation of the TelaiOS Agent Service.
 
 ## Overview
 

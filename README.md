@@ -1,9 +1,9 @@
-# Telaios
+# TelaiOS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![E2E Tests](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml/badge.svg)](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml)
 
-**Telaios** is an agentic software development operating system — an all-in-one platform for teams that want to manage the entire software development lifecycle, from planning through execution, with AI agents doing the heavy lifting.
+**TelaiOS** is an agentic software development operating system — an all-in-one platform for teams that want to manage the entire software development lifecycle, from planning through execution, with AI agents doing the heavy lifting.
 
 ---
 
@@ -210,4 +210,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 
 ## License
 
-Telaios is released under the [MIT License](LICENSE). © 2026 Infotech Consults.
+TelaiOS is released under the [MIT License](LICENSE). © 2026 Infotech Consults.

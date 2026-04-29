@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
-import { TelaioLogo } from "./common/TelaioLogo";
+import { TelaiOSLogo } from "./common/TelaiOSLogo.tsx";
 
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const COLLAPSED_KEY = "sidebar_collapsed";
@@ -315,8 +315,8 @@ export default function Layout() {
 
         {/* Brand — always visible in topbar */}
         <div className="flex items-center gap-2">
-          <span className="text-primary"><TelaioLogo size={22} /></span>
-          <span className="font-bold text-sm leading-snug tracking-tight">Telaios</span>
+          <span className="text-primary"><TelaiOSLogo size={22} /></span>
+          <span className="font-bold text-sm leading-snug tracking-tight">TelaiOS</span>
         </div>
 
         {/* Spacer */}

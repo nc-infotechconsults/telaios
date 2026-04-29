@@ -1,6 +1,6 @@
-// ─── Telaios Logo ─────────────────────────────────────────────────────────────
+// ─── TelaiOS Logo ─────────────────────────────────────────────────────────────
 
-export function TelaioLogo({ size = 24 }: { size?: number }) {
+export function TelaiOSLogo({ size = 24 }: { size?: number }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -22,4 +22,4 @@ export function TelaioLogo({ size = 24 }: { size?: number }) {
   );
 }
 
-export default TelaioLogo;
+export default TelaiOSLogo;

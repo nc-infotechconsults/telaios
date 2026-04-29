@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { TelaioLogo } from "../components/common/TelaioLogo";
+import { TelaiOSLogo } from "../components/common/TelaiOSLogo.tsx";
 
 
 export default function Login() {
@@ -32,10 +32,10 @@ export default function Login() {
         {/* Brand */}
         <div className="flex items-center gap-3 justify-center mb-8">
           <span className="text-primary">
-            <TelaioLogo size={36} />
+            <TelaiOSLogo size={36} />
           </span>
           <span className="font-bold text-2xl leading-snug tracking-tight text-foreground">
-            Telaios
+            TelaiOS
           </span>
         </div>
 
