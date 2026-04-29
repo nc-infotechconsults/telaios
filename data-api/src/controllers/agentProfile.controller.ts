@@ -124,7 +124,7 @@ async function discoverStdioTools(
         await request("initialize", {
           protocolVersion: "2024-11-05",
           capabilities: {},
-          clientInfo: { name: "telaio-discovery", version: "1.0" },
+          clientInfo: { name: "telaios-discovery", version: "1.0" },
         });
         send({ jsonrpc: "2.0", method: "notifications/initialized", params: {} });
         const result = (await request("tools/list", {})) as { tools?: DiscoveredTool[] } | null;

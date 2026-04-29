@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# E2E Tests — Telaio
+# E2E Tests — Telaios
 #
 # Spins up the full platform (Postgres, Redis, MinIO, data-api,
 # agent-service, Vite frontend) and runs:

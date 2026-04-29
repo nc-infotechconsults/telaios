@@ -1,6 +1,6 @@
 # agent-service
 
-Python implementation of the SWE AI Platform Agent Service.
+Python implementation of the Telaios Agent Service.
 
 ## Overview
 
