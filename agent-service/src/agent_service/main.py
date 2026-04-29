@@ -14,6 +14,7 @@ from agent_service.api.documents import router as documents_router
 from agent_service.api.document_copilot import router as document_copilot_router
 from agent_service.api.health import router as health_router
 from agent_service.api.plans import router as plans_router
+from agent_service.api.v2 import router as v2_router
 from agent_service.config import config
 
 logging.basicConfig(
@@ -45,6 +46,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         set_plan_checkpointer(plan_checkpointer)
         logger.info("Planning service graph compiled.")
+
+        from agent_service.agents.document_copilot.agent import (
+            set_checkpointer as set_doc_checkpointer,
+        )
+
+        set_doc_checkpointer(plan_checkpointer)
+        logger.info("Document copilot v2 graph compiled.")
 
         yield
 
@@ -95,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(documents_router)
     app.include_router(document_copilot_router)
     app.include_router(plans_router)
+    app.include_router(v2_router)
 
     return app
 
