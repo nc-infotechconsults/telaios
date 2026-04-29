@@ -1,5 +1,8 @@
 # Telaios
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![E2E Tests](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml/badge.svg)](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml)
+
 **Telaios** is an agentic software development operating system — an all-in-one platform for teams that want to manage the entire software development lifecycle, from planning through execution, with AI agents doing the heavy lifting.
 
 ---
@@ -198,3 +201,13 @@ cd frontend && bun run test:e2e # Playwright browser E2E tests
 - `agent-service/` is intentionally outside the Bun workspaces and uses Python packaging (`pyproject.toml`).
 - Database schema changes must always be made via new migration files — never edit existing migration files directly.
 - If you are working inside a subproject, check for a local `README.md` or `AGENTS.md` first.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+
+## License
+
+Telaios is released under the [MIT License](LICENSE). © 2026 NC Infotech Consults.

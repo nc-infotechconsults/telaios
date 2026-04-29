@@ -1,0 +1,20 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# Owners are automatically requested for review when someone opens a PR
+# that modifies matching files.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global fallback — all files
+* @nc-infotechconsults/telaios-maintainers
+
+# Frontend
+frontend/ @nc-infotechconsults/telaios-maintainers
+
+# Data API
+data-api/ @nc-infotechconsults/telaios-maintainers
+
+# Agent service (Python)
+agent-service/ @nc-infotechconsults/telaios-maintainers
+
+# CI / GitHub configuration
+.github/ @nc-infotechconsults/telaios-maintainers
