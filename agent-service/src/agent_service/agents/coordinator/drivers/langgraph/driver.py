@@ -4,6 +4,8 @@ import json
 from typing import Any, Dict, List, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.tools import StructuredTool
 
 from agent_service.agents.coordinator.drivers.base import (
     AgentArtifact,
@@ -14,13 +16,12 @@ from agent_service.agents.coordinator.drivers.base import (
 from agent_service.core.schema_utils import build_pydantic_model_from_schema
 from agent_service.core.types import Skill
 
-from .state import _CodingState
-from .tools import CustomToolHandler, _BUILTIN_TOOLS
 from .graph import build_graph
+from .tools import build_builtin_tools
 
 
 class LangGraphDriver:
-    """LangGraph-based coding agent driver."""
+    """LangGraph-based coding agent driver (create_react_agent)."""
 
     # Built-in coding system prompt used when no profile override is configured.
     _BUILTIN_SYSTEM = (
@@ -50,18 +51,12 @@ class LangGraphDriver:
         self._system_prompt_mode = system_prompt_mode
         self._structured_output = structured_output
         self._sub_agents: List[Dict[str, Any]] = sub_agents or []
-        self._sub_agent_tool_defs: List[Dict[str, Any]] = []
-        self._sub_agent_handlers: Dict[str, CustomToolHandler] = {}
+        self._sub_agent_tools: List[StructuredTool] = []
         self._status: AgentStatus = "idle"
 
-    def set_sub_agent_tools(
-        self,
-        tool_defs: List[Dict[str, Any]],
-        handlers: Dict[str, CustomToolHandler],
-    ) -> None:
-        """Inject compiled sub-agent tool definitions and dispatch handlers."""
-        self._sub_agent_tool_defs = tool_defs
-        self._sub_agent_handlers = handlers
+    def set_sub_agent_tools(self, tools: List[StructuredTool]) -> None:
+        """Inject compiled sub-agent StructuredTools."""
+        self._sub_agent_tools = tools
 
     async def get_status(self) -> AgentStatus:
         return self._status
@@ -69,18 +64,31 @@ class LangGraphDriver:
     async def execute(self, task: AgentTask, workspaces: dict[str, str]) -> AgentResult:
         self._status = "busy"
 
-        skill_tools = [
-            {
-                "name": s.name,
-                "description": f"{s.description}\n\nInstructions:\n{s.instructions}",
-                "schema": s.inputSchema.model_dump(),
-            }
-            for s in self._skills
-        ]
-        all_tools = _BUILTIN_TOOLS + skill_tools + self._sub_agent_tool_defs
-        all_handlers: Dict[str, CustomToolHandler] = {**self._sub_agent_handlers}
+        # Build skill tools: each skill becomes a StructuredTool whose coroutine
+        # returns the skill instructions when called.
+        skill_tools: List[StructuredTool] = []
+        for s in self._skills:
+            schema_dict = s.inputSchema.model_dump()
+            args_schema = build_pydantic_model_from_schema(schema_dict, f"Skill_{s.name}")
+            instructions_text = s.instructions
 
-        bound_llm = self._llm.bind_tools(all_tools) if hasattr(self._llm, "bind_tools") else self._llm
+            async def _skill_fn(_instructions=instructions_text, **kwargs: Any) -> str:
+                return _instructions
+
+            skill_tools.append(
+                StructuredTool.from_function(
+                    coroutine=_skill_fn,
+                    name=s.name,
+                    description=f"{s.description}\n\nInstructions:\n{s.instructions}",
+                    args_schema=args_schema,
+                )
+            )
+
+        all_tools = (
+            build_builtin_tools(workspaces)
+            + skill_tools
+            + self._sub_agent_tools
+        )
 
         workspace_block = (
             "Workspaces (name → path):\n"
@@ -97,7 +105,6 @@ class LangGraphDriver:
             task_block=task_block,
         )
 
-        # Compose the effective system prompt using the profile's setting.
         if self._system_prompt and self._system_prompt_mode == "override":
             system_prompt = f"{workspace_block}{task_block}" + self._system_prompt
         elif self._system_prompt and self._system_prompt_mode in ("extend", "append"):
@@ -106,39 +113,58 @@ class LangGraphDriver:
             system_prompt = builtin_prompt
 
         try:
-            graph = build_graph(bound_llm, all_tools, all_handlers or None)
-            initial_state: _CodingState = {
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": "Begin."},
-                ],
-                "workspaces": workspaces,
-                "result": "",
-                "done": False,
-                "error": None,
-            }
-            final_state = await graph.ainvoke(initial_state, {"recursion_limit": 100})
+            graph = build_graph(self._llm, all_tools, system_prompt)
+            final_state = await graph.ainvoke(
+                {"messages": [HumanMessage(content="Begin.")]},
+                {"recursion_limit": 100},
+            )
 
             self._status = "idle"
-            state: _CodingState = final_state
+            messages: list = final_state.get("messages", [])
 
+            # Extract result: prefer the finish ToolMessage, fall back to last AIMessage.
+            finish_tm = next(
+                (
+                    m for m in reversed(messages)
+                    if isinstance(m, ToolMessage) and getattr(m, "name", None) == "finish"
+                ),
+                None,
+            )
+            if finish_tm:
+                result_text = (
+                    finish_tm.content
+                    if isinstance(finish_tm.content, str)
+                    else json.dumps(finish_tm.content)
+                )
+            else:
+                last_ai = next(
+                    (m for m in reversed(messages) if isinstance(m, AIMessage)), None
+                )
+                result_text = (
+                    (last_ai.content if isinstance(last_ai.content, str) else json.dumps(last_ai.content))
+                    if last_ai
+                    else ""
+                )
+
+            # Build tool call log artifact.
             log_lines: list[str] = []
             tool_call_count = 0
-            for msg in state["messages"]:
-                if msg.get("role") == "assistant":
-                    try:
-                        calls = json.loads(msg["content"])
-                        if isinstance(calls, list) and calls and "name" in calls[0]:
-                            for call in calls:
-                                tool_call_count += 1
-                                args_fmt = json.dumps(call.get("args", {}), indent=2).replace("\n", "\n    ")
-                                log_lines.append(f"[{tool_call_count}] CALL  {call['name']}")
-                                log_lines.append(f"    args: {args_fmt}")
-                    except Exception:
-                        pass
-                elif msg.get("role") == "tool":
-                    preview = msg["content"][:500] + ("…" if len(msg["content"]) > 500 else "")
-                    log_lines.append(f"    → {msg.get('name','result')}: {preview}")
+            for msg in messages:
+                if isinstance(msg, AIMessage):
+                    tool_calls = getattr(msg, "tool_calls", []) or []
+                    for tc in tool_calls:
+                        tool_call_count += 1
+                        args_fmt = json.dumps(tc.get("args", {}), indent=2).replace("\n", "\n    ")
+                        log_lines.append(f"[{tool_call_count}] CALL  {tc['name']}")
+                        log_lines.append(f"    args: {args_fmt}")
+                elif isinstance(msg, ToolMessage):
+                    content_str = (
+                        msg.content
+                        if isinstance(msg.content, str)
+                        else json.dumps(msg.content)
+                    )
+                    preview = content_str[:500] + ("…" if len(content_str) > 500 else "")
+                    log_lines.append(f"    → {getattr(msg, 'name', None) or 'result'}: {preview}")
                     log_lines.append("")
 
             artifacts: list[AgentArtifact] = []
@@ -154,9 +180,8 @@ class LangGraphDriver:
                 )
 
             return AgentResult(
-                success=not state.get("error"),
-                output=await self._format_structured_output(state.get("result", "")),
-                error=state.get("error"),
+                success=True,
+                output=await self._format_structured_output(result_text),
                 artifacts=artifacts,
             )
         except Exception as exc:

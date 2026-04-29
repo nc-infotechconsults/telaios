@@ -2,121 +2,102 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any, Callable, Coroutine, Dict, Optional
+from typing import Dict, List
+
+from langchain_core.tools import StructuredTool
+from pydantic import BaseModel
 
 
-_BUILTIN_TOOLS = [
-    {
-        "name": "run_shell",
-        "description": "Execute a shell command in a workspace directory.",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "The shell command to run."},
-                "cwd": {"type": "string", "description": "Working directory (absolute path or workspace name)."},
-            },
-            "required": ["command"],
-        },
-    },
-    {
-        "name": "write_file",
-        "description": "Write (or overwrite) a file at the given path.",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "File path relative to the workspace root."},
-                "content": {"type": "string", "description": "Full file content to write."},
-            },
-            "required": ["path", "content"],
-        },
-    },
-    {
-        "name": "read_file",
-        "description": "Read the contents of a file.",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "File path relative to the workspace root."},
-            },
-            "required": ["path"],
-        },
-    },
-    {
-        "name": "finish",
-        "description": "Signal that the task is complete and provide a summary.",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "summary": {"type": "string", "description": "A concise summary of what was accomplished."},
-            },
-            "required": ["summary"],
-        },
-    },
-]
-
-# Type alias for a custom tool handler: receives (args: dict) and returns {"text": str, "is_error": bool}
-CustomToolHandler = Callable[[Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any]]]
-
-
-async def _dispatch_tool(
-    tool_name: str,
-    args: dict,
-    workspaces: dict[str, str],
-    custom_handlers: Optional[Dict[str, CustomToolHandler]] = None,
-) -> dict:
+def build_builtin_tools(workspaces: Dict[str, str]) -> List[StructuredTool]:
+    """Build the four built-in coding tools scoped to the given workspaces."""
     primary_workspace = next(iter(workspaces.values()), "/tmp")
+    safe_root = os.path.realpath(primary_workspace)
 
-    def _resolve_cwd(cwd_arg: Any) -> str:
-        if isinstance(cwd_arg, str):
+    def _resolve_cwd(cwd_arg: object) -> str:
+        if isinstance(cwd_arg, str) and cwd_arg:
             return workspaces.get(cwd_arg) or (
                 cwd_arg if os.path.isabs(cwd_arg) else os.path.join(primary_workspace, cwd_arg)
             )
         return primary_workspace
 
-    try:
-        if tool_name == "run_shell":
-            cwd = _resolve_cwd(args.get("cwd"))
-            proc = await asyncio.create_subprocess_shell(
-                args["command"],
-                cwd=cwd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30.0)
-            except asyncio.TimeoutError:
-                proc.kill()
-                return {"text": "Command timed out after 30 seconds.", "is_error": True}
-            text = f"stdout:\n{stdout.decode(errors='replace')}"
-            if stderr:
-                text += f"\nstderr:\n{stderr.decode(errors='replace')}"
-            return {"text": text, "is_error": False}
+    # ── Input schemas ─────────────────────────────────────────────────────────
 
-        if tool_name == "write_file":
-            safe_root = os.path.realpath(primary_workspace)
-            requested = os.path.realpath(os.path.join(primary_workspace, args["path"]))
-            if not requested.startswith(safe_root + os.sep):
-                return {"text": "Path is outside the workspace.", "is_error": True}
-            os.makedirs(os.path.dirname(requested), exist_ok=True)
-            with open(requested, "w", encoding="utf-8") as fh:
-                fh.write(args["content"])
-            return {"text": f"File written: {args['path']}", "is_error": False}
+    class RunShellInput(BaseModel):
+        command: str
+        cwd: str = ""
 
-        if tool_name == "read_file":
-            safe_root = os.path.realpath(primary_workspace)
-            requested = os.path.realpath(os.path.join(primary_workspace, args["path"]))
-            if not requested.startswith(safe_root + os.sep):
-                return {"text": "Path is outside the workspace.", "is_error": True}
-            with open(requested, "r", encoding="utf-8", errors="replace") as fh:
-                return {"text": fh.read(), "is_error": False}
+    class WriteFileInput(BaseModel):
+        path: str
+        content: str
 
-        if tool_name == "finish":
-            return {"text": str(args.get("summary", "")), "is_error": False}
+    class ReadFileInput(BaseModel):
+        path: str
 
-        # Dispatch to custom handler (e.g. sub-agent tools)
-        if custom_handlers and tool_name in custom_handlers:
-            return await custom_handlers[tool_name](args)
+    class FinishInput(BaseModel):
+        summary: str
 
-        return {"text": f"Unknown tool: {tool_name}", "is_error": True}
-    except Exception as exc:
-        return {"text": f"Tool error ({tool_name}): {exc}", "is_error": True}
+    # ── Coroutines ────────────────────────────────────────────────────────────
+
+    async def run_shell(command: str, cwd: str = "") -> str:
+        resolved_cwd = _resolve_cwd(cwd)
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            cwd=resolved_cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30.0)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return "Command timed out after 30 seconds."
+        text = f"stdout:\n{stdout.decode(errors='replace')}"
+        if stderr:
+            text += f"\nstderr:\n{stderr.decode(errors='replace')}"
+        return text
+
+    async def write_file(path: str, content: str) -> str:
+        requested = os.path.realpath(os.path.join(primary_workspace, path))
+        if not requested.startswith(safe_root + os.sep):
+            return "Error: path is outside the workspace."
+        os.makedirs(os.path.dirname(requested), exist_ok=True)
+        with open(requested, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        return f"File written: {path}"
+
+    async def read_file(path: str) -> str:
+        requested = os.path.realpath(os.path.join(primary_workspace, path))
+        if not requested.startswith(safe_root + os.sep):
+            return "Error: path is outside the workspace."
+        with open(requested, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+
+    async def finish(summary: str) -> str:
+        return summary
+
+    return [
+        StructuredTool.from_function(
+            coroutine=run_shell,
+            name="run_shell",
+            description="Execute a shell command in a workspace directory.",
+            args_schema=RunShellInput,
+        ),
+        StructuredTool.from_function(
+            coroutine=write_file,
+            name="write_file",
+            description="Write (or overwrite) a file at the given path.",
+            args_schema=WriteFileInput,
+        ),
+        StructuredTool.from_function(
+            coroutine=read_file,
+            name="read_file",
+            description="Read the contents of a file.",
+            args_schema=ReadFileInput,
+        ),
+        StructuredTool.from_function(
+            coroutine=finish,
+            name="finish",
+            description="Signal that the task is complete and provide a summary.",
+            args_schema=FinishInput,
+        ),
+    ]

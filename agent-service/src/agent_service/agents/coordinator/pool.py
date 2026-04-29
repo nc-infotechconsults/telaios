@@ -195,5 +195,5 @@ class AgentPool:
                 continue
             if not driver._sub_agents:
                 continue
-            tool_defs, handlers = build_sub_agent_tools(driver._sub_agents, self)
-            driver.set_sub_agent_tools(tool_defs, handlers)
+            tools = build_sub_agent_tools(driver._sub_agents, self)
+            driver.set_sub_agent_tools(tools)

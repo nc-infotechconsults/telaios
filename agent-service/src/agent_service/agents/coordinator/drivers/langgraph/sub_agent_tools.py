@@ -1,21 +1,21 @@
 """
-Utilities to compile sub_agents entries into native LangGraph tool definitions
-and custom dispatch handlers.
+Utilities to compile sub_agents entries into LangChain StructuredTool instances.
 
 Each entry in sub_agents has the shape:
   { "agent_id": str, "tool_name": str, "tool_description": str }
 
-The compiled tools appear as regular tool definitions to the LLM and are
-dispatched through the custom_handlers mechanism in _dispatch_tool.
+The compiled StructuredTools are passed directly to create_react_agent.
 """
 from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from langchain_core.tools import StructuredTool
+from pydantic import BaseModel
 
 from agent_service.agents.coordinator.drivers.base import AgentTask
-from agent_service.agents.coordinator.drivers.langgraph.tools import CustomToolHandler
 
 if TYPE_CHECKING:
     from agent_service.agents.coordinator.pool import AgentPool
@@ -23,20 +23,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _SubAgentInput(BaseModel):
+    task_description: str
+
+
 def build_sub_agent_tools(
     sub_agents: List[Dict[str, Any]],
     pool: "AgentPool",
-) -> Tuple[List[Dict[str, Any]], Dict[str, CustomToolHandler]]:
+) -> List[StructuredTool]:
     """
-    Build tool definitions and dispatch handlers for each sub_agent entry.
+    Build StructuredTool instances for each sub_agent entry.
 
     Returns:
-        tool_defs: list of tool schema dicts to pass to bind_tools()
-        handlers: dict mapping tool_name -> async handler for _dispatch_tool()
+        List of StructuredTool objects ready to pass to create_react_agent.
     """
-    tool_defs: List[Dict[str, Any]] = []
-    handlers: Dict[str, CustomToolHandler] = {}
-
+    tools: List[StructuredTool] = []
     seen_names: set[str] = set()
 
     for entry in sub_agents:
@@ -58,43 +59,30 @@ def build_sub_agent_tools(
             logger.warning("No driver found for sub-agent %s (tool=%s) — skipping", agent_id, tool_name)
             continue
 
-        tool_defs.append({
-            "name": tool_name,
-            "description": tool_description,
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "task_description": {
-                        "type": "string",
-                        "description": "A clear description of what you want this sub-agent to do.",
-                    },
-                },
-                "required": ["task_description"],
-            },
-        })
-
-        # Bind loop variables explicitly to avoid closure bugs
-        def _make_handler(
-            _driver=driver, _tool_name=tool_name, _agent_id=agent_id
-        ) -> CustomToolHandler:
-            async def _handler(args: Dict[str, Any]) -> Dict[str, Any]:
-                task_description = args.get("task_description", "")
+        def _make_tool(
+            _driver=driver, _name=tool_name, _desc=tool_description
+        ) -> StructuredTool:
+            async def _coroutine(task_description: str) -> str:
                 sub_task = AgentTask(
                     id=f"sub-{uuid.uuid4().hex[:8]}",
-                    title=_tool_name,
+                    title=_name,
                     description=task_description,
                     type="custom",
-                    agent_profile_id=_agent_id,
+                    agent_profile_id=None,
                 )
                 try:
                     result = await _driver.execute(sub_task, {})
-                    text = result.output or result.error or "Sub-agent returned no output"
-                    return {"text": text, "is_error": bool(result.error and not result.output)}
+                    return result.output or result.error or "Sub-agent returned no output"
                 except Exception as exc:
-                    return {"text": f"Sub-agent error: {exc}", "is_error": True}
+                    return f"Sub-agent error: {exc}"
 
-            return _handler
+            return StructuredTool.from_function(
+                coroutine=_coroutine,
+                name=_name,
+                description=_desc,
+                args_schema=_SubAgentInput,
+            )
 
-        handlers[tool_name] = _make_handler()
+        tools.append(_make_tool())
 
-    return tool_defs, handlers
+    return tools
