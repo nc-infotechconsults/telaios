@@ -49,7 +49,9 @@ def _mock_driver(success: bool = True, output: str = "done", error: str | None =
 
 def _mock_pool(driver=None):
     pool = MagicMock()
-    pool.get_driver_by_role = MagicMock(return_value=driver)
+    # Role-based lookups return None so the post-exec pipeline is a no-op
+    # (reviewer/tester not registered in these scheduler-level tests).
+    pool.get_driver_by_role = MagicMock(return_value=None)
     pool.get_driver = MagicMock(return_value=driver)
     return pool
 

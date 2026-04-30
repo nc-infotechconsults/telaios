@@ -4,8 +4,8 @@ Unit tests for the infra agent create_react_agent migration (T3).
 Covers:
 - detect_stack identifies common stacks from indicator files
 - detect_stack returns "unknown" for empty workspace
-- _build_workspace_tools write_file / read_file are workspace-scoped
-- InfraAgent.on_execute collects Written files from ToolMessage results
+- make_write_file_tool / make_read_file_tool are workspace-scoped
+- InfraAgent.on_execute collects "File written:" files from ToolMessage results
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import pytest
 from langchain_core.messages import AIMessage, ToolMessage
 
 from agent_service.agents.infra.template_gen import detect_stack
-from agent_service.agents.infra.infra_agent import _build_workspace_tools
+from agent_service.core.tools import make_read_file_tool, make_write_file_tool
 
 
 class TestDetectStack:
@@ -55,26 +55,24 @@ class TestBuildWorkspaceTools:
     @pytest.mark.asyncio
     async def test_write_and_read_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp:
-            tools = _build_workspace_tools(tmp)
-            write = next(t for t in tools if t.name == "write_file")
-            read = next(t for t in tools if t.name == "read_file")
+            write = make_write_file_tool(tmp)
+            read = make_read_file_tool(tmp)
 
             result = await write.coroutine(path="Dockerfile", content="FROM python:3.12")
-            assert result == "Written: Dockerfile"
+            assert result == "File written: Dockerfile"
             content = await read.coroutine(path="Dockerfile")
             assert "FROM python:3.12" in content
 
     @pytest.mark.asyncio
     async def test_write_blocks_path_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:
-            tools = _build_workspace_tools(tmp)
-            write = next(t for t in tools if t.name == "write_file")
+            write = make_write_file_tool(tmp)
             result = await write.coroutine(path="../../etc/crontab", content="bad")
             assert "Error" in result
 
 
 class TestInfraAgentExecute:
-    """InfraAgent.on_execute should collect Written: paths from ToolMessages."""
+    """InfraAgent.on_execute should collect 'File written:' paths from ToolMessages."""
 
     @pytest.mark.asyncio
     async def test_on_execute_collects_written_files(self):
@@ -87,8 +85,8 @@ class TestInfraAgentExecute:
 
             fake_messages = [
                 AIMessage(content="I will generate the files."),
-                ToolMessage(content="Written: Dockerfile", name="write_file", tool_call_id="1"),
-                ToolMessage(content="Written: docker-compose.yml", name="write_file", tool_call_id="2"),
+                ToolMessage(content="File written: Dockerfile", name="write_file", tool_call_id="1"),
+                ToolMessage(content="File written: docker-compose.yml", name="write_file", tool_call_id="2"),
                 AIMessage(content="Done."),
             ]
             fake_graph = MagicMock()

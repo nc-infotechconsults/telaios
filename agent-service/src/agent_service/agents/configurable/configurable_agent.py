@@ -10,8 +10,9 @@ from agent_service.core.agent_framework.context import AgentContext
 from agent_service.core.agent_framework.event_bus import get_agent_event_bus
 from agent_service.core.llm import build_chat_model
 from agent_service.core.schema_utils import build_pydantic_model_from_schema
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import StructuredTool
+from langgraph.prebuilt import create_react_agent
 
 
 _DEFAULT_SYSTEM_PROMPT = (
@@ -19,8 +20,6 @@ _DEFAULT_SYSTEM_PROMPT = (
     "Use the tools available to you to answer questions or perform actions. "
     "When finished, summarise what you did."
 )
-
-_MAX_ROUNDS = 10
 
 
 class ConfigurableAgentConfig(BaseModel):
@@ -87,49 +86,33 @@ class ConfigurableAgent(BaseAgent):
         task_desc = (ctx.task.description if ctx.task else None) or ""
         task_title = (ctx.task.title if ctx.task else None) or "Custom task"
 
-        # Build skill tools
-        lc_tools = self._build_skill_tools()
+        # Build skill tools; attach finish only when there are skills to use.
+        skill_tools = self._build_skill_tools()
+        lc_tools = skill_tools
+        if skill_tools:
+            lc_tools = skill_tools + [_build_finish_tool()]
 
         effective_system = _compose_prompt(
             _DEFAULT_SYSTEM_PROMPT, self._config.systemPrompt, self._config.systemPromptMode
         )
         system_content = f"{effective_system}\n\nTask: {task_title}\n{task_desc}"
 
-        llm = self._llm.bind_tools(lc_tools) if lc_tools and hasattr(self._llm, "bind_tools") else self._llm
+        graph = create_react_agent(self._llm, lc_tools, prompt=system_content)
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(content="Begin the task.")]},
+            {"recursion_limit": 50},
+        )
 
-        messages: list = [SystemMessage(content=system_content), HumanMessage(content="Begin the task.")]
-        tool_map = {t.name: t for t in lc_tools}
+        # Extract the last AIMessage content as the output.
         output = ""
-
-        for _ in range(_MAX_ROUNDS):
-            response = await llm.ainvoke(messages)
-            ai_msg = response
-            tool_calls = getattr(ai_msg, "tool_calls", []) or []
-
-            if not tool_calls:
-                content = ai_msg.content
+        for msg in reversed(result.get("messages", [])):
+            if isinstance(msg, AIMessage):
+                content = msg.content
                 output = content if isinstance(content, str) else json.dumps(content)
-                messages.append(ai_msg)
                 break
 
-            messages.append(ai_msg)
-            tool_results: list = []
-            for tc in tool_calls:
-                tool = tool_map.get(tc["name"])
-                try:
-                    result = str(await tool.ainvoke(tc["args"])) if tool else f"Unknown tool: {tc['name']}"
-                except Exception as exc:
-                    result = f"Tool error: {exc}"
-                tool_results.append(ToolMessage(content=result, tool_call_id=tc["id"]))
-            messages.extend(tool_results)
-        else:
-            # Exhausted rounds — ask for a final summary
-            final = await self._llm.ainvoke(messages)
-            content = final.content
-            output = content if isinstance(content, str) else json.dumps(content)
-
-        # Apply structured output formatting if configured
-        output = self._format_structured_output(output)
+        # Apply structured output formatting if configured.
+        output = await self._format_structured_output(output)
 
         self._result = BaseAgentResult(
             success=True,
@@ -148,13 +131,13 @@ class ConfigurableAgent(BaseAgent):
     async def on_cleanup(self) -> None:
         pass
 
-    def _format_structured_output(self, raw_output: str) -> str:
+    async def _format_structured_output(self, raw_output: str) -> str:
         """If a structured output schema is configured, format the output accordingly."""
         schema = self._config.structuredOutput
         if not schema or not raw_output:
             return raw_output
 
-        # Try to parse raw_output as JSON first — it might already match
+        # Try to parse raw_output as JSON first — it might already match.
         try:
             parsed = json.loads(raw_output)
             if isinstance(parsed, dict):
@@ -162,11 +145,11 @@ class ConfigurableAgent(BaseAgent):
         except (json.JSONDecodeError, TypeError):
             pass
 
-        # Build a Pydantic model from the schema and use with_structured_output
+        # Build a Pydantic model from the schema and use with_structured_output.
         try:
             model = self._build_pydantic_model_from_schema(schema, "AgentOutput")
             structured_llm = self._llm.with_structured_output(model)
-            result = structured_llm.invoke(
+            result = await structured_llm.ainvoke(
                 f"Extract structured data from the following text. "
                 f"Return ONLY a JSON object matching the schema.\n\n{raw_output}"
             )
@@ -206,3 +189,21 @@ class ConfigurableAgent(BaseAgent):
                 )
             )
         return tools
+
+
+def _build_finish_tool() -> StructuredTool:
+    """Finish tool — attached only when the agent has skills to invoke."""
+    from pydantic import BaseModel as _BM
+
+    class _FinishInput(_BM):
+        summary: str
+
+    async def finish(summary: str) -> str:
+        return summary
+
+    return StructuredTool.from_function(
+        coroutine=finish,
+        name="finish",
+        description="Signal that the task is complete and provide a final summary.",
+        args_schema=_FinishInput,
+    )

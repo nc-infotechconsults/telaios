@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import List, Literal, Optional
 
 from langchain_core.messages import HumanMessage, ToolMessage
-from langchain_core.tools import StructuredTool
 from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel
 
@@ -13,6 +11,7 @@ from agent_service.core.agent_framework.base_agent import BaseAgent, AgentResult
 from agent_service.core.agent_framework.context import AgentContext
 from agent_service.core.agent_framework.event_bus import get_agent_event_bus
 from agent_service.core.llm import build_chat_model
+from agent_service.core.tools import make_read_file_tool, make_write_file_tool
 from agent_service.agents.infra.template_gen import detect_stack
 
 
@@ -63,49 +62,6 @@ def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
     return f"{builtin}\n\n{custom}"
 
 
-def _build_workspace_tools(workspace_path: str) -> List[StructuredTool]:
-    """Build write_file and read_file tools scoped to workspace_path."""
-    safe_root = os.path.realpath(workspace_path)
-
-    class WriteFileInput(BaseModel):
-        path: str
-        content: str
-
-    class ReadFileInput(BaseModel):
-        path: str
-
-    async def write_file(path: str, content: str) -> str:
-        requested = os.path.realpath(os.path.join(safe_root, path))
-        if not requested.startswith(safe_root + os.sep):
-            return "Error: path is outside the workspace."
-        os.makedirs(os.path.dirname(requested), exist_ok=True)
-        with open(requested, "w", encoding="utf-8") as fh:
-            fh.write(content)
-        return f"Written: {path}"
-
-    async def read_file(path: str) -> str:
-        requested = os.path.realpath(os.path.join(safe_root, path))
-        if not requested.startswith(safe_root + os.sep):
-            return "Error: path is outside the workspace."
-        with open(requested, "r", encoding="utf-8", errors="replace") as fh:
-            return fh.read()
-
-    return [
-        StructuredTool.from_function(
-            coroutine=write_file,
-            name="write_file",
-            description="Write (or overwrite) a file in the workspace.",
-            args_schema=WriteFileInput,
-        ),
-        StructuredTool.from_function(
-            coroutine=read_file,
-            name="read_file",
-            description="Read the contents of a workspace file.",
-            args_schema=ReadFileInput,
-        ),
-    ]
-
-
 class InfraAgent(BaseAgent):
     def __init__(self, id: str, config: InfraAgentConfig) -> None:
         super().__init__(id, "infra")
@@ -151,7 +107,7 @@ class InfraAgent(BaseAgent):
                 self._config.systemPromptMode,
             )
 
-            tools = _build_workspace_tools(local_path)
+            tools = [make_write_file_tool(local_path), make_read_file_tool(local_path)]
             graph = create_react_agent(self._llm, tools, prompt=system_prompt)
 
             user_msg = (
@@ -179,12 +135,12 @@ class InfraAgent(BaseAgent):
 
             # Collect paths written via write_file ToolMessages.
             written = [
-                msg.content[len("Written: "):]
+                msg.content[len("File written: "):]
                 for msg in result.get("messages", [])
                 if isinstance(msg, ToolMessage)
                 and getattr(msg, "name", None) == "write_file"
                 and isinstance(msg.content, str)
-                and msg.content.startswith("Written: ")
+                and msg.content.startswith("File written: ")
             ]
             all_written.extend(f"{repo_name}/{f}" for f in written)
 

@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 
 TERMINAL_STATUSES = frozenset({"done", "failed", "skipped", "cancelled"})
 
+# Task types that trigger the post-execution review + test pipeline.
+_PIPELINE_TASK_TYPES = frozenset({"code", "general", "custom"})
+
+# Maximum number of coding-agent retries driven by review/test feedback.
+_MAX_PIPELINE_RETRIES = 3
+
 
 class Scheduler:
     """
@@ -308,6 +314,17 @@ class Scheduler:
         result = await driver.execute(agent_task, workspaces)
         logger.info("[Scheduler] Task %s finished: success=%s", task["id"], result.success)
 
+        # Post-execution review + test pipeline (auto-runs when drivers are registered).
+        pipeline_artifacts: list = []
+        if result.success and task["type"] in _PIPELINE_TASK_TYPES:
+            result, pipeline_artifacts = await self._run_post_exec_pipeline_v2(
+                project_id, task, agent_task, result, driver, workspaces
+            )
+            logger.info(
+                "[Scheduler] Pipeline finished for task %s: success=%s artifacts=%d",
+                task["id"], result.success, len(pipeline_artifacts),
+            )
+
         completed_at = _now()
 
         # Capture git diff
@@ -346,16 +363,22 @@ class Scheduler:
             "completed_at": completed_at,
         })
 
+        coding_artifacts = list(result.artifacts or [])
+        all_raw = coding_artifacts + pipeline_artifacts  # pipeline_artifacts are already dicts
         all_artifacts = diff_artifacts + [
-            {
-                "type": a.type,
-                "title": a.title,
-                "content": a.content,
-                "content_type": a.content_type,
-                "metadata": a.metadata,
-                "sort_order": len(diff_artifacts) + i,
-            }
-            for i, a in enumerate(result.artifacts or [])
+            (
+                {
+                    "type": a.type,
+                    "title": a.title,
+                    "content": a.content,
+                    "content_type": a.content_type,
+                    "metadata": a.metadata,
+                    "sort_order": len(diff_artifacts) + i,
+                }
+                if hasattr(a, "type")
+                else {**a, "sort_order": len(diff_artifacts) + i}
+            )
+            for i, a in enumerate(all_raw)
         ]
         if all_artifacts:
             try:
@@ -414,6 +437,173 @@ class Scheduler:
 
         OrchestrationService.get_instance().notify_task_complete(plan_id, task["id"], result.success)
 
+    # ── Post-execution pipeline ───────────────────────────────────────────────
+
+    async def _run_post_exec_pipeline_v2(
+        self,
+        project_id: str,
+        task: dict,
+        agent_task,
+        coding_result,
+        driver,
+        workspaces: Dict[str, str],
+    ):
+        """
+        Internal: see _run_post_exec_pipeline hook in _dispatch_task_inner.
+        Returns (final_coding_result, extra_artifact_dicts).
+        """
+        from agent_service.agents.coordinator.drivers.base import AgentTask
+
+        reviewer = self._pool.get_driver_by_role("reviewer")
+        tester = self._pool.get_driver_by_role("tester")
+
+        if not reviewer and not tester:
+            return coding_result, []
+
+        extra_artifacts: list = []
+        approved = True  # default if no reviewer
+
+        # ── Review loop ───────────────────────────────────────────────────────
+        if reviewer:
+            for attempt in range(_MAX_PIPELINE_RETRIES + 1):
+                self._emit(project_id, {
+                    "type": "review_started",
+                    "task_id": task["id"],
+                    "attempt": attempt,
+                })
+
+                review_task = AgentTask(
+                    id=task["id"],
+                    title=task["title"],
+                    description=(
+                        f"{task['description']}\n\n"
+                        f"Please evaluate what has been implemented against the above specification."
+                    ),
+                    type="reviewer",
+                    agent_profile_id=task.get("agent_profile_id"),
+                )
+                review_result = await reviewer.execute(review_task, workspaces)
+
+                # Collect review artifacts
+                for a in (review_result.artifacts or []):
+                    extra_artifacts.append({
+                        "type": a.type,
+                        "title": a.title,
+                        "content": a.content,
+                        "content_type": a.content_type,
+                        "metadata": a.metadata,
+                    })
+
+                # Parse approval from review output
+                approved = _parse_approved(review_result.output)
+                required_changes = _parse_required_changes(review_result.output)
+
+                self._emit(project_id, {
+                    "type": "review_completed",
+                    "task_id": task["id"],
+                    "approved": approved,
+                    "attempt": attempt,
+                })
+
+                if approved:
+                    break
+
+                if attempt >= _MAX_PIPELINE_RETRIES:
+                    logger.warning(
+                        "[Scheduler] Review retry limit reached for task %s — proceeding",
+                        task["id"],
+                    )
+                    break
+
+                # Retry coding with feedback
+                feedback_desc = (
+                    f"{task['description']}\n\n"
+                    f"--- REVIEW FEEDBACK (attempt {attempt + 1}) ---\n"
+                    + "\n".join(f"- {c}" for c in required_changes)
+                )
+                retry_task = AgentTask(
+                    id=task["id"],
+                    title=task["title"],
+                    description=feedback_desc,
+                    type=task["type"],
+                    agent_profile_id=task.get("agent_profile_id"),
+                )
+                self._emit(project_id, {
+                    "type": "code_retry_started",
+                    "task_id": task["id"],
+                    "attempt": attempt + 1,
+                    "reason": "review",
+                })
+                coding_result = await driver.execute(retry_task, workspaces)
+                if not coding_result.success:
+                    return coding_result, extra_artifacts
+
+        # ── Test loop (only when review passed or no reviewer) ────────────────
+        if tester and approved:
+            for attempt in range(_MAX_PIPELINE_RETRIES + 1):
+                self._emit(project_id, {"type": "test_started", "task_id": task["id"]})
+
+                test_task = AgentTask(
+                    id=task["id"],
+                    title=task["title"],
+                    description=task["description"],
+                    type="tester",
+                    agent_profile_id=task.get("agent_profile_id"),
+                )
+                test_result = await tester.execute(test_task, workspaces)
+
+                for a in (test_result.artifacts or []):
+                    extra_artifacts.append({
+                        "type": a.type,
+                        "title": a.title,
+                        "content": a.content,
+                        "content_type": a.content_type,
+                        "metadata": a.metadata,
+                    })
+
+                passed = _parse_passed(test_result.output)
+                failures = _parse_failures(test_result.output)
+
+                self._emit(project_id, {
+                    "type": "test_completed",
+                    "task_id": task["id"],
+                    "passed": passed,
+                })
+
+                if passed:
+                    break
+
+                if attempt >= _MAX_PIPELINE_RETRIES:
+                    logger.warning(
+                        "[Scheduler] Test retry limit reached for task %s — proceeding",
+                        task["id"],
+                    )
+                    break
+
+                failures_text = "\n".join(f"- {f}" for f in failures)
+                feedback_desc = (
+                    f"{task['description']}\n\n"
+                    f"--- TEST FAILURES (attempt {attempt + 1}) ---\n{failures_text}"
+                )
+                retry_task = AgentTask(
+                    id=task["id"],
+                    title=task["title"],
+                    description=feedback_desc,
+                    type=task["type"],
+                    agent_profile_id=task.get("agent_profile_id"),
+                )
+                self._emit(project_id, {
+                    "type": "code_retry_started",
+                    "task_id": task["id"],
+                    "attempt": attempt + 1,
+                    "reason": "test_failure",
+                })
+                coding_result = await driver.execute(retry_task, workspaces)
+                if not coding_result.success:
+                    return coding_result, extra_artifacts
+
+        return coding_result, extra_artifacts
+
     def _get_transitive_dependents(
         self, task_id: str, tasks: List[dict], exclude_ids: Set[str]
     ) -> List[str]:
@@ -442,3 +632,41 @@ class Scheduler:
 def _now() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
+
+
+# ── Pipeline output parsers ───────────────────────────────────────────────────
+
+def _parse_approved(output: str) -> bool:
+    """Extract the 'approved' flag from a ReviewAgent JSON output."""
+    try:
+        data = json.loads(output or "{}")
+        return bool(data.get("approved", False))
+    except Exception:
+        return False
+
+
+def _parse_required_changes(output: str) -> list:
+    """Extract the 'required_changes' list from a ReviewAgent JSON output."""
+    try:
+        data = json.loads(output or "{}")
+        return list(data.get("required_changes", []))
+    except Exception:
+        return []
+
+
+def _parse_passed(output: str) -> bool:
+    """Extract the 'passed' flag from a TestingAgent JSON output."""
+    try:
+        data = json.loads(output or "{}")
+        return bool(data.get("passed", False))
+    except Exception:
+        return False
+
+
+def _parse_failures(output: str) -> list:
+    """Extract the 'failures' list from a TestingAgent JSON output."""
+    try:
+        data = json.loads(output or "{}")
+        return list(data.get("failures", []))
+    except Exception:
+        return []

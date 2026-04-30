@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import re
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -11,8 +9,9 @@ from agent_service.core.agent_framework.base_agent import BaseAgent, AgentResult
 from agent_service.core.agent_framework.context import AgentContext
 from agent_service.core.agent_framework.event_bus import get_agent_event_bus
 from agent_service.core.llm import build_chat_model
-from agent_service.agents.testing.test_runner import detect_framework, run_tests
-from langchain_core.messages import HumanMessage, SystemMessage
+from agent_service.agents.testing.tools import build_testing_tools
+from langchain_core.messages import HumanMessage, ToolMessage
+from langgraph.prebuilt import create_react_agent
 
 
 class TestingAgentConfig(BaseModel):
@@ -42,23 +41,25 @@ def _compose_prompt(builtin: str, custom: Optional[str], mode: str) -> str:
     return f"{builtin}\n\n{custom}"
 
 
-TEST_GEN_SYSTEM_PROMPT = """\
-You are an expert software engineer specializing in test-driven development.
+TEST_SYSTEM_PROMPT = """\
+You are an expert software engineer specialising in test-driven development and quality assurance.
 
-Given a task description and source code files, generate comprehensive tests that:
-1. Cover happy paths, edge cases, and error conditions
-2. Follow the detected test framework conventions
-3. Are self-contained and runnable without mocks unless necessary
+Your workflow:
+1. **Detect the test framework** — read `package.json`, `pyproject.toml`, `go.mod`, or similar to identify the language and test runner (jest, pytest, go test, etc.)
+2. **Inspect the source code** — use `read_file` to understand what has been implemented
+3. **Write tests** — use `write_file` to create comprehensive test files covering:
+   - Happy paths
+   - Edge cases and boundary conditions
+   - Error conditions and failure modes
+4. **Run the tests** — use `run_shell` to execute the test suite and capture results
+5. **Iterate if needed** — if tests fail due to test file issues (not implementation bugs), fix them and re-run
+6. **Finish** — call `finish` with the final results
 
-Respond with a JSON array of files to create:
-[
-  {
-    "path": "tests/unit/example.test.ts",
-    "content": "// full file content here"
-  }
-]
-
-Respond with ONLY valid JSON. No markdown fences."""
+When calling `finish`:
+- `passed`: true only if the test suite exits with a 0 exit code
+- `summary`: brief description of what was tested and the outcome
+- `tests_run`: total number of test cases executed
+- `failures`: list of failing test names or error messages (empty if all passed)"""
 
 
 class TestingAgent(BaseAgent):
@@ -84,55 +85,51 @@ class TestingAgent(BaseAgent):
         bus = get_agent_event_bus()
         await bus.publish("tests.started", {"agentId": self.id, "executionId": ctx.executionId})
 
-        all_results = []
-        generated_files: list[str] = []
+        task_desc = ctx.task.description if ctx.task else "Test the implemented code."
+        task_title = ctx.task.title if ctx.task else "Testing"
 
-        for repo_name, local_path in (ctx.workspaces or {}).items():
-            framework = await detect_framework(local_path)
+        effective_system = _compose_prompt(
+            TEST_SYSTEM_PROMPT, self._config.systemPrompt, self._config.systemPromptMode
+        )
 
-            if framework is None:
-                if self._config.generateTests:
-                    gen = await self._generate_tests(ctx, local_path, "jest")
-                    generated_files.extend(f"{repo_name}/{f}" for f in gen)
-                continue
+        tools = build_testing_tools(ctx.workspaces or {})
+        graph = create_react_agent(self._llm, tools, prompt=effective_system)
 
-            result = await run_tests(local_path, framework)
-            all_results.append(result)
+        human_content = (
+            f"Task: {task_title}\n{task_desc}\n\n"
+            f"Please detect the test framework, write comprehensive tests for the implemented code, "
+            f"run them, and call finish() with the results."
+        )
 
-            if not result.success and self._config.generateTests:
-                gen = await self._generate_tests(ctx, local_path, framework.name)
-                generated_files.extend(f"{repo_name}/{f}" for f in gen)
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(content=human_content)]},
+            {"recursion_limit": 60},
+        )
 
-        total_passed = sum(r.passed for r in all_results)
-        total_failed = sum(r.failed for r in all_results)
-        total_duration = sum(r.duration_ms for r in all_results)
-        overall_success = all(r.success for r in all_results) and len(all_results) > 0
+        summary = _extract_finish_result(result.get("messages", []))
 
-        summary = {
-            "passed": total_passed,
-            "failed": total_failed,
-            "durationMs": total_duration,
-            "results": [
-                {"framework": r.framework, "passed": r.passed, "failed": r.failed, "success": r.success, "output": r.output}
-                for r in all_results
-            ],
-            "generatedFiles": generated_files,
-        }
+        overall_success = summary.get("passed", False)
+        tests_run = summary.get("tests_run", 0)
+        failures = summary.get("failures", [])
 
         self._result = BaseAgentResult(
-            success=overall_success or bool(generated_files),
+            success=overall_success,
             output=json.dumps(summary),
             artifacts=[{
                 "type": "test_result",
-                "title": f"Test Results — {total_passed} passed, {total_failed} failed",
+                "title": (
+                    f"Test Results — {tests_run - len(failures)} passed, {len(failures)} failed"
+                    if tests_run
+                    else ("Tests Passed" if overall_success else "Tests Failed")
+                ),
                 "content": json.dumps(summary),
                 "content_type": "application/json",
                 "metadata": {
-                    "passed": total_passed,
-                    "failed": total_failed,
+                    "passed": tests_run - len(failures),
+                    "failed": len(failures),
                     "skipped": 0,
-                    "total": total_passed + total_failed,
-                    "duration_ms": total_duration,
+                    "total": tests_run,
+                    "duration_ms": 0,
                 },
             }],
         )
@@ -141,74 +138,31 @@ class TestingAgent(BaseAgent):
         await bus.publish(event_topic, {
             "agentId": self.id,
             "executionId": ctx.executionId,
-            "passed": total_passed,
-            "failed": total_failed,
-            "durationMs": total_duration,
+            "testsRun": tests_run,
+            "failures": len(failures),
         })
-
-        if generated_files:
-            await bus.publish("tests.generated", {
-                "agentId": self.id,
-                "executionId": ctx.executionId,
-                "filesGenerated": len(generated_files),
-            })
 
     async def on_cleanup(self) -> None:
         pass
 
-    async def _generate_tests(
-        self, ctx: AgentContext, workspace_path: str, framework_hint: str
-    ) -> List[str]:
-        task_desc = ctx.task.description if ctx.task else "Generate tests for the codebase."
-        src_files = await self._collect_source_files(workspace_path, 5)
-        src_context = "\n\n".join(
-            f"### {path}\n```\n{content[:2000]}\n```" for path, content in src_files
-        )
-        response = await self._llm.ainvoke([
-            SystemMessage(content=_compose_prompt(TEST_GEN_SYSTEM_PROMPT, self._config.systemPrompt, self._config.systemPromptMode)),
-            HumanMessage(content=f"Task: {task_desc}\n\nTest framework: {framework_hint}\n\nSource files:\n{src_context}"),
-        ])
-        content = response.content if isinstance(response.content, str) else json.dumps(response.content)
 
-        try:
-            json_match = re.search(r"\[[\s\S]*\]", content)
-            files = json.loads(json_match.group(0) if json_match else content)
-            written: list[str] = []
-            for file in files:
-                abs_path = os.path.join(workspace_path, file["path"])
-                os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                with open(abs_path, "w", encoding="utf-8") as fh:
-                    fh.write(file["content"])
-                written.append(file["path"])
-            return written
-        except Exception:
-            return []
-
-    async def _collect_source_files(
-        self, directory: str, max_files: int
-    ) -> List[tuple[str, str]]:
-        IGNORE = frozenset(["node_modules", ".git", "dist", "build", ".next", "coverage"])
-        SRC_EXTS = frozenset([".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs"])
-        results: list[tuple[str, str]] = []
-
-        def walk(current: str) -> None:
-            if len(results) >= max_files:
-                return
+def _extract_finish_result(messages: list) -> dict:
+    """
+    Find the last ToolMessage from the 'finish' tool and parse its JSON.
+    Falls back to a safe default if not found.
+    """
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage) and getattr(msg, "name", None) == "finish":
             try:
-                entries = list(os.scandir(current))
-            except Exception:
-                return
-            for entry in entries:
-                if len(results) >= max_files:
-                    return
-                if entry.is_dir() and entry.name not in IGNORE:
-                    walk(entry.path)
-                elif entry.is_file() and os.path.splitext(entry.name)[1] in SRC_EXTS:
-                    try:
-                        with open(entry.path, "r", encoding="utf-8", errors="replace") as fh:
-                            results.append((os.path.relpath(entry.path, directory), fh.read()))
-                    except Exception:
-                        pass
+                data = json.loads(msg.content)
+                if isinstance(data, dict) and "passed" in data:
+                    return data
+            except (json.JSONDecodeError, TypeError):
+                pass
 
-        walk(directory)
-        return results
+    return {
+        "passed": False,
+        "summary": "Testing agent did not call finish(). Manual inspection required.",
+        "tests_run": 0,
+        "failures": [],
+    }
