@@ -16,6 +16,7 @@ from agent_service.agents.coordinator.drivers.base import (
 from agent_service.core.schema_utils import build_pydantic_model_from_schema
 from agent_service.core.types import Skill
 
+from .document_tools import build_document_tools
 from .graph import build_graph
 from .tools import build_builtin_tools
 

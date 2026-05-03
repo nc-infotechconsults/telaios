@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     # PostgreSQL connection string — used by LangGraph AsyncPostgresSaver for plan checkpointing
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/sweai"
 
+    # Skills management
+    # Directory containing skill definitions (SKILL.md + scripts/)
+    SKILLS_DIRECTORY: str = str(AGENT_SERVICE_ROOT / "skills")
+    # Auto-load skills at startup
+    SKILLS_AUTOLOAD: bool = True
+    # Additional paths to scan for skills (comma-separated)
+    SKILLS_EXTRA_PATHS: str = ""
+
     @field_validator("MAX_CONCURRENT_TASKS", mode="before")
     @classmethod
     def _clamp_concurrent(cls, v: int) -> int:

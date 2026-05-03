@@ -181,6 +181,16 @@ async def search_document_chunks(
     )
 
 
+async def get_document_chunks(document_id: str) -> List[Dict[str, Any]]:
+    """Return all chunks for a document."""
+    return await _get(f"/internal/documents/{document_id}/chunks")
+
+
+async def get_document_by_id(document_id: str) -> Dict[str, Any]:
+    """Return document metadata by ID."""
+    return await _get(f"/internal/documents/{document_id}")
+
+
 # ── Plan lifecycle (internal) ─────────────────────────────────────────────────
 
 

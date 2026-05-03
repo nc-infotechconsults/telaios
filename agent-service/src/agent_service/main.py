@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
@@ -14,6 +15,7 @@ from agent_service.api.documents import router as documents_router
 from agent_service.api.document_copilot import router as document_copilot_router
 from agent_service.api.health import router as health_router
 from agent_service.api.plans import router as plans_router
+from agent_service.api.skills import router as skills_router
 from agent_service.api.v2 import router as v2_router
 from agent_service.config import config
 
@@ -53,6 +55,48 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         set_doc_checkpointer(plan_checkpointer)
         logger.info("Document copilot v2 graph compiled.")
+
+        # ── Load skills from filesystem ───────────────────────────────────
+        if config.SKILLS_AUTOLOAD:
+            from tools.skill.loader import SkillDirectoryScanner
+            from tools.skill.registry import SkillRegistry
+            from tools.skill.validator import validate_skill_manifest
+
+            # Module-level singleton (will be shared with API)
+            skill_registry = SkillRegistry()
+
+            directories = [config.SKILLS_DIRECTORY]
+            if config.SKILLS_EXTRA_PATHS:
+                directories.extend(
+                    p.strip() for p in config.SKILLS_EXTRA_PATHS.split(",") if p.strip()
+                )
+
+            total_loaded = 0
+            for directory in directories:
+                if not Path(directory).exists():
+                    logger.warning("Skills directory not found: %s", directory)
+                    continue
+
+                try:
+                    manifests = SkillDirectoryScanner.scan(directory)
+                    for manifest in manifests:
+                        validation = validate_skill_manifest(manifest)
+                        if validation.is_valid:
+                            skill_registry.add(manifest)
+                            total_loaded += 1
+                        else:
+                            logger.warning(
+                                "Skill '%s' validation failed: %s",
+                                manifest.name,
+                                validation.errors,
+                            )
+                except Exception as exc:
+                    logger.error("Failed to load skills from %s: %s", directory, exc)
+
+            logger.info("Loaded %d skills from %d directories", total_loaded, len(directories))
+
+            # Store in app state for API access
+            app.state.skill_registry = skill_registry
 
         yield
 
@@ -103,6 +147,7 @@ def create_app() -> FastAPI:
     app.include_router(documents_router)
     app.include_router(document_copilot_router)
     app.include_router(plans_router)
+    app.include_router(skills_router)
     app.include_router(v2_router)
 
     return app

@@ -377,34 +377,89 @@ class VectorStoreConfig(BaseModel):
     extra: dict[str, Any] = {}
 
 
+class GraphStoreProvider(str, Enum):
+    """
+    Graph database providers supported by the GraphStore abstraction.
+
+    Sources:
+    - Neo4j: https://python.langchain.com/docs/integrations/graphs/neo4j_vector/
+    - NetworkX: https://networkx.org/documentation/stable/
+    - FalkorDB: https://www.falkordb.com/
+    """
+
+    NEO4J = "neo4j"
+    NETWORKX = "networkx"
+    FALKORDB = "falkordb"
+    MEMGRAPH = "memgraph"
+
+
 class GraphStoreConfig(BaseModel):
     """
     Connection settings for a graph database used in Graph RAG.
 
-    Supported providers: neo4j, memgraph, falkordb, …
+    Supported providers: neo4j (uri, username, password, database),
+                         networkx (in-memory, no connection needed),
+                         falkordb (uri, username, password),
+                         memgraph (uri, username, password)
+
+    Source: LangChain Graph RAG -
+    https://python.langchain.com/docs/integrations/graphs/
     """
 
-    provider: str
-    uri: str
+    provider: GraphStoreProvider | str = GraphStoreProvider.NEO4J
+    uri: str | None = None
     username: str = ""
     password: str = ""
     database: str = "neo4j"
+    extra: dict[str, Any] = {}
 
 
 class RagStrategy(str, Enum):
     """
     High-level RAG strategy that determines how retrieval interacts with generation.
 
-    SIMPLE   — one-shot retrieve → prepend context → LLM answer
-    GRAPH    — knowledge-graph traversal to build a structured context
-    AGENTIC  — the agent loop decides when and what to retrieve (multi-hop)
-    HYBRID   — vector similarity + graph traversal combined
+    SIMPLE     — one-shot retrieve → prepend context → LLM answer
+    GRAPH      — knowledge-graph traversal to build a structured context
+    AGENTIC    — the agent loop decides when and what to retrieve (multi-hop)
+    HYBRID     — vector similarity + graph/BM25 retrieval combined via RRF
+    CRAG       — corrective RAG: grade documents, rewrite query, or fallback to search
+    SELF_RAG   — self-reflective RAG: detect hallucination and regenerate
     """
 
     SIMPLE = "simple"
     GRAPH = "graph"
     AGENTIC = "agentic"
     HYBRID = "hybrid"
+    CRAG = "crag"
+    SELF_RAG = "self_rag"
+
+
+class ChunkingConfig(BaseModel):
+    """Configuration for text chunking strategies."""
+
+    strategy: str = "semantic"  # semantic | hierarchical | page | token | character
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+    max_chunks: int | None = None
+
+
+class RerankerConfig(BaseModel):
+    """Configuration for document reranking."""
+
+    provider: str = ""  # cross_encoder | voyage | cohere
+    model: str | None = None
+    api_key: str = ""
+    base_url: str | None = None
+    top_k: int | None = None
+    extra: dict[str, Any] = {}
+
+
+class CompressorConfig(BaseModel):
+    """Configuration for contextual compression."""
+
+    strategy: str = "keyword"  # llm | embedding | keyword
+    max_sentences: int = 3
+    min_sentence_length: int = 20
 
 
 class RagConfig(BaseModel):
@@ -418,7 +473,13 @@ class RagConfig(BaseModel):
     top_k: int = 5
     chunk_size: int = 512
     chunk_overlap: int = 64
+    chunking: ChunkingConfig = ChunkingConfig()
+    reranker: RerankerConfig | None = None
+    compressor: CompressorConfig | None = None
+    max_retrieval_rounds: int = 3
+    fallback_search_provider: str | None = None  # tavily | brave | serper
     framework: str = "langchain"
+    extra: dict[str, Any] = {}  # strategy-specific parameters (rrf_k, depth, etc.)
 
 
 # ── Sub-agent reference ───────────────────────────────────────────────────────

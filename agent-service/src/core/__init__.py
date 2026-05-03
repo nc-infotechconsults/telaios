@@ -37,7 +37,13 @@ from __future__ import annotations
 import logging
 
 from core.agent import Agent
-from core.factory import create_agent, create_orchestrator, create_rag, create_retriever
+from core.factory import (
+    create_agent,
+    create_llm,
+    create_orchestrator,
+    create_rag,
+    create_retriever,
+)
 from core.orchestrator import Orchestrator
 from core.providers import (
     AGENT_REGISTRY,
@@ -50,6 +56,9 @@ from core.providers import (
     register_retriever,
 )
 from core.rag import RAG, Retriever
+
+from core.graph_store import GraphStore
+from core.llm import LLM, LLMFactory
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +127,11 @@ __all__ = [
     "Orchestrator",
     "Retriever",
     "RAG",
+    "GraphStore",
+    "LLM",
     # Factory
     "create_agent",
+    "create_llm",
     "create_orchestrator",
     "create_retriever",
     "create_rag",

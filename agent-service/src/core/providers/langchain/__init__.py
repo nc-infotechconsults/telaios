@@ -17,17 +17,22 @@ from __future__ import annotations
 
 from core.providers import register_agent, register_orchestrator, register_rag, register_retriever
 from core.providers.langchain.agent import LangChainAgent
+from core.providers.langchain.llm import LangChainLLM
 from core.providers.langchain.orchestrator import LangChainOrchestrator
-from core.providers.langchain.rag import LangChainRetriever, LangChainSimpleRAG
+from core.providers.langchain.rag import LangChainRAG, LangChainRetriever, LangChainSimpleRAG
+from core.providers.langchain.retriever_bm25 import BM25Retriever
 
 register_agent("langchain", LangChainAgent)
 register_retriever("langchain", LangChainRetriever)
-register_rag("langchain", LangChainSimpleRAG)
+register_rag("langchain", LangChainRAG)
 register_orchestrator("langchain", LangChainOrchestrator)
 
 __all__ = [
     "LangChainAgent",
     "LangChainOrchestrator",
     "LangChainRetriever",
+    "LangChainRAG",
     "LangChainSimpleRAG",
+    "LangChainLLM",
+    "BM25Retriever",
 ]

@@ -168,6 +168,79 @@ class ToolRegistry:
         self.register(tool)
         logger.debug("ToolRegistry: registered skill '%s' as tool", skill.name)
 
+    def load_skills_from_directory(self, path: str) -> int:
+        """
+        Load and register all skills from a directory.
+
+        Scans the directory for skill subdirectories, parses and validates
+        each SKILL.md, and registers valid skills as ExecutableTools.
+
+        Args:
+            path: Directory containing skill subdirectories.
+
+        Returns:
+            Number of skills successfully loaded.
+        """
+        from tools.skill.loader import SkillDirectoryScanner
+        from tools.skill.validator import validate_skill_manifest
+        from tools.skill.adapter import manifest_to_executable_tool
+
+        manifests = SkillDirectoryScanner.scan(path)
+        loaded = 0
+
+        for manifest in manifests:
+            validation = validate_skill_manifest(manifest)
+            if validation.is_valid:
+                tool = manifest_to_executable_tool(manifest)
+                self.register(tool)
+                loaded += 1
+                logger.debug("ToolRegistry: loaded skill '%s' from %s", manifest.name, path)
+            else:
+                logger.warning(
+                    "ToolRegistry: skill '%s' validation failed: %s",
+                    manifest.name,
+                    validation.errors,
+                )
+
+        logger.info("ToolRegistry: loaded %d/%d skills from %s", loaded, len(manifests), path)
+        return loaded
+
+    def load_skill_by_name(self, skills_dir: str, name: str) -> bool:
+        """
+        Load and register a single skill by name from a directory.
+
+        Args:
+            skills_dir: Directory containing skill subdirectories.
+            name: Skill name (kebab-case).
+
+        Returns:
+            True if the skill was found and registered, False otherwise.
+        """
+        from tools.skill.loader import SkillDirectoryScanner
+        from tools.skill.validator import validate_skill_manifest
+        from tools.skill.adapter import manifest_to_executable_tool
+
+        manifests = SkillDirectoryScanner.scan(skills_dir)
+
+        for manifest in manifests:
+            if manifest.name == name:
+                validation = validate_skill_manifest(manifest)
+                if validation.is_valid:
+                    tool = manifest_to_executable_tool(manifest)
+                    self.register(tool)
+                    logger.debug("ToolRegistry: loaded skill '%s' from %s", name, skills_dir)
+                    return True
+                else:
+                    logger.warning(
+                        "ToolRegistry: skill '%s' validation failed: %s",
+                        name,
+                        validation.errors,
+                    )
+                    return False
+
+        logger.warning("ToolRegistry: skill '%s' not found in %s", name, skills_dir)
+        return False
+
     # ── Internals ──────────────────────────────────────────────────────────
 
     def _register_builtin_factories(self) -> None:

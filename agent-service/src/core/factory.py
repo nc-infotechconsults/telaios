@@ -55,11 +55,31 @@ import logging
 from typing import Any
 
 from core.agent import Agent
+from core.llm import LLM, LLMFactory
 from core.orchestrator import Orchestrator
 from core.rag import RAG, Retriever
-from core.types import AgentConfig, RagConfig
+from core.types import AgentConfig, LLMConfig, RagConfig
 
 logger = logging.getLogger(__name__)
+
+
+def create_llm(config: LLMConfig) -> LLM:
+    """
+    Instantiate the ``LLM`` implementation for ``config.provider``.
+
+    Args:
+        config: LLM configuration including provider, model, and options.
+
+    Returns:
+        An ``LLM`` instance backed by the requested provider.
+
+    Raises:
+        ValueError: if ``config.provider`` is not registered.
+    """
+    return LLMFactory.create(
+        provider=config.provider,
+        config=config,
+    )
 
 
 def create_agent(config: AgentConfig) -> Agent:
