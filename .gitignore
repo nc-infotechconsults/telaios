@@ -11,3 +11,4 @@ __pycache__
 *.egg-info
 /frontend/test-results/
 /agent-service/local_cache
+/agent-service/build/
