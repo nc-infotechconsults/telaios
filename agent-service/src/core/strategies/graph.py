@@ -10,6 +10,7 @@ from typing import Any, AsyncIterator
 
 from core.graph_store import GraphStore
 from core.strategies import RAGStrategy
+
 from core.types import (
     AgentInput,
     AgentOutput,
@@ -17,8 +18,6 @@ from core.types import (
     Message,
     MessageRole,
     RagConfig,
-    RetrievalQuery,
-    RetrievalResult,
     StreamEvent,
     StreamEventType,
 )

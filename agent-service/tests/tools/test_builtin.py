@@ -32,7 +32,7 @@ class TestReadFileTool:
         result = await self.tool.coroutine(path="missing.txt")
         assert "does not exist" in result
 
-    async def test_path_traversal_raises(self):
+    async def test_path_traversal_returns_error(self):
         result = await self.tool.coroutine(path="../../etc/passwd")
         assert "Error" in result
 
@@ -58,7 +58,7 @@ class TestWriteFileTool:
         assert "written successfully" in result
         assert (Path(self.tmpdir) / "sub" / "dir" / "file.txt").exists()
 
-    async def test_path_traversal_raises(self):
+    async def test_path_traversal_returns_error(self):
         result = await self.tool.coroutine(path="../outside.txt", content="x")
         assert "Error" in result
 

@@ -15,14 +15,6 @@ _DEFAULT_SYSTEM_PROMPT = (
 )
 
 
-class _AwaitableString(str):
-    def __await__(self):
-        async def _wrap() -> str:
-            return str(self)
-
-        return _wrap().__await__()
-
-
 class ConfigurableAgentConfig(BaseModel):
     llmProvider: str = "openai"
     llmModel: str = "gpt-4o"
@@ -96,14 +88,14 @@ class ConfigurableAgent:
     def _format_structured_output(self, raw_output: str) -> str:
         schema = self._config.structuredOutput
         if not schema or not raw_output:
-            return _AwaitableString(raw_output)
+            return raw_output
         try:
             parsed = json.loads(raw_output)
             if isinstance(parsed, dict):
-                return _AwaitableString(json.dumps(parsed))
+                return json.dumps(parsed)
         except (json.JSONDecodeError, TypeError):
             pass
-        return _AwaitableString(raw_output)
+        return raw_output
 
     @staticmethod
     def _build_pydantic_model_from_schema(schema: Dict[str, Any], model_name: str = "DynamicModel"):

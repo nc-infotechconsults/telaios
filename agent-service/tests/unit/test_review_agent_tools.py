@@ -87,7 +87,7 @@ class TestRunShellTool:
             tools = build_review_tools({"repo": tmp})
             run = next(t for t in tools if t.name == "run_shell")
             result = await run.coroutine(command="rm -rf /tmp/x", cwd="")
-            assert "Error: command not permitted" in result
+            assert "not in the allowed list" in result
 
     @pytest.mark.asyncio
     async def test_write_command_is_rejected(self):
@@ -95,7 +95,7 @@ class TestRunShellTool:
             tools = build_review_tools({"repo": tmp})
             run = next(t for t in tools if t.name == "run_shell")
             result = await run.coroutine(command="echo hello > file.txt", cwd="")
-            assert "Error: command not permitted" in result
+            assert "not in the allowed list" in result
 
 
 class TestFinishTool:

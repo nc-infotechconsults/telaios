@@ -13,7 +13,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from domain.agents.document_chat import chat
+from domain.agents.document_assistant import chat
 
 logger = logging.getLogger(__name__)
 

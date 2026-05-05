@@ -17,11 +17,8 @@ Sources
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 
-from pydantic import BaseModel
-
-from core.types import Chunk, RetrievalQuery, RetrievalResult
+from core.types import Chunk, RerankerConfig, RetrievalQuery, RetrievalResult
 
 
 class Reranker(ABC):
@@ -75,14 +72,3 @@ class Reranker(ABC):
             ``RetrievalResult`` with re-ordered chunks and relevance scores.
         """
         ...
-
-
-class RerankerConfig(BaseModel):
-    """Configuration for a reranker provider."""
-
-    provider: str
-    model: str | None = None
-    api_key: str = ""
-    base_url: str | None = None
-    top_k: int | None = None
-    extra: dict[str, Any] = {}

@@ -34,16 +34,6 @@ def build_coding_tools(ctx: dict) -> list:
 def build_review_tools(ctx: dict) -> list:
     repo = ctx.get("repo") or ctx.get("workspace_path") or "."
     run_shell = make_run_shell_tool(repo, allowed_prefixes=["git", "cat", "ls", "pwd"])
-
-    original_coroutine = run_shell.coroutine
-
-    async def _review_shell(command: str, **kwargs) -> str:
-        first = command.strip().split(maxsplit=1)[0] if command.strip() else ""
-        if first not in {"git", "cat", "ls", "pwd"}:
-            return "Error: command not permitted"
-        return await original_coroutine(command=command, **kwargs)
-
-    run_shell.coroutine = _review_shell
     finish = make_finish_tool({"approved": "boolean", "summary": "string", "required_changes": "array"})
 
     async def _finish_review(approved: bool, summary: str, required_changes: list | None = None) -> str:

@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_plan_checkpointer(plan_checkpointer)
         logger.info("Planning service ready.")
 
-        from domain.agents.document_chat import set_checkpointer as set_doc_checkpointer
+        from domain.agents.document_assistant import set_checkpointer as set_doc_checkpointer
 
         set_doc_checkpointer(plan_checkpointer)
         logger.info("Document copilot v2 ready.")

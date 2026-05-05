@@ -13,7 +13,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from domain.agents.document_chat import DocumentCopilotConfig, ask, extract, summarize
+from domain.agents.document_assistant import DocumentCopilotConfig, ask, extract, summarize
 from infra.settings import config
 
 logger = logging.getLogger(__name__)
@@ -24,10 +24,10 @@ router = APIRouter(prefix="/projects/{project_id}/documents/{document_id}/copilo
 def _default_cfg() -> DocumentCopilotConfig:
     """Build a DocumentCopilotConfig from environment/settings."""
     return DocumentCopilotConfig(
-        llmProvider=config.LLM_PROVIDER,
-        llmModel=config.LLM_MODEL,
-        llmApiKey=config.LLM_API_KEY,
-        llmBaseUrl=config.LLM_BASE_URL,
+        llm_provider=config.LLM_PROVIDER,
+        llm_model=config.LLM_MODEL,
+        llm_api_key=config.LLM_API_KEY,
+        llm_base_url=config.LLM_BASE_URL,
     )
 
 

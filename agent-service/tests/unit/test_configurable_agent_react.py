@@ -4,7 +4,7 @@ Unit tests for the ConfigurableAgent create_react_agent migration (6A).
 Covers:
 - _compose_prompt override and extend modes
 - _build_skill_tools returns empty list when no skills
-- _build_skill_tools produces StructuredTool with correct name and async coroutine
+- _build_skill_tools produces ExecutableTool with correct name and async coroutine
 - _format_structured_output passthrough when no schema configured
 - finish tool is attached only when skills are present
 """
@@ -83,28 +83,25 @@ class TestBuildSkillTools:
 
 
 class TestFormatStructuredOutput:
-    @pytest.mark.asyncio
-    async def test_no_schema_returns_raw_output(self):
+    def test_no_schema_returns_raw_output(self):
         cfg = ConfigurableAgentConfig(structuredOutput=None)
         agent = ConfigurableAgent("test-id", cfg)
         agent._llm = None  # should never be called
-        result = await agent._format_structured_output("hello world")
+        result = agent._format_structured_output("hello world")
         assert result == "hello world"
 
-    @pytest.mark.asyncio
-    async def test_empty_output_returns_empty(self):
+    def test_empty_output_returns_empty(self):
         cfg = ConfigurableAgentConfig(structuredOutput={"type": "object"})
         agent = ConfigurableAgent("test-id", cfg)
         agent._llm = None
-        result = await agent._format_structured_output("")
+        result = agent._format_structured_output("")
         assert result == ""
 
-    @pytest.mark.asyncio
-    async def test_valid_json_passthrough_without_llm_call(self):
+    def test_valid_json_passthrough_without_llm_call(self):
         cfg = ConfigurableAgentConfig(structuredOutput={"type": "object"})
         agent = ConfigurableAgent("test-id", cfg)
         agent._llm = None  # would raise if called
-        result = await agent._format_structured_output('{"key": "value"}')
+        result = agent._format_structured_output('{"key": "value"}')
         assert result == '{"key": "value"}'
 
 

@@ -21,12 +21,12 @@ _doc_checkpointer: Any = None
 
 
 class DocumentCopilotConfig(BaseModel):
-    llmProvider: str = "openai"
-    llmModel: str = "gpt-4o"
-    llmApiKey: str = ""
-    llmBaseUrl: Optional[str] = None
-    maxDocumentChars: int = 40_000
-    maxChunks: int = 8
+    llm_provider: str = "openai"
+    llm_model: str = "gpt-4o"
+    llm_api_key: str = ""
+    llm_base_url: Optional[str] = None
+    max_document_chars: int = 40_000
+    max_chunks: int = 8
 
 
 def set_checkpointer(checkpointer: Any) -> None:
@@ -43,10 +43,10 @@ def _parse_json(raw: str) -> Any:
 def _llm(cfg: DocumentCopilotConfig):
     return create_llm(
         LLMConfig(
-            provider=cfg.llmProvider,
-            model=cfg.llmModel,
-            api_key=cfg.llmApiKey,
-            base_url=cfg.llmBaseUrl,
+            provider=cfg.llm_provider,
+            model=cfg.llm_model,
+            api_key=cfg.llm_api_key,
+            base_url=cfg.llm_base_url,
         )
     )
 
@@ -67,7 +67,7 @@ async def _fetch_document_text(doc: Dict[str, Any]) -> str:
 
 async def summarize(project_id: str, document_id: str, cfg: DocumentCopilotConfig) -> Dict[str, Any]:
     doc = await data_client.get_document(project_id, document_id)
-    text = (await _fetch_document_text(doc))[:cfg.maxDocumentChars]
+    text = (await _fetch_document_text(doc))[:cfg.max_document_chars]
     if not text.strip():
         return {"summary": "Document has no extractable text.", "key_points": [], "word_count": 0}
 
@@ -95,8 +95,8 @@ async def ask(project_id: str, document_id: str, question: str, cfg: DocumentCop
     try:
         embeddings = await embed_texts([question])
         if embeddings and embeddings[0]:
-            chunks = await data_client.search_document_chunks(project_id, embeddings[0], cfg.maxChunks)
-            doc_chunks = [chunk for chunk in chunks if chunk.get("document_id") == document_id] or chunks[:cfg.maxChunks]
+            chunks = await data_client.search_document_chunks(project_id, embeddings[0], cfg.max_chunks)
+            doc_chunks = [chunk for chunk in chunks if chunk.get("document_id") == document_id] or chunks[:cfg.max_chunks]
             chunk_context = "\n\n".join(
                 f"[Chunk {chunk.get('chunk_index', index)}]\n{chunk.get('content', '')}"
                 for index, chunk in enumerate(doc_chunks)
@@ -105,7 +105,7 @@ async def ask(project_id: str, document_id: str, question: str, cfg: DocumentCop
         logger.warning("Chunk search failed: %s", exc)
 
     if not chunk_context:
-        chunk_context = (await _fetch_document_text(doc))[:cfg.maxDocumentChars]
+        chunk_context = (await _fetch_document_text(doc))[:cfg.max_document_chars]
     if not chunk_context.strip():
         return {"answer": "Document has no extractable text to answer questions.", "confidence": 0.0, "sources": []}
 
@@ -130,7 +130,7 @@ async def ask(project_id: str, document_id: str, question: str, cfg: DocumentCop
 
 async def extract(project_id: str, document_id: str, cfg: DocumentCopilotConfig) -> Dict[str, Any]:
     doc = await data_client.get_document(project_id, document_id)
-    text = (await _fetch_document_text(doc))[:cfg.maxDocumentChars]
+    text = (await _fetch_document_text(doc))[:cfg.max_document_chars]
     if not text.strip():
         return {"entities": {}, "tables": [], "key_values": {}}
 
@@ -152,10 +152,10 @@ async def extract(project_id: str, document_id: str, cfg: DocumentCopilotConfig)
 
 async def chat(project_id: str, document_id: str, session_id: str, message: str) -> Dict[str, Any]:
     cfg = DocumentCopilotConfig(
-        llmProvider=config.LLM_PROVIDER,
-        llmModel=config.LLM_MODEL,
-        llmApiKey=config.LLM_API_KEY,
-        llmBaseUrl=config.LLM_BASE_URL,
+        llm_provider=config.LLM_PROVIDER,
+        llm_model=config.LLM_MODEL,
+        llm_api_key=config.LLM_API_KEY,
+        llm_base_url=config.LLM_BASE_URL,
     )
     thread_id = f"doc:{project_id}:{document_id}:{session_id}"
     response = await _llm(cfg).invoke([
