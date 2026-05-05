@@ -47,6 +47,8 @@ def make_finish_tool(
     }
 
     async def _finish(**kwargs: Any) -> str:
+        if len(kwargs) == 1:
+            return next(iter(kwargs.values()))
         parts = [f"{k}: {v}" for k, v in kwargs.items()]
         return "\n".join(parts) if parts else "Task finished."
 

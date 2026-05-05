@@ -33,8 +33,8 @@ class TestReadFileTool:
         assert "does not exist" in result
 
     async def test_path_traversal_raises(self):
-        with pytest.raises(ValueError, match="escapes"):
-            await self.tool.coroutine(path="../../etc/passwd")
+        result = await self.tool.coroutine(path="../../etc/passwd")
+        assert "Error" in result
 
     def test_read_only_annotation(self):
         assert self.tool.annotations.read_only is True
@@ -59,8 +59,8 @@ class TestWriteFileTool:
         assert (Path(self.tmpdir) / "sub" / "dir" / "file.txt").exists()
 
     async def test_path_traversal_raises(self):
-        with pytest.raises(ValueError, match="escapes"):
-            await self.tool.coroutine(path="../outside.txt", content="x")
+        result = await self.tool.coroutine(path="../outside.txt", content="x")
+        assert "Error" in result
 
 
 class TestRunShellTool:
@@ -111,8 +111,7 @@ class TestFinishTool:
     async def test_coroutine_returns_key_value_pairs(self):
         tool = make_finish_tool({"summary": "string"})
         result = await tool.coroutine(summary="done")
-        assert "summary" in result
-        assert "done" in result
+        assert result == "done"
 
     async def test_empty_kwargs_returns_fallback(self):
         tool = make_finish_tool({})

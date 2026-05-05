@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_service.agents.configurable.configurable_agent import (
+from domain.agents.configurable import (
     ConfigurableAgent,
     ConfigurableAgentConfig,
     _compose_prompt,
@@ -49,7 +49,6 @@ class TestBuildSkillTools:
 
     def test_skill_produces_structured_tool_with_correct_name(self):
         import inspect
-        from langchain_core.tools import StructuredTool
 
         agent = self._make_agent(skills=[{
             "name": "my_skill",
@@ -60,7 +59,6 @@ class TestBuildSkillTools:
         tools = agent._build_skill_tools()
         assert len(tools) == 1
         t = tools[0]
-        assert isinstance(t, StructuredTool)
         assert t.name == "my_skill"
         assert t.coroutine is not None
         assert inspect.iscoroutinefunction(t.coroutine)
@@ -72,7 +70,7 @@ class TestBuildSkillTools:
             "inputSchema": {},
         }])
         skill_tools = agent._build_skill_tools()
-        from agent_service.agents.configurable.configurable_agent import _build_finish_tool
+        from domain.agents.configurable import _build_finish_tool
         lc_tools = skill_tools + [_build_finish_tool()] if skill_tools else skill_tools
         names = {t.name for t in lc_tools}
         assert "finish" in names

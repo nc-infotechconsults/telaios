@@ -145,3 +145,65 @@ class GraphStore(ABC):
     async def aclose(self) -> None:
         """Async version of close."""
         self.close()
+
+
+class InMemoryGraphStore:
+    """Small in-memory property graph used by integration tests."""
+
+    def __init__(self) -> None:
+        self._entities: dict[str, dict[str, Any]] = {}
+        self._relations: list[dict[str, str]] = []
+
+    def add_entity(
+        self,
+        name: str,
+        entity_type: str,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        self._entities[name] = {
+            "name": name,
+            "type": entity_type,
+            "properties": properties or {},
+        }
+
+    def add_relation(self, source: str, relation: str, target: str) -> None:
+        self._relations.append({"source": source, "relation": relation, "target": target})
+
+    def add_triplet(self, subject: str, predicate: str, obj: str) -> None:
+        self.add_entity(subject, "unknown")
+        self.add_entity(obj, "unknown")
+        self.add_relation(subject, predicate, obj)
+
+    def get_relations(self, source: str) -> list[dict[str, str]]:
+        return [rel for rel in self._relations if rel["source"] == source]
+
+    def get_entities_by_type(self, entity_type: str) -> list[dict[str, Any]]:
+        return [entity for entity in self._entities.values() if entity["type"] == entity_type]
+
+    def get_subgraph(
+        self,
+        center_entities: list[str],
+        depth: int = 2,
+    ) -> list[tuple[str, str, str]]:
+        centers = set(center_entities)
+        return [
+            (rel["source"], rel["relation"], rel["target"])
+            for rel in self._relations
+            if rel["source"] in centers or rel["target"] in centers
+        ]
+
+    def extract_entities(self, text: str) -> list[tuple[str, str, str]]:
+        return []
+
+    async def aadd_triplet(self, subject: str, predicate: str, obj: str) -> None:
+        self.add_triplet(subject, predicate, obj)
+
+    async def aget_subgraph(
+        self,
+        center_entities: list[str],
+        depth: int = 2,
+    ) -> list[tuple[str, str, str]]:
+        return self.get_subgraph(center_entities, depth)
+
+    async def aextract_entities(self, text: str) -> list[tuple[str, str, str]]:
+        return self.extract_entities(text)

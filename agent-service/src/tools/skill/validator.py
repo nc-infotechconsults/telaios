@@ -258,3 +258,8 @@ def validate_skill_manifest(manifest: "SkillManifest") -> SkillValidationResult:
         warnings=warnings,
         manifest=manifest if len(errors) == 0 else None,
     )
+
+
+def validate_skill(manifest: "SkillManifest") -> list[str]:
+    """Compatibility helper returning validation errors only."""
+    return validate_skill_manifest(manifest).errors

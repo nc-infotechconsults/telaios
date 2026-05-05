@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
 import time
 
 import httpx
@@ -25,6 +26,32 @@ AGENT_BASE = "http://localhost:8000"
 DATA_API_BASE = "http://localhost:3000"
 MOCK_LLM_BASE = "http://localhost:11435"
 DATA_API_HEADERS = {"Authorization": "Bearer test-internal-key"}
+
+
+def _port_open(host: str, port: int, timeout: float = 0.2) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _live_stack_available() -> bool:
+    return all(
+        _port_open(host, port)
+        for host, port in (
+            ("localhost", 8000),
+            ("localhost", 3000),
+            ("localhost", 11435),
+            ("localhost", 6379),
+        )
+    )
+
+
+pytestmark = pytest.mark.skipif(
+    not _live_stack_available(),
+    reason="live integration stack is not running",
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +87,7 @@ def test_data_api_health(http):
     assert r.json()["status"] == "ok"
 
 
-def test_agent_service_health(http):
+def test_python_service_health(http):
     r = http.get(f"{AGENT_BASE}/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
@@ -195,7 +222,7 @@ def test_post_chat_message_empty_content_rejected(http):
 
 def test_crypto_encrypt_decrypt():
     """Crypto roundtrip works correctly with the configured key."""
-    from agent_service.crypto import encrypt, decrypt
+    from infra.crypto import encrypt, decrypt
 
     plaintext = "github-token-abc123"
     ciphertext = encrypt(plaintext)
@@ -223,7 +250,7 @@ def test_crypto_compatible_with_data_api():
 @pytest.mark.asyncio
 async def test_redis_pubsub_via_event_bus():
     """Event bus can publish and receive messages via Redis pub/sub."""
-    from agent_service.core.agent_framework.event_bus import AgentEventBus
+    from infra.events import AgentEventBus
 
     bus = AgentEventBus(redis_url="redis://localhost:6379")
     received = []
@@ -247,7 +274,7 @@ async def test_redis_pubsub_via_event_bus():
 
 def test_sse_manager_broadcast_and_stream():
     """SSE manager broadcasts and queues events for subscribed streams."""
-    from agent_service.services import sse_manager
+    from infra import sse as sse_manager
 
     plan_id = f"sse-test-{int(time.time())}"
 
@@ -289,7 +316,7 @@ def test_sse_manager_broadcast_and_stream():
 @pytest.mark.asyncio
 async def test_planning_service_init_session():
     """init_session creates a new session for a plan_id even when the plan is not in DB."""
-    from agent_service.services.planning_service import init_session, _sessions
+    from domain.planning import init_session, _sessions
 
     plan_id = f"integ-plan-{int(time.time())}"
     await init_session(plan_id)
@@ -302,7 +329,7 @@ async def test_planning_service_init_session():
 
 def test_text_chunker_produces_overlapping_chunks():
     """chunk_text splits text into chunks with configurable overlap."""
-    from agent_service.services.text_chunker import chunk_text
+    from tools.builtin.documents.chunking import chunk_text
 
     text = "A" * 250
     chunks = chunk_text(text, chunk_size=100, overlap=20)
@@ -319,7 +346,7 @@ def test_text_chunker_produces_overlapping_chunks():
 
 def test_document_extractor_plain_text(tmp_path):
     """extract_text handles plain text files correctly."""
-    from agent_service.services.document_extractor import extract_text
+    from tools.builtin.documents.extraction import extract_text
 
     content = b"Hello world from the extractor test."
     loop = asyncio.new_event_loop()
@@ -333,7 +360,7 @@ def test_document_extractor_plain_text(tmp_path):
 
 def test_diff_parser_parses_unified_diff():
     """parse_diff correctly parses a proper git diff."""
-    from agent_service.agents.review.diff_parser import parse_diff
+    from tools.builtin.review import parse_diff
 
     # parse_diff requires the 'diff --git' header used by git diff
     diff = """\
@@ -358,7 +385,7 @@ diff --git a/foo.py b/foo.py
 
 def test_test_runner_detects_pytest(tmp_path):
     """detect_framework identifies pytest from pyproject.toml."""
-    from agent_service.agents.testing.test_runner import detect_framework
+    from tools.builtin.test_runner import detect_framework
 
     (tmp_path / "pyproject.toml").write_text('[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
     loop = asyncio.new_event_loop()
@@ -371,24 +398,26 @@ def test_test_runner_detects_pytest(tmp_path):
 # ── 15. Agent registry ────────────────────────────────────────────────────────
 
 
-def test_agent_registry_register_and_create():
-    """AgentRegistry registers a factory and creates instances."""
-    from agent_service.core.agent_framework.registry import AgentRegistry
-    from agent_service.core.agent_framework.base_agent import BaseAgent
+def test_core_provider_registry_registers_agent():
+    """Core provider registry registers and creates framework agents."""
+    from core import register_provider
+    from core.agent import Agent
+    from core.factory import create_agent
+    from core.types import AgentConfig, AgentInput, AgentOutput, LLMConfig
 
-    class DummyAgent(BaseAgent):
-        async def on_init(self, ctx):
-            pass
+    class DummyAgent(Agent):
+        def __init__(self, config):
+            self.config = config
 
-        async def on_execute(self, ctx):
-            pass
+        async def run(self, input: AgentInput) -> AgentOutput:
+            return AgentOutput(content="ok")
 
-        async def on_cleanup(self):
-            pass
+        async def astream(self, input: AgentInput):
+            if False:
+                yield
 
-    registry = AgentRegistry()
-    registry.register("dummy_integ2", lambda agent_id, cfg: DummyAgent(agent_id, "dummy"))
-    agent = registry.create("dummy_integ2", "agent-id-1")
+    register_provider("dummy_integ2", agent_cls=DummyAgent)
+    agent = create_agent(AgentConfig(framework="dummy_integ2", llm=LLMConfig(provider="openai", model="test")))
     assert isinstance(agent, DummyAgent)
 
 

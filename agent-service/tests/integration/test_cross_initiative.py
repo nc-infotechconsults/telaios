@@ -124,7 +124,7 @@ class TestDocumentGraphRAG:
 
     def test_document_chunking_produces_meaningful_chunks(self, sample_markdown):
         """Smart chunking produces well-structured chunks from markdown."""
-        from agent_service.services.document_analyzer import analyze_text
+        from tools.builtin.documents.analysis import analyze_text
 
         analysis = analyze_text(sample_markdown)
 
@@ -135,7 +135,7 @@ class TestDocumentGraphRAG:
 
     def test_document_analyzer_extracts_structure(self, sample_markdown):
         """Analyzer extracts headings, sections, and key terms."""
-        from agent_service.services.document_analyzer import analyze_text
+        from tools.builtin.documents.analysis import analyze_text
 
         analysis = analyze_text(sample_markdown)
 
@@ -327,7 +327,7 @@ class TestDocumentToolsSkills:
 
     def test_document_extractor_handles_markdown(self, sample_markdown):
         """Document extractor processes markdown content."""
-        from agent_service.services.document_extractor import extract_text
+        from tools.builtin.documents.extraction import extract_text
 
         loop = asyncio.new_event_loop()
         try:
@@ -340,7 +340,7 @@ class TestDocumentToolsSkills:
 
     def test_document_converter_markdown_to_html(self, sample_markdown):
         """Document converter transforms markdown to HTML."""
-        from agent_service.services.document_converter import convert_from_markdown
+        from tools.builtin.documents.conversion import convert_from_markdown
 
         loop = asyncio.new_event_loop()
         try:
@@ -353,7 +353,7 @@ class TestDocumentToolsSkills:
 
     def test_text_chunker_preserves_content(self, sample_markdown):
         """Text chunker preserves all content across chunks."""
-        from agent_service.services.text_chunker import chunk_text
+        from tools.builtin.documents.chunking import chunk_text
 
         chunks = chunk_text(sample_markdown, chunk_size=200, overlap=30)
         assert len(chunks) > 1
@@ -425,8 +425,8 @@ class TestEndToEndDocumentRAG:
 
     def test_full_pipeline_document_to_chunks(self, sample_markdown):
         """Full pipeline: document → analysis → chunking → indexing."""
-        from agent_service.services.document_analyzer import analyze_text
-        from agent_service.services.text_chunker import chunk_text
+        from tools.builtin.documents.analysis import analyze_text
+        from tools.builtin.documents.chunking import chunk_text
         from core.graph_store import InMemoryGraphStore
 
         # Step 1: Analyze document
@@ -451,7 +451,7 @@ class TestEndToEndDocumentRAG:
 
     def test_full_pipeline_hybrid_search(self, sample_markdown):
         """Full pipeline: document → BM25 + Graph search → fused results."""
-        from agent_service.services.text_chunker import chunk_text
+        from tools.builtin.documents.chunking import chunk_text
         from core.fusion import rrf_fusion
         from core.graph_store import InMemoryGraphStore
         from core.retriever_bm25 import BM25Retriever
@@ -508,19 +508,19 @@ class TestConfigurationIntegration:
 
     def test_config_has_llm_settings(self):
         """Config has LLM provider settings."""
-        from agent_service.config import config
+        from infra.settings import config
 
         assert config.LLM_PROVIDER is not None
         assert config.LLM_MODEL is not None
 
     def test_config_has_database_settings(self):
         """Config has database connection settings."""
-        from agent_service.config import config
+        from infra.settings import config
 
         assert config.DATABASE_URL is not None
 
     def test_config_has_redis_settings(self):
         """Config has Redis connection settings."""
-        from agent_service.config import config
+        from infra.settings import config
 
         assert config.REDIS_URL is not None

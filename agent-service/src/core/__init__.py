@@ -37,16 +37,21 @@ from __future__ import annotations
 import logging
 
 from core.agent import Agent
+from core.checkpoint import Checkpointer
 from core.factory import (
     create_agent,
+    create_agent_with_config,
     create_llm,
     create_orchestrator,
     create_rag,
     create_retriever,
 )
+from core.interrupt import InterruptHandle
 from core.orchestrator import Orchestrator
 from core.providers import (
     AGENT_REGISTRY,
+    CHECKPOINTER_REGISTRY,
+    INTERRUPT_REGISTRY,
     ORCHESTRATOR_REGISTRY,
     RAG_REGISTRY,
     RETRIEVER_REGISTRY,
@@ -70,6 +75,8 @@ def register_provider(
     retriever_cls: type[Retriever] | None = None,
     rag_cls: type[RAG] | None = None,
     orchestrator_cls: type[Orchestrator] | None = None,
+    interrupt_cls: type[InterruptHandle] | None = None,
+    checkpointer_cls: type[Checkpointer] | None = None,
 ) -> None:
     """
     Register one or more classes for *framework* into the provider registry.
@@ -80,11 +87,13 @@ def register_provider(
     previously registered class.
 
     Args:
-        framework:        Registry key (e.g. ``"langchain"``, ``"openai"``).
-        agent_cls:        ``Agent`` implementation for this framework.
-        retriever_cls:    ``Retriever`` implementation for this framework.
-        rag_cls:          ``RAG`` implementation for this framework.
-        orchestrator_cls: ``Orchestrator`` implementation for this framework.
+        framework:         Registry key (e.g. ``"langchain"``, ``"openai"``).
+        agent_cls:         ``Agent`` implementation for this framework.
+        retriever_cls:     ``Retriever`` implementation for this framework.
+        rag_cls:           ``RAG`` implementation for this framework.
+        orchestrator_cls:  ``Orchestrator`` implementation for this framework.
+        interrupt_cls:     ``InterruptHandle`` implementation for this framework.
+        checkpointer_cls:  ``Checkpointer`` implementation for this framework.
 
     Example::
 
@@ -105,6 +114,10 @@ def register_provider(
         register_rag(framework, rag_cls)
     if orchestrator_cls is not None:
         register_orchestrator(framework, orchestrator_cls)
+    if interrupt_cls is not None:
+        INTERRUPT_REGISTRY[framework] = interrupt_cls  # type: ignore[assignment]
+    if checkpointer_cls is not None:
+        CHECKPOINTER_REGISTRY[framework] = checkpointer_cls  # type: ignore[assignment]
 
 
 # ── Auto-load built-in LangChain provider ─────────────────────────────────────
@@ -124,6 +137,8 @@ except ImportError:
 __all__ = [
     # ABCs
     "Agent",
+    "Checkpointer",
+    "InterruptHandle",
     "Orchestrator",
     "Retriever",
     "RAG",
@@ -131,6 +146,7 @@ __all__ = [
     "LLM",
     # Factory
     "create_agent",
+    "create_agent_with_config",
     "create_llm",
     "create_orchestrator",
     "create_retriever",

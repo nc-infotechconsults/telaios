@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_service.config import ENV_FILE, Settings
+from infra.settings import _ENV_FILE as ENV_FILE, Settings
 
 
-def test_settings_uses_agent_service_env_file() -> None:
+def test_settings_uses_project_env_file() -> None:
     assert Settings.model_config.get("env_file") == str(ENV_FILE)
     assert ENV_FILE == Path(__file__).resolve().parents[2] / ".env"
 

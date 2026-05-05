@@ -131,6 +131,7 @@ class SkillRegistry:
             List of matching SkillManifest objects, ordered by relevance.
         """
         query_lower = query.lower()
+        query_terms = [term for term in query_lower.split() if term]
         matches: list[tuple[SkillManifest, int]] = []
 
         with self._lock:
@@ -154,6 +155,17 @@ class SkillRegistry:
                 for trigger in manifest.frontmatter.triggers:
                     if query_lower in trigger.lower():
                         score += 20
+
+                if score == 0 and query_terms:
+                    haystack = " ".join(
+                        [
+                            manifest.name,
+                            manifest.description,
+                            *manifest.frontmatter.tags,
+                            *manifest.frontmatter.triggers,
+                        ]
+                    ).lower()
+                    score += sum(10 for term in query_terms if term in haystack)
 
                 if score > 0:
                     matches.append((manifest, score))

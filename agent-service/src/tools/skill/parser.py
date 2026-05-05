@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from tools.skill.types import (
     SkillFrontmatter,
@@ -49,16 +50,41 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     try:
         import frontmatter
     except ImportError:
-        raise ImportError(
-            "python-frontmatter is required for parsing SKILL.md files. "
-            "Install with: pip install python-frontmatter"
-        )
+        return _parse_frontmatter_fallback(content)
 
     try:
         post = frontmatter.loads(content)
         return dict(post), str(post.content)
     except Exception as exc:
         raise SkillParseError(f"Failed to parse frontmatter: {exc}") from exc
+
+
+def _parse_frontmatter_fallback(content: str) -> tuple[dict[str, Any], str]:
+    """Parse simple YAML frontmatter without optional python-frontmatter."""
+    if not content.startswith("---"):
+        return {}, content
+
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        raise SkillParseError("Unclosed YAML frontmatter")
+
+    metadata: dict[str, Any] = {}
+    for raw_line in parts[1].splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        metadata[key.strip()] = _parse_yaml_scalar(value.strip())
+    return metadata, parts[2]
+
+
+def _parse_yaml_scalar(value: str) -> Any:
+    if value.startswith("[") and value.endswith("]"):
+        raw_items = value[1:-1].strip()
+        if not raw_items:
+            return []
+        return [item.strip().strip('"\'') for item in raw_items.split(",")]
+    return value.strip('"\'')
 
 
 def parse_skill_md(content: str, root_path: str) -> SkillManifest:
@@ -152,6 +178,11 @@ def parse_skill_file(file_path: str | Path) -> SkillManifest:
         raise SkillParseError(f"Failed to read {readme_path}: {exc}") from exc
 
     return parse_skill_md(content, str(skill_path))
+
+
+def parse_skill_manifest(file_path: str | Path) -> SkillManifest:
+    """Compatibility alias for parsing a SKILL.md manifest file."""
+    return parse_skill_file(file_path)
 
 
 def scan_skill_directory(directory: str | Path) -> SkillValidationResult:

@@ -13,7 +13,7 @@ import tempfile
 
 import pytest
 
-from agent_service.agents.testing.tools import build_testing_tools
+from tools.builtin.agent_tools import build_testing_tools
 
 
 class TestBuildTestingTools:

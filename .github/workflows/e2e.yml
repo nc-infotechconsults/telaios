@@ -98,7 +98,7 @@ jobs:
           LLM_MODEL: ${{ env.LLM_MODEL }}
           LLM_API_KEY: ${{ env.LLM_API_KEY }}
         run: |
-          cd agent-service && uvicorn agent_service.main:app \
+          cd agent-service && uvicorn api.main:app \
             --host 0.0.0.0 --port 8000 > /tmp/agent-service.log 2>&1 &
           echo "AGENT_SERVICE_PID=$!" >> "$GITHUB_ENV"
 

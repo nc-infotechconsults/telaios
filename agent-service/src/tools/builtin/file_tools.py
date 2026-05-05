@@ -36,7 +36,10 @@ def make_read_file_tool(workspace_path: str) -> ExecutableTool:
     """Return a ``read_file`` ``ExecutableTool`` scoped to *workspace_path*."""
 
     async def _read_file(path: str, **_: Any) -> str:
-        target = _resolve_path(workspace_path, path)
+        try:
+            target = _resolve_path(workspace_path, path)
+        except ValueError as exc:
+            return f"Error: {exc}"
         if not target.exists():
             return f"Error: file '{path}' does not exist."
         return target.read_text(encoding="utf-8", errors="replace")
@@ -64,7 +67,10 @@ def make_write_file_tool(workspace_path: str) -> ExecutableTool:
     """Return a ``write_file`` ``ExecutableTool`` scoped to *workspace_path*."""
 
     async def _write_file(path: str, content: str, **_: Any) -> str:
-        target = _resolve_path(workspace_path, path)
+        try:
+            target = _resolve_path(workspace_path, path)
+        except ValueError as exc:
+            return f"Error: {exc}"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         return f"File '{path}' written successfully ({len(content)} bytes)."

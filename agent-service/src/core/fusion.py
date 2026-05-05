@@ -104,3 +104,25 @@ def reciprocal_rank_fusion_with_scores(
     )
 
     return [(chunk_map[cid], rrf_scores[cid]) for cid in sorted_chunk_ids]
+
+
+def rrf_fusion(
+    results_lists: list[list[dict]],
+    k: int = 60,
+) -> list[dict]:
+    """Fuse dict-based result lists using Reciprocal Rank Fusion."""
+    if not results_lists:
+        return []
+
+    scores: dict[str, float] = {}
+    result_map: dict[str, dict] = {}
+    for result_list in results_lists:
+        for rank, item in enumerate(result_list, start=1):
+            item_id = str(item.get("id"))
+            result_map.setdefault(item_id, dict(item))
+            scores[item_id] = scores.get(item_id, 0.0) + 1.0 / (k + rank)
+
+    return [
+        {**result_map[item_id], "score": scores[item_id]}
+        for item_id in sorted(scores, key=scores.get, reverse=True)
+    ]

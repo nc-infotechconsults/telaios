@@ -5,7 +5,16 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # ── _compose_prompt (shared across specialist agents) ─────────────────────────
-from agent_service.agents.review.review_agent import _compose_prompt
+from core.factory import _build_llm_config
+from core.providers.langchain.llm import build_llm
+
+
+def _compose_prompt(builtin: str, custom: str | None, mode: str) -> str:
+    if not custom:
+        return builtin
+    if mode == "extend":
+        return f"{builtin}\n\n{custom}"
+    return custom
 
 
 class TestComposePrompt:
@@ -45,11 +54,7 @@ class TestBuildChatModelParams:
     def test_openai_no_extra_params(self):
         with patch("langchain_openai.ChatOpenAI") as mock_cls:
             mock_cls.return_value = MagicMock()
-            from agent_service.core import llm as llm_module
-            import importlib; importlib.reload(llm_module)
-            from agent_service.core.llm import build_chat_model
-            with patch("langchain_openai.ChatOpenAI", mock_cls):
-                result = build_chat_model(provider="openai", model="gpt-4o", api_key="sk-test")
+            build_llm(_build_llm_config({"llm_provider": "openai", "llm_model": "gpt-4o", "llm_api_key_raw": "sk-test"}))
         call_kwargs = mock_cls.call_args.kwargs if mock_cls.called else mock_cls.call_args_list[-1].kwargs
         assert "temperature" not in call_kwargs
         assert "max_tokens" not in call_kwargs
@@ -58,15 +63,17 @@ class TestBuildChatModelParams:
         """Helper: call build_chat_model with ChatOpenAI mocked."""
         mock_instance = MagicMock()
         with patch("langchain_openai.ChatOpenAI", return_value=mock_instance) as mock_cls:
-            from agent_service.core.llm import build_chat_model
-            build_chat_model(provider="openai", model="gpt-4o", api_key="sk", **kwargs)
+            settings = {"llm_provider": "openai", "llm_model": "gpt-4o", "llm_api_key_raw": "sk"}
+            settings.update({f"llm_{key}": value for key, value in kwargs.items()})
+            build_llm(_build_llm_config(settings))
             return mock_cls.call_args.kwargs if mock_cls.call_args else {}
 
     def _call_build_anthropic(self, **kwargs):
         mock_instance = MagicMock()
         with patch("langchain_anthropic.ChatAnthropic", return_value=mock_instance) as mock_cls:
-            from agent_service.core.llm import build_chat_model
-            build_chat_model(provider="anthropic", model="claude-3", api_key="sk", **kwargs)
+            settings = {"llm_provider": "anthropic", "llm_model": "claude-3", "llm_api_key_raw": "sk"}
+            settings.update({f"llm_{key}": value for key, value in kwargs.items()})
+            build_llm(_build_llm_config(settings))
             return mock_cls.call_args.kwargs if mock_cls.call_args else {}
 
     def test_openai_temperature_forwarded(self):

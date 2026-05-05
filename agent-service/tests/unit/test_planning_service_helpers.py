@@ -1,5 +1,5 @@
 """
-Unit tests for planning_service helper functions.
+Unit tests for planning prompt helper functions.
 
 Tests _build_project_context_text with various inputs including the
 Phase 4.2 feature: ready project documents injected into the system prompt.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_service.services.planning_service import _build_project_context_text
+from domain.planning.prompts import _format_project_context as _build_project_context_text
 
 
 def _ctx(**kwargs) -> dict:

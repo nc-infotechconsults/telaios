@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import pytest
-from agent_service.agents.configurable.configurable_agent import (
+from domain.agents.configurable import (
     ConfigurableAgentConfig,
     ConfigurableAgent,
     _compose_prompt,

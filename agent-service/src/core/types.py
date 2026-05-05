@@ -454,6 +454,37 @@ class RerankerConfig(BaseModel):
     extra: dict[str, Any] = {}
 
 
+class HybridRAGConfig(BaseModel):
+    """Strategy-specific settings for hybrid retrieval."""
+
+    vector_weight: float = 0.5
+    bm25_weight: float = 0.5
+    top_k: int = 5
+    rrf_k: int = 60
+
+
+class AgenticRAGConfig(BaseModel):
+    """Strategy-specific settings for agentic RAG."""
+
+    max_iterations: int = 3
+    retrieval_threshold: float = 0.7
+
+
+class CRAGConfig(BaseModel):
+    """Strategy-specific settings for corrective RAG."""
+
+    grade_threshold: float = 0.6
+    max_retries: int = 2
+
+
+class SelfRAGConfig(BaseModel):
+    """Strategy-specific settings for self-reflective RAG."""
+
+    reflection_threshold: float = 0.7
+    max_reflections: int = 2
+
+
+
 class CompressorConfig(BaseModel):
     """Configuration for contextual compression."""
 
@@ -467,7 +498,7 @@ class RagConfig(BaseModel):
 
     strategy: RagStrategy = RagStrategy.SIMPLE
     llm: LLMConfig | None = None  # LLM used for the generation step
-    embedding: EmbeddingConfig
+    embedding: EmbeddingConfig | None = None
     vector_store: VectorStoreConfig | None = None
     graph_store: GraphStoreConfig | None = None
     top_k: int = 5
@@ -476,6 +507,10 @@ class RagConfig(BaseModel):
     chunking: ChunkingConfig = ChunkingConfig()
     reranker: RerankerConfig | None = None
     compressor: CompressorConfig | None = None
+    hybrid: HybridRAGConfig | None = None
+    agentic: AgenticRAGConfig | None = None
+    crag: CRAGConfig | None = None
+    self_rag: SelfRAGConfig | None = None
     max_retrieval_rounds: int = 3
     fallback_search_provider: str | None = None  # tavily | brave | serper
     framework: str = "langchain"

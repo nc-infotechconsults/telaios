@@ -15,8 +15,10 @@ To register these providers explicitly (e.g. in tests or application startup)::
 
 from __future__ import annotations
 
-from core.providers import register_agent, register_orchestrator, register_rag, register_retriever
+from core.providers import register_agent, register_orchestrator, register_provider, register_rag, register_retriever
 from core.providers.langchain.agent import LangChainAgent
+from core.providers.langchain.checkpoint import PostgresCheckpointer
+from core.providers.langchain.interrupt import LangGraphInterrupt
 from core.providers.langchain.llm import LangChainLLM
 from core.providers.langchain.orchestrator import LangChainOrchestrator
 from core.providers.langchain.rag import LangChainRAG, LangChainRetriever, LangChainSimpleRAG
@@ -27,6 +29,13 @@ register_retriever("langchain", LangChainRetriever)
 register_rag("langchain", LangChainRAG)
 register_orchestrator("langchain", LangChainOrchestrator)
 
+# Register HITL and checkpoint providers
+register_provider(
+    "langchain",
+    interrupt_cls=LangGraphInterrupt,
+    checkpointer_cls=PostgresCheckpointer,
+)
+
 __all__ = [
     "LangChainAgent",
     "LangChainOrchestrator",
@@ -35,4 +44,6 @@ __all__ = [
     "LangChainSimpleRAG",
     "LangChainLLM",
     "BM25Retriever",
+    "LangGraphInterrupt",
+    "PostgresCheckpointer",
 ]

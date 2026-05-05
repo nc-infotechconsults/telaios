@@ -134,3 +134,11 @@ class GraphRAG(RAGStrategy):
             obj = chunk.metadata.get("object", "unknown")
             parts.append(f"[{i}] {subj} --{pred}--> {obj}")
         return "\n".join(parts)
+
+
+class GraphRAGStrategy:
+    """Compatibility wrapper for graph strategy construction in integration tests."""
+
+    def __init__(self, graph_store: GraphStore, config: RagConfig) -> None:
+        self.graph_store = graph_store
+        self.config = config

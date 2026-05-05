@@ -137,6 +137,10 @@ class ToolRegistry:
                 )
         return list(self._tools.values())
 
+    def list_tools(self, workspace_path: str | None = None) -> list[ExecutableTool]:
+        """Compatibility alias for callers expecting a list_tools method."""
+        return self.all(workspace_path)
+
     # ── MCP / Skill loading ────────────────────────────────────────────────
 
     async def load_mcp(self, server: McpServer) -> None:

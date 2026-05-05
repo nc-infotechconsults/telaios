@@ -1,23 +1,20 @@
 """
-Unit tests for the infra agent create_react_agent migration (T3).
+Unit tests for infra built-in helper tools.
 
 Covers:
 - detect_stack identifies common stacks from indicator files
 - detect_stack returns "unknown" for empty workspace
 - make_write_file_tool / make_read_file_tool are workspace-scoped
-- InfraAgent.on_execute collects "File written:" files from ToolMessage results
 """
 from __future__ import annotations
 
 import os
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain_core.messages import AIMessage, ToolMessage
 
-from agent_service.agents.infra.template_gen import detect_stack
-from agent_service.core.tools import make_read_file_tool, make_write_file_tool
+from tools.builtin.agent_tools import detect_stack
+from tools.builtin.file_tools import make_read_file_tool, make_write_file_tool
 
 
 class TestDetectStack:
@@ -59,7 +56,7 @@ class TestBuildWorkspaceTools:
             read = make_read_file_tool(tmp)
 
             result = await write.coroutine(path="Dockerfile", content="FROM python:3.12")
-            assert result == "File written: Dockerfile"
+            assert "written successfully" in result
             content = await read.coroutine(path="Dockerfile")
             assert "FROM python:3.12" in content
 
@@ -69,43 +66,3 @@ class TestBuildWorkspaceTools:
             write = make_write_file_tool(tmp)
             result = await write.coroutine(path="../../etc/crontab", content="bad")
             assert "Error" in result
-
-
-class TestInfraAgentExecute:
-    """InfraAgent.on_execute should collect 'File written:' paths from ToolMessages."""
-
-    @pytest.mark.asyncio
-    async def test_on_execute_collects_written_files(self):
-        from agent_service.agents.infra.infra_agent import InfraAgent, InfraAgentConfig
-        from agent_service.core.agent_framework.context import AgentContext
-
-        with tempfile.TemporaryDirectory() as tmp:
-            agent = InfraAgent("infra-1", InfraAgentConfig())
-            agent._llm = MagicMock()  # won't be called; we mock create_react_agent
-
-            fake_messages = [
-                AIMessage(content="I will generate the files."),
-                ToolMessage(content="File written: Dockerfile", name="write_file", tool_call_id="1"),
-                ToolMessage(content="File written: docker-compose.yml", name="write_file", tool_call_id="2"),
-                AIMessage(content="Done."),
-            ]
-            fake_graph = MagicMock()
-            fake_graph.ainvoke = AsyncMock(return_value={"messages": fake_messages})
-
-            ctx = MagicMock(spec=AgentContext)
-            ctx.executionId = "exec-1"
-            ctx.workspaces = {"myrepo": tmp}
-            ctx.task = MagicMock()
-            ctx.task.description = "Deploy a web app"
-
-            with patch("agent_service.agents.infra.infra_agent.create_react_agent", return_value=fake_graph):
-                with patch("agent_service.agents.infra.infra_agent.get_agent_event_bus") as mock_bus:
-                    mock_bus.return_value.publish = AsyncMock()
-                    await agent.on_execute(ctx)
-
-            import json
-            output = json.loads(agent._result.output)
-            assert output["filesGenerated"] == 2
-            assert "myrepo/Dockerfile" in output["files"]
-            assert "myrepo/docker-compose.yml" in output["files"]
-            assert agent._result.success is True
