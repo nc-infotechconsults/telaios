@@ -69,7 +69,9 @@ class WorkerPool:
 
         for (tid, _), output in zip(tasks, outputs):
             if isinstance(output, Exception):
-                results[tid] = AgentOutput(content=f"Error: {output}")
+                results[tid] = AgentOutput(
+                    content=f"Error: {type(output).__name__}: {output}"
+                )
             else:
                 results[tid] = output
 

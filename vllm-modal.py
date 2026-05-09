@@ -9,10 +9,10 @@ vllm_image = (
     .uv_pip_install(  # as of vllm 0.19.0, must install transformers separately to use Gemma 4
         "transformers==5.5.0",
     )
-    .env({"HF_XET_HIGH_PERFORMANCE": "1"})  # faster model transfers
+    .env({"HF_XET_HIGH_PERFORMANCE": "1" })  # faster model transfers
 )
 
-MODEL_NAME = "google/gemma-4-26B-A4B-it"
+MODEL_NAME = "Qwen/Qwen3.6-27B"
 MODEL_REVISION = "47b6801b24d15ff9bcd8c96dfaea0be9ed3a0301"  # avoid nasty surprises when repos update!
 
 hf_cache_vol = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
@@ -25,13 +25,16 @@ app = modal.App("vllm-inference")
 N_GPU = 1
 MINUTES = 60  # seconds
 VLLM_PORT = 8000
-
+GPU_MODEL = 'H200'
+REASONING_PARSER = 'qwen3'
+TOOL_PARSER = 'qwen3_coder'
 
 @app.function(
     image=vllm_image,
-    gpu=f"H200:{N_GPU}",
+    gpu=f"{GPU_MODEL}:{N_GPU}",
     scaledown_window=15 * MINUTES,  # how long should we stay up with no requests?
     timeout=10 * MINUTES,  # how long should we wait for container start?
+    secrets=[modal.Secret.from_name("huggingface-secret")],
     volumes={
         "/root/.cache/huggingface": hf_cache_vol,
         "/root/.cache/vllm": vllm_cache_vol,
@@ -49,8 +52,6 @@ def serve():
         "vllm",
         "serve",
         MODEL_NAME,
-        "--revision",
-        MODEL_REVISION,
         "--served-model-name",
         MODEL_NAME,
         "llm",
@@ -76,8 +77,7 @@ def serve():
         f"'{json.dumps({'image': 0, 'video': 0, 'audio': 0})}'",
         # enable reasoning and tool use
         "--enable-auto-tool-choice",
-        "--reasoning-parser gemma4",
-        "--tool-call-parser gemma4",
+        f"--reasoning-parser {REASONING_PARSER} --tool-call-parser {TOOL_PARSER}",
     ]
 
     print(*cmd)

@@ -36,7 +36,16 @@ from typing import Any
 from core.agent import Agent
 from core.checkpoint import Checkpointer
 from core.interrupt import InterruptHandle
-from core.types import AgentInput, AgentOutput, Message, MessageRole
+from core.types import (
+    AgentInput,
+    AgentOutput,
+    Message,
+    MessageRole,
+    DocumentExtractionError,
+    DocumentAnalysisError,
+    DocumentChunkingError,
+    DocumentEmbeddingError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +133,10 @@ class DocumentCopilot:
             return await self._embed()
         elif self._phase == DocumentCopilotPhase.WAITING_FOR_HUMAN:
             return await self._wait_for_human()
-        else:
+        elif self._phase == DocumentCopilotPhase.COMPLETE:
             return AgentOutput(content="Document processing complete.")
+        else:
+            return AgentOutput(content="Unknown phase.")
 
     async def run_phase(self, phase: DocumentCopilotPhase) -> AgentOutput:
         """Run a specific phase directly (for testing or manual control)."""
@@ -166,7 +177,7 @@ class DocumentCopilot:
 
         except Exception as exc:
             logger.error("Document copilot extraction failed: %s", exc)
-            return AgentOutput(content=f"Extraction failed: {exc}")
+            raise DocumentExtractionError(f"Extraction failed: {exc}") from exc
 
     async def _analyze(self) -> AgentOutput:
         """Analyze document content structure."""
@@ -179,7 +190,7 @@ class DocumentCopilot:
                 "2. Main topics and themes\n"
                 "3. Document structure (sections, headings)\n"
                 "4. Key-value pairs (version numbers, statuses, etc.)\n\n"
-                f"Document content:\n{self._document_text[:10000]}"
+                f"Document content (first 10k chars):\n{self._document_text[:10000]}"
             )
 
             agent_input = AgentInput(
@@ -203,7 +214,7 @@ class DocumentCopilot:
 
         except Exception as exc:
             logger.error("Document copilot analysis failed: %s", exc)
-            return AgentOutput(content=f"Analysis failed: {exc}")
+            raise DocumentAnalysisError(f"Analysis failed: {exc}") from exc
 
     async def _chunk(self) -> AgentOutput:
         """Split document into chunks."""
@@ -228,7 +239,7 @@ class DocumentCopilot:
 
         except Exception as exc:
             logger.error("Document copilot chunking failed: %s", exc)
-            return AgentOutput(content=f"Chunking failed: {exc}")
+            raise DocumentChunkingError(f"Chunking failed: {exc}") from exc
 
     async def _embed(self) -> AgentOutput:
         """Generate embeddings for document chunks."""
@@ -252,7 +263,7 @@ class DocumentCopilot:
 
         except Exception as exc:
             logger.error("Document copilot embedding failed: %s", exc)
-            return AgentOutput(content=f"Embedding failed: {exc}")
+            raise DocumentEmbeddingError(f"Embedding failed: {exc}") from exc
 
     async def _wait_for_human(self) -> AgentOutput:
         """Pause for human review using HITL interrupt."""
