@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![E2E Tests](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml/badge.svg)](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml)
 
+> **🚧 Migration in progress.** TelaiOS is being consolidated from a Bun monorepo (`data-api` + `agent-service`) into a single Python/FastAPI monolith under `server/`, with the existing `frontend/` kept as-is. See [`SPEC-MIGRATION.md`](SPEC-MIGRATION.md), [`PLAN-MIGRATION.md`](PLAN-MIGRATION.md), and [`TASKS-MIGRATION.md`](TASKS-MIGRATION.md) for the design and roadmap. Sections below describe the legacy layout and remain accurate for `data-api/` + `agent-service/` until they are removed in Phase 10.
+
 **TelaiOS** is an agentic software development operating system — an all-in-one platform for teams that want to manage the entire software development lifecycle, from planning through execution, with AI agents doing the heavy lifting.
 
 ---

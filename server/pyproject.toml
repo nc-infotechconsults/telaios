@@ -1,0 +1,79 @@
+[project]
+name = "telaios-server"
+version = "0.1.0"
+description = "Telaios monolith server (FastAPI). Merges legacy data-api + agent-service."
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [{ name = "Nico Cardone" }]
+license = { text = "MIT" }
+
+# Phase 0 baseline: minimal runtime deps to scaffold the app.
+# Heavy domain deps (LangChain/LangGraph, neo4j, openai, voyageai, etc.) are added in later phases
+# when their modules land. See PLAN-MIGRATION.md.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pgvector>=0.3.6",
+    "redis>=5.2",
+    "PyJWT>=2.10",
+    "bcrypt>=4.2",
+    "cryptography>=44.0",
+    "structlog>=24.4",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+# Slim-deploy profile groups (see SPEC-MIGRATION.md §4).
+# Populated incrementally as modules land.
+docker = [
+    "docker>=7.1",
+]
+k8s = [
+    "kubernetes>=31.0",
+]
+agents = [
+    # Filled in Phase 6: langchain, langgraph, openai, anthropic, ...
+]
+documents = [
+    # Filled in Phase 7: pypdf, python-docx, voyageai, etc.
+]
+storage = [
+    "aioboto3>=13.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "testcontainers[postgres]>=4.8",
+    "import-linter>=2.1",
+    "pre-commit>=4.0",
+    "types-redis",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/telaios"]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: tests that require external services (postgres, redis)",
+]

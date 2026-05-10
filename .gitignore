@@ -12,3 +12,4 @@ __pycache__
 /frontend/test-results/
 /agent-service/local_cache
 /agent-service/build/
+/server/.import_linter_cache/

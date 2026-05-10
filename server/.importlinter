@@ -1,0 +1,36 @@
+[importlinter]
+root_packages =
+    telaios
+
+# Contract A: cross-cutting layers must NEVER import from modules.* (no upward dependencies).
+# This is the single hard rule we need at Phase 0.
+[importlinter:contract:layered-shared-no-upward-deps]
+name = Shared layers cannot depend on business modules
+type = forbidden
+source_modules =
+    telaios.core
+    telaios.tools
+    telaios.infra
+    telaios.db
+    telaios.auth
+    telaios.utils
+    telaios.config
+forbidden_modules =
+    telaios.modules
+
+# Contract B: each module's public facade is `modules.<X>` / `__init__` / `service` / `schemas`.
+# Cross-module imports of `repository` / `router` are forbidden.
+# Implemented as a forbidden-glob contract; will be expanded per-module in Phase 1+
+# as the package contents fill in. Currently empty packages so this is a no-op enforcement.
+[importlinter:contract:no-cross-module-internal-imports]
+name = Modules must not import each other's repository or router
+type = forbidden
+source_modules =
+    telaios.modules
+forbidden_modules =
+    telaios.modules
+include_external_packages = False
+# Self-imports are unavoidable; allow any module to import its own internals.
+# (import-linter scopes `forbidden_modules` strictly; we'll add per-module
+# `ignore_imports` entries in Phase 1+ once real cross-module wiring exists.)
+allow_indirect_imports = True

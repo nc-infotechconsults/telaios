@@ -1,34 +1,61 @@
 # Agents.md
 
-## Setup command
-- always run command in the root directory
-- use `bun install` for base deps of the root project
-- use `bun run apps:install` for install deps of all projects
-- use `bun run agent:install` for install deps of the agent-service project
-- use `bun run data:install` for install deps of a data-api project
-- use `bun run frontend:install` for install deps of a frontend project
+## Project layout
 
-## Development command
-- use `bun run apps:dev` for development of all projects
-- use `bun run agent:dev` for development of the agent-service project
-- use `bun run data:dev` for development of a data-api project
-- use `bun run frontend:dev` for development of a frontend project
-- use `bun run docker:dev` for development of all services with docker
-- use `bun run docker:postgres` for development of postgres service with docker
-- use `bun run docker:redis` for development of redis service with docker
+This repo is being migrated from a Bun monorepo (data-api + agent-service) to a single Python/FastAPI monolith (`server/`) plus an existing TypeScript frontend (`frontend/`). See `SPEC-MIGRATION.md`, `PLAN-MIGRATION.md`, `TASKS-MIGRATION.md` for the migration design and roadmap.
 
-## Build command
-- use `bun run apps:build` for build of all projects
-- use `bun run agent:build` for build of the agent-service project
-- use `bun run data:build` for build of a data-api project
-- use `bun run frontend:build` for build of a frontend project
+```
+telaios/
+  server/        # Python 3.14 / FastAPI monolith (uv-managed)  ← active
+  frontend/     # TypeScript / React frontend (untouched)
+  data-api/     # legacy TS backend — being ported into server/
+  agent-service/# legacy Python service — being ported into server/
+```
+
+When working in a subproject, read its own `AGENTS.md` for project-specific guidance.
+
+## Setup commands
+
+```bash
+# Server (Python)
+cd server && uv sync
+
+# Frontend (TS)
+cd frontend && bun install
+```
+
+## Development commands
+
+```bash
+# Server
+cd server && uv run uvicorn telaios.main:app --reload --port 8000
+
+# Frontend
+cd frontend && bun run dev
+
+# Infrastructure (postgres, redis, minio)
+docker compose -f docker-compose.dev.yml up
+```
+
+## Quality gates (server)
+
+Every server change must pass:
+
+```bash
+cd server
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src/telaios
+uv run lint-imports
+uv run pytest
+```
 
 ## Project guideline
+
 - Every project should have a README.md file with a brief description of the project and instructions on how to use it.
 - Use semantic versioning for project releases.
 - Keep the codebase clean and organized.
 - Use AGENTS.md in the subdirectory if available to get more insight about the project scope.
-- Write clear and concise commit messages using the following convention: 
+- Write clear and concise commit messages using the following convention:
   - feat: for new features
   - fix: for bug fixes
   - docs: for documentation changes
@@ -36,3 +63,7 @@
   - refactor: for code refactoring without changing functionality
   - test: for adding or updating tests
   - chore: for other changes that don't modify src or test files (e.g., build scripts, dependencies)
+
+## Migration status
+
+Phase 0 (scaffolding) complete: empty `server/` package tree, tooling configured. The legacy `data-api/` and `agent-service/` directories remain in place until Phase 10 cleanup. The Bun monorepo root (`package.json`, `bun.lock`, `packages/`) is also being phased out — DO NOT add new code there.
