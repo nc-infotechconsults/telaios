@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.planning.prompts import _format_project_context as _build_project_context_text
+from telaios.domain.planning.prompts import _format_project_context as _build_project_context_text
 
 
 def _ctx(**kwargs) -> dict:

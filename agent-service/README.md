@@ -212,8 +212,8 @@ See [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed strategy comparison, c
 ### Quick Start
 
 ```python
-from core.types import RagConfig, LLMConfig
-from core.strategies import HybridRAGStrategy
+from telaios.core.types import RagConfig, LLMConfig
+from telaios.core.strategies import HybridRAGStrategy
 
 config = RagConfig(
     strategy="hybrid",

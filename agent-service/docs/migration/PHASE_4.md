@@ -23,12 +23,12 @@ Identify differences and merge into `src/tools/builtin/documents/chunking.py`:
 
 from __future__ import annotations
 
-from core.types import Chunk, ChunkingConfig, Document
+from telaios.core.types import Chunk, ChunkingConfig, Document
 
 
 def chunk_document(
-    document: Document,
-    config: ChunkingConfig = ChunkingConfig(),
+        document: Document,
+        config: ChunkingConfig = ChunkingConfig(),
 ) -> list[Chunk]:
     """
     Split a document into chunks based on the configured strategy.
@@ -59,14 +59,18 @@ def _chunk_semantic(document: Document, config: ChunkingConfig) -> list[Chunk]:
     # Implementation merged from both chunkers
     ...
 
+
 def _chunk_hierarchical(document: Document, config: ChunkingConfig) -> list[Chunk]:
     ...
+
 
 def _chunk_by_page(document: Document, config: ChunkingConfig) -> list[Chunk]:
     ...
 
+
 def _chunk_by_token(document: Document, config: ChunkingConfig) -> list[Chunk]:
     ...
+
 
 def _chunk_by_character(document: Document, config: ChunkingConfig) -> list[Chunk]:
     ...
@@ -84,12 +88,12 @@ Merge into `src/tools/builtin/documents/embedding.py`:
 
 from __future__ import annotations
 
-from core.types import Chunk, EmbeddingConfig
+from telaios.core.types import Chunk, EmbeddingConfig
 
 
 def embed_chunks(
-    chunks: list[Chunk],
-    config: EmbeddingConfig,
+        chunks: list[Chunk],
+        config: EmbeddingConfig,
 ) -> list[Chunk]:
     """
     Generate embeddings for a list of chunks.
@@ -110,8 +114,10 @@ def embed_chunks(
 def _embed_fastembed(chunks: list[Chunk], config: EmbeddingConfig) -> list[Chunk]:
     ...
 
+
 def _embed_voyage(chunks: list[Chunk], config: EmbeddingConfig) -> list[Chunk]:
     ...
+
 
 def _embed_openai(chunks: list[Chunk], config: EmbeddingConfig) -> list[Chunk]:
     ...
@@ -125,13 +131,13 @@ Merge `src/agent_service/services/document_extractor.py` into `src/tools/builtin
 
 from __future__ import annotations
 
-from core.types import Document
+from telaios.core.types import Document
 
 
 async def extract_document(
-    buffer: bytes,
-    mime_type: str,
-    file_type: str | None = None,
+        buffer: bytes,
+        mime_type: str,
+        file_type: str | None = None,
 ) -> Document:
     """
     Extract text content and metadata from a document file.

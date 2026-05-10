@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from core.types import LLMConfig, Message, MessageRole
-from domain.planning.persistence import PlanPersistence
-from domain.planning.session import PlanSession
+from telaios.core.types import LLMConfig
+from telaios.domain.planning.persistence import PlanPersistence
+from telaios.domain.planning.session import PlanSession
 
 
 class InMemoryCheckpointer:

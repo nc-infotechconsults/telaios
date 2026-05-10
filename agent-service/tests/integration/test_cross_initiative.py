@@ -16,11 +16,7 @@ Run with:
 from __future__ import annotations
 
 import asyncio
-import json
 import textwrap
-import time
-from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -124,7 +120,7 @@ class TestDocumentGraphRAG:
 
     def test_document_chunking_produces_meaningful_chunks(self, sample_markdown):
         """Smart chunking produces well-structured chunks from markdown."""
-        from tools.builtin.documents.analysis import analyze_text
+        from telaios.tools.builtin.documents.analysis import analyze_text
 
         analysis = analyze_text(sample_markdown)
 
@@ -135,7 +131,7 @@ class TestDocumentGraphRAG:
 
     def test_document_analyzer_extracts_structure(self, sample_markdown):
         """Analyzer extracts headings, sections, and key terms."""
-        from tools.builtin.documents.analysis import analyze_text
+        from telaios.tools.builtin.documents.analysis import analyze_text
 
         analysis = analyze_text(sample_markdown)
 
@@ -149,7 +145,7 @@ class TestDocumentGraphRAG:
 
     def test_graph_store_builds_from_documents(self, sample_markdown):
         """GraphStore builds entity relationships from document content."""
-        from core.graph_store import InMemoryGraphStore
+        from telaios.core.graph_store import InMemoryGraphStore
 
         store = InMemoryGraphStore()
 
@@ -173,9 +169,9 @@ class TestDocumentGraphRAG:
 
     def test_graph_rag_strategy_uses_graph_store(self, sample_markdown):
         """GRAPH RAG strategy retrieves from graph store."""
-        from core.graph_store import InMemoryGraphStore
-        from core.strategies.graph import GraphRAGStrategy
-        from core.types import LLMConfig, RagConfig
+        from telaios.core.graph_store import InMemoryGraphStore
+        from telaios.core.strategies.graph import GraphRAGStrategy
+        from telaios.core.types import LLMConfig, RagConfig
 
         store = InMemoryGraphStore()
         store.add_entity("PostgreSQL", "database", {"description": "Primary datastore"})
@@ -202,7 +198,7 @@ class TestSkillsDocumentTools:
 
     def test_skill_registry_loads_from_directory(self, sample_skill_dir):
         """SkillRegistry loads skills from a directory."""
-        from tools.skill.registry import SkillRegistry
+        from telaios.tools.skill.registry import SkillRegistry
 
         registry = SkillRegistry()
         count = registry.load_from_directory(str(sample_skill_dir.parent))
@@ -212,7 +208,7 @@ class TestSkillsDocumentTools:
 
     def test_skill_search_by_tag(self, sample_skill_dir):
         """Skills can be searched by tag."""
-        from tools.skill.registry import SkillRegistry
+        from telaios.tools.skill.registry import SkillRegistry
 
         registry = SkillRegistry()
         registry.load_from_directory(str(sample_skill_dir.parent))
@@ -223,7 +219,7 @@ class TestSkillsDocumentTools:
 
     def test_skill_search_by_query(self, sample_skill_dir):
         """Skills can be searched by text query."""
-        from tools.skill.registry import SkillRegistry
+        from telaios.tools.skill.registry import SkillRegistry
 
         registry = SkillRegistry()
         registry.load_from_directory(str(sample_skill_dir.parent))
@@ -233,7 +229,7 @@ class TestSkillsDocumentTools:
 
     def test_skill_manifest_parsing(self, sample_skill_dir):
         """SKILL.md is correctly parsed into a manifest."""
-        from tools.skill.parser import parse_skill_manifest
+        from telaios.tools import parse_skill_manifest
 
         skill_path = sample_skill_dir / "SKILL.md"
         manifest = parse_skill_manifest(str(skill_path))
@@ -245,8 +241,8 @@ class TestSkillsDocumentTools:
 
     def test_skill_validator_valid_manifest(self, sample_skill_dir):
         """Valid skill manifest passes validation."""
-        from tools.skill.parser import parse_skill_manifest
-        from tools.skill.validator import validate_skill
+        from telaios.tools import parse_skill_manifest
+        from telaios.tools import validate_skill
 
         skill_path = sample_skill_dir / "SKILL.md"
         manifest = parse_skill_manifest(str(skill_path))
@@ -262,7 +258,7 @@ class TestHybridRAGReranking:
 
     def test_rrf_fusion_combines_results(self):
         """Reciprocal Rank Fusion combines multiple result lists."""
-        from core.fusion import rrf_fusion
+        from telaios.core import rrf_fusion
 
         results_a = [
             {"id": "doc1", "score": 0.9},
@@ -284,7 +280,7 @@ class TestHybridRAGReranking:
 
     def test_hybrid_rag_config_valid(self):
         """HYBRID RAG configuration is valid."""
-        from core.types import LLMConfig, RagConfig, HybridRAGConfig
+        from telaios.core.types import LLMConfig, RagConfig, HybridRAGConfig
 
         config = RagConfig(
             strategy="hybrid",
@@ -302,7 +298,7 @@ class TestHybridRAGReranking:
 
     def test_bm25_retriever_ranks_by_term_frequency(self):
         """BM25 retriever ranks documents by term frequency."""
-        from core.retriever_bm25 import BM25Retriever
+        from telaios.core.retriever_bm25 import BM25Retriever
 
         docs = [
             {"id": "1", "content": "Python is a programming language"},
@@ -327,7 +323,7 @@ class TestDocumentToolsSkills:
 
     def test_document_extractor_handles_markdown(self, sample_markdown):
         """Document extractor processes markdown content."""
-        from tools.builtin.documents.extraction import extract_text
+        from telaios.tools.builtin.documents.extraction import extract_text
 
         loop = asyncio.new_event_loop()
         try:
@@ -340,7 +336,7 @@ class TestDocumentToolsSkills:
 
     def test_document_converter_markdown_to_html(self, sample_markdown):
         """Document converter transforms markdown to HTML."""
-        from tools.builtin.documents.conversion import convert_from_markdown
+        from telaios.tools import convert_from_markdown
 
         loop = asyncio.new_event_loop()
         try:
@@ -353,7 +349,7 @@ class TestDocumentToolsSkills:
 
     def test_text_chunker_preserves_content(self, sample_markdown):
         """Text chunker preserves all content across chunks."""
-        from tools.builtin.documents.chunking import chunk_text
+        from telaios.tools import chunk_text
 
         chunks = chunk_text(sample_markdown, chunk_size=200, overlap=30)
         assert len(chunks) > 1
@@ -371,7 +367,7 @@ class TestAgenticRAGDocumentContext:
 
     def test_agentic_rag_config_valid(self):
         """Agentic RAG configuration is valid."""
-        from core.types import LLMConfig, RagConfig, AgenticRAGConfig
+        from telaios.core.types import LLMConfig, RagConfig, AgenticRAGConfig
 
         config = RagConfig(
             strategy="agentic",
@@ -387,7 +383,7 @@ class TestAgenticRAGDocumentContext:
 
     def test_crag_config_valid(self):
         """CRAG configuration is valid."""
-        from core.types import LLMConfig, RagConfig, CRAGConfig
+        from telaios.core.types import LLMConfig, RagConfig, CRAGConfig
 
         config = RagConfig(
             strategy="crag",
@@ -403,7 +399,7 @@ class TestAgenticRAGDocumentContext:
 
     def test_self_rag_config_valid(self):
         """Self-RAG configuration is valid."""
-        from core.types import LLMConfig, RagConfig, SelfRAGConfig
+        from telaios.core.types import LLMConfig, RagConfig, SelfRAGConfig
 
         config = RagConfig(
             strategy="self_rag",
@@ -425,9 +421,9 @@ class TestEndToEndDocumentRAG:
 
     def test_full_pipeline_document_to_chunks(self, sample_markdown):
         """Full pipeline: document → analysis → chunking → indexing."""
-        from tools.builtin.documents.analysis import analyze_text
-        from tools.builtin.documents.chunking import chunk_text
-        from core.graph_store import InMemoryGraphStore
+        from telaios.tools.builtin.documents.analysis import analyze_text
+        from telaios.tools import chunk_text
+        from telaios.core.graph_store import InMemoryGraphStore
 
         # Step 1: Analyze document
         analysis = analyze_text(sample_markdown)
@@ -451,10 +447,10 @@ class TestEndToEndDocumentRAG:
 
     def test_full_pipeline_hybrid_search(self, sample_markdown):
         """Full pipeline: document → BM25 + Graph search → fused results."""
-        from tools.builtin.documents.chunking import chunk_text
-        from core.fusion import rrf_fusion
-        from core.graph_store import InMemoryGraphStore
-        from core.retriever_bm25 import BM25Retriever
+        from telaios.tools import chunk_text
+        from telaios.core import rrf_fusion
+        from telaios.core.graph_store import InMemoryGraphStore
+        from telaios.core.retriever_bm25 import BM25Retriever
 
         # Chunk document
         chunks = chunk_text(sample_markdown, chunk_size=300, overlap=50)
@@ -482,7 +478,7 @@ class TestToolRegistryIntegration:
 
     def test_tool_registry_builtin_tools(self):
         """Tool registry has built-in tools available."""
-        from tools.registry import ToolRegistry
+        from telaios.tools import ToolRegistry
 
         registry = ToolRegistry()
         tools = registry.list_tools()
@@ -492,7 +488,7 @@ class TestToolRegistryIntegration:
 
     def test_skill_adapter_creates_tool(self, sample_skill_dir):
         """Skill adapter creates a callable tool from a skill."""
-        from tools.skill.parser import parse_skill_manifest
+        from telaios.tools import parse_skill_manifest
 
         skill_path = sample_skill_dir / "SKILL.md"
         manifest = parse_skill_manifest(str(skill_path))
@@ -508,19 +504,19 @@ class TestConfigurationIntegration:
 
     def test_config_has_llm_settings(self):
         """Config has LLM provider settings."""
-        from infra.settings import config
+        from telaios.infra.settings import config
 
         assert config.LLM_PROVIDER is not None
         assert config.LLM_MODEL is not None
 
     def test_config_has_database_settings(self):
         """Config has database connection settings."""
-        from infra.settings import config
+        from telaios.infra.settings import config
 
         assert config.DATABASE_URL is not None
 
     def test_config_has_redis_settings(self):
         """Config has Redis connection settings."""
-        from infra.settings import config
+        from telaios.infra.settings import config
 
         assert config.REDIS_URL is not None

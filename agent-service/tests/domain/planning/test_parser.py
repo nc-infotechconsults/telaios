@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.planning.parser import (
+from telaios.domain.planning.parser import (
     ParsedPlan,
     PlanTask,
     parse_plan,

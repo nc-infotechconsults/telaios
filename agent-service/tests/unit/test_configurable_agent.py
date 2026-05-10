@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import pytest
-from domain.agents.configurable import (
+from telaios.domain.agents.configurable import (
     ConfigurableAgentConfig,
     ConfigurableAgent,
     _compose_prompt,

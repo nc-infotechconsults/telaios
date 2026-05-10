@@ -62,9 +62,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.agent import Agent
-    from core.orchestrator import Orchestrator
-    from core.rag import RAG, Retriever
+    from telaios.core.agent import Agent
+    from telaios.core.orchestrator import Orchestrator
+    from telaios.core import RAG, Retriever
 
 AGENT_REGISTRY: dict[str, type[Agent]] = {}
 ORCHESTRATOR_REGISTRY: dict[str, type[Orchestrator]] = {}
@@ -73,12 +73,12 @@ RAG_REGISTRY: dict[str, type[RAG]] = {}
 
 
 def register_provider(
-    framework: str,
-    *,
-    agent_cls: type[Agent] | None = None,
-    orchestrator_cls: type[Orchestrator] | None = None,
-    retriever_cls: type[Retriever] | None = None,
-    rag_cls: type[RAG] | None = None,
+        framework: str,
+        *,
+        agent_cls: type[Agent] | None = None,
+        orchestrator_cls: type[Orchestrator] | None = None,
+        retriever_cls: type[Retriever] | None = None,
+        rag_cls: type[RAG] | None = None,
 ) -> None:
     """Register a framework's concrete implementations."""
     if agent_cls is not None:

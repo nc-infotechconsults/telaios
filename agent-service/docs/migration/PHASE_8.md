@@ -30,14 +30,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.routers.chat import router as chat_router
-from api.routers.documents import router as documents_router
-from api.routers.document_copilot import router as document_copilot_router
-from api.routers.health import router as health_router
-from api.routers.plans import router as plans_router
-from api.routers.skills import router as skills_router
-from api.routers.v2 import router as v2_router
-from infra.settings import config
+from telaios.api.routers.chat import router as chat_router
+from telaios.api.routers.documents import router as documents_router
+from telaios.api.routers.document_copilot import router as document_copilot_router
+from telaios.api.routers.health import router as health_router
+from telaios.api.routers.plans import router as plans_router
+from telaios.api.routers.skills import router as skills_router
+from telaios.api.routers.v2 import router as v2_router
+from telaios.infra.settings import config
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Agent Service starting on port %d", config.PORT)
 
     # Set up LangGraph AsyncPostgresSaver for plan-level checkpointing.
-    from core.providers.langchain.checkpoint import PostgresCheckpointer
+    from telaios.core.providers.langchain.checkpoint import PostgresCheckpointer
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
     async with AsyncPostgresSaver.from_conn_string(config.DATABASE_URL) as checkpointer:
@@ -60,17 +60,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         plan_checkpointer = PostgresCheckpointer(checkpointer)
         logger.info("LangGraph plan checkpointer ready.")
 
-        from domain.planning.persistence import PlanPersistence
-        from domain.planning.session import PlanSession
+        from telaios.domain.planning.persistence import PlanPersistence
+        from telaios.domain.planning.session import PlanSession
 
         logger.info("Planning service ready.")
         logger.info("Document copilot v2 ready.")
 
         # ── Load skills from filesystem ───────────────────────────────────
         if config.SKILLS_AUTOLOAD:
-            from tools.skill.loader import SkillDirectoryScanner
-            from tools.skill.registry import SkillRegistry
-            from tools.skill.validator import validate_skill_manifest
+            from telaios.tools.skill.loader import SkillDirectoryScanner
+            from telaios.tools.skill.registry import SkillRegistry
+            from telaios.tools import validate_skill_manifest
 
             skill_registry = SkillRegistry()
 

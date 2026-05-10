@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.types import ToolAnnotations, ToolInputSchema, ToolParameter
-from tools.types import ExecutableTool
+from telaios.core.types import ToolAnnotations, ToolInputSchema, ToolParameter
+from telaios.tools import ExecutableTool
 
 
 async def _dummy(**kwargs):

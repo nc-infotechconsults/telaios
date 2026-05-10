@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import pytest
 
-from tools.builtin.documents.embedding import resolve_provider
+from telaios.tools.builtin.documents.embedding import resolve_provider
 
 
 class TestResolveProvider:
     """Tests for provider resolution."""
 
     def test_explicit_config_provider(self):
-        from core.types import EmbeddingConfig
+        from telaios.core.types import EmbeddingConfig
 
         config = EmbeddingConfig(provider="voyage", model="voyage-3-lite", api_key="test")
         assert resolve_provider(config) == "voyage"
 
     def test_explicit_config_provider_fastembed(self):
-        from core.types import EmbeddingConfig
+        from telaios.core.types import EmbeddingConfig
 
         config = EmbeddingConfig(provider="fastembed", model="BAAI/bge-small-en-v1.5")
         assert resolve_provider(config) == "fastembed"
@@ -38,7 +38,7 @@ class TestEmbedTexts:
 
     @pytest.mark.asyncio
     async def test_empty_texts(self):
-        from tools.builtin.documents.embedding import embed_texts
+        from telaios.tools.builtin.documents.embedding import embed_texts
 
         result = await embed_texts([])
         assert result == []
@@ -47,7 +47,7 @@ class TestEmbedTexts:
     async def test_fastembed(self):
         """Test with fastembed (local, no API key needed)."""
         fastembed = pytest.importorskip("fastembed")
-        from tools.builtin.documents.embedding import embed_texts
+        from telaios.tools.builtin.documents.embedding import embed_texts
 
         result = await embed_texts(["hello world", "test document"])
         assert len(result) == 2
@@ -60,7 +60,7 @@ class TestEmbedChunks:
 
     @pytest.mark.asyncio
     async def test_empty_chunks(self):
-        from tools.builtin.documents.embedding import embed_chunks
+        from telaios.tools.builtin.documents.embedding import embed_chunks
 
         result = await embed_chunks([])
         assert result == []
@@ -69,8 +69,8 @@ class TestEmbedChunks:
     async def test_fastembed_chunks(self):
         """Test with fastembed (local, no API key needed)."""
         fastembed = pytest.importorskip("fastembed")
-        from core.types import Chunk
-        from tools.builtin.documents.embedding import embed_chunks
+        from telaios.core.types import Chunk
+        from telaios.tools.builtin.documents.embedding import embed_chunks
 
         chunks = [
             Chunk(id="c1", document_id="d1", content="hello world"),

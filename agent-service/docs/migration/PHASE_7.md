@@ -28,11 +28,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.agent import Agent
-from core.checkpoint import Checkpointer
-from core.factory import create_agent
-from core.interrupt import InterruptHandle
-from core.types import AgentConfig, AgentInput, AgentOutput, LLMConfig, Message, MessageRole
+from telaios.core.agent import Agent
+from telaios.core.checkpoint import Checkpointer
+from telaios.core import create_agent
+from telaios.core.interrupt import InterruptHandle
+from telaios.core.types import AgentConfig, AgentInput, AgentOutput, LLMConfig, Message, MessageRole
 
 
 class DocumentCopilotPhase(str, Enum):
@@ -58,11 +58,11 @@ class DocumentCopilot:
     """
 
     def __init__(
-        self,
-        agent: Agent,
-        checkpointer: Checkpointer,
-        interrupt_handle: InterruptHandle,
-        thread_id: str,
+            self,
+            agent: Agent,
+            checkpointer: Checkpointer,
+            interrupt_handle: InterruptHandle,
+            thread_id: str,
     ):
         self._agent = agent
         self._checkpointer = checkpointer
@@ -91,7 +91,7 @@ class DocumentCopilot:
 
     async def _extract(self) -> AgentOutput:
         # Extract content using tools.builtin.documents.extraction
-        from tools.builtin.documents.extraction import extract_document
+        from telaios.tools.builtin.documents.extraction import extract_document
         # ... implementation
         self._phase = DocumentCopilotPhase.ANALYZE
         await self._save_state()

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from core.types import AgentInput, AgentOutput, Message, MessageRole
-from domain.orchestration.pool import WorkerPool
+from telaios.core.types import AgentInput, AgentOutput
+from telaios.domain.orchestration.pool import WorkerPool
 
 
 def _make_mock_agent(response: str = "done"):

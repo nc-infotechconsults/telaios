@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.interrupt import InterruptHandle
+from telaios.core.interrupt import InterruptHandle
 
 
 class TestInterruptHandleABC:
@@ -62,7 +62,7 @@ async def test_concrete_wait_for_resume():
 
 def test_langgraph_interrupt_import():
     """LangGraphInterrupt can be imported and is a subclass of InterruptHandle."""
-    from core.providers.langchain.interrupt import LangGraphInterrupt
+    from telaios.core.providers.langchain.interrupt import LangGraphInterrupt
 
     assert issubclass(LangGraphInterrupt, InterruptHandle)
 
@@ -71,7 +71,7 @@ def test_langgraph_interrupt_send_interrupt_raises():
     """send_interrupt raises GraphInterrupt when called outside a graph context."""
     from langgraph.errors import GraphInterrupt
 
-    from core.providers.langchain.interrupt import LangGraphInterrupt
+    from telaios.core.providers.langchain.interrupt import LangGraphInterrupt
 
     handle = LangGraphInterrupt()
     with pytest.raises(GraphInterrupt):

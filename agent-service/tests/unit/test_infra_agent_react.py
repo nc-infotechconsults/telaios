@@ -13,8 +13,8 @@ import tempfile
 
 import pytest
 
-from tools.builtin.agent_tools import detect_stack
-from tools.builtin.file_tools import make_read_file_tool, make_write_file_tool
+from telaios.tools.builtin.agent_tools import detect_stack
+from telaios.tools import make_read_file_tool, make_write_file_tool
 
 
 class TestDetectStack:

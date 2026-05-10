@@ -79,8 +79,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from core.types import Message, MessageRole
-from domain.planning.prompts import compose_parser_prompt
+from telaios.core.types import Message, MessageRole
+from telaios.domain.planning.prompts import compose_parser_prompt
 
 
 class PlanTask(BaseModel):
@@ -95,8 +95,8 @@ class ParsedPlan(BaseModel):
 
 
 async def parse_plan(
-    plan_text: str,
-    llm: Any,  # core.llm.LLM instance
+        plan_text: str,
+        llm: Any,  # core.llm.LLM instance
 ) -> ParsedPlan:
     """
     Parse raw plan text into a structured ParsedPlan using the LLM.
@@ -129,7 +129,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.checkpoint import Checkpointer
+from telaios.core.checkpoint import Checkpointer
 
 
 class PlanPersistence:
@@ -152,11 +152,11 @@ class PlanPersistence:
         return state.get("plan")
 
     async def update_task_status(
-        self,
-        thread_id: str,
-        task_id: str,
-        status: str,
-        result: Any = None,
+            self,
+            thread_id: str,
+            task_id: str,
+            status: str,
+            result: Any = None,
     ) -> None:
         """Update the status of a specific task."""
         state = await self._checkpointer.get(thread_id) or {}
@@ -181,11 +181,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.factory import create_llm
-from core.types import LLMConfig
-from domain.planning.parser import ParsedPlan, parse_plan
-from domain.planning.persistence import PlanPersistence
-from domain.planning.prompts import compose_planning_prompt
+from telaios.core import create_llm
+from telaios.core.types import LLMConfig
+from telaios.domain.planning.parser import ParsedPlan, parse_plan
+from telaios.domain.planning.persistence import PlanPersistence
+from telaios.domain.planning.prompts import compose_planning_prompt
 
 
 class PlanSession:
@@ -201,10 +201,10 @@ class PlanSession:
     """
 
     def __init__(
-        self,
-        thread_id: str,
-        llm_config: LLMConfig,
-        persistence: PlanPersistence,
+            self,
+            thread_id: str,
+            llm_config: LLMConfig,
+            persistence: PlanPersistence,
     ):
         self.thread_id = thread_id
         self._llm = create_llm(llm_config)
@@ -233,7 +233,7 @@ class PlanSession:
 Update `domain/planning/session.py` to use `infra/crypto.py` for key decryption:
 
 ```python
-from infra.crypto import decrypt
+from telaios.utils import decrypt
 
 # In __init__ or factory method:
 if llm_config.api_key.startswith("enc:"):
@@ -255,9 +255,9 @@ warnings.warn(
     stacklevel=2,
 )
 
-from domain.planning.session import PlanSession
-from domain.planning.persistence import PlanPersistence
-from domain.planning.parser import parse_plan
+from telaios.domain.planning.session import PlanSession
+from telaios.domain.planning.persistence import PlanPersistence
+from telaios.domain.planning.parser import parse_plan
 
 __all__ = ["PlanSession", "PlanPersistence", "parse_plan"]
 ```

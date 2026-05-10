@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-from core.types import AgentInput, AgentOutput, Message, MessageRole
-from domain.agents.document_copilot import DocumentCopilot, DocumentCopilotPhase
+from telaios.core.types import AgentOutput
+from telaios.domain.agents.document_copilot import DocumentCopilot, DocumentCopilotPhase
 
 
 class InMemoryCheckpointer:

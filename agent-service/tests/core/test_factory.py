@@ -6,13 +6,13 @@ from unittest.mock import patch
 
 import pytest
 
-from core.factory import (
+from telaios.core import (
     _build_llm_config,
     create_agent,
     create_agent_with_config,
     create_llm,
 )
-from core.types import AgentConfig, LLMConfig
+from telaios.core.types import AgentConfig, LLMConfig
 
 
 class TestBuildLLMConfig:
@@ -45,7 +45,7 @@ class TestBuildLLMConfig:
         assert config.api_key == "sk-base"  # not overridden
 
     def test_encrypted_key_is_decrypted(self):
-        from infra.crypto import encrypt
+        from telaios.utils import encrypt
 
         encrypted = encrypt("sk-real-key")
         settings = {
@@ -195,7 +195,7 @@ class TestCreateAgentWithConfig:
     @patch("core.factory.create_agent")
     def test_encrypted_key_decrypted(self, mock_create_agent):
         """Encrypted API key is transparently decrypted."""
-        from infra.crypto import encrypt
+        from telaios.utils import encrypt
 
         mock_create_agent.return_value = object()
         encrypted = encrypt("sk-real-secret-key")

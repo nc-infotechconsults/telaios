@@ -69,8 +69,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.llm import LLM, LLMFactory
-from core.types import LLMConfig
+from telaios.core import LLM, LLMFactory
+from telaios.core.types import LLMConfig
 
 
 class LangChainLLM(LLM):

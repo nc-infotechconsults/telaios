@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
-from core.types import McpServer
-from tools.mcp.adapter import mcp_schema_to_input_schema
-from tools.mcp.client import McpToolLoader
+from telaios.core.types import McpServer
+from telaios.tools.mcp.adapter import mcp_schema_to_input_schema
+from telaios.tools.mcp.client import McpToolLoader
 
 
 def _make_mcp_tool(name: str, description: str = "A tool", schema: dict | None = None):

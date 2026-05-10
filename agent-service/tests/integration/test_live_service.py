@@ -222,7 +222,7 @@ def test_post_chat_message_empty_content_rejected(http):
 
 def test_crypto_encrypt_decrypt():
     """Crypto roundtrip works correctly with the configured key."""
-    from infra.crypto import encrypt, decrypt
+    from telaios.utils import encrypt, decrypt
 
     plaintext = "github-token-abc123"
     ciphertext = encrypt(plaintext)
@@ -250,7 +250,7 @@ def test_crypto_compatible_with_data_api():
 @pytest.mark.asyncio
 async def test_redis_pubsub_via_event_bus():
     """Event bus can publish and receive messages via Redis pub/sub."""
-    from infra.events import AgentEventBus
+    from telaios.infra.events import AgentEventBus
 
     bus = AgentEventBus(redis_url="redis://localhost:6379")
     received = []
@@ -274,7 +274,7 @@ async def test_redis_pubsub_via_event_bus():
 
 def test_sse_manager_broadcast_and_stream():
     """SSE manager broadcasts and queues events for subscribed streams."""
-    from infra import sse as sse_manager
+    from telaios.infra import sse as sse_manager
 
     plan_id = f"sse-test-{int(time.time())}"
 
@@ -316,7 +316,7 @@ def test_sse_manager_broadcast_and_stream():
 @pytest.mark.asyncio
 async def test_planning_service_init_session():
     """init_session creates a new session for a plan_id even when the plan is not in DB."""
-    from domain.planning import init_session, _sessions
+    from telaios.domain import init_session, _sessions
 
     plan_id = f"integ-plan-{int(time.time())}"
     await init_session(plan_id)
@@ -329,7 +329,7 @@ async def test_planning_service_init_session():
 
 def test_text_chunker_produces_overlapping_chunks():
     """chunk_text splits text into chunks with configurable overlap."""
-    from tools.builtin.documents.chunking import chunk_text
+    from telaios.tools import chunk_text
 
     text = "A" * 250
     chunks = chunk_text(text, chunk_size=100, overlap=20)
@@ -346,7 +346,7 @@ def test_text_chunker_produces_overlapping_chunks():
 
 def test_document_extractor_plain_text(tmp_path):
     """extract_text handles plain text files correctly."""
-    from tools.builtin.documents.extraction import extract_text
+    from telaios.tools.builtin.documents.extraction import extract_text
 
     content = b"Hello world from the extractor test."
     loop = asyncio.new_event_loop()
@@ -360,7 +360,7 @@ def test_document_extractor_plain_text(tmp_path):
 
 def test_diff_parser_parses_unified_diff():
     """parse_diff correctly parses a proper git diff."""
-    from tools.builtin.review import parse_diff
+    from telaios.tools.builtin.review import parse_diff
 
     # parse_diff requires the 'diff --git' header used by git diff
     diff = """\
@@ -385,7 +385,7 @@ diff --git a/foo.py b/foo.py
 
 def test_test_runner_detects_pytest(tmp_path):
     """detect_framework identifies pytest from pyproject.toml."""
-    from tools.builtin.test_runner import detect_framework
+    from telaios.tools.builtin.test_runner import detect_framework
 
     (tmp_path / "pyproject.toml").write_text('[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
     loop = asyncio.new_event_loop()
@@ -400,10 +400,10 @@ def test_test_runner_detects_pytest(tmp_path):
 
 def test_core_provider_registry_registers_agent():
     """Core provider registry registers and creates framework agents."""
-    from core import register_provider
-    from core.agent import Agent
-    from core.factory import create_agent
-    from core.types import AgentConfig, AgentInput, AgentOutput, LLMConfig
+    from telaios.core import register_provider
+    from telaios.core.agent import Agent
+    from telaios.core import create_agent
+    from telaios.core.types import AgentConfig, AgentInput, AgentOutput, LLMConfig
 
     class DummyAgent(Agent):
         def __init__(self, config):

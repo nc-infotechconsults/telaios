@@ -12,7 +12,7 @@ import tempfile
 
 import pytest
 
-from tools.builtin.agent_tools import build_coding_tools as build_builtin_tools
+from telaios.tools.builtin.agent_tools import build_coding_tools as build_builtin_tools
 
 
 class TestBuildBuiltinTools:
@@ -22,7 +22,7 @@ class TestBuildBuiltinTools:
         assert names == {"run_shell", "read_file", "write_file", "finish"}
 
     def test_all_are_structured_tools(self):
-        from tools.types import ExecutableTool
+        from telaios.tools import ExecutableTool
 
         for t in build_builtin_tools({}):
             assert isinstance(t, ExecutableTool)

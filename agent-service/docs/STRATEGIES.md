@@ -29,7 +29,7 @@ The Agent Service implements multiple RAG (Retrieval-Augmented Generation) strat
 ### Configuration Example
 
 ```python
-from core.types import RagConfig, LLMConfig, HybridRAGConfig
+from telaios.core.types import RagConfig, LLMConfig, HybridRAGConfig
 
 config = RagConfig(
     strategy="hybrid",

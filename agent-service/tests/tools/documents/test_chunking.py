@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from core.types import Chunk, ChunkingConfig, Document
-from tools.builtin.documents.chunking import (
+from telaios.core.types import Chunk, ChunkingConfig, Document
+from telaios.tools import (
     CharacterChunker,
-    Chunker,
     ChunkerFactory,
-    ChunkMetadata,
     HierarchicalChunker,
     PageChunker,
     SemanticChunker,

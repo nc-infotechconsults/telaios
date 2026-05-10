@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.checkpoint import Checkpointer
+from telaios.core.checkpoint import Checkpointer
 
 
 class TestCheckpointerABC:
@@ -80,7 +80,7 @@ async def test_concrete_get_put_delete():
 
 def test_postgres_checkpointer_import():
     """PostgresCheckpointer can be imported and is a subclass of Checkpointer."""
-    from core.providers.langchain.checkpoint import PostgresCheckpointer
+    from telaios.core.providers.langchain.checkpoint import PostgresCheckpointer
 
     assert issubclass(PostgresCheckpointer, Checkpointer)
 
@@ -90,7 +90,7 @@ async def test_postgres_checkpointer_with_memory_saver():
     """PostgresCheckpointer works with LangGraph's MemorySaver for testing."""
     from langgraph.checkpoint.memory import MemorySaver
 
-    from core.providers.langchain.checkpoint import PostgresCheckpointer
+    from telaios.core.providers.langchain.checkpoint import PostgresCheckpointer
 
     saver = MemorySaver()
     cp = PostgresCheckpointer(saver)

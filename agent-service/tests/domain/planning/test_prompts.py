@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from domain.planning.prompts import (
+from telaios.domain.planning.prompts import (
     compose_greeting,
     compose_parser_prompt,
     compose_planning_prompt,

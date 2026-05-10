@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.types import ToolAnnotations, ToolDefinition, ToolInputSchema, ToolParameter
-from tools.types import ExecutableTool
+from telaios.core.types import ToolDefinition, ToolInputSchema, ToolParameter
+from telaios.tools import ExecutableTool
 
 
 async def _real_impl(**kwargs) -> str:
@@ -44,8 +44,8 @@ def _make_plain_tool(name: str = "plain_tool") -> ToolDefinition:
 
 
 def _get_agent():
-    from core.providers.langchain.agent import LangChainAgent
-    from core.types import AgentConfig, LLMConfig
+    from telaios.core.providers import LangChainAgent
+    from telaios.core.types import AgentConfig, LLMConfig
 
     config = AgentConfig(
         llm=LLMConfig(provider="openai", model="gpt-4o"),

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from tools.builtin.file_tools import make_read_file_tool, make_write_file_tool
-from tools.builtin.finish_tools import make_finish_tool
-from tools.builtin.shell_tools import make_run_shell_tool
+from telaios.tools import make_read_file_tool, make_write_file_tool
+from telaios.tools import make_finish_tool
+from telaios.tools.builtin.shell_tools import make_run_shell_tool
 
 
 class TestReadFileTool:

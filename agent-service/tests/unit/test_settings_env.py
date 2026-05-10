@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from infra.settings import _ENV_FILE as ENV_FILE, Settings
+from telaios.infra.settings import _ENV_FILE as ENV_FILE, Settings
 
 
 def test_settings_uses_project_env_file() -> None:

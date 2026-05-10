@@ -13,7 +13,7 @@ import tempfile
 
 import pytest
 
-from tools.builtin.agent_tools import build_testing_tools
+from telaios.tools.builtin.agent_tools import build_testing_tools
 
 
 class TestBuildTestingTools:

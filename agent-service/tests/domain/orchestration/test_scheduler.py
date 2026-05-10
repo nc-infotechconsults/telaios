@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.orchestration.scheduler import DAGScheduler, TaskNode
+from telaios.domain.orchestration.scheduler import DAGScheduler, TaskNode
 
 
 class TestTaskNode:

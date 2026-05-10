@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from core.types import McpServer, Skill, ToolAnnotations, ToolInputSchema, ToolParameter
-from tools.registry import ToolRegistry
-from tools.types import ExecutableTool
+from telaios.core.types import McpServer, Skill, ToolInputSchema
+from telaios.tools import ToolRegistry
+from telaios.tools import ExecutableTool
 
 
 def _make_tool(name: str = "test_tool") -> ExecutableTool:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.checkpoint import Checkpointer
-from domain.planning.persistence import PlanPersistence
+from telaios.core.checkpoint import Checkpointer
+from telaios.domain.planning.persistence import PlanPersistence
 
 
 class InMemoryCheckpointer(Checkpointer):

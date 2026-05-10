@@ -5,8 +5,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # ── _compose_prompt (shared across specialist agents) ─────────────────────────
-from core.factory import _build_llm_config
-from core.providers.langchain.llm import build_llm
+from telaios.core import _build_llm_config
+from telaios.core.providers.langchain.llm import build_llm
 
 
 def _compose_prompt(builtin: str, custom: str | None, mode: str) -> str:

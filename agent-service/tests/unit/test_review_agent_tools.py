@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from tools.builtin.agent_tools import build_review_tools
+from telaios.tools.builtin.agent_tools import build_review_tools
 
 
 class TestBuildReviewTools:

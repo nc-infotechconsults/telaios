@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tools.builtin.documents.extraction import extract_text
+from telaios.tools.builtin.documents.extraction import extract_text
 
 
 class TestExtractText:

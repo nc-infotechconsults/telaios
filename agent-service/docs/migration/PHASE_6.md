@@ -106,8 +106,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from core.agent import Agent
-from core.types import AgentInput, AgentOutput, Message, MessageRole
+from telaios.core.agent import Agent
+from telaios.core.types import AgentInput, AgentOutput, Message, MessageRole
 
 
 class WorkerPool:
@@ -156,8 +156,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from core.agent import Agent
-from core.types import AgentInput, AgentOutput
+from telaios.core.agent import Agent
+from telaios.core.types import AgentInput, AgentOutput
 
 
 class AgentDriver(ABC):
@@ -189,9 +189,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.agent import Agent
-from core.types import AgentInput, AgentOutput
-from domain.orchestration.drivers import AgentDriver
+from telaios.core.agent import Agent
+from telaios.core.types import AgentInput, AgentOutput
+from telaios.domain.orchestration.drivers import AgentDriver
 
 
 class OpenCodeDriver(AgentDriver):
@@ -215,9 +215,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.agent import Agent
-from core.types import AgentInput, AgentOutput
-from domain.orchestration.drivers import AgentDriver
+from telaios.core.agent import Agent
+from telaios.core.types import AgentInput, AgentOutput
+from telaios.domain.orchestration.drivers import AgentDriver
 
 
 class GitHubCopilotDriver(AgentDriver):

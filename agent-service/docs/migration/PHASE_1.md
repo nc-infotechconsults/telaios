@@ -92,7 +92,7 @@ from typing import Any
 
 from langgraph.types import interrupt, Command
 
-from core.interrupt import InterruptHandle
+from telaios.core.interrupt import InterruptHandle
 
 
 class LangGraphInterrupt(InterruptHandle):
@@ -119,7 +119,7 @@ from typing import Any
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from core.checkpoint import Checkpointer
+from telaios.core.checkpoint import Checkpointer
 
 
 class PostgresCheckpointer(Checkpointer):
@@ -156,9 +156,9 @@ class PostgresCheckpointer(Checkpointer):
 
 from __future__ import annotations
 
-from core.providers import register_provider
-from core.providers.langchain.interrupt import LangGraphInterrupt
-from core.providers.langchain.checkpoint import PostgresCheckpointer
+from telaios.core.providers import register_provider
+from telaios.core.providers.langchain.interrupt import LangGraphInterrupt
+from telaios.core.providers.langchain.checkpoint import PostgresCheckpointer
 
 # Register at module load time
 register_provider(

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from core.types import Skill, ToolInputSchema, ToolParameter
-from tools.skill.adapter import skill_to_executable_tool
+from telaios.core.types import Skill, ToolInputSchema, ToolParameter
+from telaios.tools import skill_to_executable_tool
 
 
 def _make_skill(**overrides) -> Skill:

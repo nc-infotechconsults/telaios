@@ -492,7 +492,7 @@ documents = [
 Document tools registered with `ToolRegistry`:
 
 ```python
-from tools.types import ExecutableTool
+from telaios.tools import ExecutableTool
 from agent_service.services.document_tools import (
     extract_structured_data_tool,
     summarize_document_tool,

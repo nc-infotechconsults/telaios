@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.agents.configurable import (
+from telaios.domain.agents.configurable import (
     ConfigurableAgent,
     ConfigurableAgentConfig,
     _compose_prompt,
@@ -70,7 +70,7 @@ class TestBuildSkillTools:
             "inputSchema": {},
         }])
         skill_tools = agent._build_skill_tools()
-        from domain.agents.configurable import _build_finish_tool
+        from telaios.domain.agents.configurable import _build_finish_tool
         lc_tools = skill_tools + [_build_finish_tool()] if skill_tools else skill_tools
         names = {t.name for t in lc_tools}
         assert "finish" in names

@@ -85,12 +85,15 @@ When implementing a phase:
 
 ```python
 # core/providers/myframework/agent.py
-from core.agent import Agent
-from core.providers import register_provider
+from telaios.core.agent import Agent
+from telaios.core.providers import register_provider
+
 
 class MyFrameworkAgent(Agent):
     async def run(self, input): ...
+
     async def astream(self, input): ...
+
 
 register_provider("myframework", agent_cls=MyFrameworkAgent)
 ```
@@ -98,8 +101,8 @@ register_provider("myframework", agent_cls=MyFrameworkAgent)
 ### Using the Factory
 
 ```python
-from core.factory import create_agent
-from core.types import AgentConfig, LLMConfig
+from telaios.core import create_agent
+from telaios.core.types import AgentConfig, LLMConfig
 
 agent = create_agent(AgentConfig(
     framework="langchain",
@@ -111,9 +114,10 @@ agent = create_agent(AgentConfig(
 
 ```python
 # domain/my_feature/service.py
-from core.agent import Agent  # ABC only
-from core.checkpoint import Checkpointer  # ABC only
-from core.interrupt import InterruptHandle  # ABC only
+from telaios.core.agent import Agent  # ABC only
+from telaios.core.checkpoint import Checkpointer  # ABC only
+from telaios.core.interrupt import InterruptHandle  # ABC only
+
 
 class MyService:
     def __init__(self, agent: Agent, checkpointer: Checkpointer):

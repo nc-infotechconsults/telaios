@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from core.types import AgentInput, AgentOutput, Message, MessageRole, StreamEvent, StreamEventType
-from domain.orchestration.drivers import AgentDriver
+from telaios.core.types import AgentInput, AgentOutput, Message, MessageRole, StreamEvent, StreamEventType
+from telaios.domain.orchestration.drivers import AgentDriver
 
 
 class TestAgentDriverABC:
@@ -30,7 +30,7 @@ class TestOpenCodeDriver:
 
     @pytest.mark.asyncio
     async def test_execute(self):
-        from core.providers.opencode.driver import OpenCodeDriver
+        from telaios.core.providers.opencode.driver import OpenCodeDriver
 
         agent = _make_mock_agent()
         driver = OpenCodeDriver()
@@ -41,7 +41,7 @@ class TestOpenCodeDriver:
 
     @pytest.mark.asyncio
     async def test_stream(self):
-        from core.providers.opencode.driver import OpenCodeDriver
+        from telaios.core.providers.opencode.driver import OpenCodeDriver
 
         async def mock_astream(input):
             yield StreamEvent(type=StreamEventType.TEXT_CHUNK, data="hi")
@@ -62,7 +62,7 @@ class TestGitHubCopilotDriver:
 
     @pytest.mark.asyncio
     async def test_execute(self):
-        from core.providers.github_copilot.driver import GitHubCopilotDriver
+        from telaios.core.providers.github_copilot.driver import GitHubCopilotDriver
 
         agent = _make_mock_agent()
         driver = GitHubCopilotDriver()
@@ -72,7 +72,7 @@ class TestGitHubCopilotDriver:
 
     @pytest.mark.asyncio
     async def test_stream(self):
-        from core.providers.github_copilot.driver import GitHubCopilotDriver
+        from telaios.core.providers.github_copilot.driver import GitHubCopilotDriver
 
         async def mock_astream(input):
             yield StreamEvent(type=StreamEventType.AGENT_START, data="start")

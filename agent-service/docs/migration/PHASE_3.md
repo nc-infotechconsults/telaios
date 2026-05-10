@@ -41,7 +41,7 @@ warnings.warn(
     stacklevel=2,
 )
 
-from tools.builtin.documents.conversion import (
+from telaios.tools import (
     convert_to_markdown,
     convert_from_markdown,
 )
