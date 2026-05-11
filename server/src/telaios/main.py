@@ -41,6 +41,21 @@ from telaios.db.session import dispose_engine
 from telaios.infra.redis import close_redis
 from telaios.modules.agent_profiles import agent_profiles_router
 from telaios.modules.chat import chat_router
+from telaios.modules.documents import (
+    document_activities_router,
+    document_comments_router,
+    document_favorites_router,
+    document_router,
+    document_tags_router,
+    document_versions_router,
+    project_activities_router,
+    project_documents_router,
+    project_favorites_router,
+    project_folders_router,
+    project_tags_router,
+    project_templates_router,
+    templates_router,
+)
 from telaios.modules.environments import environments_router
 from telaios.modules.library import library_router
 from telaios.modules.messages import messages_router
@@ -114,6 +129,19 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
     app.include_router(task_router)
     app.include_router(messages_router)
     app.include_router(chat_router)
+    app.include_router(project_documents_router)
+    app.include_router(document_router)
+    app.include_router(project_folders_router)
+    app.include_router(project_tags_router)
+    app.include_router(document_tags_router)
+    app.include_router(document_versions_router)
+    app.include_router(document_comments_router)
+    app.include_router(document_activities_router)
+    app.include_router(project_activities_router)
+    app.include_router(project_favorites_router)
+    app.include_router(document_favorites_router)
+    app.include_router(templates_router)
+    app.include_router(project_templates_router)
 
     # ─── Auth user-loader ─────────────────────────────────────────────────
     # Enables DB-backed validation of JWT subjects (is_active check, fresh

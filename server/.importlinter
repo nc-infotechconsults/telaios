@@ -145,3 +145,86 @@ ignore_imports =
     telaios.modules.chat.router -> telaios.modules.plans.repository
     telaios.modules.chat.router -> telaios.modules.messages.schemas
     telaios.modules.chat.router -> telaios.modules.messages.service
+    # documents module — facade
+    telaios.modules.documents -> telaios.modules.documents.router
+    telaios.modules.documents -> telaios.modules.documents.service
+    telaios.modules.documents -> telaios.modules.documents.schemas
+    telaios.modules.documents -> telaios.modules.documents.activities.router
+    telaios.modules.documents -> telaios.modules.documents.comments.router
+    telaios.modules.documents -> telaios.modules.documents.favorites.router
+    telaios.modules.documents -> telaios.modules.documents.folders.router
+    telaios.modules.documents -> telaios.modules.documents.tags.router
+    telaios.modules.documents -> telaios.modules.documents.templates.router
+    telaios.modules.documents -> telaios.modules.documents.versions.router
+    # documents core — intra
+    telaios.modules.documents.router -> telaios.modules.documents.repository
+    telaios.modules.documents.router -> telaios.modules.documents.schemas
+    telaios.modules.documents.router -> telaios.modules.documents.service
+    telaios.modules.documents.service -> telaios.modules.documents.repository
+    telaios.modules.documents.service -> telaios.modules.documents.schemas
+    telaios.modules.documents.service -> telaios.modules.documents.chunks.service
+    # documents/folders — intra
+    telaios.modules.documents.folders -> telaios.modules.documents.folders.router
+    telaios.modules.documents.folders -> telaios.modules.documents.folders.schemas
+    telaios.modules.documents.folders -> telaios.modules.documents.folders.service
+    telaios.modules.documents.folders.router -> telaios.modules.documents.folders.schemas
+    telaios.modules.documents.folders.router -> telaios.modules.documents.folders.service
+    telaios.modules.documents.folders.service -> telaios.modules.documents.folders.repository
+    telaios.modules.documents.folders.service -> telaios.modules.documents.folders.schemas
+    # documents/tags — intra + cross-subpackage
+    telaios.modules.documents.tags -> telaios.modules.documents.tags.router
+    telaios.modules.documents.tags -> telaios.modules.documents.tags.schemas
+    telaios.modules.documents.tags -> telaios.modules.documents.tags.service
+    telaios.modules.documents.tags.router -> telaios.modules.documents.repository
+    telaios.modules.documents.tags.router -> telaios.modules.documents.tags.schemas
+    telaios.modules.documents.tags.router -> telaios.modules.documents.tags.service
+    telaios.modules.documents.tags.service -> telaios.modules.documents.tags.repository
+    telaios.modules.documents.tags.service -> telaios.modules.documents.tags.schemas
+    # documents/versions — intra + cross-subpackage
+    telaios.modules.documents.versions -> telaios.modules.documents.versions.router
+    telaios.modules.documents.versions -> telaios.modules.documents.versions.schemas
+    telaios.modules.documents.versions -> telaios.modules.documents.versions.service
+    telaios.modules.documents.versions.router -> telaios.modules.documents.repository
+    telaios.modules.documents.versions.router -> telaios.modules.documents.versions.schemas
+    telaios.modules.documents.versions.router -> telaios.modules.documents.versions.service
+    telaios.modules.documents.versions.service -> telaios.modules.documents.versions.repository
+    telaios.modules.documents.versions.service -> telaios.modules.documents.versions.schemas
+    # documents/comments — intra + cross-subpackage
+    telaios.modules.documents.comments -> telaios.modules.documents.comments.router
+    telaios.modules.documents.comments -> telaios.modules.documents.comments.schemas
+    telaios.modules.documents.comments -> telaios.modules.documents.comments.service
+    telaios.modules.documents.comments.router -> telaios.modules.documents.repository
+    telaios.modules.documents.comments.router -> telaios.modules.documents.comments.schemas
+    telaios.modules.documents.comments.router -> telaios.modules.documents.comments.service
+    telaios.modules.documents.comments.service -> telaios.modules.documents.comments.repository
+    telaios.modules.documents.comments.service -> telaios.modules.documents.comments.schemas
+    # documents/activities — intra + cross-subpackage
+    telaios.modules.documents.activities -> telaios.modules.documents.activities.router
+    telaios.modules.documents.activities -> telaios.modules.documents.activities.schemas
+    telaios.modules.documents.activities -> telaios.modules.documents.activities.service
+    telaios.modules.documents.activities.router -> telaios.modules.documents.repository
+    telaios.modules.documents.activities.router -> telaios.modules.documents.activities.schemas
+    telaios.modules.documents.activities.router -> telaios.modules.documents.activities.service
+    telaios.modules.documents.activities.service -> telaios.modules.documents.activities.repository
+    telaios.modules.documents.activities.service -> telaios.modules.documents.activities.schemas
+    # documents/favorites — intra + cross-subpackage
+    telaios.modules.documents.favorites -> telaios.modules.documents.favorites.router
+    telaios.modules.documents.favorites -> telaios.modules.documents.favorites.schemas
+    telaios.modules.documents.favorites -> telaios.modules.documents.favorites.service
+    telaios.modules.documents.favorites.router -> telaios.modules.documents.repository
+    telaios.modules.documents.favorites.router -> telaios.modules.documents.favorites.schemas
+    telaios.modules.documents.favorites.router -> telaios.modules.documents.favorites.service
+    telaios.modules.documents.favorites.service -> telaios.modules.documents.favorites.repository
+    telaios.modules.documents.favorites.service -> telaios.modules.documents.favorites.schemas
+    # documents/templates — intra
+    telaios.modules.documents.templates -> telaios.modules.documents.templates.router
+    telaios.modules.documents.templates -> telaios.modules.documents.templates.schemas
+    telaios.modules.documents.templates -> telaios.modules.documents.templates.service
+    telaios.modules.documents.templates.router -> telaios.modules.documents.templates.schemas
+    telaios.modules.documents.templates.router -> telaios.modules.documents.templates.service
+    telaios.modules.documents.templates.service -> telaios.modules.documents.templates.repository
+    telaios.modules.documents.templates.service -> telaios.modules.documents.templates.schemas
+    # documents/chunks — intra
+    telaios.modules.documents.chunks -> telaios.modules.documents.chunks.repository
+    telaios.modules.documents.chunks -> telaios.modules.documents.chunks.service
+    telaios.modules.documents.chunks.service -> telaios.modules.documents.chunks.repository

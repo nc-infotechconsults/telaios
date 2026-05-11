@@ -20,6 +20,7 @@ from telaios.config.settings import get_settings
 __all__ = [
     "build_s3_key",
     "delete_from_s3",
+    "download_from_s3",
     "ensure_bucket_exists",
     "get_presigned_download_url",
     "upload_to_s3",
@@ -65,6 +66,14 @@ async def get_presigned_download_url(key: str, expires_in: int = 3600) -> str:
 async def delete_from_s3(key: str) -> None:
     async with _session().client(**_client_kwargs()) as client:
         await client.delete_object(Bucket=_bucket(), Key=key)
+
+
+async def download_from_s3(key: str) -> bytes:
+    """Download an object from S3 and return its raw bytes."""
+    async with _session().client(**_client_kwargs()) as client:
+        response = await client.get_object(Bucket=_bucket(), Key=key)
+        body: bytes = await response["Body"].read()
+        return body
 
 
 def build_s3_key(project_id: str, document_id: str, filename: str) -> str:

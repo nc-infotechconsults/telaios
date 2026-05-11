@@ -25,6 +25,7 @@ dependencies = [
     "cryptography>=44.0",
     "structlog>=24.4",
     "httpx>=0.28",
+    "python-multipart>=0.0.28",
 ]
 
 [project.optional-dependencies]

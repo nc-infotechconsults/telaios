@@ -18,11 +18,13 @@ from typing import TYPE_CHECKING, Any, Literal
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Column,
     DateTime,
     ForeignKey,
     Index,
     Integer,
     String,
+    Table,
     Text,
     func,
 )
@@ -50,6 +52,24 @@ DocumentActivityAction = Literal[
     "version_created",
 ]
 DocumentCommentAnchorType = Literal["page", "cell", "text_range", "general"]
+
+# Many-to-many junction table: Document ↔ DocumentTag
+document_document_tags = Table(
+    "document_document_tags",
+    Base.metadata,
+    Column(
+        "document_id",
+        PG_UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "tag_id",
+        PG_UUID(as_uuid=True),
+        ForeignKey("document_tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class DocumentFolder(Base, TimestampMixin, SoftDeleteMixin):
@@ -120,6 +140,10 @@ class Document(Base, TimestampMixin, SoftDeleteMixin):
         back_populates="document",
         foreign_keys="DocumentVersion.document_id",
         cascade="all, delete-orphan",
+    )
+    tags: Mapped[list[DocumentTag]] = relationship(
+        "DocumentTag",
+        secondary="document_document_tags",
     )
 
 
