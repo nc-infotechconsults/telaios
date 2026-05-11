@@ -40,6 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     ca-certificates \
     curl \
+    wget \
     && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash \
     && apt-get purge -y curl \
     && rm -rf /var/lib/apt/lists/*
@@ -48,7 +49,7 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/src ./src
 COPY alembic.ini ./
-# alembic versions copied in Phase 2
+COPY alembic/ ./alembic/
 
 EXPOSE 8000
 

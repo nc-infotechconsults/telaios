@@ -21,6 +21,7 @@ from telaios.db.models.environments import Environment
 from telaios.db.models.library import LibraryAgent, LibraryMCP, LibrarySkill
 from telaios.db.models.plans import Message, Plan
 from telaios.db.models.projects import Project, ProjectMember
+from telaios.db.models.repositories import Repository
 from telaios.db.models.tasks import Task
 from telaios.db.models.users import User
 from telaios.db.models.workspaces import Workspace
@@ -255,6 +256,33 @@ async def create_message(
     return msg
 
 
+async def create_repository(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    *,
+    name: str = "test-repo",
+    remote_url: str | None = "https://github.com/org/repo",
+    branch: str = "main",
+    provider_type: str = "git",
+    auth_type: str = "none",
+    status: str = "ready",
+) -> Repository:
+    """Insert a ``Repository`` row and return the refreshed ORM instance."""
+    repo = Repository(
+        project_id=project_id,
+        name=name,
+        remote_url=remote_url,
+        branch=branch,
+        provider_type=provider_type,  # type: ignore[arg-type]
+        auth_type=auth_type,  # type: ignore[arg-type]
+        status=status,  # type: ignore[arg-type]
+    )
+    session.add(repo)
+    await session.flush()
+    await session.refresh(repo)
+    return repo
+
+
 __all__ = [
     "create_environment",
     "create_library_agent",
@@ -264,6 +292,7 @@ __all__ = [
     "create_plan",
     "create_project",
     "create_project_member",
+    "create_repository",
     "create_task",
     "create_user",
     "create_workspace",

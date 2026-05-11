@@ -1,8 +1,11 @@
 """Environments service.
 
 CRUD for environments and helm releases.  Infra calls (Kubernetes, Docker,
-PVC file browser) are **Phase 8 stubs** — they return structured error
-responses rather than delegating to the real client implementations.
+PVC file browser) are delegated to :mod:`telaios.infra.kubernetes` and
+:mod:`telaios.infra.helm` starting from **Phase 8**.
+
+Docker-type environments return graceful "not implemented" responses for
+infra operations — Docker support lands in Phase 8.5 (``modules/containers``).
 """
 
 from __future__ import annotations
@@ -10,10 +13,13 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telaios.infra.helm import WORKSPACES_ROOT, HelmClient
+from telaios.infra.kubernetes import K8sConnectionConfig, KubernetesClient
 from telaios.modules.environments.repository import EnvironmentRepository
 from telaios.modules.environments.schemas import (
     ConnectionTestResult,
@@ -42,6 +48,17 @@ def _deserialize_connection_config(encrypted: str | None) -> dict[str, Any] | No
         return json.loads(plaintext) if plaintext else None
     except Exception:
         return None
+
+
+def _k8s_cfg_from_dict(cfg_dict: dict[str, Any]) -> K8sConnectionConfig:
+    """Build a :class:`K8sConnectionConfig` from a raw connection-config dict."""
+    return K8sConnectionConfig(
+        kubeconfig=cfg_dict.get("kubeconfig"),
+        cluster_url=cfg_dict.get("cluster_url"),
+        token=cfg_dict.get("token"),
+        ca_cert=cfg_dict.get("ca_cert"),
+        context_name=cfg_dict.get("context_name"),
+    )
 
 
 def _env_to_read(env: object, *, include_releases: bool = False) -> EnvironmentRead:
@@ -122,7 +139,7 @@ class EnvironmentService:
             raise NotFoundError("Environment not found")
         await self._repo.soft_delete(obj)
 
-    # ── Infra: connection test (Phase 8 stub) ────────────────────────────
+    # ── Infra: connection test ────────────────────────────────────────────
 
     async def test_connection(
         self, env_id: uuid.UUID, project_id: uuid.UUID
@@ -130,12 +147,25 @@ class EnvironmentService:
         obj = await self._repo.find(env_id, project_id)
         if obj is None:
             raise NotFoundError("Environment not found")
+
+        cfg_dict = _deserialize_connection_config(obj.connection_config)
+        if cfg_dict is None:
+            return ConnectionTestResult(ok=False, message="No connection config stored")
+
+        if obj.type == "kubernetes":
+            k8s_cfg = _k8s_cfg_from_dict(cfg_dict)
+            ok = await KubernetesClient().test_connection(k8s_cfg)
+            return ConnectionTestResult(
+                ok=ok,
+                message="Connected successfully" if ok else "Failed to connect to cluster",
+            )
+
         return ConnectionTestResult(
             ok=False,
-            message="Infrastructure clients are not yet implemented (Phase 8)",
+            message=f"Connection test not implemented for type '{obj.type}'",
         )
 
-    # ── Infra: resource browser (Phase 8 stubs) ─────────────────────────
+    # ── Infra: resource browser ───────────────────────────────────────────
 
     async def list_resources(
         self,
@@ -147,7 +177,13 @@ class EnvironmentService:
         obj = await self._repo.find(env_id, project_id)
         if obj is None:
             raise NotFoundError("Environment not found")
-        return []
+
+        cfg_dict = _deserialize_connection_config(obj.connection_config)
+        if cfg_dict is None or obj.type != "kubernetes":
+            return []
+
+        k8s_cfg = _k8s_cfg_from_dict(cfg_dict)
+        return await KubernetesClient().list_resources(k8s_cfg, namespace, kind)
 
     async def get_resource(
         self,
@@ -160,7 +196,13 @@ class EnvironmentService:
         obj = await self._repo.find(env_id, project_id)
         if obj is None:
             raise NotFoundError("Environment not found")
-        return None
+
+        cfg_dict = _deserialize_connection_config(obj.connection_config)
+        if cfg_dict is None or obj.type != "kubernetes":
+            return None
+
+        k8s_cfg = _k8s_cfg_from_dict(cfg_dict)
+        return await KubernetesClient().get_resource(k8s_cfg, namespace, kind, name)
 
     async def get_resource_logs(
         self,
@@ -173,9 +215,15 @@ class EnvironmentService:
         obj = await self._repo.find(env_id, project_id)
         if obj is None:
             raise NotFoundError("Environment not found")
-        return ""
 
-    # ── Helm (Phase 8 stubs — DB records written, CLI call stubbed) ──────
+        cfg_dict = _deserialize_connection_config(obj.connection_config)
+        if cfg_dict is None or obj.type != "kubernetes":
+            return ""
+
+        k8s_cfg = _k8s_cfg_from_dict(cfg_dict)
+        return await KubernetesClient().get_pod_logs(k8s_cfg, namespace, name, container=container)
+
+    # ── Helm ─────────────────────────────────────────────────────────────
 
     async def install_helm_chart(
         self,
@@ -188,7 +236,23 @@ class EnvironmentService:
         if obj is None:
             raise NotFoundError("Environment not found")
 
-        stub_msg = "Helm operations are not yet implemented (Phase 8)"
+        namespace = dto.namespace or getattr(obj, "namespace", None) or "default"
+        status = "deployed"
+        notes: str | None = None
+
+        try:
+            await HelmClient().install(
+                release_name=dto.release_name,
+                chart=dto.chart_name,
+                namespace=namespace,
+                values=dto.values_override,
+                repo_url=dto.chart_repo_url,
+                chart_version=dto.chart_version,
+            )
+        except Exception as exc:
+            status = "failed"
+            notes = str(exc)
+
         release = await self._repo.create_release(
             environment_id=env_id,
             project_id=project_id,
@@ -196,10 +260,10 @@ class EnvironmentService:
             chart_name=dto.chart_name,
             chart_repo_url=dto.chart_repo_url,
             chart_version=dto.chart_version,
-            namespace=dto.namespace or "default",
+            namespace=namespace,
             values_override=dto.values_override,
-            status="failed",
-            release_notes=stub_msg,
+            status=status,
+            release_notes=notes,
             deployed_by=deployed_by,
             deployed_at=datetime.now(UTC),
         )
@@ -229,9 +293,29 @@ class EnvironmentService:
         if release is None:
             raise NotFoundError("Helm release not found")
 
-        stub_msg = "Helm operations are not yet implemented (Phase 8)"
-        release.status = "failed"
-        release.release_notes = stub_msg
+        namespace = dto.namespace or getattr(release, "namespace", None) or "default"
+        chart: str = dto.chart_name or str(getattr(release, "chart_name", ""))
+        repo_url = dto.chart_repo_url or getattr(release, "chart_repo_url", None)
+        version = dto.chart_version or getattr(release, "chart_version", None)
+
+        status: Literal["pending", "deployed", "failed", "uninstalled"] = "deployed"
+        notes: str | None = None
+
+        try:
+            await HelmClient().upgrade(
+                release_name=release_name,
+                chart=chart,
+                namespace=namespace,
+                values=dto.values_override,
+                repo_url=repo_url,
+                chart_version=version,
+            )
+        except Exception as exc:
+            status = "failed"
+            notes = str(exc)
+
+        release.status = status
+        release.release_notes = notes
         release.deployed_by = deployed_by
         release.deployed_at = datetime.now(UTC)
         if dto.chart_name is not None:
@@ -244,6 +328,7 @@ class EnvironmentService:
             release.namespace = dto.namespace
         if dto.values_override is not None:
             release.values_override = dto.values_override
+
         release = await self._repo.save_release(release)
         return HelmReleaseRead.model_validate(release, from_attributes=True)
 
@@ -263,4 +348,10 @@ class EnvironmentService:
         obj = await self._repo.find(env_id, project_id)
         if obj is None:
             raise NotFoundError("Environment not found")
-        return []
+
+        base = Path(WORKSPACES_ROOT) / str(project_id)
+        if not base.is_dir():
+            return []
+
+        repo_names = [d.name for d in base.iterdir() if d.is_dir()]
+        return await HelmClient().scan_project_charts(str(project_id), repo_names)

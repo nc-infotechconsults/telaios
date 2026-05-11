@@ -1,28 +1,9 @@
 """FastAPI application entrypoint.
 
 ``create_app()`` accepts an optional ``modules`` iterable to support slim
-deployments (see SPEC-MIGRATION.md §4); module loading is wired in Phase 4+.
-
-Phase 1 wires foundational concerns:
-* structured logging (``configure_logging``)
-* uniform error envelope (``install_exception_handlers``)
-* CORS from settings
-* lifespan teardown for DB engine and Redis client
-
-Phase 4 adds:
-* ``auth_router``     — POST /auth/register, /auth/login, GET /auth/me
-* ``users_router``    — admin CRUD on /users
-* ``project_workspaces_router`` — project-scoped workspace CRUD
-* ``workspace_router``          — item-scoped workspace CRUD
-* ``set_user_loader`` registration so JWTs are validated against the DB
-
-Phase 5 adds:
-* ``projects_router`` / ``members_router`` / ``agents_router`` — project CRUD
-* ``repositories_router`` — repository CRUD + test endpoint
-* ``environments_router`` — environment CRUD + helm + resource inspection
-* ``settings_router``     — admin app settings
-* ``library_router``      — library agents / MCPs / skills
-* ``agent_profiles_router`` — agent profile CRUD
+deployments (see SPEC-MIGRATION.md §4).  When ``modules`` is ``None`` the
+function reads the ``TELAIOS_MODULES`` environment variable (CSV of module
+names); if that variable is also empty every registered module is loaded.
 """
 
 from __future__ import annotations
@@ -31,7 +12,7 @@ import logging
 from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from telaios.auth.dependencies import set_user_loader
@@ -78,6 +59,52 @@ from telaios.utils.errors import install_exception_handlers
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Module registry
+# ---------------------------------------------------------------------------
+# Maps a stable module name to the list of APIRouters it contributes.
+# ``create_app()`` iterates this dict in insertion order so the URL ordering
+# in the OpenAPI spec is stable.
+# ---------------------------------------------------------------------------
+
+_MODULES: dict[str, list[APIRouter]] = {
+    "users": [auth_router, users_router],
+    "workspaces": [project_workspaces_router, workspace_router],
+    "projects": [projects_router, members_router, agents_router],
+    "repositories": [repositories_router],
+    "environments": [environments_router],
+    "settings": [settings_router],
+    "library": [library_router],
+    "agent_profiles": [agent_profiles_router],
+    "plans": [project_plans_router, plan_router],
+    "tasks": [plan_tasks_router, task_router],
+    "messages": [messages_router],
+    "chat": [chat_router],
+    "documents": [
+        project_documents_router,
+        document_router,
+        project_folders_router,
+        project_tags_router,
+        document_tags_router,
+        document_versions_router,
+        document_comments_router,
+        document_activities_router,
+        project_activities_router,
+        project_favorites_router,
+        document_favorites_router,
+        templates_router,
+        project_templates_router,
+    ],
+    "document_extraction": [extraction_router, jobs_router],
+    "document_copilot": [copilot_router],
+    "skills": [skills_router],
+    "health": [health_router],
+    "analytics": [analytics_router],
+    "internal": [internal_router],
+    "containers": [containers_router],
+    "docker_shell": [docker_shell_router],
+}
+
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -95,16 +122,37 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
     """Build the FastAPI app.
 
     Args:
-        modules: Optional list of module names to mount. ``None`` means "all
-            modules registered in the module registry". Slim deploys can pass
-            a subset (also configurable via ``TELAIOS_MODULES`` env var).
+        modules: Optional list of module names to mount.  ``None`` means
+            "read from the ``TELAIOS_MODULES`` env var; if that is empty,
+            load all modules".  Slim deploys can restrict the loaded set by
+            passing a subset or by setting the env var.
+
+    Raises:
+        ValueError: If any requested module name is not in the registry.
     """
     settings = get_settings()
 
+    # Resolve the module set -------------------------------------------------
+    if modules is None:
+        env_value = settings.TELAIOS_MODULES.strip()
+        if env_value:
+            modules = [m.strip() for m in env_value.split(",") if m.strip()]
+        else:
+            modules = list(_MODULES.keys())
+
+    selected: list[str] = list(modules)
+
+    unknown = set(selected) - _MODULES.keys()
+    if unknown:
+        raise ValueError(f"Unknown module(s) requested: {sorted(unknown)}")
+
+    logger.debug("loading modules: %s", selected)
+
+    # Build the app ----------------------------------------------------------
     app = FastAPI(
         title="telaios",
         version="0.1.0",
-        description=("Telaios monolith API. See SPEC-MIGRATION.md for the migration design."),
+        description="Telaios monolith API.",
         lifespan=_lifespan,
     )
 
@@ -118,55 +166,16 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
 
     install_exception_handlers(app)
 
-    # ─── Routers ──────────────────────────────────────────────────────────
-    app.include_router(auth_router)
-    app.include_router(users_router)
-    app.include_router(project_workspaces_router)
-    app.include_router(workspace_router)
-    app.include_router(projects_router)
-    app.include_router(members_router)
-    app.include_router(agents_router)
-    app.include_router(repositories_router)
-    app.include_router(environments_router)
-    app.include_router(settings_router)
-    app.include_router(library_router)
-    app.include_router(agent_profiles_router)
-    app.include_router(project_plans_router)
-    app.include_router(plan_router)
-    app.include_router(plan_tasks_router)
-    app.include_router(task_router)
-    app.include_router(messages_router)
-    app.include_router(chat_router)
-    app.include_router(project_documents_router)
-    app.include_router(document_router)
-    app.include_router(project_folders_router)
-    app.include_router(project_tags_router)
-    app.include_router(document_tags_router)
-    app.include_router(document_versions_router)
-    app.include_router(document_comments_router)
-    app.include_router(document_activities_router)
-    app.include_router(project_activities_router)
-    app.include_router(project_favorites_router)
-    app.include_router(document_favorites_router)
-    app.include_router(templates_router)
-    app.include_router(project_templates_router)
-    app.include_router(extraction_router)
-    app.include_router(jobs_router)
-    app.include_router(copilot_router)
-    app.include_router(skills_router)
-    # ─── Phase 8 routers ──────────────────────────────────────────────────
-    app.include_router(health_router)
-    app.include_router(analytics_router)
-    app.include_router(internal_router)
-    app.include_router(containers_router)
-    app.include_router(docker_shell_router)
+    # Mount routers for each selected module in registry order ---------------
+    for name in _MODULES:
+        if name in selected:
+            for router in _MODULES[name]:
+                app.include_router(router)
 
-    # ─── Auth user-loader ─────────────────────────────────────────────────
+    # Auth user-loader -------------------------------------------------------
     # Enables DB-backed validation of JWT subjects (is_active check, fresh
     # role reload).  Tests can override this by calling set_user_loader(None).
     set_user_loader(UserService.load_principal)
-
-    _ = modules
 
     return app
 

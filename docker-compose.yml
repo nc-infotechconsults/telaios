@@ -42,82 +42,59 @@ services:
       timeout: 5s
       retries: 5
 
-  data-api:
+  server:
     build:
-      context: .
-      dockerfile: data-api/Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgres://sweai:sweai@postgres:5432/sweai
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-change-me}
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-sweai}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-sweai-secret}
-      S3_BUCKET: ${S3_BUCKET:-sweai-documents}
-      S3_REGION: ${S3_REGION:-us-east-1}
-      AGENT_SERVICE_URL: http://agent-service:8000
-      PORT: 3000
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    volumes:
-      - ./data-api:/app/data-api
-      - /app/node_modules
-      - /app/data-api/node_modules
-
-  agent-service:
-    build:
-      context: ./agent-service
-      dockerfile: Dockerfile
+      context: ./server
     ports:
       - "8000:8000"
     environment:
-      DATA_API_URL: http://data-api:3000
-      DATA_API_KEY: ${INTERNAL_API_KEY:-internal-change-me}
-      REDIS_URL: redis://redis:6379
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://sweai:sweai@postgres:5432/sweai
+      REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-sweai}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-sweai-secret}
       S3_BUCKET: ${S3_BUCKET:-sweai-documents}
       S3_REGION: ${S3_REGION:-us-east-1}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      S3_FORCE_PATH_STYLE: "true"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-change-me}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
       WORKSPACES_ROOT: /workspaces
-      PORT: 8000
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@telaios.dev}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin1234}
+    # Run Alembic migrations before starting the API server.
+    command: >-
+      sh -c "alembic upgrade head && uvicorn telaios.main:app --host 0.0.0.0 --port 8000"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
-      data-api:
-        condition: service_started
       minio:
         condition: service_healthy
     volumes:
-      - agent_workspaces:/workspaces
+      - server_workspaces:/workspaces
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
     ports:
       - "5173:5173"
     environment:
-      VITE_DATA_API_URL: http://localhost:3000
-      VITE_AGENT_SERVICE_URL: http://localhost:8000
-      INTERNAL_DATA_API_URL: http://data-api:3000
-      INTERNAL_AGENT_SERVICE_URL: http://agent-service:8000
+      VITE_API_URL: http://localhost:8000
     depends_on:
-      - data-api
-      - agent-service
-    volumes:
-      - ./frontend:/app/frontend
-      - /app/node_modules
-      - /app/frontend/node_modules
+      - server
 
 volumes:
   postgres_data:
-  agent_workspaces:
   minio_data:
+  server_workspaces:

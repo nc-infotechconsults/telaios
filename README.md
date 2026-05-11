@@ -1,9 +1,6 @@
 # TelaiOS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![E2E Tests](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml/badge.svg)](https://github.com/nc-infotechconsults/telaios/actions/workflows/e2e.yml)
-
-> **🚧 Migration in progress.** TelaiOS is being consolidated from a Bun monorepo (`data-api` + `agent-service`) into a single Python/FastAPI monolith under `server/`, with the existing `frontend/` kept as-is. See [`SPEC-MIGRATION.md`](SPEC-MIGRATION.md), [`PLAN-MIGRATION.md`](PLAN-MIGRATION.md), and [`TASKS-MIGRATION.md`](TASKS-MIGRATION.md) for the design and roadmap. Sections below describe the legacy layout and remain accurate for `data-api/` + `agent-service/` until they are removed in Phase 10.
 
 **TelaiOS** is an agentic software development operating system — an all-in-one platform for teams that want to manage the entire software development lifecycle, from planning through execution, with AI agents doing the heavy lifting.
 
@@ -40,7 +37,7 @@
 - **Environment management** — define runtime environments for agent execution, including Helm release tracking
 
 ### Infrastructure
-- **PostgreSQL** (TypeORM) for persistence, pgvector for embeddings
+- **PostgreSQL** + pgvector for persistence and embeddings (SQLAlchemy + Alembic)
 - **Redis** for pub/sub event bus and inter-agent coordination
 - **MinIO / S3-compatible** object storage for uploaded documents
 - **Docker Compose** for local development and full-stack containerised runs
@@ -51,12 +48,10 @@
 
 | Path | Purpose |
 | --- | --- |
+| `server/` | Python 3.14 / FastAPI monolith (uv-managed) — API, agent runtime, document processing |
 | `frontend/` | Vite + React + TypeScript web app |
-| `data-api/` | Bun + Express + TypeORM REST API (PostgreSQL) |
-| `agent-service/` | Python 3.12 + FastAPI + LangGraph agent runtime |
-| `packages/shared/` | Shared JavaScript packages (Bun workspaces) |
 | `tests/` | Root smoke / integration tests |
-| `docs/` | Design documents, specs, and ideas |
+| `docs/` | Design documents, specs, and decision records |
 
 ---
 
@@ -65,24 +60,21 @@
 ```
 Browser (React SPA)
     │
-    ├─── data-api (Bun / Express / TypeORM)  ← persistence, auth, project metadata
-    │        │
-    │        └─── PostgreSQL + pgvector
-    │
-    └─── agent-service (Python / FastAPI / LangGraph)  ← planning, execution, RAG
-             │
+    └─── server (Python / FastAPI / LangGraph)
+             │  ← auth, project metadata, planning, execution, RAG, documents
+             ├─── PostgreSQL + pgvector
              ├─── Redis (pub/sub, SSE coordination)
              └─── MinIO / S3 (document storage)
 ```
 
-The frontend talks to both the data API (REST) and the agent service (SSE + REST). The data API owns all persistence and project metadata. The agent service handles planning, multi-agent orchestration, document processing, and LLM interaction.
+The frontend talks to the single `server` service over REST and SSE. The server owns all persistence, auth, project metadata, agent orchestration, document processing, and LLM interaction.
 
 ---
 
 ## Prerequisites
 
-- **Bun** ≥ 1.x — JavaScript workspaces
-- **Python 3.12** — `agent-service/`
+- **Python 3.14** + **uv** — server
+- **Bun** ≥ 1.x — frontend
 - **Docker Compose** — local infrastructure (PostgreSQL, Redis, MinIO)
 
 ---
@@ -90,7 +82,8 @@ The frontend talks to both the data API (REST) and the agent service (SSE + REST
 ## Environment Setup
 
 ```bash
-cp .env.example .env
+cp server/.env.example server/.env
+cp frontend/.env.example frontend/.env
 ```
 
 Fill in the secrets and API keys (LLM provider, API key, encryption key, etc.) before starting the services.
@@ -102,34 +95,40 @@ Fill in the secrets and API keys (LLM provider, API key, encryption key, etc.) b
 ### 1. Start local infrastructure
 
 ```bash
-bun run docker:dev
+docker compose -f docker-compose.dev.yml up
 ```
 
-Brings up PostgreSQL, Redis, and MinIO from `docker-compose.dev.yml`.
+Brings up PostgreSQL, Redis, and MinIO.
 
 ### 2. Install dependencies
 
 ```bash
-bun install
-bun run apps:install
-bun run agent:install
+cd server && uv sync
+cd frontend && bun install
 ```
 
-### 3. Run the services
-
-Use separate terminals (or a process manager):
+### 3. Run database migrations
 
 ```bash
-bun run data:dev       # data-api on :3000
-bun run agent:dev      # agent-service on :8000 (with --reload)
-bun run frontend:dev   # Vite dev server on :5173
+cd server && uv run alembic upgrade head
+```
+
+### 4. Run the services
+
+Use separate terminals:
+
+```bash
+# Terminal 1 — API server
+cd server && uv run uvicorn telaios.main:app --reload --port 8000
+
+# Terminal 2 — Frontend dev server
+cd frontend && bun run dev
 ```
 
 | Service | URL |
 | --- | --- |
 | Frontend | http://localhost:5173 |
-| Data API | http://localhost:3000 |
-| Agent service | http://localhost:8000 |
+| Server API | http://localhost:8000 |
 | MinIO API | http://localhost:9000 |
 | MinIO Console | http://localhost:9001 |
 
@@ -139,34 +138,32 @@ bun run frontend:dev   # Vite dev server on :5173
 docker compose up --build
 ```
 
-`docker-compose.yml` starts PostgreSQL, Redis, MinIO, `data-api`, `agent-service`, and `frontend`.
-
----
-
-## Common Root Commands
-
-| Command | Purpose |
-| --- | --- |
-| `bun run apps:install` | Install JS workspace dependencies |
-| `bun run agent:install` | Install Python agent-service dependencies |
-| `bun run data:dev` | Start the data API |
-| `bun run agent:dev` | Start the Python agent service (hot-reload) |
-| `bun run frontend:dev` | Start the frontend dev server |
-| `bun run docker:postgres` | Start only PostgreSQL |
-| `bun run docker:redis` | Start only Redis |
-| `bun run docker:dev` | Start PostgreSQL, Redis, and MinIO |
-| `bun run build` | Build all workspaces and install the Python package |
-| `bun run test` | Run the root smoke tests |
+`docker-compose.yml` starts PostgreSQL, Redis, MinIO, `server`, and `frontend`.
 
 ---
 
 ## Testing
 
 ```bash
-bun run test                    # root smoke tests
-cd data-api && bun run test     # data-api unit tests
-bun run agent:test              # Python agent-service tests
-cd frontend && bun run test:e2e # Playwright browser E2E tests
+# Server unit + integration tests
+cd server && uv run pytest
+
+# Frontend E2E tests
+cd frontend && bun run test:e2e
+```
+
+---
+
+## Quality Gates (server)
+
+Every server change must pass before merging:
+
+```bash
+cd server
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src/telaios
+uv run lint-imports
+uv run pytest
 ```
 
 ---
@@ -175,34 +172,30 @@ cd frontend && bun run test:e2e # Playwright browser E2E tests
 
 ### Near-term (next milestones)
 
-- **Analytics dashboard** — org-wide and per-project views: task throughput, agent success rates, blocked-task alerts (no schema changes required, derived from existing data)
+- **Analytics dashboard** — org-wide and per-project views: task throughput, agent success rates, blocked-task alerts
 - **Document activity analytics** — surface which documents were accessed or modified during agent runs
-- **AI cost ledger** — token tracking per project and org with model breakdown (new `llm_usage` table)
+- **AI cost ledger** — token tracking per project and org with model breakdown
 
 ### Medium-term
 
-- **Containerised agent execution** — run agents in isolated containers for security and scalability in production environments
+- **Containerised agent execution** — run agents in isolated containers for security and scalability
 - **Theia IDE integration** — embedded web IDE for editing files surfaced during agent execution
 - **Repository browser** — in-platform browsing and searching of connected repositories
 - **Notification system** — in-app and webhook notifications when plans complete, agents are blocked, or reviews need attention
-- **Structured output validation** — enforce JSON Schema contracts on agent outputs end-to-end
 
 ### Longer-term / Ideas
 
-- **Per-user analytics** — individual productivity and AI usage metrics
-- **Multi-provider embedding** — switchable embedding backends (Voyage AI, OpenAI, local ONNX) without reprocessing
+- **Multi-provider embedding** — switchable embedding backends without reprocessing
 - **Ollama / local LLM support** — first-class support for self-hosted models
 - **Agent marketplace** — publish and share agent profiles across organisations
-- **CSV / data export** — export task history, analytics, and agent outputs
 
 ---
 
 ## Notes
 
-- The JavaScript applications are managed from the root Bun workspace.
-- `agent-service/` is intentionally outside the Bun workspaces and uses Python packaging (`pyproject.toml`).
-- Database schema changes must always be made via new migration files — never edit existing migration files directly.
+- Database schema changes must always be made via new Alembic migration files — never edit existing migration files directly.
 - If you are working inside a subproject, check for a local `README.md` or `AGENTS.md` first.
+- Migration history and design documents live in `docs/history/`.
 
 ---
 

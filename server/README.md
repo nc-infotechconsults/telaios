@@ -1,18 +1,13 @@
 # telaios-server
 
-FastAPI monolith merging the legacy `data-api` (TS/Bun/Express) and `agent-service` (Python/FastAPI) into a single deployable unit.
-
-See `../SPEC-MIGRATION.md`, `../PLAN-MIGRATION.md`, `../TASKS-MIGRATION.md` for the migration design and roadmap.
-
-## Status
-
-Phase 0 (scaffolding) — empty package tree, tooling configured, no business logic ported yet.
+Python 3.14 / FastAPI monolith — API, agent runtime, and document processing for TelaiOS.
 
 ## Quick start
 
 ```bash
 cd server
 uv sync                    # install deps
+uv run alembic upgrade head  # apply DB migrations
 uv run uvicorn telaios.main:app --reload --port 8000
 ```
 
@@ -30,19 +25,95 @@ uv run pytest               # tests
 
 ```
 src/telaios/
-  config/        # Pydantic settings
-  db/            # SQLAlchemy engine, base, models, session
-  core/          # agent runtime (LLM clients, prompts, memory) — populated in Phase 6
-  tools/         # agent tool registry — populated in Phase 6
+  config/        # Pydantic settings + structured logging
+  db/            # SQLAlchemy engine, base, models, session, Alembic
+  core/          # agent runtime (LangGraph, LLM clients, RAG, reranker)
+  tools/         # agent tool registry (file, shell, MCP, skill, document tools)
   infra/         # Docker / k8s / helm / S3 / redis clients
   auth/          # JWT, password hashing, FastAPI dependencies
-  utils/         # crypto, errors, logging, ids
-  modules/       # one folder per business capability
+  utils/         # crypto, errors, ids
+  modules/       # one folder per business capability (see Module registry below)
   main.py        # FastAPI app factory (`create_app(modules=None)`)
 ```
 
-See `SPEC-MIGRATION.md` §4 for the full structure and module boundary rules.
+## Module registry
+
+The following module names are registered in `main.py`:
+
+| Name | Routers included |
+| --- | --- |
+| `users` | `/auth/*`, `/users/*` |
+| `workspaces` | `/projects/{id}/workspaces/*`, `/workspaces/*` |
+| `projects` | `/projects/*`, `/projects/{id}/members/*`, `/projects/{id}/agents/*` |
+| `repositories` | `/repositories/*` |
+| `environments` | `/environments/*` |
+| `settings` | `/settings/*` |
+| `library` | `/library/*` |
+| `agent_profiles` | `/agent-profiles/*` |
+| `plans` | `/projects/{id}/plans/*`, `/plans/*` |
+| `tasks` | `/plans/{id}/tasks/*`, `/tasks/*` |
+| `messages` | `/messages/*` |
+| `chat` | `/chat/*` |
+| `documents` | `/projects/{id}/documents/*`, `/documents/*`, subresource routers |
+| `document_extraction` | `/documents/extract/*`, `/document-jobs/*` |
+| `document_copilot` | `/document-copilot/*` |
+| `skills` | `/skills/*` |
+| `health` | `/health`, `/ready`, `/version` |
+| `analytics` | `/analytics/*` |
+| `internal` | `/internal/*` |
+| `containers` | `/containers/*` |
+| `docker_shell` | `/docker-shell` (WebSocket) |
 
 ## Split deployments
 
-`create_app(modules=[...])` (or env `TELAIOS_MODULES=users,workspaces,...`) loads only the requested modules. See SPEC §4 for example profiles. Phase 11 will validate this.
+`create_app()` reads the `TELAIOS_MODULES` environment variable (comma-separated module names) to load only a subset of the registry.  When the variable is empty, all modules are loaded.
+
+You can also pass the list directly:
+
+```python
+from telaios.main import create_app
+app = create_app(modules=["users", "workspaces", "health"])
+```
+
+### Example profiles
+
+**`api-core`** — auth + project metadata, no agent/document features:
+
+```bash
+TELAIOS_MODULES=users,workspaces,projects,repositories,environments,settings,library,agent_profiles,health
+```
+
+Install only the core dependencies:
+
+```bash
+uv sync --no-default-groups
+```
+
+**`api-chat`** — adds planning and agent execution on top of core:
+
+```bash
+TELAIOS_MODULES=users,workspaces,projects,repositories,environments,settings,library,agent_profiles,plans,tasks,messages,chat,health
+```
+
+Install with agent extras:
+
+```bash
+uv sync --extra agents
+```
+
+**`api-documents`** — adds document processing and copilot on top of core:
+
+```bash
+TELAIOS_MODULES=users,workspaces,projects,repositories,environments,settings,library,agent_profiles,documents,document_extraction,document_copilot,skills,health
+```
+
+Install with document extras:
+
+```bash
+uv sync --extra documents
+```
+
+## Module boundary rules (enforced by import-linter)
+
+- `modules.X` may import from `modules.Y` only via its public facade (`modules.Y`, `.service`, `.schemas`, `__init__`). **Never** `modules.Y.repository` or `modules.Y.router`.
+- `core`, `tools`, `infra`, `db`, `auth`, `utils`, `config` must **not** import from `modules.*`.

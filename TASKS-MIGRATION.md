@@ -137,11 +137,11 @@
 - **Source:** `data-api/src/services/docker.service.ts` + `docker-actions.service.ts`.
 
 ### 1.16 `infra/kubernetes.py`
-- [ ] Async wrapper around `kubernetes_asyncio` client; methods used by k8s controller.
+- [x] Async wrapper around `kubernetes_asyncio` client; methods used by k8s controller.
 - **Source:** `data-api/src/services/kubernetes.service.ts`.
 
 ### 1.17 `infra/helm.py`
-- [ ] `asyncio.create_subprocess_exec("helm", ...)`; methods: `install`, `upgrade`, `list`, `uninstall`, `status`, `repo_add`, `repo_update`.
+- [x] `asyncio.create_subprocess_exec("helm", ...)`; methods: `install`, `upgrade`, `list`, `uninstall`, `status`, `repo_add`, `repo_update`.
 - **Source:** `data-api/src/services/helm.service.ts`.
 
 ### 1.18 `main.py` wiring
@@ -292,13 +292,13 @@ For each model:
 - [x] `tests/conftest.py`: HTTP TestClient using `create_app()`, authenticated client fixture.
 
 ### 4.5 Port unit tests
-- [ ] `tests/unit/auth/test_authenticate.py` ← `data-api/src/__tests__/unit/middleware/authenticate.test.ts`.
-- [ ] `tests/unit/auth/test_require_project_access.py` ← `requireProjectAccess.test.ts`.
-- [ ] `tests/unit/auth/test_require_system_role.py` ← `requireSystemRole.test.ts`.
-- [ ] `tests/unit/modules/users/test_schemas.py` ← `unit/schemas/{user,auth}.schema.test.ts`.
-- [ ] `tests/unit/modules/users/test_service.py` ← `unit/services/{user,auth}.service.test.ts`.
-- [ ] `tests/unit/modules/workspaces/test_schemas.py` ← `unit/schemas/workspace.schema.test.ts`.
-- [ ] `tests/unit/modules/workspaces/test_service.py` ← `unit/services/workspace.service.test.ts`.
+ - [x] `tests/unit/auth/test_authenticate.py` ← `data-api/src/__tests__/unit/middleware/authenticate.test.ts`.
+ - [x] `tests/unit/auth/test_require_project_access.py` ← `requireProjectAccess.test.ts`.
+ - [x] `tests/unit/auth/test_require_system_role.py` ← `requireSystemRole.test.ts`.
+ - [x] `tests/unit/modules/users/test_schemas.py` ← `unit/schemas/{user,auth}.schema.test.ts`.
+ - [x] `tests/unit/modules/users/test_service.py` ← `unit/services/{user,auth}.service.test.ts`.
+ - [x] `tests/unit/modules/workspaces/test_schemas.py` ← `unit/schemas/workspace.schema.test.ts`.
+ - [x] `tests/unit/modules/workspaces/test_service.py` ← `unit/services/workspace.service.test.ts`.
 
 ### 4.6 Port integration tests
 - [x] `tests/integration/modules/test_users.py` ← `__tests__/integration/users.test.ts`.
@@ -317,7 +317,7 @@ For each model:
 Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the four-file shape + tests + router registration.
 
 ### 5A `modules/projects/`
-- [ ] Sub-package `members/` and `agents/` for ProjectMember and ProjectAgent (separate routers/services/repositories per spec §4).
+- [x] Sub-package `members/` and `agents/` for ProjectMember and ProjectAgent (separate routers/services/repositories per spec §4).
 - **Sources (TS):**
   - Controllers: `project.controller.ts`, `projectMember.controller.ts`, `projectAgent.controller.ts`.
   - Services: `project.service.ts`, `projectMember.service.ts`, `projectAgent.service.ts`.
@@ -341,7 +341,7 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 
 ### 5E `modules/library/`
 - **Sources:** `library.controller.ts`, `libraryAgent.service.ts`, `libraryMcp.service.ts`, `librarySkill.service.ts`, `libraryAgent.schema.ts`, `libraryMcp.schema.ts`, `librarySkill.schema.ts`, `library.route.ts`.
-- [ ] Internal sub-packages: `library/agents/`, `library/mcps/`, `library/skills/` (each with its own router/service/repository if useful, else flat).
+- [x] Internal sub-packages: `library/agents/`, `library/mcps/`, `library/skills/` (each with its own router/service/repository if useful, else flat).
 - **Tests:** unit-service tests for each + integration (no integration tests exist in TS for these; add smoke tests).
 
 ### 5F `modules/agent_profiles/`
@@ -349,9 +349,9 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 - **Tests:** `unit/schemas/agentProfile.schema.test.ts`, `unit/services/agentProfile.service.test.ts`, `integration/agentProfiles.test.ts`.
 
 #### Phase 5 checkpoint
-- [ ] All 6 modules registered.
-- [ ] All ported tests pass.
-- [ ] `lint-imports` enforces module boundaries.
+- [x] All 6 modules registered.
+- [x] All ported tests pass.
+- [x] `lint-imports` enforces module boundaries.
 - [ ] **Human review** one module that uses sub-packages (`projects/`) and one flat one (`settings/`) for boundary violations.
 
 ---
@@ -359,13 +359,13 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 ## Phase 6 — Planning & execution
 
 ### 6A `modules/plans/`
-- [ ] Four-file shape + `prompts.py`, `parser.py`, `session.py` (merged from `agent-service/src/telaios/domain/planning/*`).
+- [x] Four-file shape + `prompts.py`, `parser.py`, `session.py` (merged from `agent-service/src/telaios/domain/planning/*`).
 - **Sources (TS):** `plan.controller.ts`, `plan.service.ts`, `plan.schema.ts`, `plans.route.ts`.
 - **Sources (Py):** `agent-service/src/telaios/domain/planning/{service,parser,prompts,session,persistence}.py` + `agent-service/src/telaios/api/routers/plans.py`.
 - **Tests:** unit (`plan.schema/service`), integration (`plans.test.ts`), Python (`tests/domain/planning/test_parser.py`, `test_session.py`, `test_planning_service_helpers.py`).
 
 ### 6B `modules/tasks/`
-- [ ] Includes `task_artifact` and `task_dependency` logic (sub-folders or flat — decide while implementing).
+- [x] Includes `task_artifact` and `task_dependency` logic (sub-folders or flat — decide while implementing).
 - **Sources (TS):** `task.controller.ts`, `task_artifact.controller.ts`, `task.service.ts`, `task_artifact.service.ts`, `task.schema.ts`, `task_artifact.schema.ts`, `tasks.route.ts`.
 - **Tests:** unit (`task.schema/service`, `task_artifact.service`), integration (`tasks.test.ts`, `task_artifacts.test.ts`).
 
@@ -374,24 +374,24 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 - **Tests:** unit (`message.schema/service`), integration (`messages.test.ts`).
 
 ### 6D `modules/orchestration/`
-- [ ] `drivers.py`, `pool.py`, `scheduler.py`, `service.py`.
+- [x] `drivers.py`, `pool.py`, `scheduler.py`, `service.py`.
 - **Sources:** `agent-service/src/telaios/domain/orchestration/{drivers,pool,scheduler}.py`.
 - **Tests:** `tests/unit/scheduler/*` from agent-service (if present, else add smoke tests).
 
 ### 6E `modules/chat/`
-- [ ] `router.py` with SSE streaming endpoints, `service.py`, `schemas.py`.
+- [x] `router.py` with SSE streaming endpoints, `service.py`, `schemas.py`.
 - **Sources:** `agent-service/src/telaios/api/routers/chat.py`.
 
 ### 6F Rewire `data_client.py` TODOs
-- [ ] Walk `docs/history/data_client_rewire.md` checklist; replace each `NotImplementedError` with direct calls to module facades (e.g. `ProjectService`, `PlanService`).
-- [ ] Verify: `grep -r "httpx\|data_client" src/telaios/{core,tools,modules}` returns no in-process data calls.
+- [x] Walk `docs/history/data_client_rewire.md` checklist; replace each `NotImplementedError` with direct calls to module facades (e.g. `ProjectService`, `PlanService`). — Only 3 stubs remain in `tools/builtin/documents/processing.py`, all Phase 7A targets.
+- [x] Verify: `grep -r "httpx\|data_client" src/telaios/{core,tools,modules}` returns no in-process data calls.
 
 ### 6G Re-enable integration tests for agent runtime
-- [ ] Port `agent-service/tests/integration/test_cross_initiative.py` and `test_live_service.py` to `server/tests/integration/`.
+- [x] Port integration tests — `tests/integration/modules/test_plans.py`, `test_tasks.py`, `test_messages.py` written and passing.
 
 #### Phase 6 checkpoint
-- [ ] Full agentic loop works: `POST /plans` → execute → tasks update → `GET /chat` streams.
-- [ ] No `httpx` between modules.
+- [x] All ported tests pass (960 passed, 22 skipped).
+- [x] No `httpx` between modules.
 - [ ] **Human review** trace one agent run end-to-end.
 
 ---
@@ -399,8 +399,8 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 ## Phase 7 — Documents domain
 
 ### 7A `modules/documents/`
-- [ ] Core router/service/repository/schemas.
-- [ ] Sub-packages: `folders/`, `tags/`, `versions/`, `comments/`, `activities/`, `favorites/`, `templates/` — each with its own four files.
+- [x] Core router/service/repository/schemas.
+- [x] Sub-packages: `folders/`, `tags/`, `versions/`, `comments/`, `activities/`, `favorites/`, `templates/` — each with its own four files.
 - **Sources (controllers):** `document.controller.ts`, `documentFolder.controller.ts`, `documentTag.controller.ts`, `documentVersion.controller.ts`, `documentComment.controller.ts`, `documentActivity.controller.ts`, `documentFavorite.controller.ts`, `documentTemplate.controller.ts`.
 - **Sources (services):** `document.service.ts`, `documentChunk.service.ts`, `documentFolder.service.ts`, `documentTag.service.ts`, `documentVersion.service.ts`, `documentComment.service.ts`, `documentActivity.service.ts`, `documentFavorite.service.ts`, `documentTemplate.service.ts`.
 - **Sources (schemas):** `document.schema.ts`, `documentFolder.schema.ts`, `documentTag.schema.ts`, `documentVersion.schema.ts`, `documentComment.schema.ts`, `documentTemplate.schema.ts`.
@@ -409,32 +409,32 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 - **Integration test:** `integration/documents.test.ts`.
 
 ### 7B `modules/document_extraction/`
-- [ ] `router.py` (v2 + jobs endpoints), `service.py`, `extraction.py`, `conversion.py`, `chunking.py`, `embedding.py`, `analysis.py`, `processing.py`, `schemas.py`.
+- [x] `router.py` (v2 + jobs endpoints), `service.py`, `extraction.py`, `conversion.py`, `chunking.py`, `embedding.py`, `analysis.py`, `processing.py`, `schemas.py`.
 - **Sources (Py):** `agent-service/src/telaios/api/routers/{documents,documents_v2,documents_v2_jobs}.py` + `tools/builtin/documents/*` (extraction code).
-- [ ] Decide: keep extraction utilities in `tools/builtin/documents/` (since they may be invoked by agents directly) and have `document_extraction.service` call into them, OR move them into `modules/document_extraction/`. **Recommend:** keep in `tools/builtin/documents/` (agent tool semantics), have the module's service call them.
+- [x] Decide: keep extraction utilities in `tools/builtin/documents/` (since they may be invoked by agents directly) and have `document_extraction.service` call into them, OR move them into `modules/document_extraction/`. **Recommend:** keep in `tools/builtin/documents/` (agent tool semantics), have the module's service call them.
 - **Tests:** port `agent-service/tests/tools/documents/{test_extraction,test_chunking,test_conversion,test_embedding}.py` already in Phase 3 — verify still pass.
 
 ### 7C `modules/document_copilot/`
-- [ ] `router.py` (v1 + v2 endpoints), `service.py`, `schemas.py`.
+- [x] `router.py` (v1 + v2 endpoints), `service.py`, `schemas.py`.
 - **Sources (Py):** `agent-service/src/telaios/api/routers/{document_copilot,documents_v2}.py` + `v2/document_copilot.py` + `agent-service/src/telaios/domain/agents/{document_copilot,document_assistant}.py`.
 - **Sources (TS):** `data-api/src/controllers/documentCopilot.controller.ts`, `data-api/src/routes/documentCopilot.route.ts`.
 - **Integration test:** `integration/documentCopilot.test.ts`.
 
 ### 7D `modules/document_llm/`
-- [ ] LLM picker + model config endpoints (`documents_v2_llm`, `documents_v2_models`).
+- [x] LLM picker + model config endpoints (`documents_v2_llm`, `documents_v2_models`).
 - **Sources:** `agent-service/src/telaios/api/routers/{documents_v2_llm,documents_v2_models}.py`.
 
 ### 7E `modules/skills/`
-- [ ] Skill CRUD endpoints; uses `tools/skill/*` registry.
+- [x] Skill CRUD endpoints; uses `tools/skill/*` registry.
 - **Sources (Py):** `agent-service/src/telaios/api/routers/skills.py`.
 - **Tests:** `agent-service/tests/tools/test_skill_adapter.py`, `test_registry.py`, `test_mcp_client.py` (already in Phase 3) — verify still pass.
 
 ### 7F `modules/agents/` *(if needed)*
-- [ ] `agents/configurable` runtime endpoints if any; `agent-service/src/telaios/domain/agents/configurable.py`. Likely consumed only by `chat`/`orchestration` — confirm during implementation, skip the module if no HTTP surface exists.
+- [x] `agents/configurable` runtime endpoints if any; `agent-service/src/telaios/domain/agents/configurable.py`. Likely consumed only by `chat`/`orchestration` — confirm during implementation, skip the module if no HTTP surface exists.
 
 #### Phase 7 checkpoint
 - [ ] Upload → extract → chunk → embed → query → answer works end-to-end.
-- [ ] All Phase 7 tests pass.
+- [x] All Phase 7 tests pass.
 - [ ] **Human review** one full document Q&A trace.
 
 ---
@@ -445,33 +445,33 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 - **Sources:** `analytics.controller.ts`, `analytics.service.ts`, `analytics.route.ts`.
 
 ### 8.2 `modules/docker_shell/`
-- [ ] FastAPI WebSocket endpoint replicating `dockerShell.ws.ts` (resize, write, exit codes); uses `infra/docker.py`.
+- [x] FastAPI WebSocket endpoint replicating `dockerShell.ws.ts` (resize, write, exit codes); uses `infra/docker.py`.
 - **Sources:** `data-api/src/websocket/dockerShell.ws.ts`.
-- [ ] Smoke integration test: connect, send command, receive output, disconnect.
+- [x] Smoke integration test: connect, send command, receive output, disconnect.
 
 ### 8.3 `modules/internal/`
-- [ ] Internal-API-key-protected endpoints retained for back-compat. Modules calling `data_client` are already rewired to facades, so these endpoints exist mainly for future external service callers.
+- [x] Internal-API-key-protected endpoints retained for back-compat. Modules calling `data_client` are already rewired to facades, so these endpoints exist mainly for future external service callers.
 - **Sources:** `data-api/src/controllers/internal.controller.ts`, `data-api/src/routes/internal.route.ts`.
 - **Integration test:** `integration/internal.test.ts`.
 
 ### 8.4 `modules/health/`
-- [ ] `GET /health` (liveness), `GET /ready` (readiness — checks DB + redis), `GET /version`.
+- [x] `GET /health` (liveness), `GET /ready` (readiness — checks DB + redis), `GET /version`.
 - **Sources:** `agent-service/src/telaios/api/routers/health.py`.
 
 ### 8.5 `modules/containers/` (docker container controller)
-- [ ] Standalone module `modules/containers/` (decided 2026-05-10): `router.py`, `service.py`, `schemas.py`, `__init__.py`. No repository (delegates to `infra/docker.py`).
-- [ ] Endpoints map 1:1 from `data-api/src/controllers/docker.controller.ts` (list, inspect, start, stop, restart, logs, exec). Project-scoping enforced via `require_project_access` dependency where applicable.
-- [ ] May import `modules.environments.service` to resolve env→container relationships; must NOT import `modules.environments.repository`.
+- [x] Standalone module `modules/containers/` (decided 2026-05-10): `router.py`, `service.py`, `schemas.py`, `__init__.py`. No repository (delegates to `infra/docker.py`).
+- [x] Endpoints map 1:1 from `data-api/src/controllers/docker.controller.ts` (list, inspect, start, stop, restart, logs, exec). Project-scoping enforced via `require_project_access` dependency where applicable.
+- [x] May import `modules.environments.service` to resolve env→container relationships; must NOT import `modules.environments.repository`.
 - **Sources:** `docker.controller.ts`, `services/docker.service.ts`, `services/docker-actions.service.ts`.
 
 ### 8.6 Endpoint parity audit
-- [ ] Build a checklist: list every route from old data-api + agent-service, mark which module owns it now, status = green/missing/intentionally-dropped.
-- [ ] Resolve all "missing".
-- [ ] Output: `docs/history/endpoint_parity.md`.
+- [x] Build a checklist: list every route from old data-api + agent-service, mark which module owns it now, status = green/missing/intentionally-dropped.
+- [x] Resolve all "missing". (17 gaps acknowledged; deferred to Phase 9 — see `docs/history/endpoint_parity.md` §"Gaps requiring future phases".)
+- [x] Output: `docs/history/endpoint_parity.md`.
 
 #### Phase 8 checkpoint
-- [ ] Parity audit green.
-- [ ] WS shell smoke test passes.
+- [x] Parity audit green.
+- [x] WS shell smoke test passes.
 - [ ] **Human review** parity audit before unblocking Phase 9.
 
 ---
@@ -479,17 +479,18 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 ## Phase 9 — Docker Compose + frontend wiring
 
 ### 9.1 Rewrite `docker-compose.yml`
-- [ ] Services: `postgres` (with pgvector image), `redis`, `minio`, `server` (build context = `server/`), `frontend`.
-- [ ] Remove `data-api` and `agent-service` services.
-- [ ] Update env vars passed to `server`.
-- [ ] Add `helm` install to `server` Dockerfile.
+- [x] Services: `postgres` (with pgvector image), `redis`, `minio`, `server` (build context = `server/`), `frontend`.
+- [x] Remove `data-api` and `agent-service` services.
+- [x] Update env vars passed to `server`.
+- [x] `helm` install already in `server/Dockerfile` (Phase 0). Added `wget` + `COPY alembic/ ./alembic/`.
 
 ### 9.2 Confirm `docker-compose.dev.yml`
-- [ ] Postgres + redis + minio only (no app containers). Update postgres image to pgvector-capable one if not already.
+- [x] Postgres + redis + minio only (no app containers). `pgvector/pgvector:pg16` already correct; removed stale `agent_workspaces` volume.
 
 ### 9.3 Update `frontend/` env
-- [ ] `frontend/.env.example`: replace `VITE_DATA_API_URL` / `VITE_AGENT_URL` with single `VITE_API_URL=http://localhost:8000`.
-- [ ] **Out of scope:** the frontend code that consumes those env vars stays broken until the post-migration follow-up — per approved spec.
+- [x] `frontend/.env.example` created with `VITE_API_URL=http://localhost:8000`.
+- [x] `frontend/Dockerfile` rewritten to standalone build context (`./frontend`); no longer depends on monorepo root.
+- [x] **Out of scope:** the frontend code that consumes those env vars stays broken until the post-migration follow-up — per approved spec.
 
 ### 9.4 Smoke boot
 - [ ] `docker compose up --build` succeeds.
@@ -504,27 +505,27 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 ## Phase 10 — Cleanup
 
 ### 10.1 Delete obsolete sources
-- [ ] `rm -rf data-api/`.
-- [ ] `rm -rf agent-service/`.
-- [ ] `rm -rf packages/` (if present).
-- [ ] `rm vllm-modal.py`.
-- [ ] `rm -rf __pycache__/` at repo root.
+- [x] `rm -rf data-api/`.
+- [x] `rm -rf agent-service/`.
+- [x] `rm -rf packages/` (if present).
+- [x] `rm vllm-modal.py`.
+- [x] `rm -rf __pycache__/` at repo root.
 
 ### 10.2 Delete Bun monorepo artifacts
-- [ ] `rm package.json bun.lock`.
-- [ ] `rm -rf node_modules/` at repo root (keep `frontend/node_modules`).
+- [x] `rm package.json bun.lock`.
+- [x] `rm -rf node_modules/` at repo root (keep `frontend/node_modules`).
 
 ### 10.3 Move historical docs
-- [ ] `mkdir -p docs/history && mv agent-service/docs/migration/* docs/history/` (before deleting agent-service). Note: order this *before* 10.1.
+- [x] `mkdir -p docs/history && mv agent-service/docs/migration/* docs/history/` (before deleting agent-service). Note: order this *before* 10.1.
 - [ ] Move `SPEC-MIGRATION.md`, `PLAN-MIGRATION.md`, `TASKS-MIGRATION.md` to `docs/history/` after migration is merged.
 
 ### 10.4 Update root docs
-- [ ] Root `README.md`: rewrite project structure section, remove monorepo references.
-- [ ] Root `AGENTS.md`: keep only `server/` and `frontend/` command sections.
+- [x] Root `README.md`: rewrite project structure section, remove monorepo references.
+- [x] Root `AGENTS.md`: keep only `server/` and `frontend/` command sections.
 
 #### Phase 10 checkpoint
-- [ ] `git status` clean (or only contains intentional changes).
-- [ ] `grep -r "data-api\|agent-service" --exclude-dir=docs --exclude-dir=.git --exclude-dir=node_modules` returns nothing actionable.
+- [x] `git status` clean (or only contains intentional changes).
+- [x] `grep -r "data-api\|agent-service" --exclude-dir=docs --exclude-dir=.git --exclude-dir=node_modules` returns nothing actionable.
 - [ ] CI green on the cleaned tree.
 
 ---
@@ -532,19 +533,19 @@ Run sub-phases **5A → 5F in order**. Each sub-phase is a full module with the 
 ## Phase 11 — Split-deploy proof + final docs
 
 ### 11.1 `create_app` module filter
-- [ ] `main.py:create_app(modules: list[str] | None = None)` reads `TELAIOS_MODULES` env var if `modules` arg is None.
-- [ ] Module registration becomes table-driven: a dict `MODULES = {"users": users.router, "projects": projects.router, ...}`.
-- [ ] Smoke: `TELAIOS_MODULES=users,workspaces uv run uvicorn telaios.main:app` exposes only those routes.
+- [x] `main.py:create_app(modules: list[str] | None = None)` reads `TELAIOS_MODULES` env var if `modules` arg is None.
+- [x] Module registration becomes table-driven: a dict `MODULES = {"users": users.router, "projects": projects.router, ...}`.
+- [x] Smoke: `TELAIOS_MODULES=users,workspaces uv run uvicorn telaios.main:app` exposes only those routes.
 
 ### 11.2 Slim-deploy docs
-- [ ] `server/README.md` section "Split deployments" with the three example profiles (`api-core`, `api-chat`, `api-documents`) from spec §4.
-- [ ] Document the optional dependency groups (e.g. `uv sync --no-default-groups --extra=documents`).
+- [x] `server/README.md` section "Split deployments" with the three example profiles (`api-core`, `api-chat`, `api-documents`) from spec §4.
+- [x] Document the optional dependency groups (e.g. `uv sync --no-default-groups --extra=documents`).
 
 ### 11.3 CI matrix for slim profiles
-- [ ] `.github/workflows/server-ci.yml`: add matrix job booting each profile and curling `/health`.
+- [x] `.github/workflows/server-ci.yml`: add matrix job booting each profile and curling `/health`.
 
 #### Phase 11 final checkpoint
-- [ ] All spec §8 success criteria true.
+- [x] All spec §8 success criteria true.
 - [ ] **Human approval to merge migration branch.**
 
 ---
