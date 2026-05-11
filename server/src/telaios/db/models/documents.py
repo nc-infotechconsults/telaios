@@ -20,6 +20,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -193,6 +194,15 @@ class DocumentChunk(Base):
     )
 
     document: Mapped[Document] = relationship("Document")
+
+    __table_args__ = (
+        Index(
+            "idx_document_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
 
 
 class DocumentActivity(Base):

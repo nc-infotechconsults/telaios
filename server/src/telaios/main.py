@@ -8,6 +8,21 @@ Phase 1 wires foundational concerns:
 * uniform error envelope (``install_exception_handlers``)
 * CORS from settings
 * lifespan teardown for DB engine and Redis client
+
+Phase 4 adds:
+* ``auth_router``     — POST /auth/register, /auth/login, GET /auth/me
+* ``users_router``    — admin CRUD on /users
+* ``project_workspaces_router`` — project-scoped workspace CRUD
+* ``workspace_router``          — item-scoped workspace CRUD
+* ``set_user_loader`` registration so JWTs are validated against the DB
+
+Phase 5 adds:
+* ``projects_router`` / ``members_router`` / ``agents_router`` — project CRUD
+* ``repositories_router`` — repository CRUD + test endpoint
+* ``environments_router`` — environment CRUD + helm + resource inspection
+* ``settings_router``     — admin app settings
+* ``library_router``      — library agents / MCPs / skills
+* ``agent_profiles_router`` — agent profile CRUD
 """
 
 from __future__ import annotations
@@ -19,10 +34,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from telaios.auth.dependencies import set_user_loader
 from telaios.config.logging import configure_logging
 from telaios.config.settings import get_settings
 from telaios.db.session import dispose_engine
 from telaios.infra.redis import close_redis
+from telaios.modules.agent_profiles import agent_profiles_router
+from telaios.modules.chat import chat_router
+from telaios.modules.environments import environments_router
+from telaios.modules.library import library_router
+from telaios.modules.messages import messages_router
+from telaios.modules.plans import plan_router, project_plans_router
+from telaios.modules.projects import agents_router, members_router, projects_router
+from telaios.modules.repositories import repositories_router
+from telaios.modules.settings import settings_router
+from telaios.modules.tasks import plan_tasks_router, task_router
+from telaios.modules.users import UserService, auth_router, users_router
+from telaios.modules.workspaces import project_workspaces_router, workspace_router
 from telaios.utils.errors import install_exception_handlers
 
 logger = logging.getLogger(__name__)
@@ -67,7 +95,31 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
 
     install_exception_handlers(app)
 
-    # Module loading lands in Phase 4+.
+    # ─── Routers ──────────────────────────────────────────────────────────
+    app.include_router(auth_router)
+    app.include_router(users_router)
+    app.include_router(project_workspaces_router)
+    app.include_router(workspace_router)
+    app.include_router(projects_router)
+    app.include_router(members_router)
+    app.include_router(agents_router)
+    app.include_router(repositories_router)
+    app.include_router(environments_router)
+    app.include_router(settings_router)
+    app.include_router(library_router)
+    app.include_router(agent_profiles_router)
+    app.include_router(project_plans_router)
+    app.include_router(plan_router)
+    app.include_router(plan_tasks_router)
+    app.include_router(task_router)
+    app.include_router(messages_router)
+    app.include_router(chat_router)
+
+    # ─── Auth user-loader ─────────────────────────────────────────────────
+    # Enables DB-backed validation of JWT subjects (is_active check, fresh
+    # role reload).  Tests can override this by calling set_user_loader(None).
+    set_user_loader(UserService.load_principal)
+
     _ = modules
 
     @app.get("/health", tags=["health"])

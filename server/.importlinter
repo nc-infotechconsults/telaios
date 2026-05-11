@@ -30,7 +30,118 @@ source_modules =
 forbidden_modules =
     telaios.modules
 include_external_packages = False
-# Self-imports are unavoidable; allow any module to import its own internals.
-# (import-linter scopes `forbidden_modules` strictly; we'll add per-module
-# `ignore_imports` entries in Phase 1+ once real cross-module wiring exists.)
 allow_indirect_imports = True
+# Intra-module wiring is always allowed (router→service, service→repository, etc.).
+# Only cross-module imports of .repository / .router are forbidden.
+ignore_imports =
+    telaios.modules.users -> telaios.modules.users.router
+    telaios.modules.users -> telaios.modules.users.service
+    telaios.modules.users.router -> telaios.modules.users.schemas
+    telaios.modules.users.router -> telaios.modules.users.service
+    telaios.modules.users.service -> telaios.modules.users.repository
+    telaios.modules.users.service -> telaios.modules.users.schemas
+    telaios.modules.workspaces -> telaios.modules.workspaces.router
+    telaios.modules.workspaces -> telaios.modules.workspaces.service
+    telaios.modules.workspaces.router -> telaios.modules.workspaces.repository
+    telaios.modules.workspaces.router -> telaios.modules.workspaces.schemas
+    telaios.modules.workspaces.router -> telaios.modules.workspaces.service
+    telaios.modules.workspaces.service -> telaios.modules.workspaces.repository
+    telaios.modules.workspaces.service -> telaios.modules.workspaces.schemas
+    telaios.modules.projects -> telaios.modules.projects.router
+    telaios.modules.projects -> telaios.modules.projects.service
+    telaios.modules.projects -> telaios.modules.projects.agents.router
+    telaios.modules.projects -> telaios.modules.projects.members.router
+    telaios.modules.projects.router -> telaios.modules.projects.schemas
+    telaios.modules.projects.router -> telaios.modules.projects.service
+     telaios.modules.projects.service -> telaios.modules.projects.repository
+     telaios.modules.projects.service -> telaios.modules.projects.schemas
+     telaios.modules.projects.service -> telaios.modules.projects.members.service
+     telaios.modules.projects.agents.router -> telaios.modules.projects.agents.service
+     telaios.modules.projects.agents.router -> telaios.modules.projects.schemas
+     telaios.modules.projects.agents.service -> telaios.modules.projects.agents.repository
+     telaios.modules.projects.agents.service -> telaios.modules.projects.schemas
+     telaios.modules.projects.members.router -> telaios.modules.projects.members.service
+     telaios.modules.projects.members.router -> telaios.modules.projects.schemas
+     telaios.modules.projects.members.service -> telaios.modules.projects.members.repository
+     telaios.modules.projects.members.service -> telaios.modules.projects.schemas
+     telaios.modules.projects.members.repository -> telaios.modules.projects.schemas
+    telaios.modules.repositories -> telaios.modules.repositories.router
+    telaios.modules.repositories -> telaios.modules.repositories.service
+    telaios.modules.repositories.router -> telaios.modules.repositories.schemas
+    telaios.modules.repositories.router -> telaios.modules.repositories.service
+    telaios.modules.repositories.service -> telaios.modules.repositories.repository
+    telaios.modules.repositories.service -> telaios.modules.repositories.schemas
+    telaios.modules.environments -> telaios.modules.environments.router
+    telaios.modules.environments -> telaios.modules.environments.service
+    telaios.modules.environments.router -> telaios.modules.environments.schemas
+    telaios.modules.environments.router -> telaios.modules.environments.service
+    telaios.modules.environments.service -> telaios.modules.environments.repository
+    telaios.modules.environments.service -> telaios.modules.environments.schemas
+    telaios.modules.settings -> telaios.modules.settings.router
+    telaios.modules.settings -> telaios.modules.settings.service
+    telaios.modules.settings.router -> telaios.modules.settings.schemas
+    telaios.modules.settings.router -> telaios.modules.settings.service
+    telaios.modules.settings.service -> telaios.modules.settings.repository
+    telaios.modules.settings.service -> telaios.modules.settings.schemas
+    telaios.modules.library -> telaios.modules.library.router
+    telaios.modules.library -> telaios.modules.library.service
+    telaios.modules.library.router -> telaios.modules.library.schemas
+    telaios.modules.library.router -> telaios.modules.library.service
+    telaios.modules.library.service -> telaios.modules.library.repository
+    telaios.modules.library.service -> telaios.modules.library.schemas
+    telaios.modules.agent_profiles -> telaios.modules.agent_profiles.router
+    telaios.modules.agent_profiles -> telaios.modules.agent_profiles.service
+    telaios.modules.agent_profiles.router -> telaios.modules.agent_profiles.schemas
+    telaios.modules.agent_profiles.router -> telaios.modules.agent_profiles.service
+    telaios.modules.agent_profiles.service -> telaios.modules.agent_profiles.schemas
+    telaios.modules.agent_profiles.service -> telaios.modules.library.repository
+    # plans module — intra
+    telaios.modules.plans -> telaios.modules.plans.router
+    telaios.modules.plans -> telaios.modules.plans.service
+    telaios.modules.plans -> telaios.modules.plans.schemas
+    telaios.modules.plans.router -> telaios.modules.plans.schemas
+    telaios.modules.plans.router -> telaios.modules.plans.service
+    telaios.modules.plans.router -> telaios.modules.plans.repository
+    telaios.modules.plans.service -> telaios.modules.plans.repository
+    telaios.modules.plans.service -> telaios.modules.plans.schemas
+    telaios.modules.plans.session -> telaios.modules.plans.parser
+    telaios.modules.plans.session -> telaios.modules.plans.persistence
+    telaios.modules.plans.session -> telaios.modules.plans.prompts
+    telaios.modules.plans.parser -> telaios.modules.plans.prompts
+    # plans.router cross-module (allowed)
+    telaios.modules.plans.router -> telaios.modules.tasks.service
+    telaios.modules.plans.router -> telaios.modules.messages.service
+    telaios.modules.plans.router -> telaios.modules.messages.schemas
+    telaios.modules.plans.router -> telaios.modules.orchestration.service
+    # tasks module — intra
+    telaios.modules.tasks -> telaios.modules.tasks.router
+    telaios.modules.tasks -> telaios.modules.tasks.service
+    telaios.modules.tasks -> telaios.modules.tasks.schemas
+    telaios.modules.tasks.router -> telaios.modules.tasks.schemas
+    telaios.modules.tasks.router -> telaios.modules.tasks.service
+    telaios.modules.tasks.router -> telaios.modules.tasks.repository
+    telaios.modules.tasks.service -> telaios.modules.tasks.repository
+    telaios.modules.tasks.service -> telaios.modules.tasks.schemas
+    telaios.modules.tasks.router -> telaios.modules.tasks.artifacts.schemas
+    telaios.modules.tasks.router -> telaios.modules.tasks.artifacts.service
+    telaios.modules.tasks.artifacts -> telaios.modules.tasks.artifacts.schemas
+    telaios.modules.tasks.artifacts -> telaios.modules.tasks.artifacts.service
+    telaios.modules.tasks.artifacts.service -> telaios.modules.tasks.artifacts.repository
+    telaios.modules.tasks.artifacts.service -> telaios.modules.tasks.artifacts.schemas
+    # tasks.router cross-module (allowed)
+    telaios.modules.tasks.router -> telaios.modules.plans.repository
+    # messages module — intra
+    telaios.modules.messages -> telaios.modules.messages.router
+    telaios.modules.messages -> telaios.modules.messages.service
+    telaios.modules.messages -> telaios.modules.messages.schemas
+    telaios.modules.messages.router -> telaios.modules.messages.schemas
+    telaios.modules.messages.router -> telaios.modules.messages.service
+    telaios.modules.messages.service -> telaios.modules.messages.repository
+    telaios.modules.messages.service -> telaios.modules.messages.schemas
+    # orchestration module — intra
+    telaios.modules.orchestration -> telaios.modules.orchestration.service
+    # chat module — intra + cross-module (allowed)
+    telaios.modules.chat -> telaios.modules.chat.router
+    telaios.modules.chat.router -> telaios.modules.plans.repository
+    telaios.modules.chat.router -> telaios.modules.messages.schemas
+    telaios.modules.chat.router -> telaios.modules.messages.service

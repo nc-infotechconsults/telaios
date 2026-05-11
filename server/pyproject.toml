@@ -13,7 +13,7 @@ license = { text = "MIT" }
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
-    "pydantic>=2.9",
+    "pydantic[email]>=2.9",
     "pydantic-settings>=2.6",
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30",
@@ -31,6 +31,7 @@ dependencies = [
 # Slim-deploy profile groups (see SPEC-MIGRATION.md §4).
 # Populated incrementally as modules land.
 docker = [
+    "aioboto3>=15.5.0",
     "docker>=7.1",
 ]
 k8s = [

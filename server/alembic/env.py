@@ -10,16 +10,15 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from telaios.config.settings import settings
-from telaios.db.base import Base
-
 # Importing the registry attaches every ORM class to ``Base.metadata``.
 import telaios.db.models  # noqa: F401  (side-effect import)
+from alembic import context
+from telaios.config.settings import settings
+from telaios.db.base import Base
 
 config = context.config
 
@@ -27,18 +26,20 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Inject the runtime DB URL.
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Allow tests or external callers to override by pre-setting `sqlalchemy.url`
+# on the config object; only fall back to application settings when unset.
+_configured_url = config.get_main_option("sqlalchemy.url")
+config.set_main_option(
+    "sqlalchemy.url",
+    _configured_url if _configured_url else settings.DATABASE_URL,
+)
 
 target_metadata = Base.metadata
 
 
-def _include_object(
-    object_: object, name: str | None, type_: str, *_args: object
-) -> bool:
+def _include_object(object_: object, name: str | None, type_: str, *_args: object) -> bool:
     """Skip pgvector's internal helper tables, if any leak into autogenerate."""
-    if type_ == "table" and name and name.startswith("pg_"):
-        return False
-    return True
+    return not (type_ == "table" and name and name.startswith("pg_"))
 
 
 def run_migrations_offline() -> None:

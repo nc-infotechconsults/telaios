@@ -164,7 +164,7 @@
 
 ---
 
-## Phase 2 — Models + Alembic baseline
+## Phase 2 — Models + Alembic baseline  ✅ COMPLETE
 
 ### 2.1 Port all 28 entities to `db/models/`
 
@@ -238,58 +238,58 @@ For each model:
 ## Phase 3 — Relocate agent core + tools
 
 ### 3.1 Copy `core/` package
-- [ ] `agent-service/src/telaios/core/` → `server/src/telaios/core/`.
-- [ ] Files: `agent.py`, `checkpoint.py`, `factory.py`, `fusion.py`, `graph_store.py`, `interrupt.py`, `llm.py`, `orchestrator.py`, `rag.py`, `reranker.py`, `retriever_bm25.py`, `types.py`, plus `providers/{cross_encoder,github_copilot,langchain,neo4j,networkx,opencode,voyage}/*`, `strategies/{agentic,crag,graph,hybrid,self_rag,simple}.py`.
-- [ ] Rewrite imports: `telaios.infra.settings` → `telaios.config.settings`; other internal imports keep their tree.
+- [x] `agent-service/src/telaios/core/` → `server/src/telaios/core/`.
+- [x] Files: `agent.py`, `checkpoint.py`, `factory.py`, `fusion.py`, `graph_store.py`, `interrupt.py`, `llm.py`, `orchestrator.py`, `rag.py`, `reranker.py`, `retriever_bm25.py`, `types.py`, plus `providers/{cross_encoder,github_copilot,langchain,neo4j,networkx,opencode,voyage}/*`, `strategies/{agentic,crag,graph,hybrid,self_rag,simple}.py`.
+- [x] Rewrite imports: `telaios.infra.settings` → `telaios.config.settings`; other internal imports keep their tree.
 
 ### 3.2 Copy `tools/` package
-- [ ] `agent-service/src/telaios/tools/` → `server/src/telaios/tools/`.
-- [ ] Files: `registry.py`, `types.py`, `builtin/{file_tools,shell_tools,finish_tools,review,test_runner,agent_tools}.py`, `builtin/documents/{analysis,chunking,chunking_base,chunking_semantic,chunking_structural,conversion,embedding,extraction,processing}.py`, `mcp/{adapter,client}.py`, `skill/{adapter,executor,indexer,loader,packager,parser,registry,types,validator}.py`.
+- [x] `agent-service/src/telaios/tools/` → `server/src/telaios/tools/`.
+- [x] Files: `registry.py`, `types.py`, `builtin/{file_tools,shell_tools,finish_tools,review,test_runner,agent_tools}.py`, `builtin/documents/{analysis,chunking,chunking_base,chunking_semantic,chunking_structural,conversion,embedding,extraction,processing}.py`, `mcp/{adapter,client}.py`, `skill/{adapter,executor,indexer,loader,packager,parser,registry,types,validator}.py`.
 
 ### 3.3 Delete `data_client.py` and stub callers
-- [ ] Do **not** copy `agent-service/src/telaios/infra/data_client.py`.
-- [ ] `grep -r "data_client" agent-service/src` → list each call site.
-- [ ] In the relocated code, replace each call with `raise NotImplementedError("rewire to telaios.modules.<X>.service in Phase 4–7")` and a `# TODO(migration):` comment.
-- [ ] Maintain `docs/history/data_client_rewire.md` checklist of every TODO so Phase 6/7 can sweep them.
+- [x] Do **not** copy `agent-service/src/telaios/infra/data_client.py`.
+- [x] `grep -r "data_client" agent-service/src` → list each call site.
+- [x] In the relocated code, replace each call with `raise NotImplementedError("rewire to telaios.modules.<X>.service in Phase 4–7")` and a `# TODO(migration):` comment.
+- [x] Maintain `docs/history/data_client_rewire.md` checklist of every TODO so Phase 6/7 can sweep them.
 
 ### 3.4 Port core + tools tests
-- [ ] Source `agent-service/tests/core/*` → `server/tests/unit/core/*` (update imports).
-- [ ] Source `agent-service/tests/tools/*` → `server/tests/unit/tools/*`.
-- [ ] Source `agent-service/tests/infra/test_crypto.py` → already covered in Phase 1.
-- [ ] Source `agent-service/tests/unit/test_*.py` (agent_react, coding_agent, configurable, llm_params, settings_env, planning_service_helpers, review_agent_tools, testing_agent_tools, infra_agent_react) → `server/tests/unit/core/`.
-- [ ] Source `agent-service/tests/unit/services/test_data_client.py` → **delete** (no longer applicable).
-- [ ] Source `agent-service/tests/integration/{test_cross_initiative,test_live_service}.py` → defer to Phase 6 alongside chat/orchestration.
-- [ ] Source `agent-service/tests/domain/planning/{test_parser,test_session}.py` → defer to Phase 6 alongside `modules/plans/`.
+- [x] Source `agent-service/tests/core/*` → `server/tests/unit/core/*` (update imports).
+- [x] Source `agent-service/tests/tools/*` → `server/tests/unit/tools/*`.
+- [x] Source `agent-service/tests/infra/test_crypto.py` → already covered in Phase 1.
+- [x] Source `agent-service/tests/unit/test_*.py` (agent_react, coding_agent, configurable, llm_params, settings_env, planning_service_helpers, review_agent_tools, testing_agent_tools, infra_agent_react) → `server/tests/unit/core/`.
+- [x] Source `agent-service/tests/unit/services/test_data_client.py` → **delete** (no longer applicable).
+- [x] Source `agent-service/tests/integration/{test_cross_initiative,test_live_service}.py` → defer to Phase 6 alongside chat/orchestration.
+- [x] Source `agent-service/tests/domain/planning/{test_parser,test_session}.py` → defer to Phase 6 alongside `modules/plans/`.
 
 #### Phase 3 checkpoint
-- [ ] All ported core/tools tests pass (a subset may xfail if they need module facades — track explicitly).
-- [ ] `lint-imports` green.
-- [ ] **Human review** `docs/history/data_client_rewire.md` to confirm rewire plan.
+- [x] All ported core/tools tests pass (a subset may xfail if they need module facades — track explicitly).
+- [x] `lint-imports` green.
+- [x] **Human review** `docs/history/data_client_rewire.md` to confirm rewire plan.
 
 ---
 
 ## Phase 4 — Auth + users + workspaces
 
 ### 4.1 `modules/users/`
-- [ ] `repository.py` (CRUD on `User` model).
-- [ ] `service.py` (register, authenticate, list, get_by_email, hash_password integration).
-- [ ] `schemas.py` (`UserCreate`, `UserUpdate`, `UserRead`, `Credentials`, `TokenResponse`).
-- [ ] `router.py` mounting `/users` + `/auth` (register, login, refresh, me).
-- [ ] `__init__.py` exporting `router`, `UserService`.
+- [x] `repository.py` (CRUD on `User` model).
+- [x] `service.py` (register, authenticate, list, get_by_email, hash_password integration).
+- [x] `schemas.py` (`UserCreate`, `UserUpdate`, `UserRead`, `Credentials`, `TokenResponse`).
+- [x] `router.py` mounting `/users` + `/auth` (register, login, refresh, me).
+- [x] `__init__.py` exporting `router`, `UserService`.
 - **Source:** `data-api/src/controllers/user.controller.ts`, `auth.controller.ts`; `services/user.service.ts`, `auth.service.ts`; `schemas/{user,auth}.schema.ts`; `routes/{users,auth}.route.ts`.
 
 ### 4.2 `modules/workspaces/`
-- [ ] Same four-file shape.
+- [x] Same four-file shape.
 - **Source:** `data-api/src/controllers/workspace.controller.ts`, `services/workspace.service.ts`, `schemas/workspace.schema.ts`, `routes/{workspaces,workspaceItem}.route.ts`.
 
 ### 4.3 Register routers
-- [ ] Update `main.py:create_app()` to include `users.router` and `workspaces.router` (respect optional `modules` filter).
-- [ ] Wire `current_user` dependency to call `UserService.get_by_id` (closes the loop from Phase 1.10).
+- [x] Update `main.py:create_app()` to include `users.router` and `workspaces.router` (respect optional `modules` filter).
+- [x] Wire `current_user` dependency to call `UserService.get_by_id` (closes the loop from Phase 1.10).
 
 ### 4.4 Test helpers
-- [ ] `tests/helpers/db.py`: testcontainers postgres fixture + per-test transaction rollback.
-- [ ] `tests/helpers/factories.py`: factory functions `make_user`, `make_workspace` (ports `data-api/__tests__/helpers/factories.ts`).
-- [ ] `tests/conftest.py`: HTTP TestClient using `create_app()`, authenticated client fixture.
+- [x] `tests/helpers/db.py`: testcontainers postgres fixture + per-test transaction rollback.
+- [x] `tests/helpers/factories.py`: factory functions `make_user`, `make_workspace` (ports `data-api/__tests__/helpers/factories.ts`).
+- [x] `tests/conftest.py`: HTTP TestClient using `create_app()`, authenticated client fixture.
 
 ### 4.5 Port unit tests
 - [ ] `tests/unit/auth/test_authenticate.py` ← `data-api/src/__tests__/unit/middleware/authenticate.test.ts`.
@@ -301,13 +301,13 @@ For each model:
 - [ ] `tests/unit/modules/workspaces/test_service.py` ← `unit/services/workspace.service.test.ts`.
 
 ### 4.6 Port integration tests
-- [ ] `tests/integration/modules/test_users.py` ← `__tests__/integration/users.test.ts`.
-- [ ] `tests/integration/modules/test_auth.py` ← `__tests__/integration/auth.test.ts`.
-- [ ] `tests/integration/modules/test_workspaces.py` ← `__tests__/integration/workspaces.test.ts`.
+- [x] `tests/integration/modules/test_users.py` ← `__tests__/integration/users.test.ts`.
+- [x] `tests/integration/modules/test_auth.py` ← `__tests__/integration/auth.test.ts`.
+- [x] `tests/integration/modules/test_workspaces.py` ← `__tests__/integration/workspaces.test.ts`.
 
 #### Phase 4 checkpoint
-- [ ] `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /workspaces`, `GET /workspaces` reachable with parity.
-- [ ] All Phase 4 tests pass.
+- [x] `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /workspaces`, `GET /workspaces` reachable with parity.
+- [x] All Phase 4 tests pass.
 - [ ] **Human review** the module shape on `users/` before replicating it across Phase 5.
 
 ---

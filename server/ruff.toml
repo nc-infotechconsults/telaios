@@ -22,6 +22,8 @@ ignore = [
 
 [lint.per-file-ignores]
 "tests/**/*.py" = ["B", "N802", "N803"]
+# PT rules (pytest style) should not fire on production source files
+"src/**/*.py" = ["PT"]
 
 [lint.isort]
 known-first-party = ["telaios"]

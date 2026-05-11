@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     TELAIOS_MODULES: str = Field(default="")
 
     # ─── Auth & crypto ────────────────────────────────────────────────────
-    JWT_SECRET: str = Field(default="change-me-in-production")
+    JWT_SECRET: str = Field(default="change-me-in-production-use-env-var")  # ≥ 32 bytes
     JWT_ALGORITHM: str = Field(default="HS256")
     JWT_EXPIRES_IN_SECONDS: int = Field(default=7 * 24 * 60 * 60)  # 7 days
     INTERNAL_API_KEY: str = Field(default="")
