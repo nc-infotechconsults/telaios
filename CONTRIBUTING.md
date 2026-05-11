@@ -22,7 +22,7 @@ Thank you for your interest in contributing to **TelaiOS**! This document explai
 
 ## Code of Conduct
 
-This project follows a simple golden rule: **be respectful and constructive**. Harassment, discrimination, or dismissive behaviour toward other contributors will not be tolerated. If you experience or witness a problem, reach out to the maintainers.
+This project follows a simple golden rule: **be respectful and constructive**. Harassment, discrimination, or dismissive behaviour toward other contributors will not be tolerated.
 
 ---
 
@@ -46,7 +46,7 @@ Use the [bug report issue template](.github/ISSUE_TEMPLATE/bug_report.yml). Incl
 - Steps to reproduce the problem.
 - What you expected to happen vs. what actually happened.
 - Relevant logs, screenshots, or error messages.
-- Your environment (OS, browser, Node/Python/Bun versions, Docker Compose version).
+- Your environment (OS, browser, Python/Bun versions, Docker Compose version).
 
 ### Suggesting Features
 
@@ -72,60 +72,78 @@ Use the [feature request issue template](.github/ISSUE_TEMPLATE/feature_request.
 
 | Tool | Version |
 |------|---------|
+| [Python](https://python.org) | 3.14 |
+| [uv](https://docs.astral.sh/uv/) | latest |
 | [Bun](https://bun.sh) | ≥ 1.x |
-| [Python](https://python.org) | 3.12 |
 | [Docker Compose](https://docs.docker.com/compose/) | v2 |
 
 ### 1. Copy environment variables
 
 ```bash
-cp .env.example .env
+cp server/.env.example server/.env
+cp frontend/.env.example frontend/.env
 # Fill in LLM API keys and other secrets
 ```
 
 ### 2. Start local infrastructure
 
 ```bash
-bun run docker:dev   # starts PostgreSQL, Redis, MinIO
+docker compose -f docker-compose.dev.yml up
 ```
 
 ### 3. Install dependencies
 
 ```bash
-bun install
-bun run apps:install      # installs JS workspace deps
-bun run agent:install     # installs Python agent-service deps
+cd server && uv sync
+cd frontend && bun install
 ```
 
-### 4. Run the services
+### 4. Run database migrations
 
 ```bash
-bun run data:dev       # data-api  → http://localhost:3000
-bun run agent:dev      # agent-service → http://localhost:8000
-bun run frontend:dev   # frontend  → http://localhost:5173
+cd server && uv run alembic upgrade head
 ```
+
+### 5. Run the services
+
+Use separate terminals:
+
+```bash
+# Terminal 1 — API server
+cd server && uv run uvicorn telaios.main:app --reload --port 8000
+
+# Terminal 2 — Frontend dev server
+cd frontend && bun run dev
+```
+
+| Service | URL |
+| --- | --- |
+| Frontend | http://localhost:5173 |
+| Server API | http://localhost:8000 |
+| MinIO API | http://localhost:9000 |
+| MinIO Console | http://localhost:9001 |
 
 ### Subproject READMEs
 
-Each service has its own `README.md` or `AGENTS.md` with service-specific details — check those before diving in.
+Each subproject has its own `README.md` or `AGENTS.md` with service-specific details — check those before diving in.
 
 ---
 
 ## Coding Conventions
 
-### TypeScript / JavaScript (frontend, data-api)
+### TypeScript / React (frontend)
 
-- Follow the existing code style; check for a local `.eslintrc` or formatting config in each sub-package.
+- Follow the existing code style; check for a local `.eslintrc` or formatting config.
 - Use `async`/`await` over raw Promises.
 - Prefer named exports.
-- Never edit existing database migration files — always create a new migration file for schema changes.
 
-### Python (agent-service)
+### Python (server)
 
-- Python 3.12+ — use type hints throughout.
+- Python 3.14+ — use type hints throughout.
 - Follow [PEP 8](https://peps.python.org/pep-0008/) for formatting.
 - Use `pydantic` models for data validation; use `pydantic-settings` for configuration.
 - Write `pytest` tests for new behaviour.
+- Database schema changes must always be made via new Alembic migration files — never edit existing migration files directly.
 
 ### General
 
@@ -164,8 +182,8 @@ We use the [Conventional Commits](https://www.conventionalcommits.org/) format:
 **Examples:**
 
 ```
-feat(agent-service): add Ollama provider support
-fix(data-api): handle missing project member on delete
+feat(server): add Ollama provider support
+fix(frontend): handle missing project member on delete
 docs: update contributing guidelines
 chore: bump langchain-openai to 0.3.1
 ```
@@ -176,11 +194,9 @@ chore: bump langchain-openai to 0.3.1
 
 | Path | Language | Purpose |
 |------|----------|---------|
+| `server/` | Python / FastAPI | Backend API, agent runtime, document processing |
 | `frontend/` | TypeScript / React | Web application |
-| `data-api/` | TypeScript / Bun | REST API + database |
-| `agent-service/` | Python | LLM planning & agent execution |
-| `packages/shared/` | TypeScript | Shared utilities |
-| `tests/` | TypeScript | Root smoke / integration tests |
+| `tests/` | Python | Root smoke / integration tests |
 | `docs/` | Markdown | Design documents and specs |
 
 ---
@@ -194,4 +210,4 @@ chore: bump langchain-openai to 0.3.1
 
 ---
 
-Thank you for contributing to TelaiOS! 🎉
+Thank you for contributing to TelaiOS!
