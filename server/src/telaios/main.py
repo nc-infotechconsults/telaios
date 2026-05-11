@@ -40,7 +40,12 @@ from telaios.config.settings import get_settings
 from telaios.db.session import dispose_engine
 from telaios.infra.redis import close_redis
 from telaios.modules.agent_profiles import agent_profiles_router
+from telaios.modules.analytics import analytics_router
 from telaios.modules.chat import chat_router
+from telaios.modules.containers import containers_router
+from telaios.modules.docker_shell import docker_shell_router
+from telaios.modules.document_copilot import copilot_router
+from telaios.modules.document_extraction import extraction_router, jobs_router
 from telaios.modules.documents import (
     document_activities_router,
     document_comments_router,
@@ -57,12 +62,15 @@ from telaios.modules.documents import (
     templates_router,
 )
 from telaios.modules.environments import environments_router
+from telaios.modules.health import health_router
+from telaios.modules.internal import internal_router
 from telaios.modules.library import library_router
 from telaios.modules.messages import messages_router
 from telaios.modules.plans import plan_router, project_plans_router
 from telaios.modules.projects import agents_router, members_router, projects_router
 from telaios.modules.repositories import repositories_router
 from telaios.modules.settings import settings_router
+from telaios.modules.skills import skills_router
 from telaios.modules.tasks import plan_tasks_router, task_router
 from telaios.modules.users import UserService, auth_router, users_router
 from telaios.modules.workspaces import project_workspaces_router, workspace_router
@@ -142,6 +150,16 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
     app.include_router(document_favorites_router)
     app.include_router(templates_router)
     app.include_router(project_templates_router)
+    app.include_router(extraction_router)
+    app.include_router(jobs_router)
+    app.include_router(copilot_router)
+    app.include_router(skills_router)
+    # ─── Phase 8 routers ──────────────────────────────────────────────────
+    app.include_router(health_router)
+    app.include_router(analytics_router)
+    app.include_router(internal_router)
+    app.include_router(containers_router)
+    app.include_router(docker_shell_router)
 
     # ─── Auth user-loader ─────────────────────────────────────────────────
     # Enables DB-backed validation of JWT subjects (is_active check, fresh
@@ -149,11 +167,6 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
     set_user_loader(UserService.load_principal)
 
     _ = modules
-
-    @app.get("/health", tags=["health"])
-    async def health() -> dict[str, str]:
-        """Liveness probe (placeholder until modules.health lands in Phase 8)."""
-        return {"status": "ok"}
 
     return app
 

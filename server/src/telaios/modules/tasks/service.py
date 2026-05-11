@@ -91,6 +91,10 @@ class TaskService:
         """Soft-delete all tasks for a plan (called from plans.router after RBAC)."""
         return await self._repo.soft_delete_by_plan(plan_id)
 
+    async def skip_dependent_tasks(self, task_id: uuid.UUID) -> int:
+        """Skip all downstream dependents of *task_id*."""
+        return await self._repo.skip_dependent_tasks(task_id)
+
     async def cancel_by_plan(self, plan_id: uuid.UUID) -> int:
         """Cancel all running/pending tasks for a plan (called from plans.router)."""
         return await self._repo.cancel_by_plan(plan_id)

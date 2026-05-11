@@ -228,3 +228,53 @@ ignore_imports =
     telaios.modules.documents.chunks -> telaios.modules.documents.chunks.repository
     telaios.modules.documents.chunks -> telaios.modules.documents.chunks.service
     telaios.modules.documents.chunks.service -> telaios.modules.documents.chunks.repository
+    # document_llm — intra (pure LLM utility, no HTTP)
+    telaios.modules.document_llm -> telaios.modules.document_llm.service
+    # document_extraction — intra
+    telaios.modules.document_extraction -> telaios.modules.document_extraction.router
+    telaios.modules.document_extraction.router -> telaios.modules.document_extraction.schemas
+    telaios.modules.document_extraction.router -> telaios.modules.document_extraction.service
+    telaios.modules.document_extraction.router -> telaios.modules.document_extraction.service_helpers
+    telaios.modules.document_extraction.service -> telaios.modules.document_extraction.service_helpers
+    telaios.modules.document_extraction.schemas -> telaios.modules.document_llm.schemas
+    # document_extraction cross-module — allowed reads from documents.* and document_llm
+    telaios.modules.document_extraction.router -> telaios.modules.documents.repository
+    telaios.modules.document_extraction.service_helpers -> telaios.modules.documents.chunks.service
+    telaios.modules.document_extraction.service_helpers -> telaios.modules.document_llm.service
+    # document_copilot — intra
+    telaios.modules.document_copilot -> telaios.modules.document_copilot.router
+    telaios.modules.document_copilot.router -> telaios.modules.document_copilot.schemas
+    telaios.modules.document_copilot.router -> telaios.modules.document_copilot.service
+    # document_copilot cross-module — reads from documents.*
+    telaios.modules.document_copilot.router -> telaios.modules.documents.repository
+    telaios.modules.document_copilot.service -> telaios.modules.documents.chunks.service
+    telaios.modules.document_copilot.service -> telaios.modules.documents.service
+    # skills — intra (no repository; filesystem-backed)
+     telaios.modules.skills -> telaios.modules.skills.router
+     telaios.modules.skills.router -> telaios.modules.skills.schemas
+     telaios.modules.skills.router -> telaios.modules.skills.service
+     # health — intra (cross-layer reads from infra + db allowed via contract A exemption)
+     telaios.modules.health -> telaios.modules.health.router
+     # analytics — intra
+     telaios.modules.analytics -> telaios.modules.analytics.router
+     telaios.modules.analytics.router -> telaios.modules.analytics.schemas
+     telaios.modules.analytics.router -> telaios.modules.analytics.service
+     telaios.modules.analytics.service -> telaios.modules.analytics.schemas
+     # internal — intra + cross-module service reads (allowed)
+     telaios.modules.internal -> telaios.modules.internal.router
+     telaios.modules.internal.router -> telaios.modules.internal.schemas
+     telaios.modules.internal.router -> telaios.modules.documents.service
+     telaios.modules.internal.router -> telaios.modules.documents.chunks.service
+     telaios.modules.internal.router -> telaios.modules.documents.schemas
+     telaios.modules.internal.router -> telaios.modules.plans.service
+     telaios.modules.internal.router -> telaios.modules.plans.schemas
+     telaios.modules.internal.router -> telaios.modules.tasks.service
+     telaios.modules.internal.router -> telaios.modules.tasks.artifacts.schemas
+     telaios.modules.internal.router -> telaios.modules.tasks.artifacts.service
+     telaios.modules.internal.router -> telaios.modules.projects.agents.service
+     telaios.modules.internal.router -> telaios.modules.library.service
+     # containers — intra (no cross-module reads needed)
+     telaios.modules.containers -> telaios.modules.containers.router
+     # docker_shell — intra + cross-module reads (allowed)
+     telaios.modules.docker_shell -> telaios.modules.docker_shell.router
+     telaios.modules.docker_shell.router -> telaios.modules.users.repository

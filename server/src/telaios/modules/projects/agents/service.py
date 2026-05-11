@@ -140,3 +140,18 @@ class AgentService:
 
     async def delete_agent(self, project_id: uuid.UUID, agent_id: uuid.UUID) -> None:
         await self._repo.delete(project_id, agent_id)
+
+    async def list_agents_raw(self, project_id: uuid.UUID) -> list[dict[str, Any]]:
+        """Return agents with raw (encrypted) llm_api_key for agent-service use."""
+        agents = await self._repo.list(project_id)
+        result: list[dict[str, Any]] = []
+        for a in agents:
+            data: dict[str, Any] = {}
+            for col in a.__table__.columns:
+                data[col.name] = getattr(a, col.name)
+            if data.get("id") is not None:
+                data["id"] = str(data["id"])
+            if data.get("project_id") is not None:
+                data["project_id"] = str(data["project_id"])
+            result.append(data)
+        return result

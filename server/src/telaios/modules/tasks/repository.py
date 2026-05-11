@@ -131,6 +131,42 @@ class TaskRepository:
         await self._s.flush()
         return len(tasks)
 
+    async def skip_dependent_tasks(self, task_id: uuid.UUID) -> int:
+        """Set status='skipped' on all tasks that (directly or transitively)
+        depend on *task_id* and are still in a non-terminal state."""
+        # Walk dependency graph breadth-first to collect all downstream ids.
+        visited: set[uuid.UUID] = set()
+        frontier: list[uuid.UUID] = [task_id]
+        while frontier:
+            current = frontier.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            rows = await self._s.execute(
+                select(TaskDependency.task_id).where(TaskDependency.depends_on_task_id == current)
+            )
+            for (dep_task_id,) in rows:
+                if dep_task_id not in visited:
+                    frontier.append(dep_task_id)
+
+        downstream = visited - {task_id}
+        if not downstream:
+            return 0
+
+        skippable: tuple[str, ...] = ("pending", "ready")
+        result = await self._s.execute(
+            select(Task).where(
+                Task.id.in_(downstream),
+                Task.status.in_(skippable),
+                Task.deleted_at.is_(None),
+            )
+        )
+        tasks = list(result.scalars())
+        for t in tasks:
+            t.status = "skipped"
+        await self._s.flush()
+        return len(tasks)
+
     async def soft_delete(self, obj: Task) -> None:
         obj.deleted_at = datetime.now(UTC)
         await self._s.flush()

@@ -27,5 +27,28 @@ class ChunkService:
         stored = await self._repo.bulk_create(document_id, chunks)
         return len(stored)
 
+    async def get_by_document(self, document_id: uuid.UUID) -> list[dict[str, Any]]:
+        """Return all chunks for *document_id* as plain dicts.
+
+        Each dict has keys: ``content``, ``chunk_index``, ``document_id``,
+        ``metadata``.
+        """
+        return await self._repo.list_as_dicts(document_id)
+
+    async def search_by_embedding(
+        self,
+        project_id: uuid.UUID,
+        embedding: list[float],
+        limit: int = 8,
+        document_id: uuid.UUID | None = None,
+    ) -> list[dict[str, Any]]:
+        """Cosine-similarity ANN search (delegates to repository).
+
+        Returns chunks ordered by ascending distance (most similar first).
+        """
+        return await self._repo.search_by_embedding(
+            project_id, embedding, limit=limit, document_id=document_id
+        )
+
 
 __all__ = ["ChunkService"]
