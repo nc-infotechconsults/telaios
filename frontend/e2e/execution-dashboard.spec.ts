@@ -4,7 +4,7 @@ import { loadCIData } from "./global-setup";
 /**
  * ExecutionDashboard E2E tests.
  *
- * Run against the real backend stack (data-api + agent-service).
+ * Run against the real FastAPI server.
  * Test data is seeded in global-setup.ts:
  *
  * executingProject — plan with 5 tasks:
@@ -146,4 +146,3 @@ test.describe("ExecutionDashboard — completed plan", () => {
     await expect(page.getByRole("button", { name: "Resume" })).not.toBeVisible();
   });
 });
-

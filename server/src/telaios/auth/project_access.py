@@ -25,9 +25,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.auth.dependencies import CurrentPrincipal, Principal
+from telaios.db.models.environments import Environment
 from telaios.db.models.projects import ProjectMember
 from telaios.db.session import get_session
-from telaios.utils.errors import ForbiddenError
+from telaios.utils.errors import ForbiddenError, NotFoundError
 
 # Role hierarchy: higher index = more permissive / senior role.
 _ROLE_ORDER: list[str] = ["viewer", "editor", "owner"]
@@ -74,6 +75,27 @@ async def check_project_membership(
         raise ForbiddenError("Insufficient project role")
 
 
+async def check_environment_project_access(
+    env_id: uuid.UUID,
+    principal: Principal,
+    session: AsyncSession,
+    min_role: str = "viewer",
+) -> uuid.UUID:
+    """Resolve an environment's project and enforce project membership."""
+    result = await session.execute(
+        select(Environment.project_id).where(
+            Environment.id == env_id,
+            Environment.deleted_at.is_(None),
+        )
+    )
+    project_id = result.scalar_one_or_none()
+    if project_id is None:
+        raise NotFoundError("Environment not found")
+
+    await check_project_membership(project_id, principal, session, min_role)
+    return project_id
+
+
 def require_project_access(min_role: str = "viewer") -> Callable[..., object]:
     """Return a FastAPI dependency that enforces ``min_role`` on a project.
 
@@ -104,6 +126,20 @@ def require_project_access(min_role: str = "viewer") -> Callable[..., object]:
     return _dep
 
 
+def require_environment_project_access(min_role: str = "viewer") -> Callable[..., object]:
+    """Return a dependency enforcing project RBAC for ``env_id`` routes."""
+
+    async def _dep(
+        env_id: uuid.UUID,
+        principal: CurrentPrincipal,
+        session: AsyncSession = Depends(get_session),
+    ) -> Principal:
+        await check_environment_project_access(env_id, principal, session, min_role)
+        return principal
+
+    return _dep
+
+
 RequireProjectViewer = Annotated[Principal, Depends(require_project_access("viewer"))]
 RequireProjectEditor = Annotated[Principal, Depends(require_project_access("editor"))]
 RequireProjectOwner = Annotated[Principal, Depends(require_project_access("owner"))]
@@ -112,6 +148,8 @@ __all__ = [
     "RequireProjectEditor",
     "RequireProjectOwner",
     "RequireProjectViewer",
+    "check_environment_project_access",
     "check_project_membership",
+    "require_environment_project_access",
     "require_project_access",
 ]

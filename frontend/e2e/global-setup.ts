@@ -14,7 +14,7 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 
-const DATA_API = process.env.DATA_API_URL ?? "http://localhost:3000";
+const SERVER_URL = process.env.SERVER_URL ?? "http://localhost:8000";
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY ?? "test-internal-api-key";
 
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
@@ -48,11 +48,12 @@ export function loadCIData(): CIData {
   return JSON.parse(fs.readFileSync(CI_DATA_FILE, "utf-8")) as CIData;
 }
 
-// Internal / admin HTTP client (INTERNAL_API_KEY bypass)
-const api = axios.create({
-  baseURL: DATA_API,
-  headers: { Authorization: `Bearer ${INTERNAL_KEY}` },
+const internalApi = axios.create({
+  baseURL: SERVER_URL,
+  headers: { "X-Internal-Api-Key": INTERNAL_KEY },
 });
+
+let api = axios.create({ baseURL: SERVER_URL });
 
 async function makeTask(
   planId: string,
@@ -63,8 +64,7 @@ async function makeTask(
   order: number,
   deps: string[],
 ): Promise<{ id: string }> {
-  const { data } = await api.post<{ id: string }>("/tasks", {
-    plan_id: planId,
+  const { data } = await api.post<{ id: string }>(`/plans/${planId}/tasks`, {
     title,
     description,
     type: "code",
@@ -85,7 +85,7 @@ export default async function globalSetup(config: FullConfig) {
   let token: string;
 
   try {
-    const { data } = await axios.post<{ token: string }>(`${DATA_API}/auth/register`, {
+    const { data } = await axios.post<{ token: string }>(`${SERVER_URL}/auth/register`, {
       email,
       password,
       display_name: "E2E Test User",
@@ -93,9 +93,14 @@ export default async function globalSetup(config: FullConfig) {
     token = data.token;
   } catch {
     // User already exists from a previous run — just log in
-    const { data } = await axios.post<{ token: string }>(`${DATA_API}/auth/login`, { email, password });
+    const { data } = await axios.post<{ token: string }>(`${SERVER_URL}/auth/login`, { email, password });
     token = data.token;
   }
+
+  api = axios.create({
+    baseURL: SERVER_URL,
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
   // ── 2. Agent profile ────────────────────────────────────────────────────────
   const { data: agentProfile } = await api.post<{ id: string }>("/agent-profiles", {
@@ -163,7 +168,7 @@ export default async function globalSetup(config: FullConfig) {
     auth_type: "none",
   });
 
-  const { data: execPlan } = await api.post<{ id: string }>("/plans", { project_id: executingProjectId });
+  const { data: execPlan } = await api.post<{ id: string }>(`/projects/${executingProjectId}/plans`, {});
   const executingPlanId = execPlan.id;
 
   const t1 = await makeTask(executingPlanId, agentProfileId, [authRepo.id],
@@ -195,7 +200,7 @@ export default async function globalSetup(config: FullConfig) {
   await api.patch(`/tasks/${t3.id}`, { status: "in_progress" });
 
   await api.patch(`/plans/${executingPlanId}`, { status: "confirmed" });
-  await api.patch(`/internal/plans/${executingPlanId}/status`, { status: "executing" });
+  await internalApi.patch(`/internal/plans/${executingPlanId}/status`, { status: "executing" });
 
   // ── 4. Planning project (only a draft plan — no active plan) ────────────────
   const { data: planningProject } = await api.post<{ id: string }>("/projects", {
@@ -203,7 +208,7 @@ export default async function globalSetup(config: FullConfig) {
     description: "CI test: planning-only project",
   });
   const planningProjectId = planningProject.id;
-  await api.post("/plans", { project_id: planningProjectId });
+  await api.post(`/projects/${planningProjectId}/plans`, {});
 
   // ── 5. Completed project ────────────────────────────────────────────────────
   const { data: completedProject } = await api.post<{ id: string }>("/projects", {
@@ -212,7 +217,7 @@ export default async function globalSetup(config: FullConfig) {
   });
   const completedProjectId = completedProject.id;
 
-  const { data: completedPlan } = await api.post<{ id: string }>("/plans", { project_id: completedProjectId });
+  const { data: completedPlan } = await api.post<{ id: string }>(`/projects/${completedProjectId}/plans`, {});
   const completedPlanId = completedPlan.id;
 
   const ct1 = await makeTask(completedPlanId, agentProfileId, [],
@@ -227,8 +232,8 @@ export default async function globalSetup(config: FullConfig) {
     await api.patch(`/tasks/${id}`, { status: "done" });
   }
   await api.patch(`/plans/${completedPlanId}`, { status: "confirmed" });
-  await api.patch(`/internal/plans/${completedPlanId}/status`, { status: "executing" });
-  await api.patch(`/internal/plans/${completedPlanId}/status`, { status: "completed" });
+  await internalApi.patch(`/internal/plans/${completedPlanId}/status`, { status: "executing" });
+  await internalApi.patch(`/internal/plans/${completedPlanId}/status`, { status: "completed" });
 
   // ── 6. Write CI data fixture ────────────────────────────────────────────────
   const ciData: CIData = {

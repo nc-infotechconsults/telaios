@@ -228,7 +228,7 @@ export const testRepository = (
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
 export const getPlans = (projectId: string): Promise<Plan[]> =>
-  DEMO ? delay(demo.PLANS[projectId] ?? []) : http.get<Plan[]>("/plans", { params: { project_id: projectId } }).then((r) => r.data);
+  DEMO ? delay(demo.PLANS[projectId] ?? []) : http.get<Plan[]>(`/projects/${projectId}/plans`).then((r) => r.data);
 
 export const getPlan = (planId: string): Promise<Plan> =>
   DEMO
@@ -244,7 +244,7 @@ export const createPlan = (projectId: string, title?: string): Promise<Plan> =>
         status: "draft",
         created_at: new Date().toISOString(),
       })
-    : http.post<Plan>("/plans", { project_id: projectId, title }).then((r) => r.data);
+    : http.post<Plan>(`/projects/${projectId}/plans`, { title }).then((r) => r.data);
 
 export const deletePlan = (planId: string): Promise<void> =>
   DEMO ? delay(undefined) : http.delete(`/plans/${planId}`).then(() => undefined);
@@ -252,7 +252,7 @@ export const deletePlan = (planId: string): Promise<void> =>
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
 export const getTasks = (planId: string): Promise<Task[]> =>
-  DEMO ? delay(demo.TASKS[planId] ?? []) : http.get<Task[]>(`/tasks?plan_id=${planId}`).then((r) => r.data);
+  DEMO ? delay(demo.TASKS[planId] ?? []) : http.get<Task[]>(`/plans/${planId}/tasks`).then((r) => r.data);
 
 export const retryTask = (taskId: string): Promise<Task> =>
   DEMO ? delay({} as Task) : http.post<Task>(`/tasks/${taskId}/retry`).then((r) => r.data);
@@ -264,7 +264,7 @@ export const cancelPlan = (planId: string): Promise<{ cancelled: number }> =>
   DEMO ? delay({ cancelled: 0 }) : http.post<{ cancelled: number }>(`/plans/${planId}/cancel`).then((r) => r.data);
 
 export const resumePlan = (planId: string): Promise<void> =>
-  DEMO ? delay(undefined) : axios.post(`/agent/plans/${planId}/resume`).then(() => undefined);
+  DEMO ? delay(undefined) : http.post(`/plans/${planId}/resume`).then(() => undefined);
 
 // ─── Task Artifacts ───────────────────────────────────────────────────────────
 
@@ -791,6 +791,16 @@ export const listDockerContainers = (envId: string): Promise<DockerContainer[]> 
 export const getDockerContainer = (envId: string, containerId: string): Promise<unknown> =>
   http.get(`/environments/${envId}/docker/containers/${containerId}`).then((r) => r.data);
 
+export const createDockerShellTicket = (
+  envId: string,
+  containerId: string,
+): Promise<{ ticket: string; expires_in: number }> =>
+  http
+    .post<{ ticket: string; expires_in: number }>(
+      `/environments/${envId}/docker/shell/${encodeURIComponent(containerId)}/ticket`,
+    )
+    .then((r) => r.data);
+
 export const startDockerContainer = (envId: string, containerId: string): Promise<void> =>
   http.post(`/environments/${envId}/docker/containers/${containerId}/start`).then(() => undefined);
 
@@ -1089,4 +1099,3 @@ export const getProjectDocAnalytics = (
     : http
         .get<DocumentAnalytics>(`/projects/${projectId}/analytics/documents`, { params: { period } })
         .then((r) => r.data);
-

@@ -4,7 +4,7 @@ import { loadCIData } from "./global-setup";
 /**
  * Agent Profiles E2E tests.
  *
- * Run against the real backend stack (data-api).
+ * Run against the real FastAPI server.
  * Test data is seeded in global-setup.ts:
  *
  *   agentProfile      — "GPT-4o Coder"      (no system_prompt, no sub-agents)

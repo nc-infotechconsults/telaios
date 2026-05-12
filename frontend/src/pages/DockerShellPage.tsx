@@ -5,10 +5,7 @@
  * WebSocket.  Opened in a new browser tab by DockerContainerDetail when the
  * user clicks "Shell".
  *
- * URL:  /environments/:envId/docker/shell/:containerId?token=<jwt>
- *
- * The JWT token is passed as a query-param because browsers cannot send
- * custom headers on WebSocket upgrade requests.
+ * URL:  /environments/:envId/docker/shell/:containerId?ticket=<one-time-ticket>
  */
 import { useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -18,12 +15,12 @@ import "@xterm/xterm/css/xterm.css";
 
 const WS_BASE =
   import.meta.env.VITE_WS_URL ??
-  `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host.replace(/:\d+$/, ":3000")}`;
+  `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
 
 export default function DockerShellPage() {
   const { envId, containerId } = useParams<{ envId: string; containerId: string }>();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  const ticket = searchParams.get("ticket") ?? "";
 
   const termRef = useRef<HTMLDivElement>(null);
   const termInstance = useRef<Terminal | null>(null);
@@ -31,7 +28,7 @@ export default function DockerShellPage() {
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    if (!termRef.current || !envId || !containerId) return;
+    if (!termRef.current || !envId || !containerId || !ticket) return;
 
     let disposed = false;
     let rafId = 0;
@@ -65,7 +62,7 @@ export default function DockerShellPage() {
 
     // ── WebSocket setup ─────────────────────────────────────────────────────
     // Start connecting immediately; xterm buffers writes before open() is called.
-    const wsUrl = `${WS_BASE}/ws/environments/${envId}/docker/shell/${containerId}?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${WS_BASE}/ws/environments/${envId}/docker/shell/${containerId}?ticket=${encodeURIComponent(ticket)}`;
     const socket = new WebSocket(wsUrl);
     socket.binaryType = "arraybuffer";
     ws.current = socket;
@@ -146,7 +143,7 @@ export default function DockerShellPage() {
       fitAddon.current = null;
       ws.current = null;
     };
-  }, [envId, containerId, token]);
+  }, [envId, containerId, ticket]);
 
   return (
     <div

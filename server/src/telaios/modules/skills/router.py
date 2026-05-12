@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from telaios.auth.dependencies import require_admin
 from telaios.modules.skills.schemas import (
     InstallRequest,
     InstallResponse,
@@ -53,13 +54,15 @@ async def search_skills_endpoint(
     return search_skills(q, limit)
 
 
-@skills_router.post("/reload", response_model=ReloadResponse)
+@skills_router.post("/reload", response_model=ReloadResponse, dependencies=[Depends(require_admin)])
 async def reload_skills_endpoint() -> dict[str, Any]:
     """Reload all skills from the configured skills directory."""
     return reload_skills()
 
 
-@skills_router.post("/install", response_model=InstallResponse)
+@skills_router.post(
+    "/install", response_model=InstallResponse, dependencies=[Depends(require_admin)]
+)
 async def install_skill_endpoint(body: InstallRequest) -> dict[str, Any]:
     """Install a skill from a zip file path."""
     return install_skill(body.zip_path, body.conflict_policy)

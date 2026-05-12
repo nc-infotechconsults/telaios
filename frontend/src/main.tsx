@@ -33,13 +33,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
-                <Route
-                  path="/environments/:envId/docker/shell/:containerId"
-                  element={<DockerShellPage />}
-                />
 
                 {/* Protected routes */}
                 <Route element={<ProtectedRoute />}>
+                  <Route
+                    path="/environments/:envId/docker/shell/:containerId"
+                    element={<DockerShellPage />}
+                  />
                   <Route element={<Layout />}>
                     <Route path="/" element={<ProjectList />} />
                     <Route path="/projects/:projectId" element={<ProjectDetail />} />

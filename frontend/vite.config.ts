@@ -3,11 +3,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 // When running inside Docker the proxy needs Docker network service names.
-// Outside Docker these env vars are unset, so we fall back to localhost.
-const DATA_API = process.env.INTERNAL_DATA_API_URL ?? "http://localhost:3000";
-const AGENT_HTTP = process.env.INTERNAL_AGENT_SERVICE_URL ?? "http://localhost:8000";
-// Internal service-to-service key — injected by the proxy so the browser never sees it.
-const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? "dev-internal-key-12345";
+// Outside Docker this env var is unset, so we fall back to localhost.
+const SERVER_URL = process.env.INTERNAL_SERVER_URL ?? process.env.VITE_API_URL ?? "http://localhost:8000";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -16,17 +13,14 @@ export default defineConfig({
     host: "0.0.0.0",
     proxy: {
       "/api": {
-        target: DATA_API,
+        target: SERVER_URL,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
-      "/agent": {
-        target: AGENT_HTTP,
+      "/ws": {
+        target: SERVER_URL,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/agent/, ""),
-        headers: {
-          Authorization: `Bearer ${INTERNAL_API_KEY}`,
-        },
+        ws: true,
       },
     },
   },

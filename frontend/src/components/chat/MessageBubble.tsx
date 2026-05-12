@@ -37,11 +37,23 @@ const MD_COMPONENTS: Components = {
   h1: ({ children }: El<"h1">) => <h1 className="text-base font-bold mb-1 mt-2">{children}</h1>,
   h2: ({ children }: El<"h2">) => <h2 className="text-sm font-bold mb-1 mt-2">{children}</h2>,
   h3: ({ children }: El<"h3">) => <h3 className="text-sm font-semibold mb-1 mt-2">{children}</h3>,
-  a: ({ href, children }: El<"a">) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }: El<"a">) => {
+    const safeHref = (() => {
+      if (!href) return undefined;
+      try {
+        const parsed = new URL(href, window.location.origin);
+        return ["http:", "https:", "mailto:"].includes(parsed.protocol) ? href : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+    if (!safeHref) return <>{children}</>;
+    return (
+      <a href={safeHref} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+        {children}
+      </a>
+    );
+  },
   hr: () => <hr className="border-default-300 my-3" />,
 };
 

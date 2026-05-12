@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from telaios.auth.dependencies import Principal
-from telaios.auth.project_access import check_project_membership
+from telaios.auth.project_access import check_environment_project_access, check_project_membership
 from telaios.utils.errors import ForbiddenError
 
 # ─── Helpers ──────────────────────────────────────────────────────────────
@@ -46,6 +46,26 @@ def _mock_session(membership_role: str | None) -> AsyncMock:
         scalar_result = MagicMock()
         scalar_result.scalar_one_or_none.return_value = None
     session.execute.return_value = scalar_result
+    return session
+
+
+def _mock_env_session(project_id: uuid.UUID | None, membership_role: str | None) -> AsyncMock:
+    """Return a session mock for env lookup followed by membership lookup."""
+    session = AsyncMock()
+
+    env_result = MagicMock()
+    env_result.scalar_one_or_none.return_value = project_id
+
+    if membership_role is not None:
+        member = MagicMock()
+        member.role = membership_role
+        member_result = MagicMock()
+        member_result.scalar_one_or_none.return_value = member
+    else:
+        member_result = MagicMock()
+        member_result.scalar_one_or_none.return_value = None
+
+    session.execute.side_effect = [env_result, member_result]
     return session
 
 
@@ -122,3 +142,39 @@ class TestRoleHierarchy:
     async def test_owner_satisfies_owner(self):
         p = _principal()
         await check_project_membership(uuid.uuid4(), p, _mock_session("owner"), min_role="owner")
+
+
+class TestEnvironmentProjectAccess:
+    @pytest.mark.asyncio
+    async def test_resolves_environment_project_and_checks_membership(self):
+        project_id = uuid.uuid4()
+        p = _principal()
+        session = _mock_env_session(project_id, "editor")
+
+        resolved_project_id = await check_environment_project_access(
+            uuid.uuid4(), p, session, min_role="viewer"
+        )
+
+        assert resolved_project_id == project_id
+        assert session.execute.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_forbids_non_member(self):
+        p = _principal()
+        session = _mock_env_session(uuid.uuid4(), None)
+
+        with pytest.raises(ForbiddenError):
+            await check_environment_project_access(uuid.uuid4(), p, session)
+
+    @pytest.mark.asyncio
+    async def test_admin_bypasses_membership_after_environment_resolution(self):
+        project_id = uuid.uuid4()
+        p = _principal(system_role="admin")
+        session = _mock_env_session(project_id, None)
+
+        resolved_project_id = await check_environment_project_access(
+            uuid.uuid4(), p, session, min_role="owner"
+        )
+
+        assert resolved_project_id == project_id
+        assert session.execute.await_count == 1

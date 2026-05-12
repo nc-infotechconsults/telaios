@@ -23,7 +23,9 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from telaios.auth.jwt import TokenClaims
+from telaios.auth.dependencies import Principal, set_user_loader
+from telaios.auth.jwt import issue_token
+from telaios.db.session import get_session
 from telaios.main import create_app
 
 # ---------------------------------------------------------------------------
@@ -41,20 +43,30 @@ VALID_TOKEN = "valid.test.token"
 # ---------------------------------------------------------------------------
 
 
-def _claims() -> TokenClaims:
-    return TokenClaims(
-        sub=str(USER_ID),
+def _principal() -> Principal:
+    return Principal(
+        id=str(USER_ID),
         email="test@test.com",
         system_role="user",
-        iat=0,
-        exp=9_999_999_999,
     )
 
 
-def _active_user() -> MagicMock:
-    u = MagicMock()
-    u.is_active = True
-    return u
+def _env_lookup_result(project_id: uuid.UUID) -> MagicMock:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = project_id
+    return result
+
+
+def _membership_result(role: str = "editor") -> MagicMock:
+    member = MagicMock()
+    member.role = role
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = member
+    return result
+
+
+def _jwt(role: str = "member") -> str:
+    return issue_token(user_id=str(USER_ID), email="test@test.com", system_role=role)
 
 
 def _mock_sock(chunks: list[bytes]) -> MagicMock:
@@ -100,8 +112,8 @@ def app_client() -> TestClient:
     return TestClient(create_app(), raise_server_exceptions=False)
 
 
-def _ws_url(env_id: uuid.UUID = ENV_ID, container: str = CONTAINER_ID, token: str = "") -> str:
-    return f"/ws/environments/{env_id}/docker/shell/{container}?token={token}"
+def _ws_url(env_id: uuid.UUID = ENV_ID, container: str = CONTAINER_ID, ticket: str = "") -> str:
+    return f"/ws/environments/{env_id}/docker/shell/{container}?ticket={ticket}"
 
 
 # ---------------------------------------------------------------------------
@@ -109,19 +121,51 @@ def _ws_url(env_id: uuid.UUID = ENV_ID, container: str = CONTAINER_ID, token: st
 # ---------------------------------------------------------------------------
 
 
-def test_rejects_missing_token(app_client: TestClient) -> None:
-    """Empty token string must cause the server to close the WS."""
-    with pytest.raises(WebSocketDisconnect), app_client.websocket_connect(_ws_url(token="")) as ws:
+def test_rejects_missing_ticket(app_client: TestClient) -> None:
+    """Empty ticket string must cause the server to close the WS."""
+    with pytest.raises(WebSocketDisconnect), app_client.websocket_connect(_ws_url(ticket="")) as ws:
         ws.receive_bytes()
 
 
-def test_rejects_invalid_jwt(app_client: TestClient) -> None:
-    """Malformed JWT must cause the server to close the WS."""
+def test_rejects_invalid_ticket(app_client: TestClient) -> None:
+    """Unknown ticket must cause the server to close the WS."""
     with (
         pytest.raises(WebSocketDisconnect),
-        app_client.websocket_connect(_ws_url(token="not.a.valid.jwt")) as ws,
+        app_client.websocket_connect(_ws_url(ticket="not-a-ticket")) as ws,
     ):
         ws.receive_bytes()
+
+
+def test_ticket_endpoint_requires_authentication() -> None:
+    client = TestClient(create_app(), raise_server_exceptions=False)
+
+    res = client.post(f"/environments/{ENV_ID}/docker/shell/{CONTAINER_ID}/ticket")
+
+    assert res.status_code == 401
+
+
+def test_ticket_endpoint_checks_environment_membership() -> None:
+    app = create_app()
+    set_user_loader(None)
+
+    mock_session = AsyncMock()
+    mock_session.execute.side_effect = [_env_lookup_result(uuid.uuid4()), _membership_result()]
+
+    async def override_session_yield():
+        yield mock_session
+
+    app.dependency_overrides[get_session] = override_session_yield
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        res = client.post(
+            f"/environments/{ENV_ID}/docker/shell/{CONTAINER_ID}/ticket",
+            headers={"Authorization": f"Bearer {_jwt()}"},
+        )
+
+    assert res.status_code == 200
+    assert res.json()["ticket"]
+    assert res.json()["expires_in"] == 30
+    assert mock_session.execute.await_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -134,22 +178,21 @@ def test_closes_when_env_not_found() -> None:
     mock_session = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalars.return_value.first.return_value = None  # env not found
-    mock_session.execute.return_value = mock_result
-
-    mock_user_repo = AsyncMock()
-    mock_user_repo.find_by_id.return_value = _active_user()
+    mock_session.execute.side_effect = [_env_lookup_result(uuid.uuid4()), mock_result]
 
     client = TestClient(create_app(), raise_server_exceptions=False)
 
     with (
-        patch("telaios.modules.docker_shell.router.verify_token", return_value=_claims()),
+        patch(
+            "telaios.modules.docker_shell.router._consume_shell_ticket",
+            return_value=_principal(),
+        ),
         patch(
             "telaios.modules.docker_shell.router.get_sessionmaker",
             return_value=_FakeSessionmaker(mock_session),
         ),
-        patch("telaios.modules.users.repository.UserRepository", return_value=mock_user_repo),
         pytest.raises(WebSocketDisconnect),
-        client.websocket_connect(_ws_url(token=VALID_TOKEN)) as ws,
+        client.websocket_connect(_ws_url(ticket=VALID_TOKEN)) as ws,
     ):
         ws.receive_bytes()
 
@@ -184,26 +227,29 @@ def test_pty_lifecycle_connect_receive_disconnect() -> None:
     mock_env.connection_config = None
     mock_result = MagicMock()
     mock_result.scalars.return_value.first.return_value = mock_env
-    mock_session.execute.return_value = mock_result
-
-    mock_user_repo = AsyncMock()
-    mock_user_repo.find_by_id.return_value = _active_user()
+    mock_session.execute.side_effect = [
+        _env_lookup_result(uuid.uuid4()),
+        _membership_result(),
+        mock_result,
+    ]
 
     client = TestClient(create_app(), raise_server_exceptions=False)
 
     with (
-        patch("telaios.modules.docker_shell.router.verify_token", return_value=_claims()),
+        patch(
+            "telaios.modules.docker_shell.router._consume_shell_ticket",
+            return_value=_principal(),
+        ),
         patch(
             "telaios.modules.docker_shell.router.get_sessionmaker",
             return_value=_FakeSessionmaker(mock_session),
         ),
-        patch("telaios.modules.users.repository.UserRepository", return_value=mock_user_repo),
         patch(
             "telaios.modules.docker_shell.router.DockerClient.build_client_sync",
             return_value=mock_sync_client,
         ),
         contextlib.suppress(Exception),
-        client.websocket_connect(_ws_url(token=VALID_TOKEN)) as ws,
+        client.websocket_connect(_ws_url(ticket=VALID_TOKEN)) as ws,
     ):
         chunk = ws.receive_bytes()
         assert chunk == pty_output

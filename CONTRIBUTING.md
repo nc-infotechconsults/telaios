@@ -46,7 +46,7 @@ Use the [bug report issue template](.github/ISSUE_TEMPLATE/bug_report.yml). Incl
 - Steps to reproduce the problem.
 - What you expected to happen vs. what actually happened.
 - Relevant logs, screenshots, or error messages.
-- Your environment (OS, browser, Python/Bun versions, Docker Compose version).
+- Your environment (OS, browser, Python/Node versions, Docker Compose version).
 
 ### Suggesting Features
 
@@ -74,7 +74,7 @@ Use the [feature request issue template](.github/ISSUE_TEMPLATE/feature_request.
 |------|---------|
 | [Python](https://python.org) | 3.14 |
 | [uv](https://docs.astral.sh/uv/) | latest |
-| [Bun](https://bun.sh) | ≥ 1.x |
+| [Node.js](https://nodejs.org) / npm | ≥ 22.x |
 | [Docker Compose](https://docs.docker.com/compose/) | v2 |
 
 ### 1. Copy environment variables
@@ -95,7 +95,7 @@ docker compose -f docker-compose.dev.yml up
 
 ```bash
 cd server && uv sync
-cd frontend && bun install
+cd frontend && npm ci
 ```
 
 ### 4. Run database migrations
@@ -113,7 +113,7 @@ Use separate terminals:
 cd server && uv run uvicorn telaios.main:app --reload --port 8000
 
 # Terminal 2 — Frontend dev server
-cd frontend && bun run dev
+cd frontend && npm run dev
 ```
 
 | Service | URL |

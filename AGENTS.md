@@ -7,7 +7,7 @@ TelaiOS is a Python/FastAPI monolith (`server/`) plus a TypeScript/React fronten
 ```
 telaios/
   server/        # Python 3.14 / FastAPI monolith (uv-managed)  ← active
-  frontend/      # TypeScript / React frontend (Bun + Vite)
+  frontend/      # TypeScript / React frontend (npm + Vite)
   tests/         # Root smoke tests
   docs/          # Design documents, specs, and decision records
 ```
@@ -21,7 +21,7 @@ When working in a subproject, read its own `AGENTS.md` for project-specific guid
 cd server && uv sync
 
 # Frontend (TS)
-cd frontend && bun install
+cd frontend && npm ci
 ```
 
 ## Development commands
@@ -31,7 +31,7 @@ cd frontend && bun install
 cd server && uv run uvicorn telaios.main:app --reload --port 8000
 
 # Frontend
-cd frontend && bun run dev
+cd frontend && npm run dev
 
 # Infrastructure (postgres, redis, minio)
 docker compose -f docker-compose.dev.yml up

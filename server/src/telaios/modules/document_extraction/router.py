@@ -46,7 +46,7 @@ from telaios.modules.document_extraction.service_helpers import (
     summarize_document_chunks,
 )
 from telaios.modules.documents.repository import DocumentRepository
-from telaios.utils.errors import NotFoundError
+from telaios.utils.errors import BadRequestError, NotFoundError
 
 extraction_router = APIRouter(tags=["document-extraction"])
 jobs_router = APIRouter(prefix="/document-jobs", tags=["document-jobs"])
@@ -200,12 +200,18 @@ async def summarize_document_async(
 
 
 @jobs_router.get("/{job_id}")
-async def get_job_status(job_id: str) -> dict[str, Any]:
+async def get_job_status(
+    job_id: str,
+    principal: CurrentPrincipal,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, Any]:
     """Get status and result of an async document job."""
     tracker = get_job_tracker()
     job = tracker.get_job(job_id)
     if job is None:
         raise NotFoundError(f"Job {job_id} not found")
+    if job.document_id is not None:
+        await _check_doc_access(uuid.UUID(job.document_id), principal, session)
     return {
         "job_id": job.id,
         "type": job.type,
@@ -221,11 +227,17 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
 
 @jobs_router.get("")
 async def list_jobs(
+    principal: CurrentPrincipal,
+    session: Annotated[AsyncSession, Depends(get_session)],
     document_id: Annotated[str | None, Query()] = None,
     status: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
     """List async document jobs."""
+    if document_id is None and principal.system_role != "admin":
+        raise BadRequestError("document_id is required")
+    if document_id is not None:
+        await _check_doc_access(uuid.UUID(document_id), principal, session)
     tracker = get_job_tracker()
     jobs = tracker.list_jobs(document_id=document_id, status=status, limit=limit)
     return {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Spinner, useDisclosure } from "@heroui/react";
-import { getDockerContainer } from "../../lib/api";
+import { createDockerShellTicket, getDockerContainer } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerContainer } from "../../types";
 import DockerExecModal from "./DockerExecModal";
@@ -57,6 +57,7 @@ type InspectData = Record<string, any>;
 export default function DockerContainerDetail({ environmentId, container, onClose }: Props) {
   const [data, setData] = useState<InspectData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openingShell, setOpeningShell] = useState(false);
   const { isOpen: isExecOpen, onOpen: onExecOpen, onOpenChange: onExecOpenChange } = useDisclosure();
   const { isOpen: isStatsOpen, onOpen: onStatsOpen, onOpenChange: onStatsOpenChange } = useDisclosure();
 
@@ -79,6 +80,22 @@ export default function DockerContainerDetail({ environmentId, container, onClos
   const envVars: string[] = config.Env ?? [];
   const portBindings: InspectData = hostConfig.PortBindings ?? {};
   const networks: InspectData = networkSettings.Networks ?? {};
+
+  const openShell = async () => {
+    setOpeningShell(true);
+    try {
+      const { ticket } = await createDockerShellTicket(environmentId, container.id);
+      window.open(
+        `/environments/${environmentId}/docker/shell/${container.id}?ticket=${encodeURIComponent(ticket)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } catch {
+      toast.error("Failed to open shell");
+    } finally {
+      setOpeningShell(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-1">
@@ -114,15 +131,9 @@ export default function DockerContainerDetail({ environmentId, container, onClos
         <Button
           size="sm"
           variant="flat"
-          onPress={() => {
-            const token = localStorage.getItem("swe_auth_token") ?? "";
-            window.open(
-              `/environments/${environmentId}/docker/shell/${container.id}?token=${encodeURIComponent(token)}`,
-              "_blank",
-              "noopener,noreferrer",
-            );
-          }}
+          onPress={openShell}
           isDisabled={container.state !== "running"}
+          isLoading={openingShell}
         >
           Shell
         </Button>

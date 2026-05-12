@@ -4,7 +4,7 @@ import { loadCIData } from "./global-setup";
 /**
  * TaskDetailModal E2E tests.
  *
- * Run against the real backend stack (data-api + agent-service).
+ * Run against the real FastAPI server.
  * Test data is seeded in global-setup.ts:
  *
  * executingProject — plan with 5 tasks:
@@ -179,4 +179,3 @@ test.describe("TaskDetailModal — completed plan", () => {
     await expect(modal.getByText("No artifacts recorded for this task.")).toBeVisible();
   });
 });
-

@@ -22,17 +22,21 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import secrets
+import time
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telaios.auth.jwt import verify_token
+from telaios.auth.dependencies import CurrentPrincipal, Principal
+from telaios.auth.project_access import check_environment_project_access
 from telaios.db.models.environments import Environment
-from telaios.db.session import get_sessionmaker
+from telaios.db.session import get_session, get_sessionmaker
 from telaios.infra.docker import DockerClient, DockerConnectionConfig
 from telaios.utils.crypto import decrypt
 
@@ -41,6 +45,40 @@ log = structlog.get_logger(__name__)
 docker_shell_router = APIRouter(tags=["docker-shell"])
 
 _SHELL_CMD = "/bin/sh -c 'if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi'"
+_SHELL_TICKET_TTL_SECONDS = 30
+
+
+@dataclass(frozen=True)
+class _ShellTicket:
+    principal: Principal
+    env_id: uuid.UUID
+    container_id: str
+    expires_at: float
+
+
+_shell_tickets: dict[str, _ShellTicket] = {}
+
+
+def _issue_shell_ticket(principal: Principal, env_id: uuid.UUID, container_id: str) -> str:
+    ticket = secrets.token_urlsafe(32)
+    _shell_tickets[ticket] = _ShellTicket(
+        principal=principal,
+        env_id=env_id,
+        container_id=container_id,
+        expires_at=time.monotonic() + _SHELL_TICKET_TTL_SECONDS,
+    )
+    return ticket
+
+
+def _consume_shell_ticket(ticket: str, env_id: uuid.UUID, container_id: str) -> Principal | None:
+    payload = _shell_tickets.pop(ticket, None)
+    if payload is None:
+        return None
+    if time.monotonic() > payload.expires_at:
+        return None
+    if payload.env_id != env_id or payload.container_id != container_id:
+        return None
+    return payload.principal
 
 
 def _build_cfg(connection_config_encrypted: str | None) -> DockerConnectionConfig:
@@ -74,26 +112,37 @@ async def _resolve_config(session: AsyncSession, env_id: uuid.UUID) -> DockerCon
     return _build_cfg(env.connection_config)
 
 
+@docker_shell_router.post("/environments/{env_id}/docker/shell/{container_id}/ticket")
+async def create_docker_shell_ticket(
+    env_id: uuid.UUID,
+    container_id: str,
+    principal: CurrentPrincipal,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int | str]:
+    """Issue a short-lived one-time ticket for a Docker shell WebSocket."""
+    await check_environment_project_access(env_id, principal, session, min_role="editor")
+    ticket = _issue_shell_ticket(principal, env_id, container_id)
+    return {"ticket": ticket, "expires_in": _SHELL_TICKET_TTL_SECONDS}
+
+
 @docker_shell_router.websocket("/ws/environments/{env_id}/docker/shell/{container_id}")
 async def docker_shell(
     websocket: WebSocket,
     env_id: uuid.UUID,
     container_id: str,
-    token: str = "",
+    ticket: str = "",
 ) -> None:
     # ── Auth ──────────────────────────────────────────────────────────────────
-    try:
-        claims = verify_token(token)
-    except Exception:
+    principal = _consume_shell_ticket(ticket, env_id, container_id)
+    if principal is None:
         await websocket.close(code=4001)
         return
 
     async with get_sessionmaker()() as session:
-        from telaios.modules.users.repository import UserRepository
-
-        user = await UserRepository(session).find_by_id(uuid.UUID(claims.sub))
-        if not user or not user.is_active:
-            await websocket.close(code=4001)
+        try:
+            await check_environment_project_access(env_id, principal, session, min_role="editor")
+        except Exception:
+            await websocket.close(code=4003)
             return
 
         # ── Resolve Docker config ─────────────────────────────────────────────

@@ -74,7 +74,7 @@ The frontend talks to the single `server` service over REST and SSE. The server 
 ## Prerequisites
 
 - **Python 3.14** + **uv** — server
-- **Bun** ≥ 1.x — frontend
+- **Node.js** ≥ 22.x + **npm** — frontend and smoke tests
 - **Docker Compose** — local infrastructure (PostgreSQL, Redis, MinIO)
 
 ---
@@ -104,7 +104,7 @@ Brings up PostgreSQL, Redis, and MinIO.
 
 ```bash
 cd server && uv sync
-cd frontend && bun install
+cd frontend && npm ci
 ```
 
 ### 3. Run database migrations
@@ -122,7 +122,7 @@ Use separate terminals:
 cd server && uv run uvicorn telaios.main:app --reload --port 8000
 
 # Terminal 2 — Frontend dev server
-cd frontend && bun run dev
+cd frontend && npm run dev
 ```
 
 | Service | URL |
@@ -149,7 +149,7 @@ docker compose up --build
 cd server && uv run pytest
 
 # Frontend E2E tests
-cd frontend && bun run test:e2e
+cd frontend && npm run test:e2e
 ```
 
 ---

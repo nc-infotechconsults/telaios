@@ -19,8 +19,9 @@ Closes #<!-- issue number -->
 
 <!-- Describe the tests you ran, or explain why no tests are needed. -->
 
-- [ ] Unit tests pass (`bun run test` / `bun run agent:test`)
-- [ ] E2E tests pass (`cd frontend && bun run test:e2e`)
+- [ ] Server tests pass (`cd server && uv run pytest`)
+- [ ] Frontend build passes (`cd frontend && npm run build`)
+- [ ] E2E tests pass (`cd frontend && npm run test:e2e`)
 - [ ] Manually tested in local environment
 
 ## Checklist

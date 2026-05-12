@@ -19,7 +19,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telaios.auth.project_access import require_project_access
+from telaios.auth.project_access import require_environment_project_access
 from telaios.db.session import get_session
 from telaios.infra.docker import DockerClient, DockerConnectionConfig
 from telaios.utils.crypto import decrypt
@@ -134,7 +134,7 @@ class UpdateFileBody(BaseModel):
 
 @containers_router.get(
     "/containers",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def list_containers(
     env_id: uuid.UUID,
@@ -151,7 +151,7 @@ async def list_containers(
 
 @containers_router.get(
     "/containers/{container_id}",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def get_container(
     env_id: uuid.UUID,
@@ -170,7 +170,7 @@ async def get_container(
 @containers_router.get(
     "/containers/{container_id}/logs",
     response_class=PlainTextResponse,
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def get_container_logs(
     env_id: uuid.UUID,
@@ -190,7 +190,7 @@ async def get_container_logs(
 @containers_router.post(
     "/containers/{container_id}/start",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def start_container(
     env_id: uuid.UUID,
@@ -209,7 +209,7 @@ async def start_container(
 @containers_router.post(
     "/containers/{container_id}/stop",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def stop_container(
     env_id: uuid.UUID,
@@ -228,7 +228,7 @@ async def stop_container(
 @containers_router.post(
     "/containers/{container_id}/restart",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def restart_container(
     env_id: uuid.UUID,
@@ -247,7 +247,7 @@ async def restart_container(
 @containers_router.delete(
     "/containers/{container_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def remove_container(
     env_id: uuid.UUID,
@@ -267,7 +267,7 @@ async def remove_container(
 @containers_router.post(
     "/containers",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def create_container(
     env_id: uuid.UUID,
@@ -296,7 +296,7 @@ async def create_container(
 
 @containers_router.post(
     "/containers/{container_id}/exec",
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def exec_container(
     env_id: uuid.UUID,
@@ -322,7 +322,7 @@ async def exec_container(
 
 @containers_router.get(
     "/containers/{container_id}/stats",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def container_stats(
     env_id: uuid.UUID,
@@ -343,7 +343,7 @@ async def container_stats(
 
 @containers_router.get(
     "/images",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def list_images(
     env_id: uuid.UUID,
@@ -361,7 +361,7 @@ async def list_images(
 @containers_router.delete(
     "/images/{image_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def remove_image(
     env_id: uuid.UUID,
@@ -380,7 +380,7 @@ async def remove_image(
 
 @containers_router.get(
     "/images/{image_id}",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def inspect_image(
     env_id: uuid.UUID,
@@ -399,7 +399,7 @@ async def inspect_image(
 @containers_router.post(
     "/images/{image_id}/tag",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def tag_image(
     env_id: uuid.UUID,
@@ -418,7 +418,7 @@ async def tag_image(
 
 @containers_router.post(
     "/images/prune",
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def prune_images(
     env_id: uuid.UUID,
@@ -438,7 +438,7 @@ async def prune_images(
 
 @containers_router.get(
     "/volumes",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def list_volumes(
     env_id: uuid.UUID,
@@ -456,7 +456,7 @@ async def list_volumes(
 @containers_router.post(
     "/volumes",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def create_volume(
     env_id: uuid.UUID,
@@ -477,7 +477,7 @@ async def create_volume(
 @containers_router.delete(
     "/volumes/{name}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def remove_volume(
     env_id: uuid.UUID,
@@ -495,7 +495,7 @@ async def remove_volume(
 
 @containers_router.post(
     "/volumes/prune",
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def prune_volumes(
     env_id: uuid.UUID,
@@ -512,7 +512,7 @@ async def prune_volumes(
 
 @containers_router.get(
     "/volumes/{name}/files",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def list_volume_files(
     env_id: uuid.UUID,
@@ -531,7 +531,7 @@ async def list_volume_files(
 
 @containers_router.get(
     "/volumes/{name}/files/content",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def get_volume_file_content(
     env_id: uuid.UUID,
@@ -551,7 +551,7 @@ async def get_volume_file_content(
 @containers_router.put(
     "/volumes/{name}/files/content",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def update_volume_file_content(
     env_id: uuid.UUID,
@@ -574,7 +574,7 @@ async def update_volume_file_content(
 
 @containers_router.get(
     "/networks",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def list_networks(
     env_id: uuid.UUID,
@@ -591,7 +591,7 @@ async def list_networks(
 
 @containers_router.get(
     "/networks/{network_id}",
-    dependencies=[Depends(require_project_access("viewer"))],
+    dependencies=[Depends(require_environment_project_access("viewer"))],
 )
 async def inspect_network(
     env_id: uuid.UUID,
@@ -610,7 +610,7 @@ async def inspect_network(
 @containers_router.post(
     "/networks",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def create_network(
     env_id: uuid.UUID,
@@ -636,7 +636,7 @@ async def create_network(
 @containers_router.delete(
     "/networks/{network_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def remove_network(
     env_id: uuid.UUID,
@@ -654,7 +654,7 @@ async def remove_network(
 
 @containers_router.post(
     "/networks/prune",
-    dependencies=[Depends(require_project_access("editor"))],
+    dependencies=[Depends(require_environment_project_access("editor"))],
 )
 async def prune_networks(
     env_id: uuid.UUID,

@@ -7,7 +7,7 @@ import fs from "fs";
 import path from "path";
 import type { CIData } from "./global-setup";
 
-const DATA_API = process.env.DATA_API_URL ?? "http://localhost:3000";
+const SERVER_URL = process.env.SERVER_URL ?? "http://localhost:8000";
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY ?? "test-internal-api-key";
 const CI_DATA_FILE = path.join(__dirname, "fixtures", "ci-data.json");
 
@@ -17,7 +17,7 @@ export default async function globalTeardown() {
 
     const ciData: CIData = JSON.parse(fs.readFileSync(CI_DATA_FILE, "utf-8"));
     const api = axios.create({
-      baseURL: DATA_API,
+      baseURL: SERVER_URL,
       headers: { Authorization: `Bearer ${INTERNAL_KEY}` },
     });
 

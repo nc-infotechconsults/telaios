@@ -67,7 +67,8 @@ body:
       value: |
         - OS:
         - Browser (if frontend):
-        - Bun version (`bun --version`):
+        - Node version (`node --version`):
+        - npm version (`npm --version`):
         - Python version (`python --version`):
         - Docker Compose version (`docker compose version`):
         - LLM provider / model:

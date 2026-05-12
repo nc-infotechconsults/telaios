@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright config for swe-ai-platform frontend E2E tests.
+ * Playwright config for TelaiOS frontend E2E tests.
  *
- * Tests run against a real backend stack (data-api + agent-service).
+ * Tests run against the real FastAPI monolith.
  * globalSetup seeds the required projects/plans/tasks and writes browser
  * auth state to e2e/fixtures/.auth.json so every test starts authenticated.
  */
@@ -33,7 +33,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "bunx vite",
+    command: "npm run dev -- --host 0.0.0.0",
     port: 5173,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

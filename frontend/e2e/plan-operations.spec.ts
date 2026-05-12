@@ -4,7 +4,7 @@ import { loadCIData } from "./global-setup";
 /**
  * Plan operations E2E tests.
  *
- * Run against the real backend stack (data-api + agent-service).
+ * Run against the real FastAPI server.
  * Test data is seeded in global-setup.ts.
  *
  * Tests that click "Cancel plan" or "Cancel task" use page.route() to
@@ -154,4 +154,3 @@ test.describe("View toggle persistence within session", () => {
     await expect(listBtn).toHaveAttribute("aria-pressed", "false");
   });
 });
-

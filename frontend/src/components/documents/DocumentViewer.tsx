@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { Button, Spinner } from "@heroui/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 import type { DocumentFileType } from "../../types";
 
 interface Props {
@@ -62,6 +63,38 @@ function langFromFileName(name: string): string {
   return map[ext] ?? "plaintext";
 }
 
+function safeHref(href: string | undefined): string | undefined {
+  if (!href) return undefined;
+  try {
+    const parsed = new URL(href, window.location.origin);
+    return ["http:", "https:", "mailto:"].includes(parsed.protocol) ? href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const MARKDOWN_COMPONENTS: Components = {
+  a: ({ href, children }) => {
+    const safe = safeHref(href);
+    if (!safe) return <>{children}</>;
+    return <a href={safe} target="_blank" rel="noreferrer">{children}</a>;
+  },
+};
+
+function sanitizeHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, iframe, object, embed, link, meta, style").forEach((node) => node.remove());
+  doc.querySelectorAll("*").forEach((node) => {
+    for (const attr of Array.from(node.attributes)) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim();
+      if (name.startsWith("on")) node.removeAttribute(attr.name);
+      if ((name === "href" || name === "src") && !safeHref(value)) node.removeAttribute(attr.name);
+    }
+  });
+  return doc.body.innerHTML;
+}
+
 // ─── Sub-viewers ──────────────────────────────────────────────────────────────
 
 function PdfViewer({ url }: { url: string }) {
@@ -90,7 +123,7 @@ function MarkdownViewer({ url }: { url: string }) {
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none p-6 overflow-auto">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>{text}</ReactMarkdown>
     </div>
   );
 }
@@ -127,7 +160,7 @@ function DocxViewer({ url }: { url: string }) {
         // Dynamic import so the bundle remains clean when mammoth isn't installed yet
         const mammoth = await import("mammoth");
         const result = await mammoth.convertToHtml({ arrayBuffer: buf });
-        if (!cancelled) setHtml(result.value);
+        if (!cancelled) setHtml(sanitizeHtml(result.value));
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to render DOCX");
       }
@@ -141,7 +174,7 @@ function DocxViewer({ url }: { url: string }) {
   return (
     <div
       className="prose prose-sm dark:prose-invert max-w-none p-6 overflow-auto"
-      // mammoth produces safe HTML (no scripts), but we gate on trusted S3 content
+      // DOCX files are user-controlled; sanitize converted HTML before rendering.
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

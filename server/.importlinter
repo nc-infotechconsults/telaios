@@ -275,6 +275,5 @@ ignore_imports =
      telaios.modules.internal.router -> telaios.modules.library.service
      # containers — intra (no cross-module reads needed)
      telaios.modules.containers -> telaios.modules.containers.router
-     # docker_shell — intra + cross-module reads (allowed)
-     telaios.modules.docker_shell -> telaios.modules.docker_shell.router
-     telaios.modules.docker_shell.router -> telaios.modules.users.repository
+      # docker_shell — intra
+      telaios.modules.docker_shell -> telaios.modules.docker_shell.router
