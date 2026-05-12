@@ -824,3 +824,31 @@ export interface DocumentAnalytics {
   total_agent_events: number;
   total_human_events: number;
 }
+
+// ── System Settings ────────────────────────────────────────────────────────────
+
+export interface AppSettings {
+  id: number;
+  llm_provider: string | null;
+  llm_model: string | null;
+  llm_base_url: string | null;
+  llm_temperature: number | null;
+  llm_max_tokens: number | null;
+  llm_top_p: number | null;
+  llm_frequency_penalty: number | null;
+  llm_presence_penalty: number | null;
+  has_api_key: boolean;
+  updated_at: string;
+}
+
+export interface PatchSettingsPayload {
+  llm_provider?: string | null;
+  llm_model?: string | null;
+  llm_api_key_raw?: string | null;
+  llm_base_url?: string | null;
+  llm_temperature?: number | null;
+  llm_max_tokens?: number | null;
+  llm_top_p?: number | null;
+  llm_frequency_penalty?: number | null;
+  llm_presence_penalty?: number | null;
+}

@@ -23,9 +23,11 @@ const VERBOSE = process.env.VERBOSE === "1";
 
 let smokeToken = "";
 let api = axios.create({ baseURL: SERVER_URL });
+// Admin routes (settings) require system_role=admin. Use X-Internal-Api-Key
+// which grants admin-level bypass regardless of which user was registered first.
 let adminApi = axios.create({
   baseURL: SERVER_URL,
-  headers: { Authorization: `Bearer ${INTERNAL_KEY}` },
+  headers: { "X-Internal-Api-Key": INTERNAL_KEY },
 });
 
 // Internal routes require the service-to-service header, not a user Bearer token.
@@ -67,7 +69,7 @@ function assertEqual(actual, expected, label) {
 }
 
 async function authenticateSmokeUser() {
-  const email = process.env.SMOKE_EMAIL ?? "smoke-test@ci.local";
+  const email = process.env.SMOKE_EMAIL ?? "smoke-test@example.com";
   const password = process.env.SMOKE_PASSWORD ?? "SmokeTest1234!";
   let token;
 
@@ -86,13 +88,6 @@ async function authenticateSmokeUser() {
   smokeToken = token;
 
   api = axios.create({
-    baseURL: SERVER_URL,
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  // The first registered user is admin; if this DB already has users, the
-  // internal key remains the fallback for settings-only admin checks.
-  adminApi = axios.create({
     baseURL: SERVER_URL,
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -211,7 +206,8 @@ async function runApiTests() {
   await test("GET /agent-profiles/:id returns profile", async () => {
     const { data } = await api.get(`/agent-profiles/${profileId}`);
     assertEqual(data.id, profileId, "id");
-    assertEqual(data.agent_type, "langgraph", "agent_type");
+    // Server normalises agent_type to "custom" for all user-created profiles.
+    assertEqual(data.agent_type, "custom", "agent_type");
   });
 
   await test("PATCH /agent-profiles/:id updates profile", async () => {

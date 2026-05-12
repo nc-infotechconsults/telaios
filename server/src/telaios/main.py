@@ -50,7 +50,7 @@ from telaios.modules.messages import messages_router
 from telaios.modules.plans import plan_router, project_plans_router
 from telaios.modules.projects import agents_router, members_router, projects_router
 from telaios.modules.repositories import repositories_router
-from telaios.modules.settings import settings_router
+from telaios.modules.settings import llm_router, settings_router
 from telaios.modules.skills import skills_router
 from telaios.modules.tasks import plan_tasks_router, task_router
 from telaios.modules.users import UserService, auth_router, users_router
@@ -73,7 +73,7 @@ _MODULES: dict[str, list[APIRouter]] = {
     "projects": [projects_router, members_router, agents_router],
     "repositories": [repositories_router],
     "environments": [environments_router],
-    "settings": [settings_router],
+    "settings": [settings_router, llm_router],
     "library": [library_router],
     "agent_profiles": [agent_profiles_router],
     "plans": [project_plans_router, plan_router],

@@ -45,6 +45,8 @@ import type {
   OrgProjectSummary,
   AnalyticsPeriod,
   DocumentAnalytics,
+  AppSettings,
+  PatchSettingsPayload,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -284,6 +286,14 @@ export const getMessages = (projectId: string): Promise<Message[]> =>
 export const getLlmProviders = (): Promise<LlmProviderDefinition[]> =>
   DEMO ? delay([]) : http.get<LlmProviderDefinition[]>("/llm/providers").then((r) => r.data);
 
+// ─── System Settings (admin) ──────────────────────────────────────────────────
+
+export const getSettings = (): Promise<AppSettings> =>
+  DEMO ? delay<AppSettings>({ id: 1, llm_provider: null, llm_model: null, llm_base_url: null, llm_temperature: null, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, has_api_key: false, updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
+
+export const patchSettings = (data: PatchSettingsPayload): Promise<AppSettings> =>
+  DEMO ? delay<AppSettings>({ id: 1, llm_provider: data.llm_provider ?? null, llm_model: data.llm_model ?? null, llm_base_url: data.llm_base_url ?? null, llm_temperature: data.llm_temperature ?? null, llm_max_tokens: data.llm_max_tokens ?? null, llm_top_p: data.llm_top_p ?? null, llm_frequency_penalty: data.llm_frequency_penalty ?? null, llm_presence_penalty: data.llm_presence_penalty ?? null, has_api_key: !!data.llm_api_key_raw, updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
+
 // ─── Agent Profiles (legacy — retained for settings/admin pages) ──────────────
 
 export const getAgentProfiles = (): Promise<AgentProfile[]> =>
@@ -359,7 +369,7 @@ export const createLibraryAgent = (data: Partial<LibraryAgent>): Promise<Library
   http.post<LibraryAgent>("/library/agents", data).then((r) => r.data);
 
 export const updateLibraryAgent = (id: string, data: Partial<LibraryAgent>): Promise<LibraryAgent> =>
-  http.put<LibraryAgent>(`/library/agents/${id}`, data).then((r) => r.data);
+  http.patch<LibraryAgent>(`/library/agents/${id}`, data).then((r) => r.data);
 
 export const deleteLibraryAgent = (id: string): Promise<void> =>
   http.delete(`/library/agents/${id}`).then(() => undefined);
@@ -370,17 +380,17 @@ export const listLibraryMCPs = (params?: { q?: string }): Promise<LibraryMCP[]> 
   DEMO
     ? delay([])
     : http
-        .get<{ items: LibraryMCP[]; total: number; page: number; limit: number }>("/library/mcps", { params })
+        .get<{ items: LibraryMCP[]; total: number; page: number; limit: number }>("/library/mcp", { params })
         .then((r) => r.data.items);
 
 export const createLibraryMCP = (data: Partial<LibraryMCP>): Promise<LibraryMCP> =>
-  http.post<LibraryMCP>("/library/mcps", data).then((r) => r.data);
+  http.post<LibraryMCP>("/library/mcp", data).then((r) => r.data);
 
 export const updateLibraryMCP = (id: string, data: Partial<LibraryMCP>): Promise<LibraryMCP> =>
-  http.put<LibraryMCP>(`/library/mcps/${id}`, data).then((r) => r.data);
+  http.patch<LibraryMCP>(`/library/mcp/${id}`, data).then((r) => r.data);
 
 export const deleteLibraryMCP = (id: string): Promise<void> =>
-  http.delete(`/library/mcps/${id}`).then(() => undefined);
+  http.delete(`/library/mcp/${id}`).then(() => undefined);
 
 // ─── Library Skills ───────────────────────────────────────────────────────────
 
@@ -398,14 +408,14 @@ export const createLibrarySkill = (data: Partial<LibrarySkill>): Promise<Library
   http.post<LibrarySkill>("/library/skills", data).then((r) => r.data);
 
 export const updateLibrarySkill = (id: string, data: Partial<LibrarySkill>): Promise<LibrarySkill> =>
-  http.put<LibrarySkill>(`/library/skills/${id}`, data).then((r) => r.data);
+  http.patch<LibrarySkill>(`/library/skills/${id}`, data).then((r) => r.data);
 
 export const deleteLibrarySkill = (id: string): Promise<void> =>
   http.delete(`/library/skills/${id}`).then(() => undefined);
 
 /** Trigger a zip download of the full skill package. */
 export const exportLibrarySkill = async (id: string, slug: string): Promise<void> => {
-  const response = await http.get(`/library/skills/${id}/export`, { responseType: "blob" });
+  const response = await http.get(`/library/skills/${id}/download`, { responseType: "blob" });
   const url = URL.createObjectURL(response.data as Blob);
   const a = document.createElement("a");
   a.href = url;
@@ -443,7 +453,7 @@ export const cloneProjectAgentFromLibrary = (
         updated_at: new Date().toISOString(),
       })
     : http
-        .post<ProjectAgent>(`/projects/${projectId}/agents/from-library/${libraryAgentId}`)
+        .post<ProjectAgent>(`/projects/${projectId}/agents/clone`, { library_agent_id: libraryAgentId })
         .then((r) => r.data);
 
 /** Create a custom project agent without a library template. */
@@ -473,7 +483,7 @@ export const updateProjectAgent = (
   agentId: string,
   data: Partial<Omit<ProjectAgent, "id" | "project_id" | "created_at" | "updated_at">>,
 ): Promise<ProjectAgent> =>
-  http.put<ProjectAgent>(`/projects/${projectId}/agents/${agentId}`, data).then((r) => r.data);
+  http.patch<ProjectAgent>(`/projects/${projectId}/agents/${agentId}`, data).then((r) => r.data);
 
 export const removeProjectAgent = (projectId: string, agentId: string): Promise<void> =>
   DEMO
@@ -1083,12 +1093,12 @@ export const getProjectAnalytics = (
         agent_stats: [],
         blocked_tasks: [],
       })
-    : http.get<ProjectAnalytics>(`/projects/${projectId}/analytics`, { params: { period } }).then((r) => r.data);
+    : http.get<ProjectAnalytics>(`/analytics/projects/${projectId}`, { params: { period } }).then((r) => r.data);
 
 export const getOrgAnalytics = (): Promise<OrgProjectSummary[]> =>
   DEMO
     ? Promise.resolve([])
-    : http.get<OrgProjectSummary[]>("/analytics").then((r) => r.data);
+    : http.get<OrgProjectSummary[]>("/analytics/org").then((r) => r.data);
 
 export const getProjectDocAnalytics = (
   projectId: string,
@@ -1097,5 +1107,5 @@ export const getProjectDocAnalytics = (
   DEMO
     ? Promise.resolve({ top_documents: [], daily_activity: [], recent_events: [], total_events: 0, total_agent_events: 0, total_human_events: 0 })
     : http
-        .get<DocumentAnalytics>(`/projects/${projectId}/analytics/documents`, { params: { period } })
+        .get<DocumentAnalytics>(`/analytics/projects/${projectId}/docs`, { params: { period } })
         .then((r) => r.data);

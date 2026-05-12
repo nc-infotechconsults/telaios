@@ -78,6 +78,7 @@ ignore_imports =
     telaios.modules.environments.service -> telaios.modules.environments.repository
     telaios.modules.environments.service -> telaios.modules.environments.schemas
     telaios.modules.settings -> telaios.modules.settings.router
+    telaios.modules.settings -> telaios.modules.settings.llm_router
     telaios.modules.settings -> telaios.modules.settings.service
     telaios.modules.settings.router -> telaios.modules.settings.schemas
     telaios.modules.settings.router -> telaios.modules.settings.service

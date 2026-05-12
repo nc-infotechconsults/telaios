@@ -21,6 +21,7 @@ import DockerShellPage from "./pages/DockerShellPage";
 import LoginPage from "./pages/Login";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import SettingsPage from "./pages/SettingsPage";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -51,6 +52,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="/library/agents/:agentId" element={<LibraryAgentDetail />} />
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
                   </Route>
                 </Route>
               </Routes>
