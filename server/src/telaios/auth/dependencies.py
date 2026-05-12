@@ -83,13 +83,20 @@ def _service_principal() -> Principal:
 
 
 async def current_principal(request: Request) -> Principal:
-    """Resolve the request's Bearer token to a :class:`Principal`.
+    """Resolve the request's credentials to a :class:`Principal`.
 
     Resolution order:
-      1. INTERNAL_API_KEY exact match → service principal.
-      2. JWT verify → user-loader (if registered) → Principal.
-      3. JWT verify → claims-only Principal (Phase 1 fallback).
+      1. X-Internal-Api-Key header match → service principal.
+      2. INTERNAL_API_KEY as Bearer token match → service principal (legacy).
+      3. JWT verify → user-loader (if registered) → Principal.
+      4. JWT verify → claims-only Principal (Phase 1 fallback).
     """
+    # Preferred service-to-service path: dedicated header avoids mixing API
+    # keys with Bearer JWT tokens.
+    internal_key = request.headers.get("x-internal-api-key", "")
+    if internal_key and is_internal_api_key(internal_key):
+        return _service_principal()
+
     token = _extract_bearer(request)
 
     if is_internal_api_key(token):
