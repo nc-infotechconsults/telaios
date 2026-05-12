@@ -117,6 +117,15 @@ async def patch_library_agent(
     return await LibraryAgentService(session).patch(agent_id, body)
 
 
+@library_router.post("/agents/{agent_id}/clone", status_code=201, response_model=LibraryAgentRead)
+async def clone_library_agent(
+    agent_id: uuid.UUID,
+    principal: Annotated[Principal, Depends(require_admin)],
+    session: AsyncSession = Depends(get_session),
+) -> LibraryAgentRead:
+    return await LibraryAgentService(session).clone(agent_id, published_by=str(principal.id))
+
+
 @library_router.delete("/agents/{agent_id}", status_code=204)
 async def delete_library_agent(
     agent_id: uuid.UUID,

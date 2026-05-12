@@ -289,10 +289,10 @@ export const getLlmProviders = (): Promise<LlmProviderDefinition[]> =>
 // ─── System Settings (admin) ──────────────────────────────────────────────────
 
 export const getSettings = (): Promise<AppSettings> =>
-  DEMO ? delay<AppSettings>({ id: 1, llm_provider: null, llm_model: null, llm_base_url: null, llm_temperature: null, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, has_api_key: false, updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
+  DEMO ? delay<AppSettings>({ id: 1, brand_name: "TelaiOS", brand_color: "#006FEE", logo_url: null, favicon_url: null, default_theme: "dark", updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
 
 export const patchSettings = (data: PatchSettingsPayload): Promise<AppSettings> =>
-  DEMO ? delay<AppSettings>({ id: 1, llm_provider: data.llm_provider ?? null, llm_model: data.llm_model ?? null, llm_base_url: data.llm_base_url ?? null, llm_temperature: data.llm_temperature ?? null, llm_max_tokens: data.llm_max_tokens ?? null, llm_top_p: data.llm_top_p ?? null, llm_frequency_penalty: data.llm_frequency_penalty ?? null, llm_presence_penalty: data.llm_presence_penalty ?? null, has_api_key: !!data.llm_api_key_raw, updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
+  DEMO ? delay<AppSettings>({ id: 1, brand_name: data.brand_name ?? "TelaiOS", brand_color: data.brand_color ?? "#006FEE", logo_url: data.logo_url ?? null, favicon_url: data.favicon_url ?? null, default_theme: data.default_theme ?? "dark", updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
 
 // ─── Agent Profiles (legacy — retained for settings/admin pages) ──────────────
 
@@ -373,6 +373,9 @@ export const updateLibraryAgent = (id: string, data: Partial<LibraryAgent>): Pro
 
 export const deleteLibraryAgent = (id: string): Promise<void> =>
   http.delete(`/library/agents/${id}`).then(() => undefined);
+
+export const cloneLibraryAgent = (id: string): Promise<LibraryAgent> =>
+  http.post<LibraryAgent>(`/library/agents/${id}/clone`).then((r) => r.data);
 
 // ─── Library MCPs ─────────────────────────────────────────────────────────────
 

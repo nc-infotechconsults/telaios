@@ -1,99 +1,98 @@
-import { useEffect, useState, useCallback } from "react";
-import { Button, Spinner } from "@heroui/react";
-import ProviderForm, {
-  type LLMConfig,
-  DEFAULT_LLM_CONFIG,
-} from "../components/settings/ProviderForm";
-import { getSettings, patchSettings, getLlmProviders } from "../lib/api";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Button, Input, Spinner, Switch } from "@heroui/react";
+import { getSettings, patchSettings } from "../lib/api";
 import type { AppSettings } from "../types";
 import { toast } from "../lib/toast";
 
-function settingsToConfig(s: AppSettings): LLMConfig {
-  return {
-    llm_provider: s.llm_provider ?? DEFAULT_LLM_CONFIG.llm_provider,
-    llm_model: s.llm_model ?? DEFAULT_LLM_CONFIG.llm_model,
-    llm_api_key_raw: "",   // never returned by API
-    llm_base_url: s.llm_base_url ?? DEFAULT_LLM_CONFIG.llm_base_url,
-    llm_temperature: s.llm_temperature ?? DEFAULT_LLM_CONFIG.llm_temperature,
-    llm_max_tokens: s.llm_max_tokens != null ? String(s.llm_max_tokens) : "",
-    llm_top_p: s.llm_top_p != null ? String(s.llm_top_p) : "",
-    llm_frequency_penalty:
-      s.llm_frequency_penalty != null ? String(s.llm_frequency_penalty) : "",
-    llm_presence_penalty:
-      s.llm_presence_penalty != null ? String(s.llm_presence_penalty) : "",
-  };
+const DEFAULT_SETTINGS: AppSettings = {
+  id: 1,
+  brand_name: "TelaiOS",
+  brand_color: "#006FEE",
+  logo_url: null,
+  favicon_url: null,
+  default_theme: "dark",
+  updated_at: new Date().toISOString(),
+};
+
+function isValidHex(color: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(color);
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [config, setConfig] = useState<LLMConfig>({
-    ...DEFAULT_LLM_CONFIG,
-    llm_api_key_raw: "",
-  });
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-  // prefetch providers to warm the cache used by ProviderForm
-  const [_providers, _setProviders] = useState<unknown[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([getSettings(), getLlmProviders()])
-      .then(([settings, providers]) => {
-        setConfig(settingsToConfig(settings));
-        setHasApiKey(settings.has_api_key);
-        setUpdatedAt(settings.updated_at);
-        _setProviders(providers);
-      })
+    getSettings()
+      .then((s) => setSettings(s))
       .catch(() => toast.error("Failed to load settings"))
       .finally(() => setLoading(false));
   }, []);
 
   const handleSave = useCallback(async () => {
+    if (!isValidHex(settings.brand_color)) {
+      toast.error("Brand colour must be a valid hex code (e.g. #006FEE)");
+      return;
+    }
     setSaving(true);
-    setTestResult(null);
     try {
       const updated = await patchSettings({
-        llm_provider: config.llm_provider || null,
-        llm_model: config.llm_model || null,
-        llm_api_key_raw: config.llm_api_key_raw || null,
-        llm_base_url: config.llm_base_url || null,
-        llm_temperature: config.llm_temperature,
-        llm_max_tokens: config.llm_max_tokens ? Number(config.llm_max_tokens) : null,
-        llm_top_p: config.llm_top_p ? Number(config.llm_top_p) : null,
-        llm_frequency_penalty: config.llm_frequency_penalty
-          ? Number(config.llm_frequency_penalty)
-          : null,
-        llm_presence_penalty: config.llm_presence_penalty
-          ? Number(config.llm_presence_penalty)
-          : null,
+        brand_name: settings.brand_name,
+        brand_color: settings.brand_color,
+        logo_url: settings.logo_url,
+        favicon_url: settings.favicon_url,
+        default_theme: settings.default_theme,
       });
-      setHasApiKey(updated.has_api_key);
-      setUpdatedAt(updated.updated_at);
-      // clear the raw key field after save
-      setConfig((prev) => ({ ...prev, llm_api_key_raw: "" }));
+      setSettings(updated);
       toast.success("Settings saved");
     } catch {
       toast.error("Failed to save settings");
     } finally {
       setSaving(false);
     }
-  }, [config]);
+  }, [settings]);
 
-  const handleTest = useCallback(async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      // Save first so the backend tests the persisted config
-      await handleSave();
-      setTestResult({ ok: true, message: "Connection successful" });
-    } catch {
-      setTestResult({ ok: false, message: "Connection failed" });
-    } finally {
-      setTesting(false);
+  const handleLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      toast.error("Logo must be under 500KB");
+      return;
     }
-  }, [handleSave]);
+    try {
+      const base64 = await readFileAsBase64(file);
+      setSettings((prev) => ({ ...prev, logo_url: base64 }));
+    } catch {
+      toast.error("Failed to read logo file");
+    }
+  }, []);
+
+  const handleFaviconUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 100 * 1024) {
+      toast.error("Favicon must be under 100KB");
+      return;
+    }
+    try {
+      const base64 = await readFileAsBase64(file);
+      setSettings((prev) => ({ ...prev, favicon_url: base64 }));
+    } catch {
+      toast.error("Failed to read favicon file");
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -104,32 +103,161 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-xl">
-      <div className="mb-6">
+    <div className="max-w-2xl">
+      <div className="mb-8">
         <h1 className="text-2xl font-bold">System Settings</h1>
         <p className="text-default-500 text-sm mt-1">
-          Configure the global LLM provider used by all agents unless overridden.
+          Customise the appearance and branding of your TelaiOS instance.
         </p>
-        {hasApiKey && (
-          <p className="text-xs text-success mt-1">API key is set. Leave the field blank to keep it.</p>
-        )}
-        {updatedAt && (
-          <p className="text-xs text-default-400 mt-0.5">
-            Last updated: {new Date(updatedAt).toLocaleString()}
-          </p>
-        )}
       </div>
 
-      <ProviderForm
-        config={config}
-        onChange={setConfig}
-        onTest={handleTest}
-        isTesting={testing}
-        testResult={testResult}
-      />
+      <div className="space-y-6">
+        {/* Brand name */}
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Brand Name</label>
+          <Input
+            value={settings.brand_name}
+            onValueChange={(v) => setSettings((prev) => ({ ...prev, brand_name: v }))}
+            placeholder="TelaiOS"
+            maxLength={255}
+          />
+        </div>
 
-      <div className="mt-6 flex justify-end">
-        <Button color="primary" onPress={handleSave} isLoading={saving} isDisabled={saving || testing}>
+        {/* Brand colour */}
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Primary Colour</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={settings.brand_color}
+              onChange={(e) => setSettings((prev) => ({ ...prev, brand_color: e.target.value }))}
+              className="w-10 h-10 rounded-lg cursor-pointer border-0 p-0"
+              aria-label="Pick primary colour"
+            />
+            <Input
+              value={settings.brand_color}
+              onValueChange={(v) => setSettings((prev) => ({ ...prev, brand_color: v }))}
+              placeholder="#006FEE"
+              className="w-40"
+              isInvalid={!isValidHex(settings.brand_color)}
+            />
+            <div
+              className="w-8 h-8 rounded-full border border-divider"
+              style={{ backgroundColor: isValidHex(settings.brand_color) ? settings.brand_color : "#ccc" }}
+              aria-hidden="true"
+            />
+          </div>
+          {!isValidHex(settings.brand_color) && (
+            <p className="text-danger text-xs mt-1">Must be a valid 6-digit hex code</p>
+          )}
+        </div>
+
+        {/* Live preview */}
+        <div
+          className="p-6 rounded-xl border border-divider"
+          style={{
+            borderLeftWidth: "4px",
+            borderLeftColor: isValidHex(settings.brand_color) ? settings.brand_color : "#ccc",
+          }}
+        >
+          <p className="text-xs text-default-400 mb-2 uppercase tracking-wide">Live Preview</p>
+          <div className="flex items-center gap-3">
+            {settings.logo_url ? (
+              <img src={settings.logo_url} alt="Logo" className="h-8 w-auto object-contain" />
+            ) : (
+              <div
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+                style={{ backgroundColor: settings.brand_color }}
+              >
+                {settings.brand_name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="font-bold text-lg" style={{ color: settings.brand_color }}>
+              {settings.brand_name}
+            </span>
+          </div>
+        </div>
+
+        {/* Logo upload */}
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Logo</label>
+          <div className="flex items-center gap-3">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/svg+xml,image/png,image/jpeg"
+              onChange={handleLogoUpload}
+              className="hidden"
+            />
+            <Button variant="bordered" onPress={() => logoInputRef.current?.click()}>
+              Upload Logo
+            </Button>
+            {settings.logo_url && (
+              <>
+                <img src={settings.logo_url} alt="Preview" className="h-8 w-auto object-contain" />
+                <Button
+                  size="sm"
+                  variant="light"
+                  color="danger"
+                  onPress={() => setSettings((prev) => ({ ...prev, logo_url: null }))}
+                >
+                  Remove
+                </Button>
+              </>
+            )}
+          </div>
+          <p className="text-xs text-default-400 mt-1">SVG, PNG or JPEG. Max 500KB.</p>
+        </div>
+
+        {/* Favicon upload */}
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Favicon</label>
+          <div className="flex items-center gap-3">
+            <input
+              ref={faviconInputRef}
+              type="file"
+              accept="image/x-icon,image/png,image/svg+xml"
+              onChange={handleFaviconUpload}
+              className="hidden"
+            />
+            <Button variant="bordered" onPress={() => faviconInputRef.current?.click()}>
+              Upload Favicon
+            </Button>
+            {settings.favicon_url && (
+              <>
+                <img src={settings.favicon_url} alt="Favicon" className="h-6 w-6 object-contain" />
+                <Button
+                  size="sm"
+                  variant="light"
+                  color="danger"
+                  onPress={() => setSettings((prev) => ({ ...prev, favicon_url: null }))}
+                >
+                  Remove
+                </Button>
+              </>
+            )}
+          </div>
+          <p className="text-xs text-default-400 mt-1">ICO, PNG or SVG. Max 100KB.</p>
+        </div>
+
+        {/* Default theme */}
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Default Theme</label>
+          <div className="flex items-center gap-4">
+            <Switch
+              isSelected={settings.default_theme === "dark"}
+              onValueChange={(v) =>
+                setSettings((prev) => ({ ...prev, default_theme: v ? "dark" : "light" }))
+              }
+            >
+              Dark mode
+            </Switch>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 flex justify-end">
+        <Button color="primary" onPress={handleSave} isLoading={saving} isDisabled={saving}>
           Save Settings
         </Button>
       </div>

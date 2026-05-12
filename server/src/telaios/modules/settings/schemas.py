@@ -1,6 +1,6 @@
 """Settings schemas.
 
-Ported from ``data-api/src/schemas/settings.schema.ts``.
+UI customisation settings (brand name, colour, logo, favicon, default theme).
 """
 
 from __future__ import annotations
@@ -14,29 +14,20 @@ class SettingsRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    llm_provider: str | None
-    llm_model: str | None
-    llm_base_url: str | None
-    llm_temperature: float | None
-    llm_max_tokens: int | None
-    llm_top_p: float | None
-    llm_frequency_penalty: float | None
-    llm_presence_penalty: float | None
-    has_api_key: bool
+    brand_name: str
+    brand_color: str
+    logo_url: str | None
+    favicon_url: str | None
+    default_theme: str
     updated_at: datetime
 
 
 class PatchSettingsDto(BaseModel):
-    llm_provider: str | None = None
-    llm_model: str | None = None
-    # plaintext key; service encrypts before persisting
-    llm_api_key_raw: str | None = None
-    llm_base_url: str | None = None
-    llm_temperature: float | None = Field(default=None, ge=0, le=2)
-    llm_max_tokens: int | None = Field(default=None, gt=0)
-    llm_top_p: float | None = Field(default=None, ge=0, le=1)
-    llm_frequency_penalty: float | None = Field(default=None, ge=-2, le=2)
-    llm_presence_penalty: float | None = Field(default=None, ge=-2, le=2)
+    brand_name: str | None = Field(default=None, min_length=1, max_length=255)
+    brand_color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+    logo_url: str | None = Field(default=None, max_length=500_000)  # base64
+    favicon_url: str | None = Field(default=None, max_length=100_000)  # base64
+    default_theme: str | None = Field(default=None, pattern=r"^(light|dark)$")
 
 
 __all__ = ["PatchSettingsDto", "SettingsRead"]

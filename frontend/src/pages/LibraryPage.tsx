@@ -31,6 +31,7 @@ const SearchIcon = (
   </svg>
 );
 import {
+  cloneLibraryAgent,
   deleteLibraryAgent,
   deleteLibraryMCP,
   deleteLibrarySkill,
@@ -219,6 +220,16 @@ export default function LibraryPage() {
       toast.error("Failed to delete agent");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCloneAgent = async (agent: LibraryAgent) => {
+    try {
+      const cloned = await cloneLibraryAgent(agent.id);
+      setAgents((prev) => [cloned, ...prev]);
+      toast.success("Agent cloned", cloned.name);
+    } catch {
+      toast.error("Failed to clone agent");
     }
   };
 
@@ -412,6 +423,7 @@ export default function LibraryPage() {
                         setFormOpen(true);
                       }}
                       onDelete={() => setAgentToDelete(agent)}
+                      onClone={() => handleCloneAgent(agent)}
                     />
                   ))}
                 </div>
@@ -439,8 +451,13 @@ export default function LibraryPage() {
                       <span className="text-xs text-default-400 shrink-0 hidden md:inline">{agent.usage_count} uses</span>
                       <div className="flex items-center gap-1 shrink-0">
                         <Button size="sm" variant="bordered" onPress={() => navigate(`/library/agents/${agent.id}`)}>View</Button>
-                        <Button size="sm" variant="bordered" onPress={() => { setEditingAgent(agent); setFormOpen(true); }}>Edit</Button>
-                        <Button size="sm" variant="light" color="danger" onPress={() => setAgentToDelete(agent)}>Delete</Button>
+                        <Button size="sm" variant="bordered" onPress={() => handleCloneAgent(agent)}>Clone</Button>
+                        {!agent.is_base && (
+                          <>
+                            <Button size="sm" variant="bordered" onPress={() => { setEditingAgent(agent); setFormOpen(true); }}>Edit</Button>
+                            <Button size="sm" variant="light" color="danger" onPress={() => setAgentToDelete(agent)}>Delete</Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -508,8 +525,13 @@ export default function LibraryPage() {
                         <TableCell>
                           <div className="flex gap-1">
                             <Button size="sm" variant="bordered" onPress={() => navigate(`/library/agents/${agent.id}`)}>View</Button>
-                            <Button size="sm" variant="bordered" onPress={() => { setEditingAgent(agent); setFormOpen(true); }}>Edit</Button>
-                            <Button size="sm" variant="light" color="danger" onPress={() => setAgentToDelete(agent)}>Delete</Button>
+                            <Button size="sm" variant="bordered" onPress={() => handleCloneAgent(agent)}>Clone</Button>
+                            {!agent.is_base && (
+                              <>
+                                <Button size="sm" variant="bordered" onPress={() => { setEditingAgent(agent); setFormOpen(true); }}>Edit</Button>
+                                <Button size="sm" variant="light" color="danger" onPress={() => setAgentToDelete(agent)}>Delete</Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

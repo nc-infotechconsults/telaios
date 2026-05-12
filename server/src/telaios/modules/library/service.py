@@ -40,7 +40,7 @@ from telaios.modules.library.schemas import (
     SkillFileRead,
 )
 from telaios.utils.crypto import encrypt
-from telaios.utils.errors import ConflictError, NotFoundError
+from telaios.utils.errors import ConflictError, ForbiddenError, NotFoundError
 
 # ── LibraryAgent ──────────────────────────────────────────────────────────────
 
@@ -98,6 +98,8 @@ class LibraryAgentService:
         obj = await self._repo.find(agent_id)
         if obj is None:
             raise NotFoundError("Library agent not found")
+        if obj.is_base:
+            raise ForbiddenError("Base agents cannot be edited directly; clone them instead")
         if obj.agent_type == "system":
             obj.agent_type = "custom"
         for field, val in dto.model_dump(exclude_unset=True).items():
@@ -113,7 +115,37 @@ class LibraryAgentService:
         obj = await self._repo.find(agent_id)
         if obj is None:
             raise NotFoundError("Library agent not found")
+        if obj.is_base:
+            raise ForbiddenError("Base agents cannot be deleted")
         await self._repo.soft_delete(obj)
+
+    async def clone(self, agent_id: uuid.UUID, published_by: str | None = None) -> LibraryAgentRead:
+        obj = await self._repo.find(agent_id)
+        if obj is None:
+            raise NotFoundError("Library agent not found")
+        data: dict[str, Any] = {
+            "name": f"{obj.name} (Copy)",
+            "slug": f"{obj.slug}-copy-{uuid.uuid4().hex[:8]}",
+            "description": obj.description,
+            "agent_type": "custom",
+            "role": obj.role,
+            "system_prompt": obj.system_prompt,
+            "system_prompt_mode": obj.system_prompt_mode,
+            "llm_provider": obj.llm_provider,
+            "llm_model": obj.llm_model,
+            "llm_temperature": obj.llm_temperature,
+            "llm_max_tokens": obj.llm_max_tokens,
+            "llm_api_key": obj.llm_api_key,
+            "sub_agents": obj.sub_agents,
+            "mcp_servers": obj.mcp_servers,
+            "skills": obj.skills,
+            "structured_output": obj.structured_output,
+            "tags": obj.tags,
+            "published_by": published_by,
+            "cloned_from_id": obj.id,
+        }
+        new_obj = await self._repo.create(**data)
+        return LibraryAgentRead.from_orm_sanitized(new_obj)
 
     async def increment_usage(self, agent_id: uuid.UUID) -> bool:
         return await self._repo.increment_usage(agent_id)

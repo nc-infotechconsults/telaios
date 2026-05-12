@@ -1,6 +1,6 @@
 """tests/unit/modules/settings/test_schemas.py
 
-Unit tests for settings module schemas.
+Unit tests for settings module schemas (UI customisation).
 """
 
 from __future__ import annotations
@@ -24,58 +24,32 @@ class TestSettingsRead:
     def test_valid_full(self):
         data = {
             "id": 1,
-            "llm_provider": "openai",
-            "llm_model": "gpt-4o",
-            "llm_base_url": None,
-            "llm_temperature": 0.7,
-            "llm_max_tokens": 4096,
-            "llm_top_p": 1.0,
-            "llm_frequency_penalty": 0.0,
-            "llm_presence_penalty": 0.0,
-            "has_api_key": True,
+            "brand_name": "TelaiOS",
+            "brand_color": "#006FEE",
+            "logo_url": "data:image/png;base64,abc",
+            "favicon_url": "data:image/x-icon;base64,def",
+            "default_theme": "dark",
             "updated_at": _now(),
         }
         read = SettingsRead.model_validate(data)
         assert read.id == 1
-        assert read.llm_provider == "openai"
-        assert read.has_api_key is True
+        assert read.brand_name == "TelaiOS"
+        assert read.brand_color == "#006FEE"
+        assert read.default_theme == "dark"
 
-    def test_all_none_optional(self):
+    def test_minimal(self):
         data = {
             "id": 1,
-            "llm_provider": None,
-            "llm_model": None,
-            "llm_base_url": None,
-            "llm_temperature": None,
-            "llm_max_tokens": None,
-            "llm_top_p": None,
-            "llm_frequency_penalty": None,
-            "llm_presence_penalty": None,
-            "has_api_key": False,
+            "brand_name": "TelaiOS",
+            "brand_color": "#006FEE",
+            "logo_url": None,
+            "favicon_url": None,
+            "default_theme": "dark",
             "updated_at": _now(),
         }
         read = SettingsRead.model_validate(data)
-        assert read.has_api_key is False
-        assert read.llm_provider is None
-
-    def test_no_raw_api_key_field(self):
-        """SettingsRead must never expose the raw llm_api_key."""
-        read = SettingsRead.model_validate(
-            {
-                "id": 1,
-                "llm_provider": None,
-                "llm_model": None,
-                "llm_base_url": None,
-                "llm_temperature": None,
-                "llm_max_tokens": None,
-                "llm_top_p": None,
-                "llm_frequency_penalty": None,
-                "llm_presence_penalty": None,
-                "has_api_key": False,
-                "updated_at": _now(),
-            }
-        )
-        assert not hasattr(read, "llm_api_key")
+        assert read.logo_url is None
+        assert read.favicon_url is None
 
 
 # ── PatchSettingsDto ──────────────────────────────────────────────────────
@@ -84,54 +58,34 @@ class TestSettingsRead:
 class TestPatchSettingsDto:
     def test_all_none_default(self):
         dto = PatchSettingsDto()
-        assert dto.llm_provider is None
-        assert dto.llm_api_key_raw is None
-        assert dto.llm_temperature is None
+        assert dto.brand_name is None
+        assert dto.brand_color is None
+        assert dto.logo_url is None
+        assert dto.favicon_url is None
+        assert dto.default_theme is None
 
-    def test_valid_temperature_boundary(self):
-        PatchSettingsDto(llm_temperature=0.0)
-        PatchSettingsDto(llm_temperature=2.0)
+    def test_valid_brand_color(self):
+        PatchSettingsDto(brand_color="#FF0000")
+        PatchSettingsDto(brand_color="#abcdef")
 
-    def test_temperature_above_max_raises(self):
+    def test_invalid_brand_color_raises(self):
         with pytest.raises(ValidationError):
-            PatchSettingsDto(llm_temperature=2.1)
-
-    def test_temperature_below_min_raises(self):
+            PatchSettingsDto(brand_color="red")
         with pytest.raises(ValidationError):
-            PatchSettingsDto(llm_temperature=-0.1)
+            PatchSettingsDto(brand_color="#FF00")
 
-    def test_max_tokens_must_be_positive(self):
+    def test_valid_theme(self):
+        PatchSettingsDto(default_theme="light")
+        PatchSettingsDto(default_theme="dark")
+
+    def test_invalid_theme_raises(self):
         with pytest.raises(ValidationError):
-            PatchSettingsDto(llm_max_tokens=0)
+            PatchSettingsDto(default_theme="auto")
 
-    def test_max_tokens_valid(self):
-        dto = PatchSettingsDto(llm_max_tokens=1)
-        assert dto.llm_max_tokens == 1
-
-    def test_top_p_boundary(self):
-        PatchSettingsDto(llm_top_p=0.0)
-        PatchSettingsDto(llm_top_p=1.0)
-
-    def test_top_p_above_max_raises(self):
+    def test_brand_name_max_length(self):
         with pytest.raises(ValidationError):
-            PatchSettingsDto(llm_top_p=1.1)
+            PatchSettingsDto(brand_name="x" * 256)
 
-    def test_frequency_penalty_boundary(self):
-        PatchSettingsDto(llm_frequency_penalty=-2.0)
-        PatchSettingsDto(llm_frequency_penalty=2.0)
-
-    def test_frequency_penalty_out_of_range_raises(self):
-        with pytest.raises(ValidationError):
-            PatchSettingsDto(llm_frequency_penalty=2.1)
-
-    def test_presence_penalty_boundary(self):
-        PatchSettingsDto(llm_presence_penalty=-2.0)
-        PatchSettingsDto(llm_presence_penalty=2.0)
-
-    def test_presence_penalty_out_of_range_raises(self):
-        with pytest.raises(ValidationError):
-            PatchSettingsDto(llm_presence_penalty=-2.1)
-
-    def test_llm_api_key_raw_passthrough(self):
-        dto = PatchSettingsDto(llm_api_key_raw="sk-abc123")
-        assert dto.llm_api_key_raw == "sk-abc123"
+    def test_brand_name_valid(self):
+        dto = PatchSettingsDto(brand_name="x" * 255)
+        assert dto.brand_name == "x" * 255

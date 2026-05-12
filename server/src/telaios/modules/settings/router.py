@@ -1,9 +1,8 @@
 """Settings router.
 
 Endpoints:
-  GET    /settings          — get current settings (all authenticated users)
-  GET    /settings/raw      — get with plaintext key (admin only)
-  PATCH  /settings          — update settings (admin only)
+  GET    /settings          — get current UI settings (admin only)
+  PATCH  /settings          — update UI settings (admin only)
 """
 
 from __future__ import annotations

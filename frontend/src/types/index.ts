@@ -288,6 +288,8 @@ export interface LibraryAgent {
   llm_temperature?: number | null;
   llm_max_tokens?: number | null;
   has_llm_api_key?: boolean;
+  is_base: boolean;
+  cloned_from_id: string | null;
   sub_agents: SubAgentEntry[];
   mcp_servers: McpServer[];
   skills: InlineSkill[];
@@ -829,26 +831,18 @@ export interface DocumentAnalytics {
 
 export interface AppSettings {
   id: number;
-  llm_provider: string | null;
-  llm_model: string | null;
-  llm_base_url: string | null;
-  llm_temperature: number | null;
-  llm_max_tokens: number | null;
-  llm_top_p: number | null;
-  llm_frequency_penalty: number | null;
-  llm_presence_penalty: number | null;
-  has_api_key: boolean;
+  brand_name: string;
+  brand_color: string;
+  logo_url: string | null;
+  favicon_url: string | null;
+  default_theme: string;
   updated_at: string;
 }
 
 export interface PatchSettingsPayload {
-  llm_provider?: string | null;
-  llm_model?: string | null;
-  llm_api_key_raw?: string | null;
-  llm_base_url?: string | null;
-  llm_temperature?: number | null;
-  llm_max_tokens?: number | null;
-  llm_top_p?: number | null;
-  llm_frequency_penalty?: number | null;
-  llm_presence_penalty?: number | null;
+  brand_name?: string;
+  brand_color?: string;
+  logo_url?: string | null;
+  favicon_url?: string | null;
+  default_theme?: string;
 }

@@ -107,19 +107,20 @@ async function runApiTests() {
   });
 
   // Settings
-  await test("GET /settings returns settings object", async () => {
+  await test("GET /settings returns UI settings object", async () => {
     const { data } = await adminApi.get("/settings");
     assert(typeof data === "object", "settings is object");
-    assert("llm_provider" in data, "has llm_provider");
+    assert("brand_name" in data, "has brand_name");
+    assertEqual(data.brand_name, "TelaiOS", "default brand name");
   });
 
-  await test("PATCH /settings updates provider", async () => {
+  await test("PATCH /settings updates brand", async () => {
     const { data } = await adminApi.patch("/settings", {
-      llm_provider: "openai",
-      llm_model: "gpt-4o",
+      brand_name: "TestBrand",
+      brand_color: "#FF0000",
     });
-    assertEqual(data.llm_provider, "openai", "provider");
-    assertEqual(data.llm_model, "gpt-4o", "model");
+    assertEqual(data.brand_name, "TestBrand", "brand name");
+    assertEqual(data.brand_color, "#FF0000", "brand color");
   });
 
   // Projects
@@ -587,29 +588,20 @@ async function runServerHealthTests() {
   });
 }
 
-// ─── LLM connectivity test ─────────────────────────────────────────────────────
+// ─── UI settings test ──────────────────────────────────────────────────────────
 
 async function runLLMTest() {
-  console.log("\n── LLM Connectivity ──────────────────────────────────────────");
+  console.log("\n── UI Settings ───────────────────────────────────────────────");
 
-  const apiKey = process.env.LLM_API_KEY;
-  if (!apiKey) {
-    console.log("  ⚠  LLM_API_KEY not set — skipping LLM test");
-    return;
-  }
-
-  const provider = process.env.LLM_PROVIDER ?? "openai";
-  const model = process.env.LLM_MODEL ?? "gpt-4o-mini";
-
-  await test(`PATCH /settings stores LLM credentials (provider=${provider}, model=${model})`, async () => {
+  await test("PATCH /settings updates UI branding", async () => {
     const { data } = await adminApi.patch("/settings", {
-      llm_provider: provider,
-      llm_model: model,
-      llm_api_key_raw: apiKey,
+      brand_name: "SmokeTest",
+      brand_color: "#123456",
+      default_theme: "light",
     });
-    assertEqual(data.llm_provider, provider, "provider");
-    assertEqual(data.llm_model, model, "model");
-    assert(data.has_api_key === true, "has stored API key");
+    assertEqual(data.brand_name, "SmokeTest", "brand name");
+    assertEqual(data.brand_color, "#123456", "brand color");
+    assertEqual(data.default_theme, "light", "default theme");
   });
 }
 

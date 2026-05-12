@@ -23,6 +23,7 @@ interface Props {
   onView?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onClone?: () => void;
 }
 
 export default function LibraryAgentCard({
@@ -32,8 +33,10 @@ export default function LibraryAgentCard({
   onView,
   onEdit,
   onDelete,
+  onClone,
 }: Props) {
   const isSystem = agent.agent_type === "system";
+  const isBase = agent.is_base;
 
   return (
     <div className="flex flex-col gap-3 p-4 clay-card transition-shadow">
@@ -49,7 +52,12 @@ export default function LibraryAgentCard({
           <Chip size="sm" variant="flat" color={ROLE_COLOR[agent.role] ?? "default"}>
             {agent.role}
           </Chip>
-          {isSystem && (
+          {isBase && (
+            <Chip size="sm" variant="flat" color="warning">
+              Base
+            </Chip>
+          )}
+          {isSystem && !isBase && (
             <Chip size="sm" variant="flat" color="primary">
               system
             </Chip>
@@ -99,7 +107,31 @@ export default function LibraryAgentCard({
             View
           </Button>
         )}
-        {onEdit && (
+        {onClone && (
+          <Tooltip content="Clone agent">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              aria-label="Clone agent"
+              onPress={onClone}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+            </Button>
+          </Tooltip>
+        )}
+        {onEdit && !isBase && (
           <Tooltip content="Edit agent">
             <Button
               isIconOnly
@@ -122,7 +154,7 @@ export default function LibraryAgentCard({
             </Button>
           </Tooltip>
         )}
-        {onDelete && !isSystem && (
+        {onDelete && !isBase && (
           <Tooltip content="Delete agent" color="danger">
             <Button
               isIconOnly

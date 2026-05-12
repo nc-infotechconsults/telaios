@@ -63,6 +63,8 @@ def _make_agent_obj(
     obj.skills = []
     obj.structured_output = None
     obj.tags = []
+    obj.is_base = False
+    obj.cloned_from_id = None
     obj.published_by = None
     obj.usage_count = 0
     obj.version = "1.0.0"

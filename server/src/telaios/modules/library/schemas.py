@@ -71,6 +71,8 @@ class LibraryAgentRead(BaseModel):
     has_llm_api_key: bool
     llm_temperature: float | None
     llm_max_tokens: int | None
+    is_base: bool
+    cloned_from_id: str | None
     sub_agents: list[dict[str, Any]]
     mcp_servers: list[dict[str, Any]]
     skills: list[dict[str, Any]]
@@ -103,6 +105,8 @@ class LibraryAgentRead(BaseModel):
                 "llm_model",
                 "llm_temperature",
                 "llm_max_tokens",
+                "is_base",
+                "cloned_from_id",
                 "sub_agents",
                 "mcp_servers",
                 "skills",
@@ -116,6 +120,9 @@ class LibraryAgentRead(BaseModel):
             )
         }
         data["has_llm_api_key"] = has_key
+        # Convert UUID to string for JSON serialization
+        if data.get("cloned_from_id"):
+            data["cloned_from_id"] = str(data["cloned_from_id"])
         return cls.model_validate(data)
 
 

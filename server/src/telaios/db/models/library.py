@@ -8,7 +8,8 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from sqlalchemy import Float, Integer, String, Text
+import sqlalchemy as sa
+from sqlalchemy import UUID, Boolean, Float, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +43,15 @@ class LibraryAgent(Base, TimestampMixin, SoftDeleteMixin):
     llm_temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
     llm_max_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     llm_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    is_base: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    cloned_from_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("library_agents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     sub_agents: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
