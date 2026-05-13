@@ -5,7 +5,11 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import type { CIData } from "./global-setup";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const SERVER_URL = process.env.SERVER_URL ?? "http://localhost:8000";
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY ?? "test-internal-api-key";

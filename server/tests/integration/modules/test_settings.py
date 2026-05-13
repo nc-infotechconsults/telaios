@@ -51,9 +51,9 @@ class TestGetSettings:
         # Singleton row is created on demand
         assert "id" in body
 
-    def test_member_is_forbidden(self, client: TestClient, member_token: str) -> None:
+    def test_member_gets_settings(self, client: TestClient, member_token: str) -> None:
         res = client.get("/settings", headers={"Authorization": f"Bearer {member_token}"})
-        assert res.status_code == 403
+        assert res.status_code == 200
 
     def test_requires_auth(self, client: TestClient) -> None:
         res = client.get("/settings")
@@ -67,36 +67,50 @@ class TestPatchSettings:
     def test_admin_can_patch(self, client: TestClient, admin_token: str) -> None:
         res = client.patch(
             "/settings",
-            json={"llm_provider": "openai", "llm_model": "gpt-4o"},
+            json={"brand_name": "Acme", "brand_color": "#112233", "default_theme": "light"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert res.status_code == 200
         body = res.json()
-        assert body["llm_provider"] == "openai"
-        assert body["llm_model"] == "gpt-4o"
+        assert body["brand_name"] == "Acme"
+        assert body["brand_color"] == "#112233"
+        assert body["default_theme"] == "light"
 
     def test_patch_is_idempotent(self, client: TestClient, admin_token: str) -> None:
         client.patch(
             "/settings",
-            json={"llm_model": "gpt-4"},
+            json={"brand_name": "Brand A"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         res = client.patch(
             "/settings",
-            json={"llm_model": "gpt-4o"},
+            json={"brand_name": "Brand B"},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert res.status_code == 200
-        assert res.json()["llm_model"] == "gpt-4o"
+        assert res.json()["brand_name"] == "Brand B"
 
     def test_member_is_forbidden(self, client: TestClient, member_token: str) -> None:
         res = client.patch(
             "/settings",
-            json={"llm_model": "gpt-4"},
+            json={"brand_name": "Nope"},
             headers={"Authorization": f"Bearer {member_token}"},
         )
         assert res.status_code == 403
 
+    def test_admin_can_patch_large_logo_data_url(
+        self, client: TestClient, admin_token: str
+    ) -> None:
+        large_logo = f"data:image/png;base64,{('a' * 600_000)}"
+        res = client.patch(
+            "/settings",
+            json={"logo_url": large_logo},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["logo_url"] == large_logo
+
     def test_requires_auth(self, client: TestClient) -> None:
-        res = client.patch("/settings", json={"llm_model": "gpt-4"})
+        res = client.patch("/settings", json={"brand_name": "No Auth"})
         assert res.status_code == 401

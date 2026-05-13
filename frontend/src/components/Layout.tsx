@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { getSettings } from "../lib/api";
+import {
+  loadCachedAppSettings,
+  persistAndApplyAppSettings,
+  subscribeToAppSettingsUpdates,
+} from "../lib/appSettings";
+import type { AppSettings } from "../types";
 import { TelaiOSLogo } from "./common/TelaiOSLogo.tsx";
 
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
@@ -188,8 +195,9 @@ function SideNavLink({
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, toggle } = useTheme();
+  const { theme, toggle, syncThemeWithDefault } = useTheme();
   const { user, logout } = useAuth();
+  const [appSettings, setAppSettings] = useState<AppSettings>(loadCachedAppSettings);
 
   // Desktop: expanded (false) or icon-only collapsed (true)
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -198,6 +206,27 @@ export default function Layout() {
 
   // Mobile: drawer open or closed
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    return subscribeToAppSettingsUpdates(setAppSettings);
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    getSettings()
+      .then((settings) => {
+        persistAndApplyAppSettings(settings);
+        syncThemeWithDefault(settings.default_theme === "light" ? "light" : "dark");
+      })
+      .catch(() => {
+        // Best-effort refresh: keep cached settings if request fails.
+      });
+  }, [syncThemeWithDefault, user]);
+
+  const brandName = appSettings.brand_name.trim() || "TelaiOS";
 
   const handleLogout = useCallback(() => {
     logout();
@@ -333,8 +362,18 @@ export default function Layout() {
 
         {/* Brand — always visible in topbar */}
         <div className="flex items-center gap-2">
-          <span className="text-primary"><TelaiOSLogo size={22} /></span>
-          <span className="font-bold text-sm leading-snug tracking-tight">TelaiOS</span>
+          <span className="text-primary inline-flex items-center">
+            {appSettings.logo_url ? (
+              <img
+                src={appSettings.logo_url}
+                alt={`${brandName} logo`}
+                className="h-[22px] w-auto max-w-[140px] object-contain"
+              />
+            ) : (
+              <TelaiOSLogo size={22} />
+            )}
+          </span>
+          <span className="font-bold text-sm leading-snug tracking-tight">{brandName}</span>
         </div>
 
         {/* Spacer */}

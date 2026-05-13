@@ -84,6 +84,13 @@ class BulkArtifactsBody(BaseModel):
     artifacts: list[ArtifactInBody]
 
 
+# ── User role promotion ────────────────────────────────────────────────────────
+
+
+class UpdateUserRoleBody(BaseModel):
+    system_role: str  # "admin" | "member" — validated at service layer
+
+
 __all__ = [
     "ArtifactInBody",
     "BulkArtifactsBody",
@@ -98,4 +105,5 @@ __all__ = [
     "UpdatePlanStatusCompleted",
     "UpdatePlanStatusExecuting",
     "UpdatePlanStatusFailed",
+    "UpdateUserRoleBody",
 ]

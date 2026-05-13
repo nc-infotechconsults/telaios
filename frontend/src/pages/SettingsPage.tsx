@@ -3,16 +3,11 @@ import { Button, Input, Spinner, Switch } from "@heroui/react";
 import { getSettings, patchSettings } from "../lib/api";
 import type { AppSettings } from "../types";
 import { toast } from "../lib/toast";
-
-const DEFAULT_SETTINGS: AppSettings = {
-  id: 1,
-  brand_name: "TelaiOS",
-  brand_color: "#006FEE",
-  logo_url: null,
-  favicon_url: null,
-  default_theme: "dark",
-  updated_at: new Date().toISOString(),
-};
+import {
+  loadCachedAppSettings,
+  persistAndApplyAppSettings,
+} from "../lib/appSettings";
+import { useTheme } from "../context/ThemeContext";
 
 function isValidHex(color: string): boolean {
   return /^#[0-9A-Fa-f]{6}$/.test(color);
@@ -30,16 +25,21 @@ function readFileAsBase64(file: File): Promise<string> {
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(loadCachedAppSettings);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
+  const { syncThemeWithDefault } = useTheme();
 
   useEffect(() => {
     getSettings()
-      .then((s) => setSettings(s))
+      .then((s) => {
+        setSettings(s);
+        persistAndApplyAppSettings(s);
+        syncThemeWithDefault(s.default_theme === "light" ? "light" : "dark");
+      })
       .catch(() => toast.error("Failed to load settings"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [syncThemeWithDefault]);
 
   const handleSave = useCallback(async () => {
     if (!isValidHex(settings.brand_color)) {
@@ -56,6 +56,8 @@ export default function SettingsPage() {
         default_theme: settings.default_theme,
       });
       setSettings(updated);
+      persistAndApplyAppSettings(updated);
+      syncThemeWithDefault(updated.default_theme === "light" ? "light" : "dark");
       toast.success("Settings saved");
     } catch {
       toast.error("Failed to save settings");
@@ -66,9 +68,13 @@ export default function SettingsPage() {
 
   const handleLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      e.currentTarget.value = "";
+      return;
+    }
     if (file.size > 500 * 1024) {
       toast.error("Logo must be under 500KB");
+      e.currentTarget.value = "";
       return;
     }
     try {
@@ -76,14 +82,20 @@ export default function SettingsPage() {
       setSettings((prev) => ({ ...prev, logo_url: base64 }));
     } catch {
       toast.error("Failed to read logo file");
+    } finally {
+      e.currentTarget.value = "";
     }
   }, []);
 
   const handleFaviconUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      e.currentTarget.value = "";
+      return;
+    }
     if (file.size > 100 * 1024) {
       toast.error("Favicon must be under 100KB");
+      e.currentTarget.value = "";
       return;
     }
     try {
@@ -91,6 +103,8 @@ export default function SettingsPage() {
       setSettings((prev) => ({ ...prev, favicon_url: base64 }));
     } catch {
       toast.error("Failed to read favicon file");
+    } finally {
+      e.currentTarget.value = "";
     }
   }, []);
 

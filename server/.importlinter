@@ -144,8 +144,16 @@ ignore_imports =
     # chat module — intra + cross-module (allowed)
     telaios.modules.chat -> telaios.modules.chat.router
     telaios.modules.chat.router -> telaios.modules.plans.repository
+    telaios.modules.chat.router -> telaios.modules.plans.prompts
+    telaios.modules.chat.router -> telaios.modules.plans.schemas
+    telaios.modules.chat.router -> telaios.modules.plans.service
     telaios.modules.chat.router -> telaios.modules.messages.schemas
     telaios.modules.chat.router -> telaios.modules.messages.service
+    telaios.modules.chat.router -> telaios.modules.documents.service
+    telaios.modules.chat.router -> telaios.modules.documents.chunks.service
+    telaios.modules.chat.router -> telaios.modules.repositories.service
+    telaios.modules.chat.router -> telaios.modules.tasks.schemas
+    telaios.modules.chat.router -> telaios.modules.tasks.service
     # documents module — facade
     telaios.modules.documents -> telaios.modules.documents.router
     telaios.modules.documents -> telaios.modules.documents.service
@@ -274,6 +282,8 @@ ignore_imports =
      telaios.modules.internal.router -> telaios.modules.tasks.artifacts.service
      telaios.modules.internal.router -> telaios.modules.projects.agents.service
      telaios.modules.internal.router -> telaios.modules.library.service
+     telaios.modules.internal.router -> telaios.modules.users.schemas
+     telaios.modules.internal.router -> telaios.modules.users.service
      # containers — intra (no cross-module reads needed)
      telaios.modules.containers -> telaios.modules.containers.router
       # docker_shell — intra

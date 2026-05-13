@@ -13,9 +13,13 @@ import { chromium, type FullConfig } from "@playwright/test";
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const SERVER_URL = process.env.SERVER_URL ?? "http://localhost:8000";
-const INTERNAL_KEY = process.env.INTERNAL_API_KEY ?? "test-internal-api-key";
+const INTERNAL_KEY = process.env.INTERNAL_API_KEY ?? "dev-internal-key";
 
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 export const AUTH_FILE = path.join(FIXTURES_DIR, ".auth.json");
@@ -80,22 +84,31 @@ export default async function globalSetup(config: FullConfig) {
   fs.mkdirSync(FIXTURES_DIR, { recursive: true });
 
   // ── 1. Register test user + get JWT ────────────────────────────────────────
-  const email = "e2e-test@ci.local";
+  const email = "e2e-test@example.com";
   const password = "E2eTest1234!";
   let token: string;
+  let userId: string;
 
   try {
-    const { data } = await axios.post<{ token: string }>(`${SERVER_URL}/auth/register`, {
+    const { data } = await axios.post<{ token: string; user: { id: string } }>(`${SERVER_URL}/auth/register`, {
       email,
       password,
       display_name: "E2E Test User",
     });
     token = data.token;
+    userId = data.user.id;
   } catch {
     // User already exists from a previous run — just log in
-    const { data } = await axios.post<{ token: string }>(`${SERVER_URL}/auth/login`, { email, password });
+    const { data } = await axios.post<{ token: string; user: { id: string } }>(`${SERVER_URL}/auth/login`, { email, password });
     token = data.token;
+    userId = data.user.id;
   }
+
+  // Ensure the e2e user is always an admin (needed for settings page tests)
+  await internalApi.patch(`/internal/users/${userId}/role`, { system_role: "admin" });
+  // Re-login to get a fresh token with the updated role encoded in it
+  const { data: refreshed } = await axios.post<{ token: string }>(`${SERVER_URL}/auth/login`, { email, password });
+  token = refreshed.token;
 
   api = axios.create({
     baseURL: SERVER_URL,
@@ -265,6 +278,7 @@ export default async function globalSetup(config: FullConfig) {
   const page = await context.newPage();
   await page.goto(baseURL);
   await page.evaluate((t) => localStorage.setItem("swe_auth_token", t), token);
+  await page.evaluate(() => localStorage.removeItem("telaios_app_settings"));
   await context.storageState({ path: AUTH_FILE });
   await browser.close();
 }

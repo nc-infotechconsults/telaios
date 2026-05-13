@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./stores/appStore";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
+import { applyAppSettingsToDocument, loadCachedAppSettings } from "./lib/appSettings";
 import "./index.css";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -22,6 +23,8 @@ import LoginPage from "./pages/Login";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import SettingsPage from "./pages/SettingsPage";
+
+applyAppSettingsToDocument(loadCachedAppSettings());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

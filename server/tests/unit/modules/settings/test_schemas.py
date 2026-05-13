@@ -89,3 +89,19 @@ class TestPatchSettingsDto:
     def test_brand_name_valid(self):
         dto = PatchSettingsDto(brand_name="x" * 255)
         assert dto.brand_name == "x" * 255
+
+    def test_logo_url_allows_large_data_url(self):
+        dto = PatchSettingsDto(logo_url=f"data:image/png;base64,{('a' * 600_000)}")
+        assert dto.logo_url is not None
+
+    def test_favicon_url_allows_large_data_url(self):
+        dto = PatchSettingsDto(favicon_url=f"data:image/png;base64,{('a' * 120_000)}")
+        assert dto.favicon_url is not None
+
+    def test_rejects_non_data_url_logo(self):
+        with pytest.raises(ValidationError):
+            PatchSettingsDto(logo_url="https://example.com/logo.png")
+
+    def test_rejects_non_data_url_favicon(self):
+        with pytest.raises(ValidationError):
+            PatchSettingsDto(favicon_url="/favicon.ico")

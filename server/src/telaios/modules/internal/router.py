@@ -25,6 +25,7 @@ from telaios.modules.internal.schemas import (
     StoreChunksResponse,
     UpdatePlanStatusBody,
     UpdatePlanStatusFailed,
+    UpdateUserRoleBody,
 )
 from telaios.modules.library.service import LibraryAgentService
 from telaios.modules.plans.schemas import PlanPatch, PlanRead
@@ -214,3 +215,26 @@ async def increment_library_agent_usage(
     ok = await svc.increment_usage(agent_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library agent not found")
+
+
+# ── User role management (test/admin tooling) ──────────────────────────────────
+
+
+@internal_router.patch(
+    "/users/{user_id}/role",
+    dependencies=[_Guard],
+)
+async def update_user_role(
+    user_id: uuid.UUID,
+    body: UpdateUserRoleBody,
+    session: AsyncSession = Depends(get_session),
+) -> Any:
+    """Promote or demote a user's system_role. Intended for CI seed scripts."""
+    from telaios.modules.users.schemas import UserUpdate
+    from telaios.modules.users.service import UserService
+
+    svc = UserService(session)
+    try:
+        return await svc.patch_user(user_id, UserUpdate(system_role=body.system_role))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
