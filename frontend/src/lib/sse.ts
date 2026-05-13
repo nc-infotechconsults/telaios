@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import type { WsEvent } from "../types";
+import type { DesignWsEvent, WsEvent } from "../types";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const TOKEN_KEY = "swe_auth_token";
@@ -85,6 +85,83 @@ export function usePlanSSE(
       controller.abort();
     };
   }, [planId]);
+
+  return { sendMessage };
+}
+
+export function useDesignSSE(
+  sessionId: string | undefined,
+  onEvent: (event: DesignWsEvent) => void
+) {
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
+
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (DEMO || !sessionId) return;
+      const res = await fetch(`/api/design/sessions/${sessionId}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    },
+    [sessionId]
+  );
+
+  useEffect(() => {
+    if (DEMO || !sessionId) return;
+
+    const controller = new AbortController();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    async function connect() {
+      while (!controller.signal.aborted) {
+        buffer = "";
+        try {
+          const res = await fetch(`/api/design/sessions/${sessionId}/stream`, {
+            headers: authHeaders(),
+            signal: controller.signal,
+          });
+          if (!res.ok || !res.body) throw new Error(`SSE returned ${res.status}`);
+          const reader = res.body.getReader();
+          while (!controller.signal.aborted) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() ?? "";
+            for (const frame of frames) {
+              const data = frame
+                .split("\n")
+                .filter((line) => line.startsWith("data:"))
+                .map((line) => line.slice(5).trimStart())
+                .join("\n");
+              if (!data) continue;
+              try {
+                onEventRef.current(JSON.parse(data) as DesignWsEvent);
+              } catch {
+                // ignore non-JSON frames
+              }
+            }
+          }
+        } catch {
+          if (controller.signal.aborted) return;
+          await new Promise<void>((resolve) => {
+            const t = setTimeout(resolve, 2000);
+            controller.signal.addEventListener("abort", () => { clearTimeout(t); resolve(); });
+          });
+        }
+      }
+    }
+
+    void connect();
+
+    return () => {
+      controller.abort();
+    };
+  }, [sessionId]);
 
   return { sendMessage };
 }

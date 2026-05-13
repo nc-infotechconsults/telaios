@@ -404,9 +404,14 @@ export default function ProjectDetail() {
         )}
         <div className="ml-auto shrink-0">
           {activeTab === "plans" && (
-            <Button size="sm" color="primary" onPress={onNewPlanOpen}>
-              + New Plan
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="bordered" onPress={() => navigate(`/projects/${projectId}/design`)}>
+                Design Studio
+              </Button>
+              <Button size="sm" color="primary" onPress={onNewPlanOpen}>
+                + New Plan
+              </Button>
+            </div>
           )}
           {activeTab === "agents" && (
             <Button size="sm" color="primary" onPress={onLibraryOpen}>

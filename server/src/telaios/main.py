@@ -25,6 +25,7 @@ from telaios.modules.agent_profiles import agent_profiles_router
 from telaios.modules.analytics import analytics_router
 from telaios.modules.chat import chat_router
 from telaios.modules.containers import containers_router
+from telaios.modules.design_chat import design_sessions_router, project_design_sessions_router
 from telaios.modules.docker_shell import docker_shell_router
 from telaios.modules.document_copilot import copilot_router
 from telaios.modules.document_extraction import extraction_router, jobs_router
@@ -81,6 +82,7 @@ _MODULES: dict[str, list[APIRouter]] = {
     "tasks": [plan_tasks_router, task_router],
     "messages": [messages_router],
     "chat": [chat_router],
+    "design_chat": [project_design_sessions_router, design_sessions_router],
     "documents": [
         project_documents_router,
         document_router,

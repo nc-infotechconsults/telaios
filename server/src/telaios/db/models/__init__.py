@@ -5,6 +5,7 @@ contains every table when Alembic runs autogenerate.
 """
 
 from telaios.db.models.app_settings import AppSettings
+from telaios.db.models.design_chat import DesignArtifact, DesignMessage, DesignSession
 from telaios.db.models.documents import (
     Document,
     DocumentActivity,
@@ -37,6 +38,9 @@ from telaios.db.models.workspaces import Workspace
 
 __all__ = [
     "AppSettings",
+    "DesignArtifact",
+    "DesignMessage",
+    "DesignSession",
     "Document",
     "DocumentActivity",
     "DocumentChunk",

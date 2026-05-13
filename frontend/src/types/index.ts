@@ -133,6 +133,40 @@ export interface Message {
   created_at: string;
 }
 
+export type DesignSessionStatus = "active" | "archived";
+
+export interface DesignSession {
+  id: string;
+  project_id: string;
+  title?: string | null;
+  status: DesignSessionStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DesignMessage {
+  id: string;
+  session_id: string;
+  role: MessageRole;
+  content: string;
+  created_at: string;
+}
+
+export interface DesignArtifact {
+  id: string;
+  session_id: string;
+  revision: number;
+  title: string;
+  description?: string | null;
+  html_content: string;
+  css_content?: string | null;
+  js_content?: string | null;
+  prompt?: string | null;
+  rationale?: string | null;
+  artifact_metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export type McpToolPermission = "read" | "write" | "execute" | "require-confirmation";
 
 /**
@@ -732,6 +766,14 @@ export type WsEvent =
   | { type: "document_updated"; document_id: string; name: string }
   | { type: "document_deleted"; document_id: string }
   | { type: "document_processing_complete"; document_id: string; name: string };
+
+export type DesignWsEvent =
+  | { type: "design_chat_token"; content: string }
+  | { type: "design_chat_end" }
+  | { type: "design_chat_thinking" }
+  | { type: "design_artifact"; artifact: DesignArtifact }
+  | { type: "design_message"; data: DesignMessage }
+  | { type: "error"; message: string };
 
 // ─── LLM Providers ───────────────────────────────────────────────────────────
 

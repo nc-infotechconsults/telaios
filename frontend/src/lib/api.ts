@@ -7,6 +7,9 @@ import type {
   Task,
   TaskArtifact,
   Message,
+  DesignSession,
+  DesignMessage,
+  DesignArtifact,
   AgentProfile,
   ProjectAgent,
   LibraryAgent,
@@ -280,6 +283,41 @@ export const getPlanMessages = (planId: string): Promise<Message[]> =>
 
 export const getMessages = (projectId: string): Promise<Message[]> =>
   DEMO ? delay(demo.MESSAGES[projectId] ?? []) : http.get<Message[]>(`/messages?project_id=${projectId}`).then((r) => r.data);
+
+// ─── Design Chat ─────────────────────────────────────────────────────────────
+
+export const listDesignSessions = (projectId: string): Promise<DesignSession[]> =>
+  DEMO ? delay([]) : http.get<DesignSession[]>(`/projects/${projectId}/design/sessions`).then((r) => r.data);
+
+export const createDesignSession = (projectId: string, title?: string): Promise<DesignSession> =>
+  DEMO
+    ? delay<DesignSession>({
+        id: `design-${Date.now()}`,
+        project_id: projectId,
+        title: title ?? null,
+        status: "active",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http.post<DesignSession>(`/projects/${projectId}/design/sessions`, { title }).then((r) => r.data);
+
+export const getDesignSession = (sessionId: string): Promise<DesignSession> =>
+  DEMO
+    ? delay<DesignSession>({
+        id: sessionId,
+        project_id: "demo",
+        title: "Design Session",
+        status: "active",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http.get<DesignSession>(`/design/sessions/${sessionId}`).then((r) => r.data);
+
+export const getDesignMessages = (sessionId: string): Promise<DesignMessage[]> =>
+  DEMO ? delay([]) : http.get<DesignMessage[]>(`/design/sessions/${sessionId}/messages`).then((r) => r.data);
+
+export const getDesignArtifacts = (sessionId: string): Promise<DesignArtifact[]> =>
+  DEMO ? delay([]) : http.get<DesignArtifact[]>(`/design/sessions/${sessionId}/artifacts`).then((r) => r.data);
 
 // ─── LLM Providers ───────────────────────────────────────────────────────────
 

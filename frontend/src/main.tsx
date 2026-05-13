@@ -11,6 +11,7 @@ import "./index.css";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
 import PlanningChat from "./pages/PlanningChat";
+import DesignChat from "./pages/DesignChat";
 import ExecutionDashboard from "./pages/ExecutionDashboard";
 import LibraryPage from "./pages/LibraryPage";
 import LibraryAgentDetail from "./pages/LibraryAgentDetail";
@@ -48,6 +49,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="/" element={<ProjectList />} />
                     <Route path="/projects/:projectId" element={<ProjectDetail />} />
                     <Route path="/projects/:projectId/plans/:planId" element={<PlanningChat />} />
+                    <Route path="/projects/:projectId/design" element={<DesignChat />} />
+                    <Route path="/projects/:projectId/design/:designSessionId" element={<DesignChat />} />
                     <Route path="/projects/:projectId/execute" element={<ExecutionDashboard />} />
                     <Route path="/projects/:projectId/documents/:documentId" element={<DocumentViewerPage />} />
                     <Route path="/projects/:projectId/environments/:envId" element={<EnvironmentDetail />} />
