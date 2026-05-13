@@ -24,6 +24,8 @@ def _make_settings_obj(
     logo_url: str | None = None,
     favicon_url: str | None = None,
     default_theme: str = "dark",
+    theme_preset: str | None = None,
+    custom_theme: dict | None = None,
 ) -> MagicMock:
     obj = MagicMock()
     obj.id = 1
@@ -32,6 +34,8 @@ def _make_settings_obj(
     obj.logo_url = logo_url
     obj.favicon_url = favicon_url
     obj.default_theme = default_theme
+    obj.theme_preset = theme_preset
+    obj.custom_theme = custom_theme
     obj.updated_at = _now()
     return obj
 
@@ -87,7 +91,9 @@ class TestPatchSettings:
         repo.get_or_create.return_value = obj
         repo.save.return_value = obj
 
-        dto = PatchSettingsDto(logo_url="data:image/png;base64,abc", favicon_url="data:image/x-icon;base64,def")
+        dto = PatchSettingsDto(
+            logo_url="data:image/png;base64,abc", favicon_url="data:image/x-icon;base64,def"
+        )
         await svc.patch_settings(dto)
 
         assert obj.logo_url == "data:image/png;base64,abc"

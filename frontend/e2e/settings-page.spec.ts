@@ -35,6 +35,21 @@ test.describe("Settings page", () => {
     expect(rootPrimary).toBe(brandColor);
   });
 
+  test("applies theme preset CSS vars after selecting and saving", async ({ page }) => {
+    // Click the "Corporate" preset — radius: "none" → --heroui-radius-small: "0px"
+    await page.getByRole("button", { name: "Corporate" }).click();
+
+    await page.getByRole("button", { name: "Save Settings" }).click();
+    await expect(page.getByText("Settings saved")).toBeVisible({ timeout: 10_000 });
+
+    await page.goto("/");
+
+    const radiusSmall = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--heroui-radius-small").trim(),
+    );
+    expect(radiusSmall).toBe("0px");
+  });
+
   test("accepts logo upload and shows it in topbar after save", async ({ page }) => {
     const logoDataUrl =
       "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc5NicgaGVpZ2h0PSczMicgdmlld0JveD0nMCAwIDk2IDMyJz48cmVjdCB3aWR0aD0nOTYnIGhlaWdodD0nMzInIHJ4PSc4JyBmaWxsPScjMEQ5N0Y2Jy8+PHRleHQgeD0nNDgnIHk9JzIxJyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBmb250LXNpemU9JzEyJyBmb250LWZhbWlseT0nc2Fucy1zZXJpZicgZmlsbD0nd2hpdGUnPkUyRSBMT0dPPC90ZXh0Pjwvc3ZnPg==";

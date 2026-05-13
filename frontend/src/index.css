@@ -57,7 +57,7 @@
 
 /* Card surface with depth shadow + subtle gradient */
 .clay-card {
-  border-radius: 20px;
+  border-radius: var(--heroui-radius-large, 20px);
   background: linear-gradient(160deg, #ffffff 0%, #FEF4EF 100%);
   border: 1px solid rgba(224, 123, 84, 0.12);
   box-shadow:
@@ -104,7 +104,7 @@
 
 /* Inflated text input with inner shadow */
 .clay-input {
-  border-radius: 14px;
+  border-radius: var(--heroui-radius-medium, 14px);
   border: 1px solid rgba(224, 123, 84, 0.2);
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.04) inset,
@@ -214,7 +214,7 @@
 
 /* Compact pill toolbar (e.g., view mode toggle, pagination) */
 .clay-toolbar {
-  border-radius: 12px;
+  border-radius: var(--heroui-radius-medium, 12px);
   background: linear-gradient(135deg, #ffffff 0%, #FEF4EF 100%);
   border: 1px solid rgba(224, 123, 84, 0.15);
   box-shadow:
