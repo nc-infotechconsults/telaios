@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
 
 if TYPE_CHECKING:
+    from telaios.db.models.design_chat import DesignSession
     from telaios.db.models.documents import Document, DocumentFolder
     from telaios.db.models.environments import Environment
     from telaios.db.models.plans import Message, Plan
@@ -63,6 +64,9 @@ class Project(Base, SoftDeleteMixin):
     )
     plans: Mapped[list[Plan]] = relationship(
         "Plan", back_populates="project", cascade="all, delete-orphan"
+    )
+    design_sessions: Mapped[list[DesignSession]] = relationship(
+        "DesignSession", cascade="all, delete-orphan"
     )
     messages: Mapped[list[Message]] = relationship(
         "Message", back_populates="project", cascade="all, delete-orphan"

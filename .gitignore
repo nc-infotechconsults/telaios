@@ -13,3 +13,4 @@ __pycache__
 /agent-service/local_cache
 /agent-service/build/
 /server/.import_linter_cache/
+/frontend/playwright-report/

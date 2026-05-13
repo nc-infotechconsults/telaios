@@ -220,12 +220,12 @@ export const deleteRepository = (projectId: string, id: string): Promise<void> =
   DEMO ? delay(undefined as unknown as void) : http.delete(`/projects/${projectId}/repositories/${id}`).then(() => undefined);
 
 export const testRepository = (
-  projectId: string,
+  _projectId: string,
   data: Pick<Repository, "provider_type" | "remote_url" | "branch" | "auth_type" | "bucket_name" | "region" | "endpoint"> & { credentials?: string }
 ): Promise<RepositoryTestResult> =>
   DEMO
     ? delay<RepositoryTestResult>({ ok: true, code: "OK", message: "Demo: repository reachable", default_branch: data.branch ?? "main" })
-    : http.post<RepositoryTestResult>(`/projects/${projectId}/repositories/test`, data).then((r) => r.data);
+    : http.post<RepositoryTestResult>("/repositories/test", data).then((r) => r.data);
 
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
@@ -289,10 +289,10 @@ export const getLlmProviders = (): Promise<LlmProviderDefinition[]> =>
 // ─── System Settings (admin) ──────────────────────────────────────────────────
 
 export const getSettings = (): Promise<AppSettings> =>
-  DEMO ? delay<AppSettings>({ id: 1, brand_name: "TelaiOS", brand_color: "#006FEE", logo_url: null, favicon_url: null, default_theme: "dark", updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
+  DEMO ? delay<AppSettings>({ id: 1, brand_name: "TelaiOS", brand_color: "#006FEE", logo_url: null, favicon_url: null, default_theme: "dark", theme_preset: null, custom_theme: null, updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
 
 export const patchSettings = (data: PatchSettingsPayload): Promise<AppSettings> =>
-  DEMO ? delay<AppSettings>({ id: 1, brand_name: data.brand_name ?? "TelaiOS", brand_color: data.brand_color ?? "#006FEE", logo_url: data.logo_url ?? null, favicon_url: data.favicon_url ?? null, default_theme: data.default_theme ?? "dark", updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
+  DEMO ? delay<AppSettings>({ id: 1, brand_name: data.brand_name ?? "TelaiOS", brand_color: data.brand_color ?? "#006FEE", logo_url: data.logo_url ?? null, favicon_url: data.favicon_url ?? null, default_theme: data.default_theme ?? "dark", theme_preset: data.theme_preset ?? null, custom_theme: data.custom_theme ?? null, updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
 
 // ─── Agent Profiles (legacy — retained for settings/admin pages) ──────────────
 
@@ -498,8 +498,8 @@ export const removeProjectAgent = (projectId: string, agentId: string): Promise<
 export const listDocuments = (projectId: string): Promise<Document[]> =>
   DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents`).then((r) => r.data);
 
-export const getDocument = (projectId: string, documentId: string): Promise<Document> =>
-  http.get<Document>(`/projects/${projectId}/documents/${documentId}`).then((r) => r.data);
+export const getDocument = (_projectId: string, documentId: string): Promise<Document> =>
+  http.get<Document>(`/documents/${documentId}`).then((r) => r.data);
 
 export const uploadDocument = (projectId: string, file: File, folderId?: string | null): Promise<Document> => {
   if (DEMO) {
@@ -524,22 +524,32 @@ export const uploadDocument = (projectId: string, file: File, folderId?: string 
   }
   const form = new FormData();
   form.append("file", file);
-  if (folderId) form.append("folder_id", folderId);
-  return http.post<Document>(`/projects/${projectId}/documents`, form).then((r) => r.data);
+  return http
+    .post<Document>(`/projects/${projectId}/documents/upload`, form, {
+      params: folderId ? { folder_id: folderId } : undefined,
+    })
+    .then((r) => r.data);
 };
 
-export const deleteDocument = (projectId: string, id: string): Promise<void> =>
-  DEMO ? delay(undefined as unknown as void) : http.delete(`/projects/${projectId}/documents/${id}`).then(() => undefined);
+export const deleteDocument = (_projectId: string, id: string): Promise<void> =>
+  DEMO ? delay(undefined as unknown as void) : http.delete(`/documents/${id}`).then(() => undefined);
 
-export const getDocumentDownloadUrl = (projectId: string, id: string): Promise<string> =>
+export const getDocumentDownloadUrl = (_projectId: string, id: string): Promise<string> =>
   DEMO
     ? delay("")
-    : http.get<{ url: string }>(`/projects/${projectId}/documents/${id}/download`).then((r) => r.data.url);
+    : http.get<{ url: string }>(`/documents/${id}/download`).then((r) => r.data.url);
 
-export const updateDocumentContent = (projectId: string, id: string, content: string): Promise<Document> =>
-  DEMO
-    ? delay({} as Document)
-    : http.put<Document>(`/projects/${projectId}/documents/${id}/content`, { content }).then((r) => r.data);
+export const updateDocumentContent = async (_projectId: string, id: string, content: string): Promise<Document> => {
+  if (DEMO) return delay({} as Document);
+  try {
+    return await http.put<Document>(`/documents/${id}/content`, { content }).then((r) => r.data);
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      throw new Error("Document editing is not enabled on the server yet.");
+    }
+    throw error;
+  }
+};
 
 // ─── Document Folders ─────────────────────────────────────────────────────────
 
@@ -547,7 +557,7 @@ export const listFolders = (projectId: string, parentFolderId?: string | null): 
   DEMO ? delay([]) : http.get<DocumentFolder[]>(`/projects/${projectId}/folders`, { params: parentFolderId ? { parent_folder_id: parentFolderId } : undefined }).then((r) => r.data);
 
 export const listAllFolders = (projectId: string): Promise<DocumentFolder[]> =>
-  DEMO ? delay([]) : http.get<DocumentFolder[]>(`/projects/${projectId}/folders/all`).then((r) => r.data);
+  DEMO ? delay([]) : http.get<DocumentFolder[]>(`/projects/${projectId}/folders`).then((r) => r.data);
 
 export const createFolder = (projectId: string, data: { name: string; parent_folder_id?: string | null }): Promise<DocumentFolder> =>
   DEMO
@@ -571,18 +581,21 @@ export const deleteFolder = (projectId: string, folderId: string): Promise<void>
 
 // ─── Document Versions ────────────────────────────────────────────────────────
 
-export const listVersions = (projectId: string, documentId: string): Promise<DocumentVersion[]> =>
-  DEMO ? delay([]) : http.get<DocumentVersion[]>(`/projects/${projectId}/documents/${documentId}/versions`).then((r) => r.data);
+export const listVersions = (_projectId: string, documentId: string): Promise<DocumentVersion[]> =>
+  DEMO ? delay([]) : http.get<DocumentVersion[]>(`/documents/${documentId}/versions`).then((r) => r.data);
 
-export const uploadVersion = (projectId: string, documentId: string, file: File, changeDescription?: string): Promise<DocumentVersion> => {
+export const uploadVersion = (_projectId: string, documentId: string, file: File, changeDescription?: string): Promise<DocumentVersion> => {
   const form = new FormData();
   form.append("file", file);
-  if (changeDescription) form.append("change_description", changeDescription);
-  return http.post<DocumentVersion>(`/projects/${projectId}/documents/${documentId}/versions`, form).then((r) => r.data);
+  return http
+    .post<DocumentVersion>(`/documents/${documentId}/versions`, form, {
+      params: changeDescription ? { change_description: changeDescription } : undefined,
+    })
+    .then((r) => r.data);
 };
 
-export const getVersionDownloadUrl = (projectId: string, documentId: string, versionId: string): Promise<string> =>
-  http.get<{ url: string }>(`/projects/${projectId}/documents/${documentId}/versions/${versionId}/download`).then((r) => r.data.url);
+export const getVersionDownloadUrl = (_projectId: string, documentId: string, versionId: string): Promise<string> =>
+  http.get<{ url: string }>(`/documents/${documentId}/versions/${versionId}/download`).then((r) => r.data.url);
 
 // ─── Document Tags ────────────────────────────────────────────────────────────
 
@@ -595,33 +608,40 @@ export const createTag = (projectId: string, data: { name: string; color?: strin
 export const deleteTag = (projectId: string, tagId: string): Promise<void> =>
   http.delete(`/projects/${projectId}/tags/${tagId}`).then(() => undefined);
 
-export const getDocumentTags = (projectId: string, documentId: string): Promise<DocumentTag[]> =>
-  DEMO ? delay([]) : http.get<DocumentTag[]>(`/projects/${projectId}/documents/${documentId}/tags`).then((r) => r.data);
+export const getDocumentTags = async (_projectId: string, documentId: string): Promise<DocumentTag[]> => {
+  if (DEMO) return delay([]);
+  try {
+    return await http.get<DocumentTag[]>(`/documents/${documentId}/tags`).then((r) => r.data);
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return [];
+    throw error;
+  }
+};
 
-export const assignDocumentTag = (projectId: string, documentId: string, tagId: string): Promise<void> =>
-  http.post(`/projects/${projectId}/documents/${documentId}/tags/${tagId}`).then(() => undefined);
+export const assignDocumentTag = (_projectId: string, documentId: string, tagId: string): Promise<void> =>
+  http.post(`/documents/${documentId}/tags/${tagId}`).then(() => undefined);
 
-export const unassignDocumentTag = (projectId: string, documentId: string, tagId: string): Promise<void> =>
-  http.delete(`/projects/${projectId}/documents/${documentId}/tags/${tagId}`).then(() => undefined);
+export const unassignDocumentTag = (_projectId: string, documentId: string, tagId: string): Promise<void> =>
+  http.delete(`/documents/${documentId}/tags/${tagId}`).then(() => undefined);
 
 // ─── Document Comments ────────────────────────────────────────────────────────
 
-export const listComments = (projectId: string, documentId: string): Promise<DocumentComment[]> =>
-  DEMO ? delay([]) : http.get<DocumentComment[]>(`/projects/${projectId}/documents/${documentId}/comments`).then((r) => r.data);
+export const listComments = (_projectId: string, documentId: string): Promise<DocumentComment[]> =>
+  DEMO ? delay([]) : http.get<DocumentComment[]>(`/documents/${documentId}/comments`).then((r) => r.data);
 
-export const createComment = (projectId: string, documentId: string, data: { content: string; anchor_type?: string; parent_comment_id?: string | null }): Promise<DocumentComment> =>
-  http.post<DocumentComment>(`/projects/${projectId}/documents/${documentId}/comments`, data).then((r) => r.data);
+export const createComment = (_projectId: string, documentId: string, data: { content: string; anchor_type?: string; parent_comment_id?: string | null }): Promise<DocumentComment> =>
+  http.post<DocumentComment>(`/documents/${documentId}/comments`, data).then((r) => r.data);
 
-export const patchComment = (projectId: string, documentId: string, commentId: string, data: { content?: string; resolved?: boolean }): Promise<DocumentComment> =>
-  http.patch<DocumentComment>(`/projects/${projectId}/documents/${documentId}/comments/${commentId}`, data).then((r) => r.data);
+export const patchComment = (_projectId: string, documentId: string, commentId: string, data: { content?: string; resolved?: boolean }): Promise<DocumentComment> =>
+  http.patch<DocumentComment>(`/documents/${documentId}/comments/${commentId}`, data).then((r) => r.data);
 
-export const deleteComment = (projectId: string, documentId: string, commentId: string): Promise<void> =>
-  http.delete(`/projects/${projectId}/documents/${documentId}/comments/${commentId}`).then(() => undefined);
+export const deleteComment = (_projectId: string, documentId: string, commentId: string): Promise<void> =>
+  http.delete(`/documents/${documentId}/comments/${commentId}`).then(() => undefined);
 
 // ─── Document Activity ────────────────────────────────────────────────────────
 
-export const listDocumentActivities = (projectId: string, documentId: string): Promise<DocumentActivityItem[]> =>
-  DEMO ? delay([]) : http.get<DocumentActivityItem[]>(`/projects/${projectId}/documents/${documentId}/activity`).then((r) => r.data);
+export const listDocumentActivities = (_projectId: string, documentId: string): Promise<DocumentActivityItem[]> =>
+  DEMO ? delay([]) : http.get<DocumentActivityItem[]>(`/documents/${documentId}/activity`).then((r) => r.data);
 
 export const listProjectDocumentActivities = (projectId: string): Promise<DocumentActivityItem[]> =>
   DEMO ? delay([]) : http.get<DocumentActivityItem[]>(`/projects/${projectId}/activity/documents`).then((r) => r.data);
@@ -637,34 +657,64 @@ export const listProjectTemplates = (projectId: string): Promise<DocumentTemplat
 // ─── Document Favorites ───────────────────────────────────────────────────────
 
 export const listFavorites = (projectId: string): Promise<string[]> =>
-  DEMO ? delay([]) : http.get<string[]>(`/projects/${projectId}/favorites`).then((r) => r.data);
+  DEMO
+    ? delay([])
+    : http
+        .get<Array<{ document_id: string }>>(`/projects/${projectId}/favorites`)
+        .then((r) => r.data.map((favorite) => favorite.document_id));
 
-export const checkFavorite = (projectId: string, documentId: string): Promise<boolean> =>
-  DEMO ? delay(false) : http.get<{ is_favorite: boolean }>(`/projects/${projectId}/documents/${documentId}/favorite`).then((r) => r.data.is_favorite);
+export const checkFavorite = async (projectId: string, documentId: string): Promise<boolean> => {
+  if (DEMO) return delay(false);
+  const favoriteIds = await listFavorites(projectId);
+  return favoriteIds.includes(documentId);
+};
 
-export const addFavorite = (projectId: string, documentId: string): Promise<void> =>
-  http.post(`/projects/${projectId}/documents/${documentId}/favorite`).then(() => undefined);
+export const addFavorite = (_projectId: string, documentId: string): Promise<void> =>
+  http.post(`/documents/${documentId}/favorite`).then(() => undefined);
 
-export const removeFavorite = (projectId: string, documentId: string): Promise<void> =>
-  http.delete(`/projects/${projectId}/documents/${documentId}/favorite`).then(() => undefined);
+export const removeFavorite = (_projectId: string, documentId: string): Promise<void> =>
+  http.delete(`/documents/${documentId}/favorite`).then(() => undefined);
 
 // ─── Document Search ──────────────────────────────────────────────────────────
 
-export const searchDocuments = (projectId: string, params: { q?: string; type?: string; tag?: string }): Promise<Document[]> =>
-  DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents/search`, { params }).then((r) => r.data);
+export const searchDocuments = async (projectId: string, params: { q?: string; type?: string; tag?: string }): Promise<Document[]> => {
+  if (DEMO) return delay([]);
+  try {
+    return await http.get<Document[]>(`/projects/${projectId}/documents/search`, { params }).then((r) => r.data);
+  } catch (error) {
+    if (!axios.isAxiosError(error) || error.response?.status !== 404) throw error;
+    const docs = await listDocuments(projectId);
+    const normalizedQuery = params.q?.trim().toLowerCase();
+    let filtered = docs;
+    if (normalizedQuery) {
+      filtered = filtered.filter((doc) => doc.name.toLowerCase().includes(normalizedQuery));
+    }
+    if (params.type) {
+      filtered = filtered.filter((doc) => doc.file_type === params.type);
+    }
+    return filtered;
+  }
+};
 
 // ─── Document Trash ───────────────────────────────────────────────────────────
 
-export const listTrash = (projectId: string): Promise<Document[]> =>
-  DEMO ? delay([]) : http.get<Document[]>(`/projects/${projectId}/documents/trash`).then((r) => r.data);
+export const listTrash = async (projectId: string): Promise<Document[]> => {
+  if (DEMO) return delay([]);
+  try {
+    return await http.get<Document[]>(`/projects/${projectId}/documents/trash`).then((r) => r.data);
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return [];
+    throw error;
+  }
+};
 
-export const restoreDocument = (projectId: string, documentId: string): Promise<Document> =>
-  http.post<Document>(`/projects/${projectId}/documents/${documentId}/restore`).then((r) => r.data);
+export const restoreDocument = (_projectId: string, documentId: string): Promise<Document> =>
+  http.post<Document>(`/documents/${documentId}/restore`).then((r) => r.data);
 
 // ─── Document with folder update ─────────────────────────────────────────────
 
-export const moveDocument = (projectId: string, documentId: string, folderId: string | null): Promise<Document> =>
-  http.patch<Document>(`/projects/${projectId}/documents/${documentId}`, { metadata: { folder_id: folderId } }).then((r) => r.data);
+export const moveDocument = (_projectId: string, documentId: string, folderId: string | null): Promise<Document> =>
+  http.patch<Document>(`/documents/${documentId}`, { folder_id: folderId }).then((r) => r.data);
 
 // ─── Workspaces ───────────────────────────────────────────────────────────────
 
@@ -1071,14 +1121,14 @@ export interface CopilotExtractResult {
   key_values: Record<string, string>;
 }
 
-export const copilotSummarize = (projectId: string, documentId: string): Promise<CopilotSummarizeResult> =>
-  http.post<CopilotSummarizeResult>(`/projects/${projectId}/documents/${documentId}/copilot/summarize`).then((r) => r.data);
+export const copilotSummarize = (_projectId: string, documentId: string): Promise<CopilotSummarizeResult> =>
+  http.post<CopilotSummarizeResult>(`/documents/${documentId}/copilot/summarize`).then((r) => r.data);
 
-export const copilotAsk = (projectId: string, documentId: string, question: string): Promise<CopilotAskResult> =>
-  http.post<CopilotAskResult>(`/projects/${projectId}/documents/${documentId}/copilot/ask`, { question }).then((r) => r.data);
+export const copilotAsk = (_projectId: string, documentId: string, question: string): Promise<CopilotAskResult> =>
+  http.post<CopilotAskResult>(`/documents/${documentId}/copilot/ask`, { question }).then((r) => r.data);
 
-export const copilotExtract = (projectId: string, documentId: string): Promise<CopilotExtractResult> =>
-  http.post<CopilotExtractResult>(`/projects/${projectId}/documents/${documentId}/copilot/extract`).then((r) => r.data);
+export const copilotExtract = (_projectId: string, documentId: string): Promise<CopilotExtractResult> =>
+  http.post<CopilotExtractResult>(`/documents/${documentId}/copilot/extract`).then((r) => r.data);
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 

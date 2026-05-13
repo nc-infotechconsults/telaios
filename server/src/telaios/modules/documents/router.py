@@ -18,7 +18,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.auth.dependencies import CurrentPrincipal, Principal
@@ -86,15 +86,19 @@ async def upload_document(
     project_id: uuid.UUID,
     principal: CurrentPrincipal,
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     folder_id: Annotated[uuid.UUID | None, Query()] = None,
     session: AsyncSession = Depends(get_session),
 ) -> DocumentRead:
-    return await DocumentService(session).upload(
+    svc = DocumentService(session)
+    doc = await svc.upload(
         project_id,
         file,
         uploaded_by=uuid.UUID(principal.id),
         folder_id=folder_id,
     )
+    background_tasks.add_task(svc.process, doc.id, project_id)
+    return doc
 
 
 # ─── Document-scoped router ───────────────────────────────────────────────────

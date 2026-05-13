@@ -20,6 +20,7 @@ from telaios.config.logging import configure_logging
 from telaios.config.settings import get_settings
 from telaios.db.session import dispose_engine
 from telaios.infra.redis import close_redis
+from telaios.infra.s3 import ensure_bucket_exists
 from telaios.modules.agent_profiles import agent_profiles_router
 from telaios.modules.analytics import analytics_router
 from telaios.modules.chat import chat_router
@@ -110,6 +111,7 @@ _MODULES: dict[str, list[APIRouter]] = {
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     logger.info("telaios starting")
+    await ensure_bucket_exists()
     try:
         yield
     finally:

@@ -37,35 +37,45 @@ export function usePlanSSE(
     let buffer = "";
 
     async function connect() {
-      try {
-        const res = await fetch(`/api/chat/${planId}/stream`, {
-          headers: authHeaders(),
-          signal: controller.signal,
-        });
-        if (!res.ok || !res.body) throw new Error(`SSE returned ${res.status}`);
-        const reader = res.body.getReader();
-        while (!controller.signal.aborted) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const frames = buffer.split("\n\n");
-          buffer = frames.pop() ?? "";
-          for (const frame of frames) {
-            const data = frame
-              .split("\n")
-              .filter((line) => line.startsWith("data:"))
-              .map((line) => line.slice(5).trimStart())
-              .join("\n");
-            if (!data) continue;
-            try {
-              onEventRef.current(JSON.parse(data) as WsEvent);
-            } catch {
-              // ignore non-JSON frames
+      // Retry loop: reconnect on transient errors (e.g. server not yet ready
+      // when the plan was just created) until the component unmounts.
+      while (!controller.signal.aborted) {
+        buffer = "";
+        try {
+          const res = await fetch(`/api/chat/${planId}/stream`, {
+            headers: authHeaders(),
+            signal: controller.signal,
+          });
+          if (!res.ok || !res.body) throw new Error(`SSE returned ${res.status}`);
+          const reader = res.body.getReader();
+          while (!controller.signal.aborted) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() ?? "";
+            for (const frame of frames) {
+              const data = frame
+                .split("\n")
+                .filter((line) => line.startsWith("data:"))
+                .map((line) => line.slice(5).trimStart())
+                .join("\n");
+              if (!data) continue;
+              try {
+                onEventRef.current(JSON.parse(data) as WsEvent);
+              } catch {
+                // ignore non-JSON frames
+              }
             }
           }
+        } catch (err) {
+          if (controller.signal.aborted) return;
+          // Transient failure — wait 2 s before reconnecting
+          await new Promise<void>((resolve) => {
+            const t = setTimeout(resolve, 2000);
+            controller.signal.addEventListener("abort", () => { clearTimeout(t); resolve(); });
+          });
         }
-      } catch (err) {
-        if (!controller.signal.aborted) console.error("SSE error", err);
       }
     }
 

@@ -29,6 +29,8 @@ export default function DocumentsTab({ projectId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollAttemptsRef = useRef(0);
+  const MAX_POLL_ATTEMPTS = 40; // ~2 minutes at 3 s intervals
 
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onOpenChange: onDeleteOpenChange } = useDisclosure();
 
@@ -43,16 +45,25 @@ export default function DocumentsTab({ projectId }: Props) {
     }
   };
 
-  // Poll while any document is still in processing/uploading state
+  // Poll while any document is still in processing/uploading state.
+  // Stops automatically once all docs are settled or after MAX_POLL_ATTEMPTS.
   const schedulePoll = (docs: Document[]) => {
     if (pollRef.current) clearTimeout(pollRef.current);
     const needsPoll = docs.some((d) => d.status === "processing" || d.status === "uploading");
-    if (needsPoll) {
-      pollRef.current = setTimeout(async () => {
-        const updated = await load();
-        schedulePoll(updated);
-      }, 3000);
+    if (!needsPoll) {
+      pollAttemptsRef.current = 0;
+      return;
     }
+    if (pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+      pollAttemptsRef.current = 0;
+      toast.error("Document processing timed out");
+      return;
+    }
+    pollAttemptsRef.current += 1;
+    pollRef.current = setTimeout(async () => {
+      const updated = await load();
+      schedulePoll(updated);
+    }, 3000);
   };
 
   useEffect(() => {

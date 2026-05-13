@@ -56,6 +56,8 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollAttemptsRef = useRef(0);
+  const MAX_POLL_ATTEMPTS = 40; // ~2 minutes at 3 s intervals
   const { isOpen: isFolderModalOpen, onOpen: openFolderModal, onClose: closeFolderModal } = useDisclosure();
 
   // Build breadcrumb path from current folder
@@ -102,11 +104,21 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
     }
   }, [projectId]);
 
-  // Poll while any document is still in processing/uploading state
+  // Poll while any document is still in processing/uploading state.
+  // Stops automatically once all docs are settled or after MAX_POLL_ATTEMPTS.
   const schedulePoll = useCallback((docs: Document[]) => {
     if (pollRef.current) clearTimeout(pollRef.current);
     const needsPoll = docs.some((d) => d.status === "processing" || d.status === "uploading");
-    if (!needsPoll || !projectId) return;
+    if (!needsPoll || !projectId) {
+      pollAttemptsRef.current = 0;
+      return;
+    }
+    if (pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+      pollAttemptsRef.current = 0;
+      toast.error("Document processing timed out");
+      return;
+    }
+    pollAttemptsRef.current += 1;
     pollRef.current = setTimeout(async () => {
       try {
         const updated = await listDocuments(projectId);
