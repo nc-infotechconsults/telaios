@@ -18,7 +18,9 @@ _HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 RadiusLiteral = Literal["none", "small", "medium", "large", "full"]
 ShadowLiteral = Literal["none", "small", "medium", "large"]
 FontFamilyLiteral = Literal["system", "inter", "roboto", "helvetica", "georgia", "mono"]
-PresetLiteral = Literal["default", "corporate", "midnight", "warm", "minimal"]
+PresetLiteral = Literal[
+    "default", "corporate", "midnight", "warm", "minimal", "ocean", "forest", "sunset"
+]
 
 
 class CustomTheme(BaseModel):

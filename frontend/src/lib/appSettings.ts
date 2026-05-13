@@ -1,4 +1,4 @@
-import type { AppSettings } from "../types";
+import type { AppSettings, CustomTheme, FontFamilyKey, RadiusStep, ShadowStep, ThemePreset } from "../types";
 
 const DEFAULT_BRAND_NAME = "TelaiOS";
 const DEFAULT_BRAND_COLOR = "#006FEE";
@@ -26,6 +26,149 @@ const PRIMARY_STOPS: Array<{ key: string; target: Rgb; amount: number }> = [
 export const APP_SETTINGS_STORAGE_KEY = "telaios_app_settings";
 export const APP_SETTINGS_UPDATED_EVENT = "telaios:app-settings-updated";
 
+// ── Preset definitions ────────────────────────────────────────────────────────
+
+/** A fully-resolved theme (all keys present) used internally for CSS var injection. */
+export interface ResolvedTheme {
+  background: string;
+  foreground: string;
+  content1: string;
+  content2: string;
+  content3: string;
+  divider: string;
+  radius: RadiusStep;
+  shadow: ShadowStep;
+  font_family: FontFamilyKey;
+  sidebar_background: string;
+}
+
+export const THEME_PRESETS: Record<ThemePreset, ResolvedTheme> = {
+  default: {
+    background: "#0d0d0d",
+    foreground: "#ededed",
+    content1: "#1a1a1a",
+    content2: "#161616",
+    content3: "#121212",
+    divider: "#2a2a2a",
+    radius: "medium",
+    shadow: "medium",
+    font_family: "system",
+    sidebar_background: "#111111",
+  },
+  corporate: {
+    background: "#ffffff",
+    foreground: "#111111",
+    content1: "#f5f5f5",
+    content2: "#eeeeee",
+    content3: "#e8e8e8",
+    divider: "#dddddd",
+    radius: "none",
+    shadow: "none",
+    font_family: "helvetica",
+    sidebar_background: "#f0f0f0",
+  },
+  midnight: {
+    background: "#050c1a",
+    foreground: "#e8f0ff",
+    content1: "#0a1628",
+    content2: "#081322",
+    content3: "#06101d",
+    divider: "#1a2d4d",
+    radius: "medium",
+    shadow: "large",
+    font_family: "inter",
+    sidebar_background: "#080f1e",
+  },
+  warm: {
+    background: "#fdf8f2",
+    foreground: "#2d1f0e",
+    content1: "#fef4e8",
+    content2: "#fdf0e0",
+    content3: "#fcebd8",
+    divider: "#e8d5ba",
+    radius: "large",
+    shadow: "small",
+    font_family: "georgia",
+    sidebar_background: "#f9f0e4",
+  },
+  minimal: {
+    background: "#ffffff",
+    foreground: "#000000",
+    content1: "#fafafa",
+    content2: "#f5f5f5",
+    content3: "#f0f0f0",
+    divider: "#e0e0e0",
+    radius: "none",
+    shadow: "none",
+    font_family: "system",
+    sidebar_background: "#f8f8f8",
+  },
+  ocean: {
+    background: "#04101a",
+    foreground: "#d6eeff",
+    content1: "#071c2e",
+    content2: "#061726",
+    content3: "#05121e",
+    divider: "#0f3050",
+    radius: "medium",
+    shadow: "large",
+    font_family: "inter",
+    sidebar_background: "#060f1a",
+  },
+  forest: {
+    background: "#061209",
+    foreground: "#d4f0da",
+    content1: "#0d2114",
+    content2: "#0b1c11",
+    content3: "#09170e",
+    divider: "#163a1f",
+    radius: "large",
+    shadow: "medium",
+    font_family: "georgia",
+    sidebar_background: "#071410",
+  },
+  sunset: {
+    background: "#160508",
+    foreground: "#fde8d8",
+    content1: "#26080f",
+    content2: "#1f060c",
+    content3: "#180509",
+    divider: "#3d1018",
+    radius: "medium",
+    shadow: "large",
+    font_family: "system",
+    sidebar_background: "#1a060b",
+  },
+};
+
+// ── Radius / shadow / font value maps ─────────────────────────────────────────
+
+const RADIUS_VALUES: Record<RadiusStep, { small: string; medium: string; large: string }> = {
+  none:   { small: "0px",   medium: "0px",   large: "0px" },
+  small:  { small: "4px",   medium: "8px",   large: "12px" },
+  medium: { small: "8px",   medium: "12px",  large: "16px" },
+  large:  { small: "12px",  medium: "16px",  large: "24px" },
+  full:   { small: "999px", medium: "999px", large: "999px" },
+};
+
+const SHADOW_VALUES: Record<ShadowStep, string> = {
+  none:   "none",
+  small:  "0 1px 3px rgba(0,0,0,0.12)",
+  medium: "0 4px 12px rgba(0,0,0,0.18)",
+  large:  "0 8px 32px rgba(0,0,0,0.28)",
+};
+
+const FONT_FAMILY_VALUES: Record<FontFamilyKey, string> = {
+  system:    "system-ui, -apple-system, sans-serif",
+  inter:     "Inter, system-ui, sans-serif",
+  roboto:    "Roboto, Helvetica Neue, Arial, sans-serif",
+  helvetica: "Helvetica Neue, Helvetica, Arial, sans-serif",
+  georgia:   "Georgia, Times New Roman, serif",
+  mono:      "ui-monospace, Menlo, monospace",
+};
+
+// ── Colour utilities ──────────────────────────────────────────────────────────
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 1,
   brand_name: DEFAULT_BRAND_NAME,
@@ -33,6 +176,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   logo_url: null,
   favicon_url: null,
   default_theme: "dark",
+  theme_preset: null,
+  custom_theme: null,
   updated_at: new Date().toISOString(),
 };
 
@@ -51,6 +196,13 @@ function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings {
     default_theme: isThemeValue(parsed.default_theme)
       ? parsed.default_theme
       : DEFAULT_APP_SETTINGS.default_theme,
+    theme_preset:
+      parsed.theme_preset != null && parsed.theme_preset in THEME_PRESETS
+        ? (parsed.theme_preset as ThemePreset)
+        : null,
+    custom_theme: parsed.custom_theme != null && typeof parsed.custom_theme === "object"
+      ? (parsed.custom_theme as CustomTheme)
+      : null,
     updated_at:
       typeof parsed.updated_at === "string"
         ? parsed.updated_at
@@ -58,7 +210,7 @@ function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings {
   };
 }
 
-function isHexColor(value: unknown): value is string {
+export function isHexColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
 }
 
@@ -112,6 +264,10 @@ function rgbToHslChannels(rgb: Rgb): string {
   return `${h.toFixed(2)} ${(s * 100).toFixed(2)}% ${(l * 100).toFixed(2)}%`;
 }
 
+function hexToHslChannels(hex: string): string {
+  return rgbToHslChannels(parseHexColor(hex));
+}
+
 function luminanceChannel(channel: number): number {
   const normalized = channel / 255;
   return normalized <= 0.03928
@@ -146,6 +302,64 @@ function buildPrimaryScaleChannels(hexColor: string): Record<string, string> {
 
   return channels;
 }
+
+// ── Theme override application ────────────────────────────────────────────────
+
+/**
+ * Resolve a preset + optional overrides into a complete theme object,
+ * then inject all CSS custom properties onto `document.documentElement`.
+ */
+export function applyThemeOverrides(
+  preset: ThemePreset | null,
+  overrides: CustomTheme | null,
+): void {
+  if (typeof document === "undefined") return;
+
+  const base: ResolvedTheme = THEME_PRESETS[preset ?? "default"];
+
+  const resolved: ResolvedTheme = {
+    background:        (isHexColor(overrides?.background)  ? overrides!.background!  : base.background),
+    foreground:        (isHexColor(overrides?.foreground)   ? overrides!.foreground!  : base.foreground),
+    content1:          (isHexColor(overrides?.content1)     ? overrides!.content1!    : base.content1),
+    content2:          (isHexColor(overrides?.content2)     ? overrides!.content2!    : base.content2),
+    content3:          (isHexColor(overrides?.content3)     ? overrides!.content3!    : base.content3),
+    divider:           (isHexColor(overrides?.divider)      ? overrides!.divider!     : base.divider),
+    radius:            overrides?.radius      ?? base.radius,
+    shadow:            overrides?.shadow      ?? base.shadow,
+    font_family:       overrides?.font_family ?? base.font_family,
+    sidebar_background:(isHexColor(overrides?.sidebar_background) ? overrides!.sidebar_background! : base.sidebar_background),
+  };
+
+  const rootStyle = document.documentElement.style;
+
+  // Colours — HeroUI uses HSL channel-only format (no hsl() wrapper)
+  rootStyle.setProperty("--heroui-background",  hexToHslChannels(resolved.background));
+  rootStyle.setProperty("--heroui-foreground",  hexToHslChannels(resolved.foreground));
+  rootStyle.setProperty("--heroui-content1",    hexToHslChannels(resolved.content1));
+  rootStyle.setProperty("--heroui-content2",    hexToHslChannels(resolved.content2));
+  rootStyle.setProperty("--heroui-content3",    hexToHslChannels(resolved.content3));
+  rootStyle.setProperty("--heroui-divider",     hexToHslChannels(resolved.divider));
+
+  // Sidebar (custom var — hex)
+  rootStyle.setProperty("--sidebar-background", resolved.sidebar_background);
+
+  // Border radius
+  const r = RADIUS_VALUES[resolved.radius];
+  rootStyle.setProperty("--heroui-radius-small",  r.small);
+  rootStyle.setProperty("--heroui-radius-medium", r.medium);
+  rootStyle.setProperty("--heroui-radius-large",  r.large);
+
+  // Box shadow
+  const s = SHADOW_VALUES[resolved.shadow];
+  rootStyle.setProperty("--heroui-box-shadow-small",  s);
+  rootStyle.setProperty("--heroui-box-shadow-medium", s);
+  rootStyle.setProperty("--heroui-box-shadow-large",  s);
+
+  // Font family
+  rootStyle.setProperty("font-family", FONT_FAMILY_VALUES[resolved.font_family]);
+}
+
+// ── Favicon / meta helpers ────────────────────────────────────────────────────
 
 function ensureDynamicFaviconLink(): HTMLLinkElement {
   let link = document.querySelector<HTMLLinkElement>("link[data-app-favicon='true']");
@@ -183,6 +397,8 @@ function ensureThemeColorMeta(): HTMLMetaElement {
   document.head.appendChild(meta);
   return meta;
 }
+
+// ── Cache helpers ─────────────────────────────────────────────────────────────
 
 export function loadCachedAppSettings(): AppSettings {
   if (typeof window === "undefined") {
@@ -251,6 +467,8 @@ export function subscribeToAppSettingsUpdates(
   };
 }
 
+// ── Main document apply ───────────────────────────────────────────────────────
+
 export function applyAppSettingsToDocument(settings: AppSettings): void {
   if (typeof document === "undefined") return;
 
@@ -275,4 +493,7 @@ export function applyAppSettingsToDocument(settings: AppSettings): void {
 
   const themeColorMeta = ensureThemeColorMeta();
   themeColorMeta.content = brandColor;
+
+  // Apply theme preset + custom overrides
+  applyThemeOverrides(settings.theme_preset ?? null, settings.custom_theme ?? null);
 }

@@ -30,7 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider>
       <HeroUIProvider>
-        <ToastProvider placement="bottom-right" maxVisibleToasts={5} />
+        <ToastProvider placement="bottom-right" maxVisibleToasts={5} disableAnimation={true} />
         <AuthProvider>
           <AppProvider>
             <BrowserRouter>
