@@ -289,17 +289,18 @@ export const getMessages = (projectId: string): Promise<Message[]> =>
 export const listDesignSessions = (projectId: string): Promise<DesignSession[]> =>
   DEMO ? delay([]) : http.get<DesignSession[]>(`/projects/${projectId}/design/sessions`).then((r) => r.data);
 
-export const createDesignSession = (projectId: string, title?: string): Promise<DesignSession> =>
+export const createDesignSession = (projectId: string, title?: string, designer_agent_id?: string): Promise<DesignSession> =>
   DEMO
     ? delay<DesignSession>({
         id: `design-${Date.now()}`,
         project_id: projectId,
         title: title ?? null,
+        designer_agent_id: designer_agent_id ?? null,
         status: "active",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-    : http.post<DesignSession>(`/projects/${projectId}/design/sessions`, { title }).then((r) => r.data);
+    : http.post<DesignSession>(`/projects/${projectId}/design/sessions`, { title, designer_agent_id }).then((r) => r.data);
 
 export const getDesignSession = (sessionId: string): Promise<DesignSession> =>
   DEMO
@@ -312,6 +313,19 @@ export const getDesignSession = (sessionId: string): Promise<DesignSession> =>
         updated_at: new Date().toISOString(),
       })
     : http.get<DesignSession>(`/design/sessions/${sessionId}`).then((r) => r.data);
+
+export const patchDesignSession = (sessionId: string, designer_agent_id?: string | null): Promise<DesignSession> =>
+  DEMO
+    ? delay<DesignSession>({
+        id: sessionId,
+        project_id: "demo",
+        title: "Design Session",
+        designer_agent_id: designer_agent_id ?? null,
+        status: "active",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    : http.patch<DesignSession>(`/design/sessions/${sessionId}`, { designer_agent_id }).then((r) => r.data);
 
 export const getDesignMessages = (sessionId: string): Promise<DesignMessage[]> =>
   DEMO ? delay([]) : http.get<DesignMessage[]>(`/design/sessions/${sessionId}/messages`).then((r) => r.data);

@@ -32,6 +32,7 @@ const ROLE_COLOR: Record<
   knowledge: "default",
   custom: "default",
   "document-copilot": "default",
+  designer: "default",
 };
 
 const BackIcon = (

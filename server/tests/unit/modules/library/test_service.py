@@ -291,14 +291,14 @@ class TestLibraryAgentServicePatch:
 
     @pytest.mark.asyncio
     @patch("telaios.utils.crypto.decrypt", return_value=None)
-    async def test_system_agent_type_becomes_custom(self, mock_decrypt):
+    async def test_system_agent_type_stays_system(self, mock_decrypt):
         svc, repo = _make_agent_service()
         obj = _make_agent_obj(agent_type="system")
         repo.find.return_value = obj
         repo.save.return_value = obj
 
         await svc.patch(obj.id, LibraryAgentPatch(name="Updated"))
-        assert obj.agent_type == "custom"
+        assert obj.agent_type == "system"
 
     @pytest.mark.asyncio
     @patch("telaios.utils.crypto.decrypt", return_value=None)

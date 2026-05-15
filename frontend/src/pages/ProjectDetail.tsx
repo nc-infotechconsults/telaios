@@ -64,7 +64,7 @@ const STATUS_COLOR: Record<string, "warning" | "success" | "primary" | "default"
   completed: "success",
 };
 
-const ROLE_OPTIONS: AgentRole[] = ["planner", "coder", "reviewer", "tester", "infra", "knowledge", "custom"];
+const ROLE_OPTIONS: AgentRole[] = ["planner", "coder", "reviewer", "tester", "infra", "knowledge", "custom", "designer"];
 
 const ROLE_COLOR: Record<AgentRole, "warning" | "success" | "primary" | "secondary" | "danger" | "default"> = {
   planner: "primary",
@@ -75,6 +75,7 @@ const ROLE_COLOR: Record<AgentRole, "warning" | "success" | "primary" | "seconda
   knowledge: "default",
   custom: "default",
   "document-copilot": "default",
+  designer: "default",
 };
 
 const MEMBER_ROLE_OPTIONS: ProjectRole[] = ["owner", "editor", "viewer"];

@@ -100,8 +100,6 @@ class LibraryAgentService:
             raise NotFoundError("Library agent not found")
         if obj.is_base:
             raise ForbiddenError("Base agents cannot be edited directly; clone them instead")
-        if obj.agent_type == "system":
-            obj.agent_type = "custom"
         for field, val in dto.model_dump(exclude_unset=True).items():
             if field == "llm_api_key" and val:
                 val = encrypt(val)

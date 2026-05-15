@@ -139,6 +139,7 @@ export interface DesignSession {
   id: string;
   project_id: string;
   title?: string | null;
+  designer_agent_id?: string | null;
   status: DesignSessionStatus;
   created_at: string;
   updated_at: string;
@@ -298,7 +299,8 @@ export type AgentRole =
   | "infra"
   | "knowledge"
   | "custom"
-  | "document-copilot";
+  | "document-copilot"
+  | "designer";
 
 /** A sub-agent wired as a named LangChain tool. */
 export interface SubAgentEntry {

@@ -155,12 +155,14 @@ ignore_imports =
     telaios.modules.chat.router -> telaios.modules.tasks.schemas
     telaios.modules.chat.router -> telaios.modules.tasks.service
     # design_chat — intra
-    telaios.modules.design_chat -> telaios.modules.design_chat.router
-    telaios.modules.design_chat -> telaios.modules.design_chat.service
-    telaios.modules.design_chat.router -> telaios.modules.design_chat.schemas
-    telaios.modules.design_chat.router -> telaios.modules.design_chat.service
-    telaios.modules.design_chat.service -> telaios.modules.design_chat.repository
-    telaios.modules.design_chat.service -> telaios.modules.design_chat.schemas
+     telaios.modules.design_chat -> telaios.modules.design_chat.router
+     telaios.modules.design_chat -> telaios.modules.design_chat.service
+     telaios.modules.design_chat.router -> telaios.modules.design_chat.schemas
+     telaios.modules.design_chat.router -> telaios.modules.design_chat.service
+     telaios.modules.design_chat.service -> telaios.modules.design_chat.repository
+     telaios.modules.design_chat.service -> telaios.modules.design_chat.schemas
+     # design_chat cross-module — reads from library facade for designer agent resolution
+     telaios.modules.design_chat.service -> telaios.modules.library
     # documents module — facade
     telaios.modules.documents -> telaios.modules.documents.router
     telaios.modules.documents -> telaios.modules.documents.service

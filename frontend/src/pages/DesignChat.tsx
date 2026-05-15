@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Spinner, Textarea, useDisclosure } from "@heroui/react";
+import { Button, Card, CardBody, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Select, SelectItem, Spinner, Textarea, useDisclosure } from "@heroui/react";
 import ChatInput from "../components/chat/ChatInput";
 import MessageBubble from "../components/chat/MessageBubble";
-import { createDesignSession, getDesignArtifacts, getDesignMessages, getDesignSession } from "../lib/api";
+import { createDesignSession, getDesignArtifacts, getDesignMessages, getDesignSession, listLibraryAgents, patchDesignSession } from "../lib/api";
 import { useDesignSSE } from "../lib/sse";
 import { toast } from "../lib/toast";
-import type { DesignArtifact, DesignMessage, DesignSession, DesignWsEvent, Message } from "../types";
+import type { DesignArtifact, DesignMessage, DesignSession, DesignWsEvent, LibraryAgent, Message } from "../types";
 
 function toMessage(m: DesignMessage): Message {
   return {
@@ -39,6 +39,30 @@ export default function DesignChat() {
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [designerAgents, setDesignerAgents] = useState<LibraryAgent[]>([]);
+  const [selectedDesignerAgentId, setSelectedDesignerAgentId] = useState<string>("");
+  const [sessionDesignerAgentId, setSessionDesignerAgentId] = useState<string>("");
+  const [swappingAgent, setSwappingAgent] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    listLibraryAgents({ role: "designer", limit: 100 })
+      .then((agents) => {
+        setDesignerAgents(agents);
+        const defaultAgent = agents.find((a) => a.role === "designer" && a.agent_type === "system");
+        if (defaultAgent) {
+          setSelectedDesignerAgentId(defaultAgent.id);
+        } else if (agents.length > 0) {
+          setSelectedDesignerAgentId(agents[0].id);
+        } else {
+          setSelectedDesignerAgentId("");
+        }
+      })
+      .catch(() => {
+        setDesignerAgents([]);
+        setSelectedDesignerAgentId("");
+      });
+  }, [isOpen]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -53,11 +77,15 @@ export default function DesignChat() {
       getDesignSession(designSessionId),
       getDesignMessages(designSessionId),
       getDesignArtifacts(designSessionId),
+      listLibraryAgents({ role: "designer", limit: 100 }),
     ])
-      .then(([s, msg, arts]) => {
+      .then(([s, msg, arts, agents]) => {
         setSession(s);
         setMessages(msg);
         setArtifacts(arts);
+        setDesignerAgents(agents);
+        const currentAgentId = s.designer_agent_id ?? "";
+        setSessionDesignerAgentId(currentAgentId);
         if (arts.length > 0) setActiveArtifactId(arts[arts.length - 1].id);
       })
       .catch(() => toast.error("Failed to load design session"))
@@ -100,9 +128,14 @@ export default function DesignChat() {
     if (!projectId) return;
     setCreating(true);
     try {
-      const created = await createDesignSession(projectId, newTitle.trim() || undefined);
+      const created = await createDesignSession(
+        projectId,
+        newTitle.trim() || undefined,
+        selectedDesignerAgentId || undefined,
+      );
       onOpenChange();
       setNewTitle("");
+      setSelectedDesignerAgentId("");
       navigate(`/projects/${projectId}/design/${created.id}`);
     } catch {
       toast.error("Failed to create design session");
@@ -151,9 +184,39 @@ export default function DesignChat() {
             {session?.title ?? "Design Studio"}
           </h1>
           {session && (
-            <Chip size="sm" variant="flat" color="primary" className="ml-auto">
-              {session.status}
-            </Chip>
+            <>
+              <Select
+                size="sm"
+                aria-label="Designer agent"
+                className="ml-auto w-40"
+                selectedKeys={sessionDesignerAgentId ? new Set([sessionDesignerAgentId]) : new Set()}
+                onSelectionChange={async (keys) => {
+                  const key = Array.from(keys)[0] as string | undefined;
+                  if (!key || key === sessionDesignerAgentId || !designSessionId) return;
+                  setSwappingAgent(true);
+                  try {
+                    const updated = await patchDesignSession(designSessionId, key);
+                    setSession(updated);
+                    setSessionDesignerAgentId(key);
+                    toast.success("Designer agent updated");
+                  } catch {
+                    toast.error("Failed to update designer agent");
+                  } finally {
+                    setSwappingAgent(false);
+                  }
+                }}
+                isDisabled={swappingAgent || isStreaming}
+              >
+                {designerAgents.map((agent) => (
+                  <SelectItem key={agent.id} textValue={agent.name}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </Select>
+              <Chip size="sm" variant="flat" color="primary">
+                {session.status}
+              </Chip>
+            </>
           )}
         </div>
 
@@ -236,7 +299,7 @@ export default function DesignChat() {
           {() => (
             <>
               <ModalHeader>Create Design Session</ModalHeader>
-              <ModalBody>
+              <ModalBody className="gap-4">
                 <Textarea
                   autoFocus
                   label="Session title"
@@ -245,6 +308,21 @@ export default function DesignChat() {
                   value={newTitle}
                   onValueChange={setNewTitle}
                 />
+                <Select
+                  label="Designer agent"
+                  placeholder="Select a designer agent"
+                  selectedKeys={selectedDesignerAgentId ? new Set([selectedDesignerAgentId]) : new Set()}
+                  onSelectionChange={(keys) => {
+                    const key = Array.from(keys)[0] as string | undefined;
+                    setSelectedDesignerAgentId(key ?? "");
+                  }}
+                >
+                  {designerAgents.map((agent) => (
+                    <SelectItem key={agent.id} textValue={agent.name}>
+                      {agent.name}
+                    </SelectItem>
+                  ))}
+                </Select>
               </ModalBody>
               <ModalFooter>
                 <Button variant="light" onPress={() => navigate(`/projects/${projectId}`)}>

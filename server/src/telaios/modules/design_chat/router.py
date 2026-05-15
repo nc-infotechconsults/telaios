@@ -29,6 +29,7 @@ from telaios.modules.design_chat.schemas import (
     DesignMessageRead,
     DesignMessageRequest,
     DesignSessionCreate,
+    DesignSessionPatch,
     DesignSessionRead,
 )
 from telaios.modules.design_chat.service import DesignChatService
@@ -99,6 +100,19 @@ async def get_design_session(
     session: AsyncSession = Depends(get_session),
 ) -> DesignSessionRead:
     return await DesignChatService(session).get_session(session_id)
+
+
+@design_sessions_router.patch(
+    "/{session_id}",
+    response_model=DesignSessionRead,
+    dependencies=[Depends(_require_design_session_access("editor"))],
+)
+async def patch_design_session(
+    session_id: uuid.UUID,
+    body: DesignSessionPatch,
+    session: AsyncSession = Depends(get_session),
+) -> DesignSessionRead:
+    return await DesignChatService(session).patch_session(session_id, body)
 
 
 @design_sessions_router.get(

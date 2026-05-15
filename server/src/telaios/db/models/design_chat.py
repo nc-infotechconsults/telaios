@@ -9,7 +9,8 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, func
+import sqlalchemy as sa
+from sqlalchemy import UUID, DateTime, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +30,11 @@ class DesignSession(Base, TimestampMixin, SoftDeleteMixin):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     project_id: Mapped[uuid.UUID] = uuid_fk("projects.id")
+    designer_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("library_agents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[DesignSessionStatus] = mapped_column(

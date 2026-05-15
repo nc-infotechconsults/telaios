@@ -58,6 +58,7 @@ const ROLE_COLOR: Record<AgentRole, "warning" | "success" | "primary" | "seconda
   knowledge: "default",
   custom: "default",
   "document-copilot": "default",
+  designer: "default",
 };
 
 type LibraryTab = "agents" | "mcps" | "skills";
@@ -68,6 +69,7 @@ const ROLE_FILTERS: Array<AgentRole | "all"> = [
   "coder",
   "reviewer",
   "tester",
+  "designer",
   "infra",
   "knowledge",
   "custom",

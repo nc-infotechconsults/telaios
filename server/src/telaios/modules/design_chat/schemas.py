@@ -14,6 +14,7 @@ DesignMessageRole = Literal["user", "assistant", "system"]
 
 class DesignSessionCreate(BaseModel):
     title: str | None = None
+    designer_agent_id: uuid.UUID | None = None
 
 
 class DesignSessionRead(BaseModel):
@@ -21,10 +22,15 @@ class DesignSessionRead(BaseModel):
 
     id: uuid.UUID
     project_id: uuid.UUID
+    designer_agent_id: uuid.UUID | None
     title: str | None
     status: DesignSessionStatus
     created_at: datetime
     updated_at: datetime
+
+
+class DesignSessionPatch(BaseModel):
+    designer_agent_id: uuid.UUID | None = None
 
 
 class DesignMessageRequest(BaseModel):
@@ -64,6 +70,7 @@ __all__ = [
     "DesignMessageRequest",
     "DesignMessageRole",
     "DesignSessionCreate",
+    "DesignSessionPatch",
     "DesignSessionRead",
     "DesignSessionStatus",
 ]

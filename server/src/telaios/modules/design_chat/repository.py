@@ -35,10 +35,21 @@ class DesignSessionRepository:
         *,
         project_id: uuid.UUID,
         title: str | None,
+        designer_agent_id: uuid.UUID | None = None,
         status: str = "active",
     ) -> DesignSession:
-        obj = DesignSession(project_id=project_id, title=title, status=status)
+        obj = DesignSession(
+            project_id=project_id,
+            title=title,
+            designer_agent_id=designer_agent_id,
+            status=status,
+        )
         self._s.add(obj)
+        await self._s.flush()
+        await self._s.refresh(obj)
+        return obj
+
+    async def save(self, obj: DesignSession) -> DesignSession:
         await self._s.flush()
         await self._s.refresh(obj)
         return obj
