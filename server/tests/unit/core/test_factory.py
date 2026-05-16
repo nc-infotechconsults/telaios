@@ -147,7 +147,7 @@ class TestCreateAgent:
             framework="langchain",
             llm=LLMConfig(provider="openai", model="gpt-4o", api_key="sk-test"),
         )
-        with patch("telaios.core.agent._build_chat_model", return_value=MagicMock()):
+        with patch("telaios.core.agent.build_chat_model", return_value=MagicMock()):
             agent = create_agent(config)
         assert isinstance(agent, LangChainAgent)
 

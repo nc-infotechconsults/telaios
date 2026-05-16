@@ -3,27 +3,32 @@ src/core/retriever.py
 ---------------------
 Retriever abstraction for RAG strategies.
 
-``Retriever`` is a simple base class (not an ABC) that concrete retriever
-implementations extend.  It is used only by ``core/strategies/`` as a type
-annotation — callers pass any object with ``retrieve`` / ``aretrieve`` methods.
+``Retriever`` defines the interface that concrete retriever implementations
+must fulfill.  It is used by ``core/strategies/`` as a type annotation.
 """
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
 from telaios.core.types import RetrievalQuery, RetrievalResult
 
 
-class Retriever:
+class Retriever(ABC):
     """
-    Base class for any retrieval backend.
+    Abstract base class for any retrieval backend.
 
     Implementations may wrap a vector database, graph database, BM25 index,
     hybrid search engine, or web-search API.  Pass any subclass to the RAG
     strategy constructors in ``core/strategies/``.
     """
 
-    def retrieve(self, query: RetrievalQuery) -> RetrievalResult:  # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    def retrieve(self, query: RetrievalQuery) -> RetrievalResult:
+        """Synchronously retrieve relevant chunks for *query*."""
+        ...
 
-    async def aretrieve(self, query: RetrievalQuery) -> RetrievalResult:  # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    async def aretrieve(self, query: RetrievalQuery) -> RetrievalResult:
+        """Asynchronously retrieve relevant chunks for *query*."""
+        ...

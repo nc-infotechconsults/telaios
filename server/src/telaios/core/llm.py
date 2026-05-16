@@ -42,7 +42,7 @@ class LangChainLLM:
     def _get_model(self) -> Any:
         """Lazily build the underlying LangChain model."""
         if self._model is None:
-            self._model = _build_chat_model(self._config)
+            self._model = build_chat_model(self._config)
         return self._model
 
     async def invoke(self, messages: list[Message]) -> Message:
@@ -75,7 +75,8 @@ class LangChainLLM:
         return await structured_model.ainvoke(lc_messages)
 
 
-# Keep the public alias used by callers
+# ``LLM`` is kept as a public alias for backward compatibility with callers
+# that imported ``from telaios.core.llm import LLM``.
 LLM = LangChainLLM
 
 
@@ -95,7 +96,7 @@ def build_llm(cfg: LLMConfig) -> LangChainLLM:
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 
-def _build_chat_model(cfg: LLMConfig) -> Any:
+def build_chat_model(cfg: LLMConfig) -> Any:
     """
     Instantiate a LangChain ``BaseChatModel`` from an ``LLMConfig``.
 

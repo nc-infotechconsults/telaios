@@ -26,7 +26,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
-from telaios.core.llm import _build_chat_model
+from telaios.core.llm import build_chat_model
 from telaios.core.types import (
     AgentArtifact,
     AgentConfig,
@@ -70,7 +70,7 @@ class LangChainAgent:
     def __init__(self, config: AgentConfig) -> None:
         self._config = config
         self._graph: Any | None = None
-        self._llm: BaseChatModel = _build_chat_model(config.llm)
+        self._llm: BaseChatModel = build_chat_model(config.llm)
         self._tools: list[StructuredTool] = [self._build_lc_tool(t) for t in config.tools]
 
     # ── Public API ─────────────────────────────────────────────────────────

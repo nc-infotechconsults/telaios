@@ -53,7 +53,7 @@ def _get_agent():
     )
     with pytest.MonkeyPatch().context() as mp:
         mp.setattr(
-            "telaios.core.agent._build_chat_model",
+            "telaios.core.agent.build_chat_model",
             lambda cfg: MagicMock(),
         )
         return LangChainAgent(config)
