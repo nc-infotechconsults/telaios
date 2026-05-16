@@ -12,7 +12,6 @@ def test_langgraph_interrupt_instantiates():
     handle = LangGraphInterrupt()
     assert handle is not None
     assert hasattr(handle, "wait_for_resume")
-    assert hasattr(handle, "send_interrupt")
 
 
 def test_langgraph_interrupt_import_from_providers():
@@ -22,11 +21,11 @@ def test_langgraph_interrupt_import_from_providers():
     assert LC is LangGraphInterrupt
 
 
-def test_langgraph_interrupt_send_interrupt_raises():
-    """send_interrupt raises GraphInterrupt when called outside a graph context."""
+def test_langgraph_interrupt_wait_for_resume_raises():
+    """wait_for_resume raises GraphInterrupt when called outside a graph context."""
     pytest.importorskip("langgraph", reason="Phase 6: langgraph not installed")
     from langgraph.errors import GraphInterrupt
 
     handle = LangGraphInterrupt()
     with pytest.raises(GraphInterrupt):
-        handle.send_interrupt("test message")
+        handle.wait_for_resume("test message")

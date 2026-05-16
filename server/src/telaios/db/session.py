@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from telaios.config.settings import settingsi1
+from telaios.config.settings import settings
 
 
 @lru_cache(maxsize=1)

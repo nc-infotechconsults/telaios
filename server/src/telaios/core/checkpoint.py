@@ -45,10 +45,11 @@ class PostgresCheckpointer:
     async def get(self, thread_id: str) -> dict[str, Any] | None:
         """Retrieve checkpoint state for a thread. Returns None if not found."""
         config = self._make_config(thread_id)
-        checkpoint = await self._saver.aget(config)
-        if checkpoint is None:
+        checkpoint_tuple = await self._saver.aget(config)
+        if checkpoint_tuple is None:
             return None
-        return cast(dict[str, Any], checkpoint.get("channel_values", {}))
+        # aget() returns CheckpointTuple (NamedTuple); .checkpoint is the raw dict
+        return cast(dict[str, Any], checkpoint_tuple.checkpoint.get("channel_values", {}))
 
     async def put(self, thread_id: str, state: dict[str, Any]) -> None:
         """Persist checkpoint state for a thread."""
@@ -68,7 +69,12 @@ class PostgresCheckpointer:
             "channel_values": state,
             "channel_versions": channel_versions,
         }
-        metadata: CheckpointMetadata = {"source": "domain", "step": -1}
+        metadata: CheckpointMetadata = {
+            "source": "update",
+            "step": -1,
+            "writes": None,
+            "parents": {},
+        }
         await self._saver.aput(config, checkpoint, metadata, channel_versions)
 
     async def delete(self, thread_id: str) -> None:

@@ -41,7 +41,14 @@ k8s = [
     "kubernetes>=31.0",
 ]
 agents = [
-    # Filled in Phase 6: langchain, langgraph, openai, anthropic, ...
+    # Phase 6: LangChain / LangGraph stack
+    "langchain-core>=0.3",
+    "langchain-openai>=0.3",
+    "langchain-anthropic>=0.3",
+    "langgraph>=0.3",
+    "langgraph-checkpoint-postgres>=2.0",
+    "openai>=1.0",
+    "anthropic>=0.40",
 ]
 documents = [
     # Filled in Phase 7: pypdf, python-docx, voyageai, etc.
@@ -61,11 +68,16 @@ dev = [
     "import-linter>=2.1",
     "pre-commit>=4.0",
     "types-redis",
+    # TUI eval CLI
+    "textual>=1.0",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[project.scripts]
+telaios-eval = "telaios.cli.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/telaios"]

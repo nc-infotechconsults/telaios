@@ -9,8 +9,14 @@ Usage inside a LangGraph node::
 
     from telaios.core.interrupt import LangGraphInterrupt
 
-    interrupt = LangGraphInterrupt()
-    resume_value = await interrupt.wait_for_resume()
+    interrupt_handler = LangGraphInterrupt()
+    resume_value = interrupt_handler.wait_for_resume("Your question here?")
+
+``interrupt()`` is a **synchronous** function — it raises ``GraphInterrupt``
+internally and LangGraph catches it.  Do NOT wrap it in ``async def``; calling
+``await interrupt_handler.wait_for_resume()`` inside a node is incorrect.
+
+To resume, call the graph again with ``Command(resume=<value>)``.
 """
 
 from __future__ import annotations
@@ -22,20 +28,22 @@ class LangGraphInterrupt:
     """
     Human-in-the-loop interrupt using LangGraph's native mechanism.
 
-    - ``send_interrupt(message)`` raises ``GraphInterrupt`` to pause execution.
-    - ``wait_for_resume()`` calls ``interrupt()`` and returns the resume value
-      when the graph is resumed with ``Command(resume=...)``.
+    Call ``wait_for_resume(message)`` inside a LangGraph node to pause
+    execution and return control to the caller.  LangGraph will raise
+    ``GraphInterrupt`` internally; when the graph is resumed via
+    ``Command(resume=<value>)`` this call returns the provided value.
+
+    Note: ``interrupt()`` is synchronous — do NOT place this inside an
+    ``async def`` and do NOT ``await`` the result.
     """
 
-    async def wait_for_resume(self) -> Any:
-        """Pause the graph and wait for a human resume value."""
+    def wait_for_resume(self, message: str = "Waiting for human input...") -> Any:
+        """Pause the graph and return the human-provided resume value.
+
+        Must be called from inside a LangGraph node function.
+        The graph is resumed by re-invoking it with
+        ``Command(resume=<value>)``.
+        """
         from langgraph.types import interrupt
 
-        return interrupt("Waiting for human input...")
-
-    def send_interrupt(self, message: str) -> None:
-        """Raise a GraphInterrupt to pause execution with the given message."""
-        from langgraph.errors import GraphInterrupt
-        from langgraph.types import Interrupt
-
-        raise GraphInterrupt([Interrupt(value=message)])
+        return interrupt(message)
