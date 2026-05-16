@@ -3,17 +3,17 @@ src/core/agent.py
 -----------------
 LangChain / LangGraph-backed agent implementation.
 
-Uses ``langgraph.prebuilt.create_react_agent`` directly — no abstract base
-class or provider registry.  Tools are passed as ``ExecutableTool`` objects
-from ``telaios.tools``; the agent converts them to LangChain ``StructuredTool``
-instances internally.
+Uses ``langgraph.prebuilt.create_react_agent`` directly.  Tools are passed as
+``ExecutableTool`` objects from ``telaios.tools``; the agent converts them to
+LangChain ``StructuredTool`` instances internally.
 
 Usage::
 
     from telaios.core.agent import LangChainAgent
+    from telaios.core.factory import create_agent
     from telaios.core.types import AgentConfig, LLMConfig
 
-    agent = LangChainAgent(AgentConfig(
+    agent = create_agent(AgentConfig(
         llm=LLMConfig(provider="openai", model="gpt-4o", api_key="..."),
     ))
     result = await agent.run(AgentInput(messages=[...]))
@@ -54,20 +54,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Keep a simple Protocol so domain code can type-hint against it without
-# depending on LangChain itself.
-class Agent:
-    """Minimal Protocol-style base for type annotations only."""
-
-    async def run(self, input: AgentInput) -> AgentOutput:  # pragma: no cover
-        raise NotImplementedError
-
-    async def astream(self, input: AgentInput) -> AsyncIterator[StreamEvent]:  # pragma: no cover
-        raise NotImplementedError
-        yield  # type: ignore[misc]
-
-
-class LangChainAgent(Agent):
+class LangChainAgent:
     """
     LangChain / LangGraph-backed agent.
 

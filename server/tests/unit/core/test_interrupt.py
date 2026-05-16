@@ -16,8 +16,8 @@ def test_langgraph_interrupt_instantiates():
 
 
 def test_langgraph_interrupt_import_from_providers():
-    """LangGraphInterrupt is importable from legacy provider path."""
-    from telaios.core.providers.langchain.interrupt import LangGraphInterrupt as LC
+    """LangGraphInterrupt is importable from the canonical core.interrupt path."""
+    from telaios.core.interrupt import LangGraphInterrupt as LC  # noqa: N814
 
     assert LC is LangGraphInterrupt
 

@@ -45,7 +45,8 @@ class WorkerPool:
         """
         async with self._semaphore:
             agent_input = AgentInput(messages=[Message(role=MessageRole.HUMAN, content=input_text)])
-            return await self._agent.run(agent_input)
+            result: AgentOutput = await self._agent.run(agent_input)
+            return result
 
     async def execute_batch(self, tasks: list[tuple[str, str]]) -> dict[str, AgentOutput]:
         """Execute multiple tasks concurrently, respecting max_concurrent limit.

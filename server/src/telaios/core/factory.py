@@ -1,62 +1,35 @@
 """
 src/core/factory.py
 -------------------
-Factory functions for creating framework-agnostic agent and RAG instances.
+Factory functions for creating LangChain/LangGraph agent and LLM instances.
 
 Usage
 ~~~~~
 ::
 
-    from core import create_agent, create_orchestrator, create_retriever, create_rag
-    from core.types import AgentConfig, LLMConfig, RagConfig, SubAgentConfig
+    from telaios.core import create_agent, create_llm
+    from telaios.core.types import AgentConfig, LLMConfig
 
-    # Simple agent
+    # Create an LLM
+    llm = create_llm(LLMConfig(provider="openai", model="gpt-4o", api_key="..."))
+
+    # Create a LangGraph react agent
     agent = create_agent(AgentConfig(llm=LLMConfig(provider="openai", model="gpt-4o")))
 
-    # Orchestrator with mixed-provider sub-agents
-    from core import register_provider
-    register_provider("openai", agent_cls=MyOpenAIAgent)  # register at any time
-
-    config = AgentConfig(
-        framework="langchain",
-        llm=LLMConfig(provider="anthropic", model="claude-opus-4-5"),
-        sub_agents=[
-            SubAgentConfig(
-                name="reviewer",
-                description="Reviews code",
-                agent_config=AgentConfig(framework="openai", llm=LLMConfig(...)),
-            ),
-        ],
-    )
-    orchestrator = create_orchestrator(config)
-
-How dispatch works
-~~~~~~~~~~~~~~~~~~
-1. ``AgentConfig.framework`` (default ``"langchain"``) is used as a registry key.
-2. The factory looks up the registered class in the provider registry.
-3. If the framework is not registered, a ``ValueError`` is raised with a helpful
-   message reminding the caller to register the provider first.
-
-Registering providers
-~~~~~~~~~~~~~~~~~~~~~
-Use ``register_provider()`` from ``core/__init__.py``::
-
-    from core import register_provider
-    register_provider("myfw", agent_cls=MyAgent, orchestrator_cls=MyOrchestrator)
-
-Providers can be registered at any time — before or after the factory is called.
-The registry is the sole source of truth; there is no startup-time auto-loading
-in this module.
+    # Build agent from raw settings dict (e.g. from app config)
+    _, agent = create_agent_with_config(settings, system_prompt="You are helpful.")
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from telaios.core.agent import Agent
 from telaios.core.llm import LLM, LangChainLLM
 from telaios.core.types import AgentConfig, LLMConfig
+
+if TYPE_CHECKING:
+    from telaios.core.agent import LangChainAgent
 
 logger = logging.getLogger(__name__)
 
@@ -131,12 +104,10 @@ def create_llm(config: LLMConfig) -> LLM:
     Returns:
         A ``LangChainLLM`` instance backed by the requested provider.
     """
-    from telaios.core.llm import LangChainLLM
-
     return LangChainLLM(config)
 
 
-def create_agent(config: AgentConfig) -> Agent:
+def create_agent(config: AgentConfig) -> LangChainAgent:
     """
     Instantiate a LangGraph react agent from ``config``.
 
@@ -156,7 +127,7 @@ def create_agent_with_config(
     agent_overrides: dict[str, Any] | None = None,
     framework: str = "langchain",
     system_prompt: str | None = None,
-) -> tuple[AgentConfig, Agent]:
+) -> tuple[AgentConfig, LangChainAgent]:
     """Build an ``AgentConfig`` from raw settings dicts and instantiate the agent.
 
     This is the single entry point for building profile-driven agent configs.

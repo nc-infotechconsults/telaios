@@ -17,10 +17,10 @@ def test_postgres_checkpointer_instantiates_with_saver():
 
 
 def test_postgres_checkpointer_import_from_providers():
-    """PostgresCheckpointer is importable from the legacy provider path."""
-    from telaios.core.providers.langchain.checkpoint import PostgresCheckpointer as LC
+    """PostgresCheckpointer is importable from the canonical core.checkpoint path."""
+    from telaios.core.checkpoint import PostgresCheckpointer as CP  # noqa: N814
 
-    assert LC is PostgresCheckpointer
+    assert CP is PostgresCheckpointer
 
 
 @pytest.mark.asyncio

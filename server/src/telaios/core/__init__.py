@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 
-from telaios.core.agent import Agent, LangChainAgent
+from telaios.core.agent import LangChainAgent
 from telaios.core.checkpoint import PostgresCheckpointer
 from telaios.core.factory import (
     _build_llm_config,
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [  # noqa: RUF022
     # Agent
-    "Agent",
     "LangChainAgent",
     # Checkpoint
     "PostgresCheckpointer",

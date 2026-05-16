@@ -49,7 +49,8 @@ class OpenCodeDriver(AgentDriver):
     """Driver for executing agents via the OpenCode platform."""
 
     async def execute(self, agent: Any, input: AgentInput) -> AgentOutput:
-        return await agent.run(input)
+        result: AgentOutput = await agent.run(input)
+        return result
 
     async def stream(self, agent: Any, input: AgentInput) -> AsyncIterator[StreamEvent]:
         async for event in agent.astream(input):
@@ -60,7 +61,8 @@ class GitHubCopilotDriver(AgentDriver):
     """Driver for executing agents via the GitHub Copilot platform."""
 
     async def execute(self, agent: Any, input: AgentInput) -> AgentOutput:
-        return await agent.run(input)
+        result: AgentOutput = await agent.run(input)
+        return result
 
     async def stream(self, agent: Any, input: AgentInput) -> AsyncIterator[StreamEvent]:
         async for event in agent.astream(input):

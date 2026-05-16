@@ -3,13 +3,12 @@ domain/planning/persistence.py
 ------------------------------
 Plan CRUD operations with checkpoint integration.
 
-Uses the ``Checkpointer`` ABC from ``core.checkpoint`` to persist plan state.
-Vendor-agnostic — no LangGraph or provider-specific imports.
+Uses ``PostgresCheckpointer`` from ``core.checkpoint`` to persist plan state.
 
 Usage::
 
-    from core.checkpoint import Checkpointer
-    from domain.planning.persistence import PlanPersistence
+    from telaios.core.checkpoint import PostgresCheckpointer
+    from telaios.modules.plans.persistence import PlanPersistence
 
     persistence = PlanPersistence(checkpointer)
     await persistence.save_plan("thread-1", {"tasks": [...]})
@@ -20,13 +19,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from telaios.core.checkpoint import Checkpointer
+from telaios.core.checkpoint import PostgresCheckpointer
 
 
 class PlanPersistence:
     """Handles plan CRUD operations with checkpoint integration."""
 
-    def __init__(self, checkpointer: Checkpointer):
+    def __init__(self, checkpointer: PostgresCheckpointer) -> None:
         self._checkpointer = checkpointer
 
     async def save_plan(self, thread_id: str, plan: dict[str, Any]) -> None:

@@ -1,13 +1,10 @@
 """
-core/strategies — provider-agnostic RAG strategy implementations.
+core/strategies — RAG strategy implementations using LangChain/LangGraph.
 
 Every strategy here uses only:
-- ``core.llm.LLM`` (abstract LLM interface)
-- ``core.rag.Retriever`` (abstract retriever interface)
+- ``core.llm.LangChainLLM`` (or the ``LLM`` protocol)
+- ``core.retriever.Retriever`` (base retriever class)
 - ``core.types.*`` (domain types)
-
-No LangChain, no OpenAI SDK, no provider-specific imports.
-Concrete providers wire these strategies with their LLM implementation.
 """
 
 from __future__ import annotations
@@ -17,7 +14,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from telaios.core.llm import LLM
-from telaios.core.rag import Retriever
+from telaios.core.retriever import Retriever
 from telaios.core.types import (
     AgentInput,
     AgentOutput,
