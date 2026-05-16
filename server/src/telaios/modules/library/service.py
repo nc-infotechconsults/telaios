@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telaios.db.models.library import LibraryAgent
 from telaios.modules.library.repository import (
     LibraryAgentRepository,
     LibraryMcpRepository,
@@ -65,6 +66,12 @@ class LibraryAgentService:
         if obj is None:
             raise NotFoundError("Library agent not found")
         return LibraryAgentRead.from_orm_sanitized(obj)
+
+    async def get_orm(self, agent_id: uuid.UUID) -> LibraryAgent:
+        obj = await self._repo.find(agent_id)
+        if obj is None:
+            raise NotFoundError("Library agent not found")
+        return obj
 
     async def get_by_slug(self, slug: str) -> LibraryAgentRead:
         obj = await self._repo.find_by_slug(slug)

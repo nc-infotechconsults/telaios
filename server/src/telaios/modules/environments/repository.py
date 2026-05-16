@@ -54,6 +54,14 @@ class EnvironmentRepository:
         )
         return result.scalar_one_or_none()
 
+    async def find_by_id(self, env_id: uuid.UUID) -> Environment | None:
+        result = await self._s.execute(
+            select(Environment)
+            .where(Environment.id == env_id, Environment.deleted_at.is_(None))
+            .options(selectinload(Environment.helm_releases))
+        )
+        return result.scalar_one_or_none()
+
     async def create(self, **kwargs: object) -> Environment:
         obj = Environment(**kwargs)
         self._s.add(obj)

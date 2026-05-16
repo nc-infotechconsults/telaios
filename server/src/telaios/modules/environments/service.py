@@ -116,6 +116,13 @@ class EnvironmentService:
         result.helm_releases = releases
         return result
 
+    async def get_environment_raw(self, env_id: uuid.UUID) -> Any:
+        """Return raw ORM object for cross-module use (containers, docker_shell)."""
+        obj = await self._repo.find_by_id(env_id)
+        if obj is None:
+            raise NotFoundError("Environment not found")
+        return obj
+
     async def patch_environment(
         self, env_id: uuid.UUID, project_id: uuid.UUID, dto: EnvironmentPatch
     ) -> EnvironmentRead:

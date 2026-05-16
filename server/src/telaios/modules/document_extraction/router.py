@@ -45,7 +45,7 @@ from telaios.modules.document_extraction.service_helpers import (
     extract_chunks_structured,
     summarize_document_chunks,
 )
-from telaios.modules.documents.repository import DocumentRepository
+from telaios.modules.documents.service import DocumentService
 from telaios.utils.errors import BadRequestError, NotFoundError
 
 extraction_router = APIRouter(tags=["document-extraction"])
@@ -61,8 +61,8 @@ async def _check_doc_access(
     session: AsyncSession,
     min_role: str = "viewer",
 ) -> None:
-    repo = DocumentRepository(session)
-    doc = await repo.find_with_deleted(document_id)
+    doc_service = DocumentService(session)
+    doc = await doc_service.get_orm(document_id)
     if doc is None:
         raise NotFoundError("Document not found")
     await check_project_membership(doc.project_id, principal, session, min_role)

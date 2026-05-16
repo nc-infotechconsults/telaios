@@ -25,7 +25,7 @@ from telaios.modules.document_copilot.service import (
     copilot_extract,
     copilot_summarize,
 )
-from telaios.modules.documents.repository import DocumentRepository
+from telaios.modules.documents.service import DocumentService
 from telaios.utils.errors import NotFoundError
 
 copilot_router = APIRouter(tags=["document-copilot"])
@@ -38,8 +38,8 @@ async def _check_doc_access(
     min_role: str = "viewer",
 ) -> uuid.UUID:
     """Verify access and return project_id."""
-    repo = DocumentRepository(session)
-    doc = await repo.find_with_deleted(document_id)
+    doc_service = DocumentService(session)
+    doc = await doc_service.get_orm(document_id)
     if doc is None:
         raise NotFoundError("Document not found")
     await check_project_membership(doc.project_id, principal, session, min_role)

@@ -1,15 +1,14 @@
 """Containers HTTP router.
 
 All endpoints are scoped under ``/environments/{env_id}/docker/...`` and
-delegate to ``telaios.infra.docker.DockerClient``.  Auth is done via the
-standard project-member check (viewer role minimum).
+delegate to ``telaios.modules.containers.service.ContainersService``.
+Auth is done via the standard project-member check (viewer role minimum).
 
 The environment must have ``type == "docker"``; otherwise 400 is returned.
 """
 
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Any
 
@@ -21,8 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.auth.project_access import require_environment_project_access
 from telaios.db.session import get_session
-from telaios.infra.docker import DockerClient, DockerConnectionConfig
-from telaios.utils.crypto import decrypt
+from telaios.modules.containers.service import ContainersService
 from telaios.utils.errors import NotFoundError
 
 log = structlog.get_logger(__name__)
@@ -33,58 +31,12 @@ containers_router = APIRouter(
 )
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-
-async def _get_docker_cfg(
-    env_id: uuid.UUID,
-    session: AsyncSession,
-    require_docker_type: bool = True,
-) -> DockerConnectionConfig:
-    """Load environment and return its DockerConnectionConfig."""
-    # We can't use find() because it requires project_id — use raw select
-    from sqlalchemy import select
-
-    from telaios.db.models.environments import Environment
-
-    result = await session.execute(
-        select(Environment).where(Environment.id == env_id, Environment.deleted_at.is_(None))
-    )
-    env = result.scalars().first()
-    if env is None:
-        raise NotFoundError("Environment not found")
-    if require_docker_type and env.type != "docker":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Environment is not a Docker environment",
-        )
-    cfg = DockerConnectionConfig()
-    if env.connection_config:
-        raw = decrypt(env.connection_config)
-        if raw:
-            try:
-                data: dict[str, Any] = json.loads(raw)
-                cfg = DockerConnectionConfig(
-                    host=data.get("host"),
-                    tls_cert=data.get("tls_cert"),
-                    tls_key=data.get("tls_key"),
-                    tls_ca=data.get("tls_ca"),
-                    type=data.get("type", "docker"),
-                )
-            except json.JSONDecodeError, TypeError:
-                pass
-    return cfg
-
-
 def _handle_docker_error(exc: Exception) -> HTTPException:
     msg = str(exc)
     log.error("docker_error", error=msg)
-    if "404" in msg or "No such" in msg.lower():
+    if "404" in msg or "no such" in msg.lower():
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
-
-
-# ── Pydantic bodies ────────────────────────────────────────────────────────────
 
 
 class CreateContainerBody(BaseModel):
@@ -141,8 +93,8 @@ async def list_containers(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.list_containers(cfg)
+        svc = ContainersService(session)
+        return await svc.list_containers(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -159,8 +111,8 @@ async def get_container(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.get_container(cfg, container_id)
+        svc = ContainersService(session)
+        return await svc.get_container(env_id, container_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -179,8 +131,8 @@ async def get_container_logs(
     session: AsyncSession = Depends(get_session),
 ) -> str:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.get_container_logs(cfg, container_id, tail=tail)
+        svc = ContainersService(session)
+        return await svc.get_container_logs(env_id, container_id, tail=tail)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -198,8 +150,8 @@ async def start_container(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.start_container(cfg, container_id)
+        svc = ContainersService(session)
+        await svc.start_container(env_id, container_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -217,8 +169,8 @@ async def stop_container(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.stop_container(cfg, container_id)
+        svc = ContainersService(session)
+        await svc.stop_container(env_id, container_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -236,8 +188,8 @@ async def restart_container(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.restart_container(cfg, container_id)
+        svc = ContainersService(session)
+        await svc.restart_container(env_id, container_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -256,8 +208,8 @@ async def remove_container(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.remove_container(cfg, container_id, force=force)
+        svc = ContainersService(session)
+        await svc.remove_container(env_id, container_id, force=force)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -275,9 +227,9 @@ async def create_container(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.create_container(
-            cfg,
+        svc = ContainersService(session)
+        return await svc.create_container(
+            env_id,
             image=body.image,
             name=body.name,
             cmd=body.cmd,
@@ -305,10 +257,10 @@ async def exec_container(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.exec_container(
-            cfg,
-            container_id=container_id,
+        svc = ContainersService(session)
+        return await svc.exec_container(
+            env_id,
+            container_id,
             cmd=body.cmd,
             working_dir=body.working_dir,
             user=body.user,
@@ -330,8 +282,8 @@ async def container_stats(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.container_stats(cfg, container_id)
+        svc = ContainersService(session)
+        return await svc.container_stats(env_id, container_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -350,8 +302,8 @@ async def list_images(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.list_images(cfg)
+        svc = ContainersService(session)
+        return await svc.list_images(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -370,8 +322,8 @@ async def remove_image(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.remove_image(cfg, image_id, force=force)
+        svc = ContainersService(session)
+        await svc.remove_image(env_id, image_id, force=force)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -388,8 +340,8 @@ async def inspect_image(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.inspect_image(cfg, image_id)
+        svc = ContainersService(session)
+        return await svc.inspect_image(env_id, image_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -408,8 +360,8 @@ async def tag_image(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.tag_image(cfg, image_id, body.repo, body.tag)
+        svc = ContainersService(session)
+        await svc.tag_image(env_id, image_id, body.repo, body.tag)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -425,8 +377,8 @@ async def prune_images(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.prune_images(cfg)
+        svc = ContainersService(session)
+        return await svc.prune_images(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -445,8 +397,8 @@ async def list_volumes(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.list_volumes(cfg)
+        svc = ContainersService(session)
+        return await svc.list_volumes(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -464,10 +416,8 @@ async def create_volume(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.create_volume(
-            cfg, body.name, body.driver or "local", body.driver_opts
-        )
+        svc = ContainersService(session)
+        return await svc.create_volume(env_id, body.name, body.driver, body.driver_opts)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -485,8 +435,8 @@ async def remove_volume(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.remove_volume(cfg, name)
+        svc = ContainersService(session)
+        await svc.remove_volume(env_id, name)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -502,8 +452,8 @@ async def prune_volumes(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.prune_volumes(cfg)
+        svc = ContainersService(session)
+        return await svc.prune_volumes(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -521,8 +471,8 @@ async def list_volume_files(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.list_volume_files(cfg, name, path)
+        svc = ContainersService(session)
+        return await svc.list_volume_files(env_id, name, path)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -540,8 +490,8 @@ async def get_volume_file_content(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.get_volume_file_content(cfg, name, path)
+        svc = ContainersService(session)
+        return await svc.get_volume_file_content(env_id, name, path)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -561,8 +511,8 @@ async def update_volume_file_content(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.update_volume_file_content(cfg, name, path, body.content)
+        svc = ContainersService(session)
+        await svc.update_volume_file_content(env_id, name, path, body.content)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -581,8 +531,8 @@ async def list_networks(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.list_networks(cfg)
+        svc = ContainersService(session)
+        return await svc.list_networks(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -599,8 +549,8 @@ async def inspect_network(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.inspect_network(cfg, network_id)
+        svc = ContainersService(session)
+        return await svc.inspect_network(env_id, network_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -618,11 +568,11 @@ async def create_network(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.create_network(
-            cfg,
+        svc = ContainersService(session)
+        return await svc.create_network(
+            env_id,
             name=body.name,
-            driver=body.driver or "bridge",
+            driver=body.driver,
             subnet=body.subnet,
             gateway=body.gateway,
             internal=body.internal,
@@ -644,8 +594,8 @@ async def remove_network(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        await DockerClient.remove_network(cfg, network_id)
+        svc = ContainersService(session)
+        await svc.remove_network(env_id, network_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
@@ -661,9 +611,12 @@ async def prune_networks(
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     try:
-        cfg = await _get_docker_cfg(env_id, session)
-        return await DockerClient.prune_networks(cfg)
+        svc = ContainersService(session)
+        return await svc.prune_networks(env_id)
     except HTTPException, NotFoundError:
         raise
     except Exception as exc:
         raise _handle_docker_error(exc) from exc
+
+
+__all__ = ["containers_router"]

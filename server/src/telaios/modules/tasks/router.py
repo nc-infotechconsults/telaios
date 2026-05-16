@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from telaios.auth.dependencies import CurrentPrincipal, Principal
 from telaios.auth.project_access import check_project_membership
 from telaios.db.session import get_session
-from telaios.modules.plans.repository import PlanRepository
+from telaios.modules.plans.service import PlanService
 from telaios.modules.tasks.artifacts.schemas import ArtifactRead, BulkArtifactCreate
 from telaios.modules.tasks.artifacts.service import ArtifactService
 from telaios.modules.tasks.repository import TaskRepository
@@ -46,8 +46,8 @@ def _require_task_access(min_role: str = "viewer") -> Callable[..., object]:
         task = await task_repo.find_with_deleted(task_id)
         if task is None:
             raise NotFoundError("Task not found")
-        plan_repo = PlanRepository(session)
-        plan = await plan_repo.find_with_deleted(task.plan_id)
+        plan_svc = PlanService(session)
+        plan = await plan_svc.get_orm(task.plan_id)
         if plan is None:
             raise NotFoundError("Plan not found")
         await check_project_membership(plan.project_id, principal, session, min_role)
@@ -64,8 +64,8 @@ def _require_plan_tasks_access(min_role: str = "viewer") -> Callable[..., object
         principal: CurrentPrincipal,
         session: AsyncSession = Depends(get_session),
     ) -> Principal:
-        plan_repo = PlanRepository(session)
-        plan = await plan_repo.find_with_deleted(plan_id)
+        plan_svc = PlanService(session)
+        plan = await plan_svc.get_orm(plan_id)
         if plan is None:
             raise NotFoundError("Plan not found")
         await check_project_membership(plan.project_id, principal, session, min_role)

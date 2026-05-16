@@ -20,8 +20,7 @@ forbidden_modules =
 
 # Contract B: each module's public facade is `modules.<X>` / `__init__` / `service` / `schemas`.
 # Cross-module imports of `repository` / `router` are forbidden.
-# Implemented as a forbidden-glob contract; will be expanded per-module in Phase 1+
-# as the package contents fill in. Currently empty packages so this is a no-op enforcement.
+# Implemented as a forbidden-glob contract.
 [importlinter:contract:no-cross-module-internal-imports]
 name = Modules must not import each other's repository or router
 type = forbidden
@@ -56,15 +55,15 @@ ignore_imports =
      telaios.modules.projects.service -> telaios.modules.projects.repository
      telaios.modules.projects.service -> telaios.modules.projects.schemas
      telaios.modules.projects.service -> telaios.modules.projects.members.service
-     telaios.modules.projects.agents.router -> telaios.modules.projects.agents.service
-     telaios.modules.projects.agents.router -> telaios.modules.projects.schemas
-     telaios.modules.projects.agents.service -> telaios.modules.projects.agents.repository
-     telaios.modules.projects.agents.service -> telaios.modules.projects.schemas
-     telaios.modules.projects.members.router -> telaios.modules.projects.members.service
-     telaios.modules.projects.members.router -> telaios.modules.projects.schemas
-     telaios.modules.projects.members.service -> telaios.modules.projects.members.repository
-     telaios.modules.projects.members.service -> telaios.modules.projects.schemas
-     telaios.modules.projects.members.repository -> telaios.modules.projects.schemas
+    telaios.modules.projects.agents.router -> telaios.modules.projects.agents.service
+    telaios.modules.projects.agents.router -> telaios.modules.projects.schemas
+    telaios.modules.projects.agents.service -> telaios.modules.projects.agents.repository
+    telaios.modules.projects.agents.service -> telaios.modules.projects.schemas
+    telaios.modules.projects.members.router -> telaios.modules.projects.members.service
+    telaios.modules.projects.members.router -> telaios.modules.projects.schemas
+    telaios.modules.projects.members.service -> telaios.modules.projects.members.repository
+    telaios.modules.projects.members.service -> telaios.modules.projects.schemas
+    telaios.modules.projects.members.repository -> telaios.modules.projects.schemas
     telaios.modules.repositories -> telaios.modules.repositories.router
     telaios.modules.repositories -> telaios.modules.repositories.service
     telaios.modules.repositories.router -> telaios.modules.repositories.schemas
@@ -90,26 +89,26 @@ ignore_imports =
     telaios.modules.library.router -> telaios.modules.library.service
     telaios.modules.library.service -> telaios.modules.library.repository
     telaios.modules.library.service -> telaios.modules.library.schemas
+    # agent_profiles module — facade delegation through library.service
     telaios.modules.agent_profiles -> telaios.modules.agent_profiles.router
     telaios.modules.agent_profiles -> telaios.modules.agent_profiles.service
     telaios.modules.agent_profiles.router -> telaios.modules.agent_profiles.schemas
     telaios.modules.agent_profiles.router -> telaios.modules.agent_profiles.service
     telaios.modules.agent_profiles.service -> telaios.modules.agent_profiles.schemas
-    telaios.modules.agent_profiles.service -> telaios.modules.library.repository
+    telaios.modules.agent_profiles.service -> telaios.modules.library.service
     # plans module — intra
     telaios.modules.plans -> telaios.modules.plans.router
     telaios.modules.plans -> telaios.modules.plans.service
     telaios.modules.plans -> telaios.modules.plans.schemas
     telaios.modules.plans.router -> telaios.modules.plans.schemas
     telaios.modules.plans.router -> telaios.modules.plans.service
-    telaios.modules.plans.router -> telaios.modules.plans.repository
     telaios.modules.plans.service -> telaios.modules.plans.repository
     telaios.modules.plans.service -> telaios.modules.plans.schemas
     telaios.modules.plans.session -> telaios.modules.plans.parser
     telaios.modules.plans.session -> telaios.modules.plans.persistence
     telaios.modules.plans.session -> telaios.modules.plans.prompts
     telaios.modules.plans.parser -> telaios.modules.plans.prompts
-    # plans.router cross-module (allowed)
+    # plans.router cross-module service calls (allowed)
     telaios.modules.plans.router -> telaios.modules.tasks.service
     telaios.modules.plans.router -> telaios.modules.messages.service
     telaios.modules.plans.router -> telaios.modules.messages.schemas
@@ -129,8 +128,8 @@ ignore_imports =
     telaios.modules.tasks.artifacts -> telaios.modules.tasks.artifacts.service
     telaios.modules.tasks.artifacts.service -> telaios.modules.tasks.artifacts.repository
     telaios.modules.tasks.artifacts.service -> telaios.modules.tasks.artifacts.schemas
-    # tasks.router cross-module (allowed)
-    telaios.modules.tasks.router -> telaios.modules.plans.repository
+    # tasks.router cross-module service calls (allowed)
+    telaios.modules.tasks.router -> telaios.modules.plans.service
     # messages module — intra
     telaios.modules.messages -> telaios.modules.messages.router
     telaios.modules.messages -> telaios.modules.messages.service
@@ -141,19 +140,16 @@ ignore_imports =
     telaios.modules.messages.service -> telaios.modules.messages.schemas
     # orchestration module — intra
     telaios.modules.orchestration -> telaios.modules.orchestration.service
-    # chat module — intra + cross-module (allowed)
+    # chat module — intra + cross-module via service layer
     telaios.modules.chat -> telaios.modules.chat.router
-    telaios.modules.chat.router -> telaios.modules.plans.repository
-    telaios.modules.chat.router -> telaios.modules.plans.prompts
-    telaios.modules.chat.router -> telaios.modules.plans.schemas
-    telaios.modules.chat.router -> telaios.modules.plans.service
-    telaios.modules.chat.router -> telaios.modules.messages.schemas
-    telaios.modules.chat.router -> telaios.modules.messages.service
-    telaios.modules.chat.router -> telaios.modules.documents.service
-    telaios.modules.chat.router -> telaios.modules.documents.chunks.service
-    telaios.modules.chat.router -> telaios.modules.repositories.service
-    telaios.modules.chat.router -> telaios.modules.tasks.schemas
-    telaios.modules.chat.router -> telaios.modules.tasks.service
+    telaios.modules.chat -> telaios.modules.chat.service
+    telaios.modules.chat.router -> telaios.modules.chat.service
+    telaios.modules.chat.service -> telaios.modules.messages.service
+    telaios.modules.chat.service -> telaios.modules.plans.service
+    telaios.modules.chat.service -> telaios.modules.tasks.service
+    telaios.modules.chat.service -> telaios.modules.documents.service
+    telaios.modules.chat.service -> telaios.modules.documents.chunks.service
+    telaios.modules.chat.service -> telaios.modules.repositories.service
     # design_chat — intra
      telaios.modules.design_chat -> telaios.modules.design_chat.router
      telaios.modules.design_chat -> telaios.modules.design_chat.service
@@ -255,16 +251,16 @@ ignore_imports =
     telaios.modules.document_extraction.router -> telaios.modules.document_extraction.service_helpers
     telaios.modules.document_extraction.service -> telaios.modules.document_extraction.service_helpers
     telaios.modules.document_extraction.schemas -> telaios.modules.document_llm.schemas
-    # document_extraction cross-module — allowed reads from documents.* and document_llm
-    telaios.modules.document_extraction.router -> telaios.modules.documents.repository
+    # document_extraction cross-module — reads via documents.service facade
+    telaios.modules.document_extraction.router -> telaios.modules.documents.service
     telaios.modules.document_extraction.service_helpers -> telaios.modules.documents.chunks.service
     telaios.modules.document_extraction.service_helpers -> telaios.modules.document_llm.service
     # document_copilot — intra
     telaios.modules.document_copilot -> telaios.modules.document_copilot.router
     telaios.modules.document_copilot.router -> telaios.modules.document_copilot.schemas
     telaios.modules.document_copilot.router -> telaios.modules.document_copilot.service
-    # document_copilot cross-module — reads from documents.*
-    telaios.modules.document_copilot.router -> telaios.modules.documents.repository
+    # document_copilot cross-module — reads via documents.service facade
+    telaios.modules.document_copilot.router -> telaios.modules.documents.service
     telaios.modules.document_copilot.service -> telaios.modules.documents.chunks.service
     telaios.modules.document_copilot.service -> telaios.modules.documents.service
     # skills — intra (no repository; filesystem-backed)
@@ -293,7 +289,10 @@ ignore_imports =
      telaios.modules.internal.router -> telaios.modules.library.service
      telaios.modules.internal.router -> telaios.modules.users.schemas
      telaios.modules.internal.router -> telaios.modules.users.service
-     # containers — intra (no cross-module reads needed)
-     telaios.modules.containers -> telaios.modules.containers.router
-      # docker_shell — intra
-      telaios.modules.docker_shell -> telaios.modules.docker_shell.router
+    # containers — uses containers.service which delegates to environments.service
+    telaios.modules.containers -> telaios.modules.containers.router
+    telaios.modules.containers -> telaios.modules.containers.service
+    telaios.modules.containers.router -> telaios.modules.containers.service
+    telaios.modules.containers.service -> telaios.modules.environments.service
+     # docker_shell — intra
+     telaios.modules.docker_shell -> telaios.modules.docker_shell.router
