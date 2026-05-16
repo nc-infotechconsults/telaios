@@ -1,39 +1,12 @@
 """
-core/providers/langchain/interrupt.py
---------------------------------------
-LangGraph-based human-in-the-loop interrupt implementation.
-
-Uses LangGraph's native ``interrupt()`` / ``Command(resume=...)`` mechanism.
-Domain code depends only on the ``InterruptHandle`` ABC — this module is
-imported only by the LangGraph provider registration in ``__init__.py``.
+src/core/providers/langchain/interrupt.py
+------------------------------------------
+Backward-compatibility shim.  Interrupt logic has moved to ``core.interrupt``.
 """
 
-from __future__ import annotations
+from telaios.core.interrupt import LangGraphInterrupt  # noqa: F401
 
-from typing import Any
+# Keep the old name for any existing code that imported InterruptHandle
+InterruptHandle = LangGraphInterrupt
 
-from telaios.core.interrupt import InterruptHandle
-
-
-class LangGraphInterrupt(InterruptHandle):
-    """
-    LangGraph-based interrupt handle using native interrupt()/Command.
-
-    Inside a LangGraph graph node:
-    - ``send_interrupt(message)`` raises ``GraphInterrupt`` to pause execution.
-    - ``wait_for_resume()`` calls ``interrupt()`` and returns the resume value
-      when the graph is resumed with ``Command(resume=...)``.
-    """
-
-    async def wait_for_resume(self) -> Any:
-        """Pause the graph and wait for a human resume value."""
-        from langgraph.types import interrupt
-
-        return interrupt("Waiting for human input...")
-
-    def send_interrupt(self, message: str) -> None:
-        """Raise a GraphInterrupt to pause execution with the given message."""
-        from langgraph.errors import GraphInterrupt
-        from langgraph.types import Interrupt
-
-        raise GraphInterrupt([Interrupt(value=message)])
+__all__ = ["LangGraphInterrupt", "InterruptHandle"]

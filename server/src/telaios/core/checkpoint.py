@@ -1,49 +1,76 @@
 """
 src/core/checkpoint.py
 ----------------------
-Vendor-agnostic checkpoint contract for persisting agent/thread state.
+LangGraph checkpoint implementation for persisting agent/thread state.
 
-Domain code uses the ``Checkpointer`` ABC to save and restore plan sessions.
-Concrete providers (e.g. LangGraph PostgresSaver) handle the actual storage
-under ``core/providers/``.
+``PostgresCheckpointer`` wraps any LangGraph ``BaseCheckpointSaver``
+(e.g. ``AsyncPostgresSaver``, ``MemorySaver``) and provides a simple
+``get`` / ``put`` / ``delete`` interface for plan sessions.
+
+Usage::
+
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from telaios.core.checkpoint import PostgresCheckpointer
+
+    async with AsyncPostgresSaver.from_conn_string(dsn) as saver:
+        cp = PostgresCheckpointer(saver)
+        await cp.put("thread-1", {"plan": {...}})
+        state = await cp.get("thread-1")
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
 
 
-class Checkpointer(ABC):
+class PostgresCheckpointer:
     """
-    Abstract checkpointer for persisting agent/thread state.
+    Wraps any LangGraph ``BaseCheckpointSaver`` for plan session persistence.
 
-    Concrete implementations live under ``core/providers/<framework>/checkpoint.py``.
-    Domain code depends only on this ABC — never on a concrete provider.
-
-    Example — domain usage::
-
-        class PlanService:
-            def __init__(self, checkpointer: Checkpointer):
-                self._cp = checkpointer
-
-            async def save_plan(self, thread_id: str, plan: dict):
-                state = await self._cp.get(thread_id) or {}
-                state["plan"] = plan
-                await self._cp.put(thread_id, state)
+    Accepts ``AsyncPostgresSaver``, ``MemorySaver``, or any other
+    ``BaseCheckpointSaver`` and delegates to its ``aget`` / ``aput`` /
+    ``adelete_thread`` methods.
     """
 
-    @abstractmethod
+    def __init__(self, saver: BaseCheckpointSaver) -> None:
+        self._saver = saver
+
+    def _make_config(self, thread_id: str) -> dict[str, Any]:
+        """Build the LangGraph config dict for a thread."""
+        return {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+
     async def get(self, thread_id: str) -> dict[str, Any] | None:
         """Retrieve checkpoint state for a thread. Returns None if not found."""
-        ...
+        config = self._make_config(thread_id)
+        checkpoint = await self._saver.aget(config)
+        if checkpoint is None:
+            return None
+        return cast(dict[str, Any], checkpoint.get("channel_values", {}))
 
-    @abstractmethod
     async def put(self, thread_id: str, state: dict[str, Any]) -> None:
         """Persist checkpoint state for a thread."""
-        ...
+        from langgraph.checkpoint.base import (
+            CheckpointMetadata,
+            empty_checkpoint,
+        )
 
-    @abstractmethod
+        config = self._make_config(thread_id)
+
+        channel_versions: dict[str, int] = {}
+        for idx, key in enumerate(state):
+            channel_versions[key] = idx + 1
+
+        checkpoint = {
+            **empty_checkpoint(),
+            "channel_values": state,
+            "channel_versions": channel_versions,
+        }
+        metadata: CheckpointMetadata = {"source": "domain", "step": -1}
+        await self._saver.aput(config, checkpoint, metadata, channel_versions)
+
     async def delete(self, thread_id: str) -> None:
         """Delete all checkpoint data for a thread."""
-        ...
+        await self._saver.adelete_thread(thread_id)

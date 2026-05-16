@@ -44,7 +44,7 @@ def _make_plain_tool(name: str = "plain_tool") -> ToolDefinition:
 
 
 def _get_agent():
-    from telaios.core.providers.langchain.agent import LangChainAgent
+    from telaios.core.agent import LangChainAgent
     from telaios.core.types import AgentConfig, LLMConfig
 
     config = AgentConfig(
@@ -53,7 +53,7 @@ def _get_agent():
     )
     with pytest.MonkeyPatch().context() as mp:
         mp.setattr(
-            "telaios.core.providers.langchain.agent.build_llm",
+            "telaios.core.agent._build_chat_model",
             lambda cfg: MagicMock(),
         )
         return LangChainAgent(config)

@@ -9,7 +9,7 @@ import pytest
 
 # ── _compose_prompt (shared across specialist agents) ─────────────────────────
 from telaios.core.factory import _build_llm_config
-from telaios.core.providers.langchain.llm import build_llm
+from telaios.core.llm import _build_chat_model as build_llm
 
 _langchain_openai_installed = importlib.util.find_spec("langchain_openai") is not None
 

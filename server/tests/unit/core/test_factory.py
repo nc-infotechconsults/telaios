@@ -115,10 +115,13 @@ class TestCreateLLM:
         assert hasattr(llm, "invoke")
         assert hasattr(llm, "astream")
 
-    def test_unknown_provider_raises(self):
-        config = LLMConfig(provider="nonexistent", model="x", api_key="sk-test")
-        with pytest.raises(ValueError, match="Unknown LLM provider"):
-            create_llm(config)
+    def test_any_provider_returns_langchain_llm(self):
+        """create_llm always returns a LangChainLLM regardless of provider name."""
+        from telaios.core.llm import LangChainLLM
+
+        config = LLMConfig(provider="ollama", model="llama3", api_key="")
+        llm = create_llm(config)
+        assert isinstance(llm, LangChainLLM)
 
 
 class TestCreateAgent:
@@ -134,13 +137,19 @@ class TestCreateAgent:
         assert hasattr(agent, "run")
         assert hasattr(agent, "astream")
 
-    def test_unknown_framework_raises(self):
+    def test_any_framework_returns_langchain_agent(self):
+        """create_agent always returns a LangChainAgent."""
+        from unittest.mock import MagicMock, patch
+
+        from telaios.core.agent import LangChainAgent
+
         config = AgentConfig(
-            framework="nonexistent",
+            framework="langchain",
             llm=LLMConfig(provider="openai", model="gpt-4o", api_key="sk-test"),
         )
-        with pytest.raises(ValueError, match="Unknown agent framework"):
-            create_agent(config)
+        with patch("telaios.core.agent._build_chat_model", return_value=MagicMock()):
+            agent = create_agent(config)
+        assert isinstance(agent, LangChainAgent)
 
 
 class TestCreateAgentWithConfig:
