@@ -1,136 +1,167 @@
 """
 src/core/llm.py
 ---------------
-Framework-agnostic LLM (Large Language Model) abstraction.
+LangChain-backed LLM implementation.
 
-This module defines the ``LLM`` abstract base class that any provider
-(LangChain, OpenAI SDK, Anthropic SDK, etc.) must implement.  All
-higher-level components — RAG strategies, agents, tools — depend only
-on this interface, never on a concrete provider.
+Provides ``LangChainLLM`` — a concrete wrapper around any LangChain
+``BaseChatModel`` — and ``build_llm()`` to instantiate it from config.
 
-Usage
-~~~~~
-Providers implement the ABC::
+Usage::
 
-    class LangChainLLM(LLM):
-        async def invoke(self, messages: list[Message]) -> Message: ...
-        async def astream(self, messages: list[Message]) -> AsyncIterator[str]: ...
+    from telaios.core.llm import build_llm
+    from telaios.core.types import LLMConfig
 
-Callers use the factory or inject directly::
-
-    from core import create_llm
-    llm = create_llm(LLMConfig(provider="openai", model="gpt-4o", ...))
+    llm = build_llm(LLMConfig(provider="openai", model="gpt-4o", api_key="..."))
     response = await llm.invoke([Message(role=MessageRole.HUMAN, content="Hello")])
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from typing import Any, ClassVar
+from typing import Any
 
-from telaios.core.types import Message
+from telaios.core.types import LLMConfig, Message, MessageRole
 
 
-class LLM(ABC):
+class LangChainLLM:
     """
-    Framework-agnostic interface for a chat language model.
+    LLM implementation backed by a LangChain ``BaseChatModel``.
 
-    Implementations may wrap:
-    - LangChain ``BaseChatModel`` (ChatOpenAI, ChatAnthropic, …)
-    - OpenAI SDK ``AsyncOpenAI``
-    - Anthropic SDK ``AsyncAnthropic``
-    - Any other chat API
+    Wraps any LangChain chat model (ChatOpenAI, ChatAnthropic, etc.) and
+    exposes a simple async interface.
 
-    Callers depend only on this interface; they never import a concrete class.
+    Supported providers (via ``build_llm()``):
+    - ``"anthropic"``  → ``ChatAnthropic``
+    - anything else    → ``ChatOpenAI`` (covers OpenAI, Ollama, vLLM, …)
     """
 
-    @abstractmethod
+    def __init__(self, config: LLMConfig) -> None:
+        self._config = config
+        self._model: Any | None = None
+
+    def _get_model(self) -> Any:
+        """Lazily build the underlying LangChain model."""
+        if self._model is None:
+            self._model = build_chat_model(self._config)
+        return self._model
+
     async def invoke(self, messages: list[Message]) -> Message:
-        """
-        Send a list of messages and receive a single response.
+        """Send messages and get a single response."""
+        model = self._get_model()
+        lc_messages = _to_lc_messages(messages)
+        response = await model.ainvoke(lc_messages)
+        return _from_lc_message(response)
 
-        Args:
-            messages: Conversation history (system, human, ai, tool).
-
-        Returns:
-            The model's response as an AI ``Message``.
-        """
-        ...
-
-    @abstractmethod
     async def astream(self, messages: list[Message]) -> AsyncIterator[str]:
-        """
-        Stream the model's response token by token.
+        """Stream the model's response token by token."""
+        model = self._get_model()
+        lc_messages = _to_lc_messages(messages)
+        async for chunk in model.astream(lc_messages):
+            content = chunk.content
+            if content:
+                text = content if isinstance(content, str) else str(content)
+                if text:
+                    yield text
 
-        Args:
-            messages: Conversation history.
-
-        Yields:
-            Text chunks as they are generated.
-        """
-        ...
-        yield  # type: ignore[misc]  # marks this as an async generator
-
-    @abstractmethod
     async def invoke_structured(
         self,
         messages: list[Message],
         response_format: type[Any],
     ) -> Any:
-        """
-        Invoke the model with structured output parsing.
-
-        Args:
-            messages: Conversation history.
-            response_format: Pydantic model class for the expected output.
-
-        Returns:
-            Parsed response as an instance of ``response_format``.
-        """
-        ...
+        """Invoke with structured output parsing."""
+        model = self._get_model()
+        lc_messages = _to_lc_messages(messages)
+        structured_model = model.with_structured_output(response_format)
+        return await structured_model.ainvoke(lc_messages)
 
 
-class LLMFactory:
+# ``LLM`` is kept as a public alias for backward compatibility with callers
+# that imported ``from telaios.core.llm import LLM``.
+LLM = LangChainLLM
+
+
+def build_llm(cfg: LLMConfig) -> LangChainLLM:
     """
-    Creates ``LLM`` instances from configuration.
+    Instantiate a ``LangChainLLM`` from an ``LLMConfig``.
 
-    Delegates to registered provider factories.  Providers register
-    themselves by adding an entry to ``_REGISTRY``.
+    Args:
+        cfg: LLM configuration including provider, model, and options.
+
+    Returns:
+        A ``LangChainLLM`` instance ready to use.
     """
+    return LangChainLLM(cfg)
 
-    _REGISTRY: ClassVar[dict[str, type[LLM]]] = {}
 
-    @classmethod
-    def register(cls, provider: str, llm_cls: type[LLM]) -> None:
-        """Register an LLM implementation for a provider key."""
-        cls._REGISTRY[provider] = llm_cls
+# ── Internal helpers ──────────────────────────────────────────────────────────
 
-    @classmethod
-    def create(cls, provider: str, **kwargs: Any) -> LLM:
-        """
-        Create an LLM instance for the given provider.
 
-        Args:
-            provider: Provider key (e.g., "openai", "anthropic").
-            **kwargs: Provider-specific configuration.
+def build_chat_model(cfg: LLMConfig) -> Any:
+    """
+    Instantiate a LangChain ``BaseChatModel`` from an ``LLMConfig``.
 
-        Returns:
-            An ``LLM`` instance.
+    Supported providers:
+    - ``"anthropic"``  → ``ChatAnthropic``
+    - anything else    → ``ChatOpenAI`` (covers OpenAI, Ollama, vLLM, …)
+    """
+    extra: dict[str, str | float | int] = {}
+    if cfg.temperature is not None:
+        extra["temperature"] = cfg.temperature
+    if cfg.max_tokens is not None:
+        extra["max_tokens"] = cfg.max_tokens
+    if cfg.top_p is not None:
+        extra["top_p"] = cfg.top_p
+    if cfg.base_url is not None:
+        extra["base_url"] = cfg.base_url
 
-        Raises:
-            ValueError: If the provider is not registered.
-        """
-        llm_cls = cls._REGISTRY.get(provider)
-        if llm_cls is None:
-            raise ValueError(
-                f"Unknown LLM provider: {provider!r}. "
-                f"Registered: {list(cls._REGISTRY)}. "
-                "Call LLMFactory.register() to add a provider."
+    extra["api_key"] = cfg.api_key or "placeholder"
+
+    if cfg.provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(model=cfg.model, **extra)
+
+    # OpenAI and OpenAI-compatible providers
+    from langchain_openai import ChatOpenAI
+
+    if cfg.frequency_penalty is not None:
+        extra["frequency_penalty"] = cfg.frequency_penalty
+    if cfg.presence_penalty is not None:
+        extra["presence_penalty"] = cfg.presence_penalty
+
+    return ChatOpenAI(model=cfg.model, **extra)
+
+
+def _to_lc_messages(messages: list[Message]) -> list[Any]:
+    """Convert ``core.types.Message`` objects to LangChain message types."""
+    from langchain_core.messages import (
+        AIMessage,
+        HumanMessage,
+        SystemMessage,
+        ToolMessage,
+    )
+
+    lc: list[Any] = []
+    for msg in messages:
+        if msg.role == MessageRole.SYSTEM:
+            lc.append(SystemMessage(content=msg.content))
+        elif msg.role == MessageRole.HUMAN:
+            lc.append(HumanMessage(content=msg.content))
+        elif msg.role == MessageRole.AI:
+            lc.append(AIMessage(content=msg.content))
+        elif msg.role == MessageRole.TOOL:
+            lc.append(
+                ToolMessage(
+                    content=msg.content,
+                    tool_call_id=msg.tool_call_id or "",
+                    name=msg.name,
+                )
             )
-        return llm_cls(**kwargs)
+    return lc
 
-    @classmethod
-    def registered_providers(cls) -> list[str]:
-        """Return list of registered provider keys."""
-        return list(cls._REGISTRY)
+
+def _from_lc_message(lc_msg: Any) -> Message:
+    """Convert a LangChain message to ``core.types.Message``."""
+    content = lc_msg.content
+    text = content if isinstance(content, str) else str(content)
+    return Message(role=MessageRole.AI, content=text)

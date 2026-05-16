@@ -3,8 +3,6 @@ domain/orchestration/pool.py
 ----------------------------
 Agent worker pool for concurrent task execution.
 
-Uses ``core.Agent`` ABC — no framework imports.
-
 Usage::
 
     from domain.orchestration.pool import WorkerPool
@@ -17,8 +15,8 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
-from telaios.core.agent import Agent
 from telaios.core.types import AgentInput, AgentOutput, Message, MessageRole
 
 
@@ -26,11 +24,11 @@ class WorkerPool:
     """
     Manages a pool of agent workers for concurrent task execution.
 
-    Workers pull tasks from a queue and execute them using the injected Agent.
+    Workers pull tasks from a queue and execute them using the injected agent.
     Concurrency is limited by a semaphore.
     """
 
-    def __init__(self, agent: Agent, max_concurrent: int = 5):
+    def __init__(self, agent: Any, max_concurrent: int = 5) -> None:
         self._agent = agent
         self._max_concurrent = max_concurrent
         self._semaphore = asyncio.Semaphore(max_concurrent)
@@ -47,7 +45,8 @@ class WorkerPool:
         """
         async with self._semaphore:
             agent_input = AgentInput(messages=[Message(role=MessageRole.HUMAN, content=input_text)])
-            return await self._agent.run(agent_input)
+            result: AgentOutput = await self._agent.run(agent_input)
+            return result
 
     async def execute_batch(self, tasks: list[tuple[str, str]]) -> dict[str, AgentOutput]:
         """Execute multiple tasks concurrently, respecting max_concurrent limit.

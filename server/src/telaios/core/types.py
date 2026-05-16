@@ -267,48 +267,6 @@ class GuardrailConfig(BaseModel):
     output: OutputGuardrailConfig = OutputGuardrailConfig()
 
 
-# ── Sandbox ───────────────────────────────────────────────────────────────────
-
-
-class SandboxProvider(StrEnum):
-    """Execution environments available for code-execution tools."""
-
-    DOCKER = "docker"
-    SUBPROCESS = "subprocess"
-    E2B = "e2b"
-    MODAL = "modal"
-    NONE = "none"
-
-
-class SandboxNetworkPolicy(StrEnum):
-    NONE = "none"
-    RESTRICTED = "restricted"
-    FULL = "full"
-
-
-class SandboxResourceLimits(BaseModel):
-    memory_mb: int | None = None
-    cpu_shares: int | None = None
-    timeout_seconds: int = 30
-
-
-class SandboxConfig(BaseModel):
-    """
-    Configuration for the sandbox that runs code-execution tools.
-
-    The actual sandbox integration lives in the tool layer; this config is
-    carried through AgentConfig so every tool in a run shares the same policy.
-    """
-
-    provider: SandboxProvider = SandboxProvider.NONE
-    image: str | None = None  # docker image when provider=DOCKER
-    allowed_commands: list[str] = []  # empty = all commands allowed
-    network: SandboxNetworkPolicy = SandboxNetworkPolicy.NONE
-    resources: SandboxResourceLimits = SandboxResourceLimits()
-    env: dict[str, str] = {}
-    working_dir: str | None = None
-
-
 # ── RAG ───────────────────────────────────────────────────────────────────────
 
 
@@ -515,46 +473,17 @@ class RagConfig(BaseModel):
     extra: dict[str, Any] = {}  # strategy-specific parameters (rrf_k, depth, etc.)
 
 
-# ── Sub-agent reference ───────────────────────────────────────────────────────
-
-
-class SubAgentConfig(BaseModel):
-    """
-    A sub-agent exposed as a callable tool to an orchestrator.
-
-    ``name`` is the tool name the LLM calls; ``description`` is the tool
-    description shown to the LLM.  ``agent_config`` is the full configuration
-    used to build the sub-agent instance — it may use a *different* framework
-    than the orchestrator.  If ``agent_config`` is ``None``, the caller must
-    inject the live ``Agent`` instance at runtime via
-    ``Orchestrator.add_sub_agent()``.
-    """
-
-    name: str
-    description: str
-    agent_config: AgentConfig | None = None
-
-
 # ── Agent configuration ───────────────────────────────────────────────────────
 
 
 class AgentConfig(BaseModel):
     """
-    Complete, framework-agnostic configuration for an Agent instance.
+    Configuration for a LangChain/LangGraph agent instance.
 
-    Passed to ``LangChainAgent`` (or any future concrete implementation).
-    All domain concerns — LLM choice, tools, guardrails, sandbox, RAG — are
-    expressed here using the types defined in this module.
-
-    Sub-agents
-    ~~~~~~~~~~
-    Set ``sub_agents`` to expose other agents as callable tools.  Each entry
-    carries its own ``agent_config`` (and its own ``framework``), so an
-    orchestrator built with ``framework="langchain"`` can have sub-agents that
-    use ``framework="openai"`` or any other registered provider.
+    Passed to ``LangChainAgent`` (and ``create_agent()``/``create_agent_with_config()``).
     """
 
-    framework: str = "langchain"
+    framework: str = "langchain"  # kept for API compatibility
     llm: LLMConfig
     system_prompt: str | None = None
     system_prompt_mode: Literal["override", "extend"] = "override"
@@ -563,10 +492,4 @@ class AgentConfig(BaseModel):
     skills: list[Skill] = []
     structured_output: BaseModel | None = None
     guardrails: GuardrailConfig = GuardrailConfig()
-    sandbox: SandboxConfig = SandboxConfig()
     max_iterations: int = 50
-    sub_agents: list[SubAgentConfig] = []
-
-
-# Resolve the forward reference: SubAgentConfig.agent_config → AgentConfig
-AgentConfig.model_rebuild()

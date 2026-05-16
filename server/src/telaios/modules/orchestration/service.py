@@ -9,14 +9,14 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from telaios.core.checkpoint import Checkpointer
+from telaios.core.checkpoint import PostgresCheckpointer
 
 logger = logging.getLogger(__name__)
 
-_checkpointer: Checkpointer | None = None
+_checkpointer: PostgresCheckpointer | None = None
 
 
-def set_checkpointer(cp: Checkpointer) -> None:
+def set_checkpointer(cp: PostgresCheckpointer) -> None:
     """Register the active checkpointer (called during app startup)."""
     global _checkpointer
     _checkpointer = cp

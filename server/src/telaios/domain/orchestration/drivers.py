@@ -1,26 +1,26 @@
 """
 domain/orchestration/drivers.py
 -------------------------------
-Vendor driver interface for orchestration.
+Driver interface for executing agents on different platforms.
 
-Defines the ``AgentDriver`` ABC that concrete platform drivers must implement.
-Domain code uses this interface — never imports a concrete driver directly.
+Both built-in drivers (OpenCode, GitHub Copilot) delegate directly to the
+agent's ``run`` / ``astream`` methods — no platform-specific logic needed
+beyond this thin wrapper.
 
 Usage::
 
-    from domain.orchestration.drivers import AgentDriver
+    from telaios.domain.orchestration.drivers import OpenCodeDriver
 
-    class MyDriver(AgentDriver):
-        async def execute(self, agent, input): ...
-        async def stream(self, agent, input): ...
+    driver = OpenCodeDriver()
+    result = await driver.execute(agent, input)
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from typing import Any
 
-from telaios.core.agent import Agent
 from telaios.core.types import AgentInput, AgentOutput, StreamEvent
 
 
@@ -28,18 +28,42 @@ class AgentDriver(ABC):
     """
     Abstract driver for executing agents on a specific platform.
 
-    Concrete implementations (OpenCode, GitHub Copilot) handle the
-    platform-specific invocation details.  Domain code depends only on
-    this ABC — never on a concrete driver.
+    Both current implementations (OpenCode, GitHub Copilot) are thin
+    wrappers — override ``execute`` or ``stream`` only for platform-specific
+    behaviour.
     """
 
     @abstractmethod
-    async def execute(self, agent: Agent, input: AgentInput) -> AgentOutput:
+    async def execute(self, agent: Any, input: AgentInput) -> AgentOutput:
         """Execute an agent using the driver's platform."""
         ...
 
     @abstractmethod
-    async def stream(self, agent: Agent, input: AgentInput) -> AsyncIterator[StreamEvent]:
+    async def stream(self, agent: Any, input: AgentInput) -> AsyncIterator[StreamEvent]:
         """Stream execution events from the agent."""
         ...
         yield  # type: ignore[misc]
+
+
+class OpenCodeDriver(AgentDriver):
+    """Driver for executing agents via the OpenCode platform."""
+
+    async def execute(self, agent: Any, input: AgentInput) -> AgentOutput:
+        result: AgentOutput = await agent.run(input)
+        return result
+
+    async def stream(self, agent: Any, input: AgentInput) -> AsyncIterator[StreamEvent]:
+        async for event in agent.astream(input):
+            yield event
+
+
+class GitHubCopilotDriver(AgentDriver):
+    """Driver for executing agents via the GitHub Copilot platform."""
+
+    async def execute(self, agent: Any, input: AgentInput) -> AgentOutput:
+        result: AgentOutput = await agent.run(input)
+        return result
+
+    async def stream(self, agent: Any, input: AgentInput) -> AsyncIterator[StreamEvent]:
+        async for event in agent.astream(input):
+            yield event
