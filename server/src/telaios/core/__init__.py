@@ -28,8 +28,17 @@ from telaios.core.factory import (
 )
 from telaios.core.fake_llm import FakeLLM
 from telaios.core.graph_store import GraphStore
+from telaios.core.knowledge_source import (
+    FileSource,
+    GitHubSource,
+    KnowledgeSource,
+    SourceDocument,
+    TextSource,
+    URLSource,
+)
 from telaios.core.llm import LLM, LangChainLLM, build_llm
 from telaios.core.rag_manager import RagManager
+from telaios.core.strategy_selector import StrategySelector
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +59,15 @@ __all__ = [  # noqa: RUF022
     "ChromaRetriever",
     "FakeLLM",
     "RagManager",
+    # Knowledge sources
+    "KnowledgeSource",
+    "SourceDocument",
+    "TextSource",
+    "FileSource",
+    "URLSource",
+    "GitHubSource",
+    # Strategy
+    "StrategySelector",
     # Factory
     "create_agent",
     "create_agent_with_config",

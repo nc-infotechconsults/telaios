@@ -208,6 +208,124 @@ class RagManager:
         collection = self.get_or_create_collection(collection_name)
         collection.delete(ids=ids, where=where)
 
+    # --- Knowledge source ingestion ----------------------------------------
+
+    async def ingest_from_source(
+        self,
+        source: Any,  # KnowledgeSource
+        *,
+        collection_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Extract documents from a knowledge source and ingest into Chroma.
+
+        Args:
+            source: A ``KnowledgeSource`` subclass (TextSource, FileSource,
+                    URLSource, GitHubSource, etc.).
+            collection_name: Chroma collection (defaults to source label).
+
+        Returns:
+            Corpus statistics dict for use with ``StrategySelector``.
+
+        Source:
+          - Chroma ``collection.add()``:
+            https://docs.trychroma.com/docs/collections/add-data
+
+        Usage::
+
+            source = FileSource("docs/architecture.md")
+            stats = await manager.ingest_from_source(source)
+            pipeline = manager.auto_pipeline("How does the auth system work?", stats)
+        """
+        from telaios.core.knowledge_source import KnowledgeSource
+
+        if not isinstance(source, KnowledgeSource):
+            raise TypeError(f"Expected KnowledgeSource, got {type(source).__name__}")
+
+        docs = await source.extract()
+        if not docs:
+            return source.corpus_stats([])
+
+        col_name = collection_name or source.label.replace(" ", "-").lower() or "default"
+
+        ids = [d.id for d in docs]
+        texts = [d.content for d in docs]
+        metas = [d.to_chroma()[2] for d in docs]
+
+        # Chroma add() — auto-embeds via the configured embedding function
+        # Source: https://docs.trychroma.com/docs/collections/add-data
+        collection = self.get_or_create_collection(col_name)
+        collection.add(ids=ids, documents=texts, metadatas=metas)
+
+        stats = source.corpus_stats(docs)
+        stats["collection_name"] = col_name
+        return stats
+
+    # --- Auto-strategy pipeline -------------------------------------------
+
+    def auto_pipeline(
+        self,
+        query: str,
+        *,
+        corpus_stats: dict[str, Any] | None = None,
+        llm: Any | None = None,
+        collection_name: str | None = None,
+        top_k: int | None = None,
+    ) -> tuple[RagStrategyEnum, str, RagConfig]:
+        """Select the best strategy and create a pipeline automatically.
+
+        Analyzes the query (and optional corpus stats) to pick the optimal
+        RAG strategy. Returns the pipeline, the strategy, and the reasoning.
+
+        Args:
+            query: The user's question.
+            corpus_stats: Optional corpus profile from ``ingest_from_source()``.
+            llm: LLM instance (defaults to ``FakeLLM``).
+            collection_name: Chroma collection.
+            top_k: Override default top-k (computed from corpus size).
+
+        Returns:
+            ``(strategy, reason, config)``. Use ``config`` with
+            ``create_pipeline()``, or call ``auto_pipeline()`` followed
+            by ``create_pipeline()`` directly.
+
+        Usage::
+
+            stats = await manager.ingest_from_source(URLSource("https://..."))
+            pipeline = manager.create_pipeline(
+                auto_config(llm=llm),
+                llm=llm,
+            )
+            output = await pipeline.answer(input)
+
+        Or use ``auto_pipeline()`` for the full flow.
+        """
+        from telaios.core.strategy_selector import StrategySelector
+
+        if llm is None:
+            from telaios.core.fake_llm import FakeLLM
+
+            llm = FakeLLM()
+
+        selector = StrategySelector()
+        query_profile = selector.analyze_query(query)
+
+        if corpus_stats:
+            corpus_profile = selector.analyze_corpus(corpus_stats)
+        else:
+            from telaios.core.strategy_selector import CorpusProfile
+
+            corpus_profile = CorpusProfile()
+
+        strategy, reason = selector.select(corpus_profile, query_profile)
+
+        # Compute sensible top_k from corpus size
+        if top_k is None:
+            doc_count = corpus_stats.get("document_count", 1) if corpus_stats else 1
+            top_k = min(max(3, doc_count), 10)
+
+        config = RagConfig(strategy=strategy, top_k=top_k)
+        return strategy, reason, config
+
     # --- Pipeline factory -------------------------------------------------
 
     def create_pipeline(

@@ -3,16 +3,16 @@ telaios.cli.app
 ---------------
 Textual TUI for evaluating TelaiOS RAG and agent capabilities.
 
-Backed by Chroma vector store (ephemeral in-memory) for real semantic search.
-Dry-run uses FakeLLM; supplying an API key enables live LLM calls via the
-full RAG pipeline (RagManager → strategy → LLM).
+Backed by Chroma vector store (ephemeral). Users select knowledge sources
+(text, files, URLs, GitHub repos); the system auto-selects the best RAG
+strategy based on corpus + query analysis.
 
 Layout
 ------
   Header
-  ┌─ Tabs: one per capability ──────────────────────────────────┐
-  │  Config (left) │ Output log (right)                         │
-  └─────────────────────────────────────────────────────────────┘
+  ┌─ Sources ──┬─ Auto ──┬─ Simple ──┬─ Hybrid ──┬─ CRAG ──┬─ Self ──┬─ Agentic ──┬─ Graph ──┬─ Chat ──┬─ Review ──┐
+  │  Config (left) │ Output log (right)                                                       │
+  └───────────────────────────────────────────────────────────────────────────────────────────┘
   Footer  (q: quit  r: run  Tab: navigate)
 
 Launch
@@ -22,9 +22,8 @@ Launch
 
 from __future__ import annotations
 
-import asyncio
 import traceback
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from textual import on, work
 from textual.app import App, ComposeResult
@@ -45,6 +44,12 @@ from textual.widgets import (
 )
 
 from telaios.core.fake_llm import FakeLLM
+from telaios.core.knowledge_source import (
+    FileSource,
+    GitHubSource,
+    TextSource,
+    URLSource,
+)
 from telaios.core.rag_manager import RagManager
 from telaios.core.types import (
     AgentInput,
@@ -54,136 +59,18 @@ from telaios.core.types import (
     MessageRole,
     RagConfig,
     RagStrategy,
-    RetrievalQuery,
     VectorStoreConfig,
 )
 
-# ---------------------------------------------------------------------------
-# Sample corpus — pre-populated into Chroma at startup
-# ---------------------------------------------------------------------------
-
-_CORPUS: list[tuple[str, str]] = [
-    # (doc_id, content)
-    (
-        "doc-python",
-        "Python is a high-level, interpreted programming language created by Guido van Rossum "
-        "and first released in 1991. It emphasises code readability and uses significant indentation. "
-        "Python supports multiple programming paradigms including procedural, object-oriented, "
-        "and functional programming. Its comprehensive standard library is one of its greatest strengths.",
-    ),
-    (
-        "doc-rag",
-        "Retrieval-Augmented Generation (RAG) combines a retrieval component with a generative LLM. "
-        "A query is used to fetch relevant documents from a vector store, which are then provided as "
-        "context to the language model. Hybrid RAG combines dense vector search with sparse keyword "
-        "search (BM25). Results are merged using Reciprocal Rank Fusion (RRF), improving recall. "
-        "Corrective RAG (CRAG) grades retrieved documents for relevance. If documents score below "
-        "a threshold the query is rewritten or a web search fallback is triggered. "
-        "Self-RAG introduces reflection tokens to detect hallucinations and optionally regenerate.",
-    ),
-    (
-        "doc-agents",
-        "A ReAct agent interleaves reasoning steps (Thought) with tool invocations (Action) "
-        "in a loop until it reaches a final answer. LangGraph implements this via a cyclic state graph. "
-        "LangGraph checkpointing persists the agent's state between turns using "
-        "AsyncPostgresSaver or MemorySaver, enabling long-running multi-turn conversations "
-        "and human-in-the-loop interrupts.",
-    ),
-    (
-        "doc-code",
-        "Static analysis tools like ruff and mypy catch issues before runtime. "
-        "ruff combines linting and formatting in a single Rust-based tool; mypy enforces "
-        "type annotations with configurable strictness. "
-        "Security hardening for LLM applications includes input sanitisation to prevent "
-        "prompt injection, output validation to block PII leakage, and rate limiting to "
-        "resist denial-of-service attacks.",
-    ),
-    (
-        "doc-chroma",
-        "Chroma is an open-source vector database for AI applications. It supports "
-        "embeddings storage, metadata filtering, and similarity search. Chroma can run "
-        "in-memory (ephemeral client), with local persistence (PersistentClient), or "
-        "in client-server mode. It provides built-in embedding functions for OpenAI, "
-        "Cohere, Sentence Transformers, and more.",
-    ),
-    (
-        "doc-telaios",
-        "TelaiOS is an AI orchestration platform for senior software engineers. "
-        "It provides multi-agent workflows, RAG pipelines, and autonomous task execution. "
-        "The platform uses FastAPI for its web API layer, SQLAlchemy for database access, "
-        "and Chroma for vector storage. It follows a modular monolith architecture with "
-        "per-module Kubernetes scaling.",
-    ),
-]
+# ── Constants ────────────────────────────────────────────────────────────────
 
 _COLLECTION_NAME = "telaios-tui"
 
-
-def _init_rag() -> RagManager:
-    """Create RagManager and pre-populate the Chroma collection."""
-    manager = RagManager(
-        vector_store=VectorStoreConfig(provider="chroma"),
-        embedding=EmbeddingConfig(provider="fastembed", model="BAAI/bge-small-en-v1.5"),
-    )
-    ids = [doc_id for doc_id, _ in _CORPUS]
-    texts = [content for _, content in _CORPUS]
-    manager.ingest(_COLLECTION_NAME, ids=ids, documents=texts)
-    return manager
-
-
-# ---------------------------------------------------------------------------
-# Capability descriptors
-# ---------------------------------------------------------------------------
-
-_CAPABILITIES: list[tuple[str, str, str]] = [
-    (
-        "simple_rag",
-        "Simple RAG",
-        "Retrieve → Prepend context → LLM answer.\n"
-        "One-shot: no query rewriting, no reflection, no iteration.",
-    ),
-    (
-        "hybrid_rag",
-        "Hybrid RAG",
-        "Vector similarity + BM25 keyword search → Reciprocal Rank Fusion → LLM answer.\n"
-        "Improves recall for rare terms and domain-specific vocabulary.",
-    ),
-    (
-        "crag",
-        "CRAG",
-        "Corrective RAG: retrieve → grade documents → rewrite query or web-search fallback "
-        "→ LLM answer.\nRejects low-confidence chunks before generation.",
-    ),
-    (
-        "self_rag",
-        "Self-RAG",
-        "Self-Reflective RAG: retrieve → generate → reflect on relevance and hallucination "
-        "→ optionally regenerate.\nAdds ISREL / ISSUP / ISUSE reflection tokens.",
-    ),
-    (
-        "agentic_rag",
-        "Agentic RAG",
-        "Agent loop decides when and what to retrieve across multiple hops.\n"
-        "Powered by LangGraph ReAct graph; supports human-in-the-loop interrupts.",
-    ),
-    (
-        "graph_rag",
-        "Graph RAG",
-        "Knowledge-graph traversal to build structured relational context → LLM answer.\n"
-        "Uses GraphStore abstraction (Neo4j, NetworkX, FalkorDB).",
-    ),
-    (
-        "agent_chat",
-        "Agent Chat",
-        "Freeform multi-turn ReAct agent with tool calls.\n"
-        "Checkpointed via LangGraph MemorySaver; supports streaming events.",
-    ),
-    (
-        "code_review",
-        "Code Review",
-        "Agent-based code review across five dimensions:\n"
-        "correctness, readability, architecture, security, performance.",
-    ),
+_SOURCE_TYPES: list[tuple[str, str]] = [
+    ("text", "Paste text"),
+    ("file", "Local file(s)"),
+    ("url", "Web URL"),
+    ("github", "GitHub repo"),
 ]
 
 _PROVIDER_OPTIONS: list[tuple[str, str]] = [
@@ -204,9 +91,61 @@ _MODEL_OPTIONS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
-# ---------------------------------------------------------------------------
-# CSS
-# ---------------------------------------------------------------------------
+_CAPABILITIES: list[tuple[str, str, str]] = [
+    (
+        "auto_rag",
+        "Auto",
+        "System picks the best RAG strategy automatically "
+        "based on corpus analysis and query intent.",
+    ),
+    (
+        "simple_rag",
+        "Simple RAG",
+        "Retrieve → Prepend context → LLM answer. One-shot: no rewriting, no reflection.",
+    ),
+    (
+        "hybrid_rag",
+        "Hybrid RAG",
+        "Dense + sparse retrieval → RRF fusion → LLM. "
+        "Best for mixed content types and domain-specific vocabulary.",
+    ),
+    (
+        "crag",
+        "CRAG",
+        "Corrective RAG: grade documents → rewrite query or "
+        "web-search fallback → LLM. Rejects irrelevant chunks.",
+    ),
+    (
+        "self_rag",
+        "Self-RAG",
+        "Self-Reflective RAG: reflect on hallucination "
+        "→ regenerate if needed. Grounding-aware generation.",
+    ),
+    (
+        "agentic_rag",
+        "Agentic RAG",
+        "Agent loop decides when and what to retrieve "
+        "across multiple hops. Powered by LangGraph ReAct graph.",
+    ),
+    (
+        "graph_rag",
+        "Graph RAG",
+        "Knowledge-graph traversal for structured relational context. Uses GraphStore abstraction.",
+    ),
+    (
+        "agent_chat",
+        "Agent Chat",
+        "Freeform multi-turn ReAct agent with tool calls. Checkpointed via LangGraph MemorySaver.",
+    ),
+    (
+        "code_review",
+        "Code Review",
+        "Agent-based code review across five "
+        "dimensions: correctness, readability, architecture, security, performance.",
+    ),
+]
+
+# ── CSS ──────────────────────────────────────────────────────────────────────
 
 CSS = """
 Screen {
@@ -267,270 +206,97 @@ RichLog {
     height: 1fr;
     scrollbar-gutter: stable;
 }
+
+#corpus-stats {
+    color: $text-muted;
+    padding: 1 0;
+}
 """
 
-
-# ---------------------------------------------------------------------------
-# Helper: Chroma-backed pipeline steps
-# ---------------------------------------------------------------------------
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 
-async def _dry_run_simple(
+def _init_rag() -> RagManager:
+    """Create RagManager with ephemeral Chroma + fastembed."""
+    return RagManager(
+        vector_store=VectorStoreConfig(provider="chroma"),
+        embedding=EmbeddingConfig(provider="fastembed", model="BAAI/bge-small-en-v1.5"),
+    )
+
+
+async def _run_pipeline(
+    strategy: RagStrategy,
     query: str,
     rag: RagManager,
+    llm: Any,
     log: RichLog,
+    top_k: int = 3,
+    extra: dict[str, Any] | None = None,
 ) -> None:
-    """Simple RAG: retrieve from Chroma, generate with FakeLLM."""
-    log.write("[bold cyan]── Simple RAG (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.02)
+    """Execute a RAG pipeline and write results to the log."""
 
-    # Real Chroma retrieval
-    retriever = rag.create_retriever(_COLLECTION_NAME)
-    result = await retriever.aretrieve(RetrievalQuery(text=query, top_k=3))
-
-    log.write(f"\n[bold]Chroma retrieved {len(result.chunks)} chunks:[/bold]")
-    for i, (chunk, score) in enumerate(zip(result.chunks, result.scores, strict=True), 1):
-        log.write(f"  [{i}] (score={score:.2f}) {chunk.content[:140]}…")
-    await asyncio.sleep(0.02)
-
-    # Generate via FakeLLM through the real strategy
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.SIMPLE, top_k=3)
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _dry_run_hybrid(
-    query: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    from telaios.core.fusion import reciprocal_rank_fusion
-
-    log.write("[bold cyan]── Hybrid RAG (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.02)
-
-    lc_retriever = rag.create_retriever(_COLLECTION_NAME)
-    vec = await lc_retriever.aretrieve(RetrievalQuery(text=query, top_k=5))
-    bm25 = await lc_retriever.aretrieve(RetrievalQuery(text=query, top_k=5))
-
-    fused = reciprocal_rank_fusion([vec.chunks, bm25.chunks], k=60)
-    log.write(f"\n[bold]RRF fused {len(fused)} chunks (dense + sparse):[/bold]")
-    for i, (chunk, _rrf) in enumerate(fused[:3], 1):
-        log.write(f"  [{i}] {chunk.content[:140]}…")
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.HYBRID, top_k=3, extra={"rrf_k": 60})
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _dry_run_crag(
-    query: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    log.write("[bold cyan]── CRAG (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.02)
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.CRAG, top_k=3, extra={"max_rewrite_attempts": 1})
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _dry_run_self_rag(
-    query: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    log.write("[bold cyan]── Self-RAG (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.02)
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.SELF_RAG, top_k=3, extra={"max_regeneration_rounds": 1})
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _dry_run_agentic(
-    query: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    log.write("[bold cyan]── Agentic RAG (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.02)
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.AGENTIC, top_k=2, extra={"max_retrieval_rounds": 3})
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _dry_run_graph(
-    query: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    log.write("[bold cyan]── Graph RAG (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.02)
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.GRAPH, top_k=5)
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _dry_run_chat(
-    query: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    log.write("[bold cyan]── Agent Chat (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[bold]User:[/bold] {query}")
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.AGENTIC, top_k=3)
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Assistant:[/bold green] {output.content}")
-
-
-async def _dry_run_code_review(
-    code: str,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    log.write("[bold cyan]── Code Review (Chroma + FakeLLM) ──[/bold cyan]")
-    log.write(f"[dim]Snippet ({len(code)} chars)[/dim]")
-
-    dimensions = [
-        ("Correctness", "Does the code do what it claims?"),
-        ("Readability", "Is the intent clear without comments?"),
-        ("Architecture", "Does it respect module boundaries?"),
-        ("Security", "Any injection / auth / PII risks?"),
-        ("Performance", "Any obvious N+1 queries or blocking I/O?"),
-    ]
-    log.write("\n[bold]Review dimensions:[/bold]")
-    for name, desc in dimensions:
-        log.write(f"  [yellow]{name}[/yellow]: {desc}")
-
-    llm = FakeLLM()
-    config = RagConfig(strategy=RagStrategy.SIMPLE, top_k=2)
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
-    output = await pipeline.answer(
-        AgentInput(
-            messages=[
-                Message(
-                    role=MessageRole.HUMAN,
-                    content=f"Review this code:\n\n```\n{code}\n```",
-                )
-            ]
-        )
-    )
-    log.write(f"\n[bold green]Review:[/bold green] {output.content}")
-
-
-# ---------------------------------------------------------------------------
-# Live pipeline runner (uses real LLM via RagManager)
-# ---------------------------------------------------------------------------
-
-
-async def _live_run(
-    capability: str,
-    query: str,
-    llm_cfg: LLMConfig,
-    rag: RagManager,
-    log: RichLog,
-) -> None:
-    """Run a live RAG strategy with a real LLM."""
-    try:
-        from telaios.core.factory import create_llm
-    except ImportError:
-        log.write(
-            "[red]agents extras not installed.[/red]\nRun:  [bold]uv sync --extra agents[/bold]"
-        )
-        return
-
-    log.write(f"[bold cyan]── {capability} (live) ──[/bold cyan]")
-    log.write(f"[dim]Provider:[/dim] {llm_cfg.provider}  [dim]Model:[/dim] {llm_cfg.model}")
-
-    strategy_map: dict[str, RagStrategy] = {
-        "simple_rag": RagStrategy.SIMPLE,
-        "hybrid_rag": RagStrategy.HYBRID,
-        "crag": RagStrategy.CRAG,
-        "self_rag": RagStrategy.SELF_RAG,
-        "agentic_rag": RagStrategy.AGENTIC,
-        "graph_rag": RagStrategy.GRAPH,
-        "agent_chat": RagStrategy.AGENTIC,
-        "code_review": RagStrategy.SIMPLE,
-    }
-    strat = strategy_map.get(capability, RagStrategy.SIMPLE)
-
-    llm = create_llm(llm_cfg)
-    config = RagConfig(strategy=strat, top_k=3)
+    config = RagConfig(strategy=strategy, top_k=top_k, extra=extra or {})
     pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)
 
-    agent_input = AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    try:
-        output = await pipeline.answer(agent_input)
-        log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-    except Exception as exc:
-        log.write(f"[red]Error:[/red] {exc}")
-        log.write(traceback.format_exc())
+    log.write(f"[bold cyan]── {strategy.value.upper()} ──[/bold cyan]")
+    log.write(f"[dim]Query:[/dim] {query}")
+
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
-# ---------------------------------------------------------------------------
-# Config state helper
-# ---------------------------------------------------------------------------
+async def _run_auto(
+    query: str,
+    rag: RagManager,
+    llm: Any,
+    log: RichLog,
+    corpus_stats: dict[str, Any] | None = None,
+) -> None:
+    """Auto-select strategy and run."""
+    from telaios.core.strategy_selector import StrategySelector
+
+    selector = StrategySelector()
+    qp = selector.analyze_query(query)
+    cp = selector.analyze_corpus(corpus_stats or {})
+
+    strategy, reason = selector.select(cp, qp)
+
+    log.write("[bold cyan]── Auto Strategy Selection ──[/bold cyan]")
+    log.write(f"[dim]Query:[/dim] {query}")
+    log.write(f"\n[bold]Corpus:[/bold] {cp.document_count} docs, {cp.total_chars} chars")
+    log.write(f"[bold]Strategy:[/bold] [yellow]{strategy.value}[/yellow]")
+    log.write(f"[bold]Reason:[/bold] [dim]{reason}[/dim]")
+    log.write("")
+
+    await _run_pipeline(strategy, query, rag, llm, log, extra={"auto_selected": True})
+
+
+# ── Config state ─────────────────────────────────────────────────────────────
 
 
 class _Config:
+    source_type: str = "text"
+    source_value: str = ""
     provider: str = "openai"
     model: str = "gpt-4o-mini"
     api_key: str = ""
     query: str = "What is RAG and how does it work?"
 
 
-# ---------------------------------------------------------------------------
-# TUI App
-# ---------------------------------------------------------------------------
+# ── TUI App ──────────────────────────────────────────────────────────────────
 
 
 class TelaiOSEval(App[None]):
-    """TelaiOS capability evaluator TUI — Chroma-backed."""
+    """TelaiOS capability evaluator TUI."""
 
     TITLE = "TelaiOS Capability Evaluator"
     CSS = CSS
     BINDINGS: ClassVar[list[Binding]] = [  # type: ignore[assignment]
         Binding("q", "quit", "Quit"),
         Binding("r", "run", "Run"),
+        Binding("i", "ingest", "Ingest"),
         Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
@@ -538,22 +304,188 @@ class TelaiOSEval(App[None]):
         super().__init__()
         self._cfg = _Config()
         self._rag: RagManager | None = None
+        self._corpus_stats: dict[str, Any] | None = None
 
     def _get_rag(self) -> RagManager:
-        """Lazy-init the RagManager and pre-populate Chroma collection."""
         if self._rag is None:
             self._rag = _init_rag()
         return self._rag
 
-    # ── Layout ──────────────────────────────────────────────────────────────
+    # ── Layout ──────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with TabbedContent(id="main-tabs"):
+            # Tab 0: Sources (ingest knowledge)
+            with TabPane("Sources", id="sources"):
+                yield from self._compose_sources_pane()
+            # Tabs 1+: Capabilities
             for tab_id, name, desc in _CAPABILITIES:
                 with TabPane(name, id=tab_id):
                     yield from self._compose_cap_pane(tab_id, desc)
         yield Footer()
+
+    # ── Sources tab ─────────────────────────────────────────────────────
+
+    def _compose_sources_pane(self) -> ComposeResult:
+        yield Static(
+            "Select a knowledge source type and click Ingest [i]. "
+            "The system extracts, embeds, and stores documents in Chroma.",
+            classes="desc-block",
+        )
+        with Horizontal(classes="split"):
+            with Vertical(classes="config-panel"):
+                yield Label("Source type")
+                yield Select(
+                    options=[(label, val) for val, label in _SOURCE_TYPES],
+                    value="text",
+                    id="source-type",
+                )
+                yield Label("Source value")
+                yield Input(
+                    placeholder="Paste text, file path, URL, or GitHub URL…",
+                    id="source-value",
+                )
+                yield Label("GitHub branch (subpath)")
+                yield Input(
+                    placeholder="main  or  main src/",
+                    id="source-github-extra",
+                )
+                yield Label("GitHub token (optional)")
+                yield Input(
+                    placeholder="ghp_… or leave blank",
+                    password=True,
+                    id="source-github-token",
+                )
+                yield Button("Ingest [i]", variant="primary", classes="run-btn", id="source-ingest")
+                yield Static("", id="corpus-stats")
+            with Vertical(classes="output-panel"):
+                yield RichLog(highlight=True, markup=True, id="source-log")
+
+    @on(Select.Changed, "#source-type")
+    def _on_source_type_changed(self, event: Select.Changed) -> None:
+        """Update placeholder when source type changes."""
+        val = str(event.value)
+        try:
+            inp: Input = self.query_one("#source-value", Input)
+        except NoMatches:
+            return
+        placeholders: dict[str, str] = {
+            "text": "Paste your text / code here…",
+            "file": "/path/to/file.md  or  /path/to/docs/  (directory)",
+            "url": "https://example.com/article",
+            "github": "https://github.com/owner/repo",
+        }
+        inp.placeholder = placeholders.get(val, inp.placeholder)
+
+    @on(Button.Pressed, "#source-ingest")
+    def _on_ingest_pressed(self, event: Button.Pressed) -> None:
+        self._dispatch_ingest()
+
+    def action_ingest(self) -> None:
+        self._dispatch_ingest()
+
+    def _read_source_inputs(self) -> tuple[str, str, str, str]:
+        """Return (source_type, source_value, github_extra, github_token)."""
+
+        def _val(wid: str, default: str = "") -> str:
+            try:
+                w = self.query_one(f"#{wid}")
+                if isinstance(w, Input):
+                    return w.value or default
+                if isinstance(w, Select):
+                    v = w.value
+                    return str(v) if v is not None else default
+            except NoMatches:
+                pass
+            return default
+
+        return (
+            _val("source-type", "text"),
+            _val("source-value", ""),
+            _val("source-github-extra", "main"),
+            _val("source-github-token", ""),
+        )
+
+    def _dispatch_ingest(self) -> None:
+        source_type, source_value, gh_extra, gh_token = self._read_source_inputs()
+        try:
+            log: RichLog = self.query_one("#source-log", RichLog)
+            stats_label: Static = self.query_one("#corpus-stats", Static)
+        except NoMatches:
+            return
+
+        log.clear()
+        if not source_value.strip():
+            log.write("[red]Please enter a source value.[/red]")
+            return
+
+        self._run_ingest(source_type, source_value, gh_extra, gh_token, log, stats_label)
+
+    @work(exclusive=False)
+    async def _run_ingest(
+        self,
+        source_type: str,
+        source_value: str,
+        gh_extra: str,
+        gh_token: str,
+        log: RichLog,
+        stats_label: Static,
+    ) -> None:
+        rag = self._get_rag()
+        log.write(f"[bold]Ingesting from [yellow]{source_type}[/yellow]:[/bold] {source_value}")
+
+        try:
+            source: Any
+            match source_type:
+                case "text":
+                    source = TextSource(source_value, title="user-input")
+                case "file":
+                    paths = [p.strip() for p in source_value.split(",")]
+                    source = FileSource(*paths, label=f"Files: {', '.join(paths)}")
+                case "url":
+                    source = URLSource(source_value)
+                case "github":
+                    branch = "main"
+                    subpath = ""
+                    parts = gh_extra.split(maxsplit=1) if gh_extra else []
+                    if parts:
+                        branch = parts[0]
+                        subpath = parts[1] if len(parts) > 1 else ""
+                    source = GitHubSource(
+                        source_value, branch=branch, subpath=subpath, token=gh_token or None
+                    )
+                case _:
+                    log.write(f"[red]Unknown source type: {source_type}[/red]")
+                    return
+
+            stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
+            self._corpus_stats = stats
+
+            doc_count = stats.get("document_count", 0)
+            total_chars = stats.get("total_chars", 0)
+            code_ratio = stats.get("code_ratio", 0)
+            types = stats.get("source_types", [])
+
+            log.write(f"\n[bold green]Ingested {doc_count} document(s)[/bold green]")
+            log.write(f"  Total chars: {total_chars:,}")
+            log.write(f"  Source types: {', '.join(types) or 'none'}")
+            if code_ratio > 0:
+                log.write(f"  Code ratio: {code_ratio:.0%}")
+            log.write(f"  Collection: [bold]{_COLLECTION_NAME}[/bold]")
+            log.write(
+                "\n[dim]Ready — switch to a capability tab and press [bold]r[/bold] to run.[/dim]"
+            )
+
+            stats_label.update(
+                f"Corpus: {doc_count} docs, {total_chars:,} chars  "
+                f"[dim](press Tab to switch to a capability)[/dim]"
+            )
+        except Exception as exc:
+            log.write(f"[red]Ingest error:[/red] {exc}")
+            log.write(traceback.format_exc())
+
+    # ── Capability tabs ─────────────────────────────────────────────────
 
     def _compose_cap_pane(self, tab_id: str, desc: str) -> ComposeResult:
         yield Static(desc, classes="desc-block")
@@ -573,11 +505,11 @@ class TelaiOSEval(App[None]):
                 )
                 yield Label("API Key  (optional)")
                 yield Input(
-                    placeholder="sk-… or leave blank for dry-run",
+                    placeholder="sk-… or leave blank for FakeLLM",
                     password=True,
                     id=f"{tab_id}-apikey",
                 )
-                yield Label("Query / Code snippet")
+                yield Label("Query")
                 yield Input(
                     value=self._cfg.query,
                     placeholder="Enter query…",
@@ -587,7 +519,7 @@ class TelaiOSEval(App[None]):
             with Vertical(classes="output-panel"):
                 yield RichLog(highlight=True, markup=True, id=f"{tab_id}-log")
 
-    # ── Events ──────────────────────────────────────────────────────────────
+    # ── Events ──────────────────────────────────────────────────────────
 
     @on(Select.Changed)
     def _on_select_changed(self, event: Select.Changed) -> None:
@@ -612,16 +544,13 @@ class TelaiOSEval(App[None]):
         self._dispatch_run(tab_id)
 
     def action_run(self) -> None:
-        """Run the currently active tab."""
         active = self.query_one(TabbedContent).active
         if active:
             self._dispatch_run(active)
 
-    # ── Run dispatch ────────────────────────────────────────────────────────
+    # ── Run dispatch ────────────────────────────────────────────────────
 
     def _read_inputs(self, tab_id: str) -> tuple[str, str, str, str]:
-        """Return (provider, model, api_key, query) for the given tab."""
-
         def _val(widget_id: str, default: str = "") -> str:
             try:
                 w = self.query_one(f"#{widget_id}")
@@ -650,54 +579,53 @@ class TelaiOSEval(App[None]):
         log.clear()
 
         rag = self._get_rag()
+        llm = self._build_llm(api_key, provider, model)
 
-        if api_key:
-            llm_cfg = LLMConfig(provider=provider, model=model, api_key=api_key)
-            self._run_live(tab_id, query, llm_cfg, rag, log)
-        else:
-            self._run_dry(tab_id, query, rag, log)
+        self._run(tab_id, query, rag, llm, log)
+
+    def _build_llm(self, api_key: str, provider: str, model: str) -> Any:
+        """Build LLM: FakeLLM for dry-run, real LLM if API key provided."""
+        if not api_key:
+            return FakeLLM()
+
+        try:
+            from telaios.core.factory import create_llm
+
+            return create_llm(LLMConfig(provider=provider, model=model, api_key=api_key))
+        except Exception:
+            return FakeLLM()
 
     @work(exclusive=False)
-    async def _run_live(
+    async def _run(
         self,
         tab_id: str,
         query: str,
-        llm_cfg: LLMConfig,
         rag: RagManager,
+        llm: Any,
         log: RichLog,
     ) -> None:
-        await _live_run(tab_id.replace("_", " ").title(), query, llm_cfg, rag, log)
-
-    @work(exclusive=False)
-    async def _run_dry(self, tab_id: str, query: str, rag: RagManager, log: RichLog) -> None:
+        strategy_map: dict[str, RagStrategy] = {
+            "simple_rag": RagStrategy.SIMPLE,
+            "hybrid_rag": RagStrategy.HYBRID,
+            "crag": RagStrategy.CRAG,
+            "self_rag": RagStrategy.SELF_RAG,
+            "agentic_rag": RagStrategy.AGENTIC,
+            "graph_rag": RagStrategy.GRAPH,
+            "agent_chat": RagStrategy.AGENTIC,
+            "code_review": RagStrategy.SIMPLE,
+        }
         try:
-            match tab_id:
-                case "simple_rag":
-                    await _dry_run_simple(query, rag, log)
-                case "hybrid_rag":
-                    await _dry_run_hybrid(query, rag, log)
-                case "crag":
-                    await _dry_run_crag(query, rag, log)
-                case "self_rag":
-                    await _dry_run_self_rag(query, rag, log)
-                case "agentic_rag":
-                    await _dry_run_agentic(query, rag, log)
-                case "graph_rag":
-                    await _dry_run_graph(query, rag, log)
-                case "agent_chat":
-                    await _dry_run_chat(query, rag, log)
-                case "code_review":
-                    await _dry_run_code_review(query, rag, log)
-                case _:
-                    log.write(f"[red]Unknown capability: {tab_id}[/red]")
+            if tab_id == "auto_rag":
+                await _run_auto(query, rag, llm, log, self._corpus_stats)
+            else:
+                strat = strategy_map.get(tab_id, RagStrategy.SIMPLE)
+                await _run_pipeline(strat, query, rag, llm, log)
         except Exception as exc:
             log.write(f"[red]Error:[/red] {exc}")
             log.write(traceback.format_exc())
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# ── Entry point ──────────────────────────────────────────────────────────────
 
 
 def main() -> None:
