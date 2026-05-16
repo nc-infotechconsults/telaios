@@ -1,4 +1,4 @@
-import { Button, Chip } from "@heroui/react";
+import { Button, Chip } from "../ui";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";
 
@@ -44,7 +44,7 @@ export default function PlanDraftCard({
   const isDraft = plan.status === "draft";
 
   return (
-    <div className="w-full clay-card overflow-hidden">
+    <div className="w-full apple-card overflow-hidden">
       {/* ── Header ── */}
       <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/8 border-b border-divider/50">
         <span aria-hidden="true" className="text-base">📋</span>

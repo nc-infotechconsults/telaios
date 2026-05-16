@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Spinner, Textarea } from "@heroui/react";
+import { Button, Input, Spinner, Textarea } from "../ui";
 import {
   createLibrarySkill,
   exportLibrarySkill,

@@ -10,7 +10,7 @@ import {
   ModalBody,
   ModalFooter,
   useDisclosure,
-} from "@heroui/react";
+} from "../components/ui";
 import type { Document, DocumentFolder } from "../types";
 import {
   listDocuments,

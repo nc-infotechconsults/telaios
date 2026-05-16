@@ -156,9 +156,17 @@ class RagManager:
     # --- Retriever factory ------------------------------------------------
 
     def create_retriever(self, collection_name: str) -> ChromaRetriever:
-        """Create a Chroma-backed retriever for the named collection."""
-        collection = self.get_or_create_collection(collection_name)
-        return ChromaRetriever(collection, embedding_function=self.embedding_function)
+        """Create a LangChain Chroma-backed retriever for the named collection.
+
+        Source:
+          https://python.langchain.com/docs/integrations/vectorstores/chroma#initialization-from-client
+        """
+        # Ensure collection exists (creates it with our embedding function)
+        self.get_or_create_collection(collection_name)
+        return ChromaRetriever.from_client(
+            self.client,
+            collection_name,
+        )
 
     # --- Document ingestion -----------------------------------------------
 

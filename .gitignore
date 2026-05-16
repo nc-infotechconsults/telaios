@@ -14,3 +14,4 @@ __pycache__
 /agent-service/build/
 /server/.import_linter_cache/
 /frontend/playwright-report/
+/server/tui.log

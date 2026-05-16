@@ -10,7 +10,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
-} from "@heroui/react";
+} from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import * as api from "../lib/api";
 import { toast } from "../lib/toast";
@@ -244,7 +244,7 @@ export default function Users() {
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {pagedUsers.map((u) => (
-                <Card key={u.id} className="clay-card transition-shadow">
+                <Card key={u.id} className="apple-card transition-shadow">
                   <CardBody className="p-5 space-y-4">
                     <div className="flex flex-col items-center text-center gap-2">
                       <div className="w-14 h-14 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xl font-bold select-none">
@@ -281,9 +281,9 @@ export default function Users() {
 
           {/* ── List ── */}
           {viewMode === "list" && (
-            <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+            <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
               {pagedUsers.map((u) => (
-                <div key={u.id} className="clay-list-item flex items-center gap-4 px-4 py-3">
+                <div key={u.id} className="apple-list-item flex items-center gap-4 px-4 py-3">
                   <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 select-none">
                     {getInitials(u.display_name)}
                   </div>
@@ -316,11 +316,11 @@ export default function Users() {
 
           {/* ── Table ── */}
           {viewMode === "table" && (
-            <div className="clay-card overflow-hidden">
+            <div className="apple-card overflow-hidden">
             <Table
               aria-label="Users table"
               removeWrapper
-              classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+              classNames={{ th: "apple-table-th", tr: "apple-list-item border-b border-divider last:border-b-0" }}
             >
               <TableHeader>
                 <TableColumn>USER</TableColumn>

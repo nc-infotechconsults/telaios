@@ -22,7 +22,6 @@ from telaios.core.types import LLMConfig, Message, MessageRole
 from telaios.infra.s3 import download_from_s3
 from telaios.modules.documents.chunks.service import ChunkService
 from telaios.modules.documents.service import DocumentService
-from telaios.tools.builtin.documents.embedding import embed_texts
 from telaios.tools.builtin.documents.extraction import extract_text
 
 logger = logging.getLogger(__name__)
@@ -102,19 +101,17 @@ async def copilot_ask(
     chunk_context = ""
 
     try:
-        embeddings = await embed_texts([question])
-        if embeddings and embeddings[0]:
+        chunks = await ChunkService(session).search_by_embedding(
+            project_id, question, limit=_MAX_CHUNKS, document_id=document_id
+        )
+        if not chunks:
             chunks = await ChunkService(session).search_by_embedding(
-                project_id, embeddings[0], limit=_MAX_CHUNKS, document_id=document_id
+                project_id, question, limit=_MAX_CHUNKS
             )
-            if not chunks:
-                chunks = await ChunkService(session).search_by_embedding(
-                    project_id, embeddings[0], limit=_MAX_CHUNKS
-                )
-                chunks = [c for c in chunks if c.get("document_id") == str(document_id)]
-            chunk_context = "\n\n".join(
-                f"[Chunk {c.get('chunk_index', i)}]\n{c['content']}" for i, c in enumerate(chunks)
-            )
+            chunks = [c for c in chunks if c.get("document_id") == str(document_id)]
+        chunk_context = "\n\n".join(
+            f"[Chunk {c.get('chunk_index', i)}]\n{c['content']}" for i, c in enumerate(chunks)
+        )
     except Exception as exc:
         logger.warning("Chunk search failed: %s", exc)
 

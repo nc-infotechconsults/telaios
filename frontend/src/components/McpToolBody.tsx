@@ -1,4 +1,4 @@
-import { Chip } from "@heroui/react";
+import { Chip } from "./ui";
 import type { McpToolConfig } from "../types";
 
 type PropDef = { type?: unknown; description?: string };

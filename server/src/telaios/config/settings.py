@@ -102,14 +102,13 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = Field(default="BAAI/bge-small-en-v1.5")
     EMBEDDING_API_KEY: str | None = Field(default=None)
     EMBEDDING_BASE_URL: str | None = Field(default=None)
-    # pgvector dimension for ``document_chunks.embedding``.
+    # Embedding dimension used when creating Chroma collections.
     # Defaults match BAAI/bge-small-en-v1.5 (fastembed) at 384. Set to:
     #   384  — BAAI/bge-small-en-v1.5
     #   768  — BAAI/bge-base-en-v1.5
     #   1024 — voyage-3-lite / voyage-3.5-lite
     #   1536 — text-embedding-3-small, text-embedding-ada-002 (OpenAI)
     #   3072 — text-embedding-3-large (OpenAI)
-    # Changing this requires a manual ALTER TABLE + HNSW rebuild (see legacy migration 1777200000000).
     EMBEDDING_DIM: int = Field(default=384)
 
     # ─── Workspaces / agents ──────────────────────────────────────────────

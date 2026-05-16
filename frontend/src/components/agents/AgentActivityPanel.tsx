@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Chip, Divider } from "@heroui/react";
+import { Card, CardBody, CardHeader, Chip, Divider } from "../ui";
 
 export type AgentRole = "code" | "review" | "test" | "knowledge" | "infra" | "general";
 
@@ -57,7 +57,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
 
   if (!hasActivity) {
     return (
-      <Card className="clay-card">
+      <Card className="apple-card">
         <CardBody>
           <p className="text-sm text-default-400 italic">No agent activity yet.</p>
         </CardBody>
@@ -71,7 +71,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
 
       {/* Pipeline progress */}
       {pipelineState && (
-        <Card className="clay-card">
+        <Card className="apple-card">
           <CardHeader className="flex items-start justify-between pb-1">
             <span className="text-sm font-semibold">Pipeline</span>
             <Chip
@@ -138,7 +138,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
 
       {/* Recent agent lifecycle events */}
       {agentEvents.length > 0 && (
-        <Card className="clay-card">
+        <Card className="apple-card">
           <CardHeader className="pb-1">
             <span className="text-sm font-semibold">Recent Events</span>
           </CardHeader>

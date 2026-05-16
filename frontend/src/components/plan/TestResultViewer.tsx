@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Chip } from "@heroui/react";
+import { Chip } from "../ui";
 
 interface TestRunResult {
   framework: string;

@@ -20,7 +20,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
-} from "@heroui/react";
+} from "../components/ui";
 import { getProjects, createProject, getRepositories } from "../lib/api";
 import { toast } from "../lib/toast";
 import type { Project, Repository } from "../types";
@@ -222,7 +222,7 @@ export default function ProjectList() {
                     key={p.id}
                     isPressable
                     onPress={() => navigate(`/projects/${p.id}`)}
-                    className="group cursor-pointer clay-card hover:shadow-xl transition-all"
+                    className="group cursor-pointer apple-card hover:shadow-xl transition-all"
                   >
                     <CardBody className="p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
@@ -258,7 +258,7 @@ export default function ProjectList() {
 
           {/* ── List ── */}
           {projects.length > 0 && viewMode === "list" && (
-            <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+            <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
               {projects.map((p) => {
                 const repos = reposByProject[p.id] ?? [];
                 return (
@@ -266,7 +266,7 @@ export default function ProjectList() {
                     key={p.id}
                     type="button"
                     onClick={() => navigate(`/projects/${p.id}`)}
-                    className="clay-list-item flex items-center gap-4 px-4 py-3 text-left w-full group"
+                    className="apple-list-item flex items-center gap-4 px-4 py-3 text-left w-full group"
                   >
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-sm group-hover:text-primary transition-colors truncate block">
@@ -293,11 +293,11 @@ export default function ProjectList() {
 
           {/* ── Table ── */}
           {projects.length > 0 && viewMode === "table" && (
-            <div className="clay-card overflow-hidden">
+            <div className="apple-card overflow-hidden">
             <Table
               aria-label="Projects table"
               removeWrapper
-              classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+              classNames={{ th: "apple-table-th", tr: "apple-list-item border-b border-divider last:border-b-0" }}
             >
               <TableHeader>
                 <TableColumn>NAME</TableColumn>

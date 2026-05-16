@@ -10,7 +10,7 @@ import {
   Select,
   SelectItem,
   Spinner,
-} from "@heroui/react";
+} from "../components/ui";
 import {
   cloneProjectAgentFromLibrary,
   getLibraryAgent,

@@ -8,7 +8,7 @@ import {
   ModalBody,
   ModalFooter,
   Spinner,
-} from "@heroui/react";
+} from "../ui";
 import { getResourceLogs } from "../../lib/api";
 import { toast } from "../../lib/toast";
 

@@ -21,7 +21,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    Index,
     Integer,
     String,
     Table,
@@ -32,7 +31,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.config.settings import settings
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
 
 if TYPE_CHECKING:
@@ -191,10 +189,10 @@ class DocumentTemplate(Base, TimestampMixin):
 
 
 class DocumentChunk(Base):
-    """RAG chunk of a document with pgvector embedding (``document_chunks`` table).
+    """RAG chunk of a document (``document_chunks`` table).
 
-    The embedding is stored as ``vector(EMBEDDING_DIM)``. We use pgvector's
-    SQLAlchemy ``Vector`` type so Alembic autogenerate detects the column.
+    Embeddings are stored in Chroma, not PostgreSQL.  The ``chroma_doc_id``
+    field links this row to its embedding in the Chroma collection.
     """
 
     __tablename__ = "document_chunks"
@@ -205,11 +203,9 @@ class DocumentChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Import locally so pgvector is only required when documents are enabled.
-    from pgvector.sqlalchemy import Vector
-
-    embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(settings.EMBEDDING_DIM), nullable=True
+    chroma_doc_id: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
     )
     chunk_metadata: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB, nullable=True)
 
@@ -218,15 +214,6 @@ class DocumentChunk(Base):
     )
 
     document: Mapped[Document] = relationship("Document")
-
-    __table_args__ = (
-        Index(
-            "idx_document_chunks_embedding",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-        ),
-    )
 
 
 class DocumentActivity(Base):

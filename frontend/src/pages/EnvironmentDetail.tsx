@@ -11,7 +11,7 @@ import {
   Spinner,
   Tooltip,
   useDisclosure,
-} from "@heroui/react";
+} from "../components/ui";
 import {
   getEnvironment,
   getEnvironmentResource,

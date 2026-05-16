@@ -12,7 +12,7 @@
  *  - Monaco is lazy-loaded so it doesn't bloat the initial bundle.
  */
 import { useEffect, useState } from "react";
-import { Button, Chip } from "@heroui/react";
+import { Button, Chip } from "../ui";
 import { updateDocumentContent } from "../../lib/api";
 import { toast } from "../../lib/toast";
 

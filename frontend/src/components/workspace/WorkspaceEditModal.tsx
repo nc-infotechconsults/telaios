@@ -8,7 +8,7 @@ import {
   ModalBody,
   ModalFooter,
   Textarea,
-} from "@heroui/react";
+} from "../ui";
 import { patchWorkspace } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { Workspace, WorkspaceConfig } from "../../types";

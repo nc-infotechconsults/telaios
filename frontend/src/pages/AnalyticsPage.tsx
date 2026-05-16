@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Chip, Spinner } from "@heroui/react";
+import { Chip, Spinner } from "../components/ui";
 import { getOrgAnalytics } from "../lib/api";
 import { toast } from "../lib/toast";
 import type { OrgProjectSummary } from "../types";

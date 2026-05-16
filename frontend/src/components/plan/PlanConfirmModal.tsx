@@ -1,4 +1,4 @@
-import { Chip, Divider, Button } from "@heroui/react";
+import { Chip, Divider, Button } from "../ui";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import TaskCard from "./TaskCard";
 

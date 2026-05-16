@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Input, Select, SelectItem, Spinner, Textarea } from "@heroui/react";
+import { Button, Input, Select, SelectItem, Spinner, Textarea } from "../ui";
 import { createLibraryMCP, updateLibraryMCP } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { LibraryMCP } from "../../types";

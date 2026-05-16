@@ -5,7 +5,7 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-} from "@heroui/react";
+} from "../ui";
 
 interface Props {
   isOpen: boolean;

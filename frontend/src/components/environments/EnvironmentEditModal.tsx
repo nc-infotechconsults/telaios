@@ -10,7 +10,7 @@ import {
   Select,
   SelectItem,
   Textarea,
-} from "@heroui/react";
+} from "../ui";
 import { patchEnvironment } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { Environment, EnvironmentType } from "../../types";

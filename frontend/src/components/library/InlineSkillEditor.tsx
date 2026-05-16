@@ -8,7 +8,7 @@ import {
   ModalHeader,
   Spinner,
   Textarea,
-} from "@heroui/react";
+} from "../ui";
 import { listLibrarySkills } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { InlineSkill, LibrarySkill } from "../../types";

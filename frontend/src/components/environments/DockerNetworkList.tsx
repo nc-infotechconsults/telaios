@@ -16,7 +16,7 @@ import {
   TableCell,
   Tooltip,
   useDisclosure,
-} from "@heroui/react";
+} from "../ui";
 import { listDockerNetworks, removeDockerNetwork, pruneDockerNetworks } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerNetwork } from "../../types";

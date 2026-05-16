@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Chip, Spinner } from "@heroui/react";
+import { Chip, Spinner } from "../ui";
 import { getProjectAnalytics, getProjectDocAnalytics } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type {

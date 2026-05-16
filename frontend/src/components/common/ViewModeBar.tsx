@@ -67,7 +67,7 @@ export default function ViewModeBar({
       <div
         role="group"
         aria-label="View mode"
-        className="clay-toolbar flex items-center p-0.5 gap-0.5 shrink-0"
+        className="apple-toolbar flex items-center p-0.5 gap-0.5 shrink-0"
       >
         {VIEWS.map(({ mode: m, label, icon }) => (
           <button
@@ -106,7 +106,7 @@ export default function ViewModeBar({
             onPageChange(1);
           }
         }}
-        className="h-8 rounded-lg clay-toolbar text-foreground text-xs px-2 pr-6 shrink-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
+        className="h-8 rounded-lg apple-toolbar text-foreground text-xs px-2 pr-6 shrink-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
         style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
       >
         {PAGE_SIZES.map((s) => (
@@ -121,7 +121,7 @@ export default function ViewModeBar({
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
           aria-label="Previous page"
-          className="h-8 w-8 flex items-center justify-center rounded-md clay-toolbar text-default-400 hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-shadow"
+          className="h-8 w-8 flex items-center justify-center rounded-md apple-toolbar text-default-400 hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-shadow"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -133,7 +133,7 @@ export default function ViewModeBar({
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
           aria-label="Next page"
-          className="h-8 w-8 flex items-center justify-center rounded-md clay-toolbar text-default-400 hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-shadow"
+          className="h-8 w-8 flex items-center justify-center rounded-md apple-toolbar text-default-400 hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-shadow"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>

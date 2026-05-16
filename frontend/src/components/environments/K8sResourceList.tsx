@@ -10,7 +10,7 @@ import {
   TableRow,
   TableCell,
   Tooltip,
-} from "@heroui/react";
+} from "../ui";
 import { listEnvironmentResources } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { K8sResource } from "../../types";

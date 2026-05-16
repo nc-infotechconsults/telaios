@@ -17,7 +17,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
-} from "@heroui/react";
+} from "../components/ui";
 import { getAgentProfiles, deleteAgentProfile } from "../lib/api";
 import { toast } from "../lib/toast";
 import type { AgentProfile } from "../types";
@@ -139,7 +139,7 @@ export default function AgentProfiles() {
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {pagedProfiles.map((p) => (
-                <Card key={p.id} className="clay-card transition-shadow">
+                <Card key={p.id} className="apple-card transition-shadow">
                   <CardBody className="p-5 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -185,9 +185,9 @@ export default function AgentProfiles() {
 
           {/* ── List ── */}
           {viewMode === "list" && (
-            <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+            <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
               {pagedProfiles.map((p) => (
-                <div key={p.id} className="clay-list-item flex items-center gap-4 px-4 py-3">
+                <div key={p.id} className="apple-list-item flex items-center gap-4 px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <span className="font-medium text-sm block truncate">{p.name}</span>
                     {p.description && (
@@ -224,11 +224,11 @@ export default function AgentProfiles() {
 
           {/* ── Table ── */}
           {viewMode === "table" && (
-            <div className="clay-card overflow-hidden">
+            <div className="apple-card overflow-hidden">
             <Table
               aria-label="Agent profiles table"
               removeWrapper
-              classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+              classNames={{ th: "apple-table-th", tr: "apple-list-item border-b border-divider last:border-b-0" }}
             >
               <TableHeader>
                 <TableColumn>NAME</TableColumn>
@@ -239,7 +239,7 @@ export default function AgentProfiles() {
               </TableHeader>
               <TableBody>
                 {pagedProfiles.map((p) => (
-                  <TableRow key={p.id} className="clay-list-item">
+                  <TableRow key={p.id} className="apple-list-item">
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm">{p.name}</p>

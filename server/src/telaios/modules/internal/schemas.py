@@ -21,7 +21,6 @@ class PatchDocumentStatusBody(BaseModel):
 class ChunkIn(BaseModel):
     chunk_index: int = Field(ge=0)
     content: str = Field(min_length=1)
-    embedding: list[float]
     metadata: dict[str, Any] | None = None
 
 
@@ -38,7 +37,7 @@ class StoreChunksResponse(BaseModel):
 
 class SearchChunksBody(BaseModel):
     project_id: uuid.UUID
-    embedding: list[float]
+    query: str = Field(min_length=1)
     limit: int = Field(default=5, ge=1, le=20)
 
 

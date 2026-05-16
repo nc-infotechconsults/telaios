@@ -11,7 +11,7 @@ import {
   Textarea,
   useDisclosure,
   Spinner,
-} from "@heroui/react";
+} from "../components/ui";
 import {
   getPlan,
   getPlanMessages,

@@ -8,7 +8,7 @@ import {
   Card,
   CardBody,
   useDisclosure,
-} from "@heroui/react";
+} from "../ui";
 import { createRepository, updateRepository, deleteRepository, testRepository } from "../../lib/api";
 import type { Repository, RepositoryProviderType, RepositoryTestResult } from "../../types";
 import ConfirmModal from "../common/ConfirmModal";

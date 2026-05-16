@@ -1,4 +1,8 @@
-"""Document chunks service (used by extraction pipeline)."""
+"""Document chunks service — Chroma-backed.
+
+Embeddings are stored in Chroma; PostgreSQL holds text content and
+metadata only.
+"""
 
 from __future__ import annotations
 
@@ -7,47 +11,48 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telaios.core.rag_manager import RagManager
 from telaios.modules.documents.chunks.repository import ChunkRepository
 
 
 class ChunkService:
-    def __init__(self, session: AsyncSession) -> None:
-        self._repo = ChunkRepository(session)
+    def __init__(
+        self,
+        session: AsyncSession,
+        rag: RagManager | None = None,
+    ) -> None:
+        self._repo = ChunkRepository(session, rag=rag)
 
     async def store(
         self,
         document_id: uuid.UUID,
         chunks: list[dict[str, Any]],
     ) -> int:
-        """Replace existing chunks for *document_id* with *chunks*.
+        """Replace existing chunks with *chunks* (text + optional metadata).
 
-        Returns the number of new chunks stored.
+        Chroma handles embedding generation automatically.
         """
         await self._repo.delete_by_document(document_id)
         stored = await self._repo.bulk_create(document_id, chunks)
         return len(stored)
 
     async def get_by_document(self, document_id: uuid.UUID) -> list[dict[str, Any]]:
-        """Return all chunks for *document_id* as plain dicts.
-
-        Each dict has keys: ``content``, ``chunk_index``, ``document_id``,
-        ``metadata``.
-        """
         return await self._repo.list_as_dicts(document_id)
 
     async def search_by_embedding(
         self,
         project_id: uuid.UUID,
-        embedding: list[float],
+        query: str,
         limit: int = 8,
         document_id: uuid.UUID | None = None,
     ) -> list[dict[str, Any]]:
-        """Cosine-similarity ANN search (delegates to repository).
+        """Similarity search via Chroma (embedding + retrieval).
 
-        Returns chunks ordered by ascending distance (most similar first).
+        The *query* parameter is now a text string — Chroma embeds it
+        automatically.
         """
         return await self._repo.search_by_embedding(
-            project_id, embedding, limit=limit, document_id=document_id
+            project_id, query, limit=limit, document_id=document_id
         )
 
 

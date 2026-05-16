@@ -11,7 +11,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, Chip, Input, Spinner, Tooltip } from "@heroui/react";
+import { Button, Chip, Input, Spinner, Tooltip } from "../components/ui";
 import type { Document } from "../types";
 import {
   getDocument,

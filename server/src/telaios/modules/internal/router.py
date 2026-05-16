@@ -100,7 +100,7 @@ async def search_document_chunks(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict[str, Any]]:
     svc = ChunkService(session)
-    return await svc.search_by_embedding(body.project_id, body.embedding, body.limit)
+    return await svc.search_by_embedding(body.project_id, body.query, body.limit)
 
 
 # ── Plan lifecycle ─────────────────────────────────────────────────────────────

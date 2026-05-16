@@ -8,7 +8,7 @@ import {
   ModalContent,
   ModalHeader,
   Spinner,
-} from "@heroui/react";
+} from "../ui";
 import { cloneProjectAgentFromLibrary, listLibraryAgents } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { AgentRole, LibraryAgent, ProjectAgent } from "../../types";

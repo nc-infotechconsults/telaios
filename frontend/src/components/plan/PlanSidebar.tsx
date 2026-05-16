@@ -6,7 +6,7 @@ import {
   ModalContent,
   ModalBody,
   useDisclosure,
-} from "@heroui/react";
+} from "../ui";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";
 import PlanDAG from "./PlanDAG";
@@ -197,7 +197,7 @@ export default function PlanSidebar({
 
                     <button
                       onClick={() => openDetail(t)}
-                      className="w-full text-left rounded-xl bg-default-50 border border-divider hover:border-primary/40 transition-all group overflow-hidden"
+                      className="w-full text-left apple-card hover:border-primary/40 transition-all group overflow-hidden"
                     >
                       {/* Title + status */}
                       <div className="flex items-start justify-between gap-2 p-3 pb-2">

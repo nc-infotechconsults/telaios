@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Chip, Divider, Button, Spinner,
-} from "@heroui/react";
+} from "../ui";
 import type { Task, AgentProfile, Repository, TaskArtifact, ArtifactType } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";
 import { getTaskArtifacts } from "../../lib/api";

@@ -86,8 +86,8 @@ export default function MessageBubble({ message, isStreaming }: Props) {
           aria-label={`${ROLE_LABEL[message.role]}: message`}
           className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-primary text-primary-foreground rounded-tr-sm whitespace-pre-wrap clay-bubble-user"
-              : "clay-bubble-agent text-foreground rounded-tl-sm"
+              ? "bg-primary text-primary-foreground rounded-tr-sm whitespace-pre-wrap apple-bubble-user"
+              : "apple-bubble-agent text-foreground rounded-tl-sm"
           }`}
         >
           {isUser || isStreaming ? (

@@ -2,8 +2,8 @@
 core/knowledge_source.py — Pluggable knowledge source abstraction.
 
 Defines ``KnowledgeSource`` ABC and concrete implementations for loading
-text from files, URLs, GitHub repos, and raw input.  Used by ``RagManager``
-to ingest knowledge from any source into Chroma.
+text from files, URLs, GitHub repos, raw input, and document formats
+(PDF, DOCX, PPTX via Docling).
 
 Sources:
   - Chroma ``collection.add()`` API:
@@ -12,6 +12,8 @@ Sources:
     https://www.python-httpx.org/async/
   - GitHub REST API (raw content):
     https://docs.github.com/en/rest/repos/contents#get-repository-content
+  - Docling document converter:
+    https://docling-project.github.io/docling/getting_started/quickstart/
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 # ── Document shape ───────────────────────────────────────────────────────────
 
@@ -389,5 +391,94 @@ class GitHubSource(KnowledgeSource):
                     },
                 )
             )
+
+        return docs
+
+
+# ── Document format source (PDF, DOCX, PPTX via Docling) ────────────────────
+
+
+class DoclingSource(KnowledgeSource):
+    """Knowledge from document formats (PDF, DOCX, PPTX, XLSX) via Docling.
+
+    Uses Docling's ``DocumentConverter`` to parse and export to Markdown
+    text.  Supports local files and URLs (ArXiv, etc.).
+
+    Source:
+      https://docling-project.github.io/docling/getting_started/quickstart/
+    """
+
+    _SUPPORTED_EXTS: ClassVar[set[str]] = {
+        ".pdf",
+        ".docx",
+        ".pptx",
+        ".xlsx",
+        ".html",
+        ".htm",
+        ".xml",
+    }
+
+    def __init__(
+        self,
+        *paths: str,
+        export_format: str = "markdown",
+        label: str = "",
+    ) -> None:
+        label = label or f"Docling: {', '.join(str(p)[:40] for p in paths)}"
+        super().__init__(label)
+        self._paths = [Path(p) for p in paths]
+        self._export_format = export_format
+
+    async def extract(self) -> list[SourceDocument]:
+        import logging
+
+        import docling.document_converter
+
+        logger = logging.getLogger(__name__)
+        docs: list[SourceDocument] = []
+
+        for path in self._paths:
+            if not path.exists():
+                logger.warning("DoclingSource: file not found: %s", path)
+                continue
+
+            ext = path.suffix.lower()
+            if ext not in self._SUPPORTED_EXTS:
+                logger.warning(
+                    "DoclingSource: unsupported extension %s for %s — skipping",
+                    ext,
+                    path.name,
+                )
+                continue
+
+            try:
+                converter = docling.document_converter.DocumentConverter()
+                result = converter.convert(str(path))
+                doc = result.document
+
+                if self._export_format == "markdown":
+                    content = doc.export_to_markdown() or ""
+                elif self._export_format == "html":
+                    content = doc.export_to_html() or ""
+                else:
+                    content = doc.export_to_markdown() or ""
+
+                source_type = "document"
+                docs.append(
+                    SourceDocument(
+                        content=content,
+                        title=path.name,
+                        source_type=source_type,
+                        source_path=str(path),
+                        metadata={
+                            "file_name": path.name,
+                            "file_suffix": ext,
+                            "export_format": self._export_format,
+                            "character_count": len(content),
+                        },
+                    )
+                )
+            except Exception as exc:
+                logger.error("DoclingSource: failed to convert %s: %s", path.name, exc)
 
         return docs

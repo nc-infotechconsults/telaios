@@ -325,7 +325,7 @@ class VectorStoreConfig(BaseModel):
     """
     Connection and collection settings for a vector database.
 
-    Supported providers: pgvector, chroma, qdrant, pinecone, weaviate, …
+    Supported providers: chroma, chroma:persistent, chroma:http, chroma:cloud
     """
 
     provider: str

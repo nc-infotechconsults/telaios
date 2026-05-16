@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Chip, Spinner, Tabs, Tab, Tooltip } from "@heroui/react";
+import { Button, Chip, Spinner, Tabs, Tab, Tooltip } from "../ui";
 import type { Document, DocumentVersion, DocumentTag, DocumentActivityItem } from "../../types";
 import {
   listVersions,

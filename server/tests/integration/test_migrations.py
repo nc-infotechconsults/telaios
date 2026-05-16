@@ -57,7 +57,7 @@ EXPECTED_TABLES: set[str] = {
 
 @pytest.fixture(scope="module")
 def pg_container():
-    """Start a pgvector-enabled PostgreSQL container for the test module."""
+    """Start a PostgreSQL container for the test module."""
     with PostgresContainer("pgvector/pgvector:pg16") as pg:
         yield pg
 
@@ -108,6 +108,24 @@ def _index_exists(asyncpg_url: str, index_name: str, table_name: str) -> bool:
     return asyncio.run(_fetch())
 
 
+def _column_exists(asyncpg_url: str, table_name: str, column_name: str) -> bool:
+    async def _fetch() -> bool:
+        engine = create_async_engine(asyncpg_url, echo=False)
+        async with engine.connect() as conn:
+            result = await conn.execute(
+                text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = :t AND column_name = :c"
+                ),
+                {"t": table_name, "c": column_name},
+            )
+            found = result.fetchone() is not None
+        await engine.dispose()
+        return found
+
+    return asyncio.run(_fetch())
+
+
 @pytest.mark.integration
 def test_upgrade_creates_all_tables(pg_container: PostgresContainer) -> None:
     """upgrade head must create every expected table."""
@@ -121,11 +139,11 @@ def test_upgrade_creates_all_tables(pg_container: PostgresContainer) -> None:
 
 
 @pytest.mark.integration
-def test_hnsw_index_created(pg_container: PostgresContainer) -> None:
-    """The HNSW vector index must exist after upgrade head."""
+def test_chroma_doc_id_column_exists(pg_container: PostgresContainer) -> None:
+    """The chroma_doc_id column must exist on document_chunks after upgrade."""
     url = _asyncpg_url(pg_container)
-    assert _index_exists(url, "idx_document_chunks_embedding", "document_chunks"), (
-        "HNSW index idx_document_chunks_embedding not found after upgrade"
+    assert _column_exists(url, "document_chunks", "chroma_doc_id"), (
+        "chroma_doc_id column not found on document_chunks after upgrade"
     )
 
 

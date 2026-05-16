@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Chip, Divider } from "@heroui/react";
+import { Card, CardBody, CardHeader, Chip, Divider } from "../ui";
 import type { AgentProfile } from "../../types";
 import { AgentStatusBadge, type AgentInstance } from "./AgentStatusBadge";
 
@@ -16,7 +16,7 @@ interface Props {
 export default function AgentPoolPanel({ agentProfiles, instances }: Props) {
   if (agentProfiles.length === 0) {
     return (
-      <Card className="clay-card">
+      <Card className="apple-card">
         <CardBody>
           <p className="text-sm text-default-400">No agent profiles configured.</p>
         </CardBody>
@@ -39,7 +39,7 @@ export default function AgentPoolPanel({ agentProfiles, instances }: Props) {
         const busy = profileInstances.filter((i) => i.status === "busy").length;
 
         return (
-          <Card key={profile.id} className="clay-card">
+          <Card key={profile.id} className="apple-card">
             <CardHeader className="flex items-start justify-between pb-1">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-semibold">{profile.name}</span>

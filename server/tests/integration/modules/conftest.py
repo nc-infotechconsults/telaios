@@ -41,7 +41,7 @@ from tests.helpers.db import (
 
 @pytest.fixture(scope="session")
 def pg_url() -> Iterator[str]:
-    """Start a pgvector container and apply migrations once per test session."""
+    """Start a PostgreSQL container and apply migrations once per test session."""
     with PostgresContainer("pgvector/pgvector:pg16") as pg:
         url = asyncpg_url(pg)
         apply_migrations(url)

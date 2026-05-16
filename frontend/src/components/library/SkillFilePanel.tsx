@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Input } from "@heroui/react";
+import { Input } from "../ui";
 import SkillFileEditor from "./SkillFileEditor";
 
 export interface FileEntry {

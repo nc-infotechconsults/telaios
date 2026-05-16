@@ -1,7 +1,7 @@
 import type { AppSettings, CustomTheme, FontFamilyKey, RadiusStep, ShadowStep, ThemePreset } from "../types";
 
 const DEFAULT_BRAND_NAME = "TelaiOS";
-const DEFAULT_BRAND_COLOR = "#006FEE";
+const DEFAULT_BRAND_COLOR = "#3B82F6";
 const DEFAULT_FAVICON_PATH = "/favicon.svg";
 
 type Theme = "light" | "dark";
@@ -44,16 +44,16 @@ export interface ResolvedTheme {
 
 export const THEME_PRESETS: Record<ThemePreset, ResolvedTheme> = {
   default: {
-    background: "#0d0d0d",
-    foreground: "#ededed",
-    content1: "#1a1a1a",
-    content2: "#161616",
-    content3: "#121212",
-    divider: "#2a2a2a",
+    background: "#1c1c1e",
+    foreground: "rgba(255,255,255,0.90)",
+    content1: "#2c2c2e",
+    content2: "#3a3a3c",
+    content3: "#48484a",
+    divider: "rgba(84,84,88,0.35)",
     radius: "medium",
     shadow: "medium",
     font_family: "system",
-    sidebar_background: "#111111",
+    sidebar_background: "#1c1c1e",
   },
   corporate: {
     background: "#ffffff",
@@ -159,12 +159,12 @@ const SHADOW_VALUES: Record<ShadowStep, string> = {
 };
 
 const FONT_FAMILY_VALUES: Record<FontFamilyKey, string> = {
-  system:    "system-ui, -apple-system, sans-serif",
-  inter:     "Inter, system-ui, sans-serif",
+  system:    "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\", \"Helvetica Neue\", Arial, sans-serif",
+  inter:     "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
   roboto:    "Roboto, Helvetica Neue, Arial, sans-serif",
   helvetica: "Helvetica Neue, Helvetica, Arial, sans-serif",
   georgia:   "Georgia, Times New Roman, serif",
-  mono:      "ui-monospace, Menlo, monospace",
+  mono:      "ui-monospace, \"SF Mono\", \"Fira Code\", \"Cascadia Code\", monospace",
 };
 
 // ── Colour utilities ──────────────────────────────────────────────────────────
@@ -494,6 +494,6 @@ export function applyAppSettingsToDocument(settings: AppSettings): void {
   const themeColorMeta = ensureThemeColorMeta();
   themeColorMeta.content = brandColor;
 
-  // Apply theme preset + custom overrides
-  applyThemeOverrides(settings.theme_preset ?? null, settings.custom_theme ?? null);
+  // Theme overrides disabled until Apple HIG interface is fully complete
+  // applyThemeOverrides(settings.theme_preset ?? null, settings.custom_theme ?? null);
 }

@@ -1,4 +1,4 @@
-import { Chip } from "@heroui/react";
+import { Chip } from "../ui";
 import type { Task, AgentProfile, Repository } from "../../types";
 
 const STATUS_COLOR: Record<Task["status"], "default" | "primary" | "warning" | "success" | "danger"> = {
@@ -37,7 +37,7 @@ export default function TaskCard({ task, profile, repositories, showResult }: Pr
   const taskRepos = (repositories ?? []).filter((r) => (task.repository_ids ?? []).includes(r.id));
 
   return (
-    <div className="p-3 clay-card space-y-2">
+    <div className="p-3 apple-card space-y-2">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold leading-tight">{task.title}</span>

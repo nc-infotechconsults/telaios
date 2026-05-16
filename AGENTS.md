@@ -33,8 +33,11 @@ cd server && uv run uvicorn telaios.main:app --reload --port 8000
 # Frontend
 cd frontend && npm run dev
 
-# Infrastructure (postgres, redis, minio)
-docker compose -f docker-compose.dev.yml up
+# Infrastructure (postgres, redis, chroma, minio)
+docker compose -f docker-compose.dev.yml up -d
+
+# TUI evaluator (RAG pipeline testing)
+cd server && uv run telaios-eval
 ```
 
 ## Quality gates (server)

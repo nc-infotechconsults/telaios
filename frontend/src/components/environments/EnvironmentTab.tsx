@@ -11,7 +11,7 @@ import {
   Spinner,
   Tooltip,
   useDisclosure,
-} from "@heroui/react";
+} from "../ui";
 import {
   listEnvironments,
   testEnvironmentConnection,
@@ -127,11 +127,11 @@ export default function EnvironmentTab({ projectId }: Props) {
           </Button>
         </div>
       ) : (
-        <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+        <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
           {environments.map((env) => (
             <div
               key={env.id}
-              className="clay-list-item flex items-center gap-4 px-4 py-3 cursor-pointer"
+              className="apple-list-item flex items-center gap-4 px-4 py-3 cursor-pointer"
               onClick={() => navigate(`/projects/${projectId}/environments/${env.id}`)}
             >
               <div className="flex-1 min-w-0">

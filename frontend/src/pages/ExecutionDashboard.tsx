@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, CardBody, CardHeader, Chip, Button, Spinner, useDisclosure } from "@heroui/react";
+import { Card, CardBody, CardHeader, Chip, Button, Spinner, useDisclosure } from "../components/ui";
 import {
   getPlans,
   getTasks,
@@ -413,7 +413,7 @@ export default function ExecutionDashboard() {
                 </Button>
               </div>
             ) : (
-              <Card className="h-full flex flex-col clay-card">
+              <Card className="h-full flex flex-col apple-card">
                 <CardHeader className="flex items-center justify-between pb-0 shrink-0">
                   <span className="text-sm font-medium text-default-500">
                     Task Dependency Plan

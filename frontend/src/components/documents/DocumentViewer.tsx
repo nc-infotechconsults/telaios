@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Spinner } from "@heroui/react";
+import { Button, Spinner } from "../ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";

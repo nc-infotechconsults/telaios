@@ -15,7 +15,7 @@ import {
   TableBody,
   TableRow,
   TableCell,
-} from "@heroui/react";
+} from "../components/ui";
 
 const SearchIcon = (
   <svg
@@ -325,7 +325,7 @@ export default function LibraryPage() {
       </div>
 
       {/* Tab bar */}
-      <div role="tablist" aria-label="Library sections" className="clay-tab-bar flex border-b border-divider -mt-2">
+      <div role="tablist" aria-label="Library sections" className="apple-tab-bar flex border-b border-divider -mt-2">
         {(["agents", "mcps", "skills"] as LibraryTab[]).map((tab) => (
           <button
             key={tab}
@@ -433,9 +433,9 @@ export default function LibraryPage() {
 
               {/* ── List ── */}
               {viewMode === "list" && (
-                <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+                <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
                   {pagedAgents.map((agent) => (
-                    <div key={agent.id} className="clay-list-item flex items-center gap-3 px-4 py-3">
+                    <div key={agent.id} className="apple-list-item flex items-center gap-3 px-4 py-3">
                       <Chip size="sm" variant="flat" color={ROLE_COLOR[agent.role] ?? "default"} className="shrink-0">
                         {agent.role}
                       </Chip>
@@ -468,11 +468,11 @@ export default function LibraryPage() {
 
               {/* ── Table ── */}
               {viewMode === "table" && (
-                <div className="clay-card overflow-hidden">
+                <div className="apple-card overflow-hidden">
                 <Table
                   aria-label="Agents table"
                   removeWrapper
-                  classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+                  classNames={{ th: "apple-table-th", tr: "apple-list-item border-b border-divider last:border-b-0" }}
                 >
                   <TableHeader>
                     <TableColumn>NAME</TableColumn>
@@ -484,7 +484,7 @@ export default function LibraryPage() {
                   </TableHeader>
                   <TableBody>
                     {pagedAgents.map((agent) => (
-                      <TableRow key={agent.id} className="clay-list-item">
+                      <TableRow key={agent.id} className="apple-list-item">
                         <TableCell>
                           <div>
                             <p className="font-medium text-sm">{agent.name}</p>
@@ -582,7 +582,7 @@ export default function LibraryPage() {
               {viewMode === "grid" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {pagedMcps.map((mcp) => (
-                    <div key={mcp.id} className="flex flex-col gap-2 p-4 clay-card">
+                    <div key={mcp.id} className="flex flex-col gap-2 p-4 apple-card">
                       <div className="flex items-start gap-2 min-w-0">
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm truncate">{mcp.name}</p>
@@ -614,9 +614,9 @@ export default function LibraryPage() {
 
               {/* ── List ── */}
               {viewMode === "list" && (
-                <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+                <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
                   {pagedMcps.map((mcp) => (
-                    <div key={mcp.id} className="clay-list-item flex items-center gap-3 px-4 py-3">
+                    <div key={mcp.id} className="apple-list-item flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-sm block truncate">{mcp.name}</span>
                         {(mcp.command || mcp.url) && (
@@ -642,11 +642,11 @@ export default function LibraryPage() {
 
               {/* ── Table ── */}
               {viewMode === "table" && (
-                <div className="clay-card overflow-hidden">
+                <div className="apple-card overflow-hidden">
                 <Table
                   aria-label="MCP servers table"
                   removeWrapper
-                  classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+                  classNames={{ th: "apple-table-th", tr: "apple-list-item border-b border-divider last:border-b-0" }}
                 >
                   <TableHeader>
                     <TableColumn>NAME</TableColumn>
@@ -778,7 +778,7 @@ export default function LibraryPage() {
               {viewMode === "grid" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {pagedSkills.map((skill) => (
-                    <div key={skill.id} className="flex flex-col gap-2 p-4 clay-card">
+                    <div key={skill.id} className="flex flex-col gap-2 p-4 apple-card">
                       <p className="font-semibold text-sm truncate">{skill.name}</p>
                       {skill.description && (
                         <p className="text-xs text-default-500 line-clamp-2">{skill.description}</p>
@@ -814,9 +814,9 @@ export default function LibraryPage() {
 
               {/* ── List ── */}
               {viewMode === "list" && (
-                <div className="clay-card overflow-hidden flex flex-col divide-y divide-default-100/60">
+                <div className="apple-card overflow-hidden flex flex-col divide-y divide-default-100/60">
                   {pagedSkills.map((skill) => (
-                    <div key={skill.id} className="clay-list-item flex items-center gap-3 px-4 py-3">
+                    <div key={skill.id} className="apple-list-item flex items-center gap-3 px-4 py-3">
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-sm block truncate">{skill.name}</span>
                         {skill.description && (
@@ -840,11 +840,11 @@ export default function LibraryPage() {
 
               {/* ── Table ── */}
               {viewMode === "table" && (
-                <div className="clay-card overflow-hidden">
+                <div className="apple-card overflow-hidden">
                 <Table
                   aria-label="Skills table"
                   removeWrapper
-                  classNames={{ th: "clay-table-th", tr: "clay-list-item border-b border-divider last:border-b-0" }}
+                  classNames={{ th: "apple-table-th", tr: "apple-list-item border-b border-divider last:border-b-0" }}
                 >
                   <TableHeader>
                     <TableColumn>NAME</TableColumn>

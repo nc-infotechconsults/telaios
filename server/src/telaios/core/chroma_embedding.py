@@ -64,7 +64,7 @@ def _build_embedding_impl(config: EmbeddingConfig) -> Any:
 
     if provider == "openai":
         try:
-            import openai  # type: ignore[import-not-found]
+            import openai
         except ImportError:
             return _default_ef()
 

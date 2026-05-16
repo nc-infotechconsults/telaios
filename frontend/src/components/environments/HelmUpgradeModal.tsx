@@ -8,7 +8,7 @@ import {
   ModalBody,
   ModalFooter,
   Textarea,
-} from "@heroui/react";
+} from "../ui";
 import { upgradeHelmChart } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { HelmRelease } from "../../types";

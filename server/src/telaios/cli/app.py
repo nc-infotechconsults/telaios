@@ -22,6 +22,7 @@ Launch
 
 from __future__ import annotations
 
+import logging
 import traceback
 from typing import Any, ClassVar
 
@@ -45,6 +46,7 @@ from textual.widgets import (
 
 from telaios.core.fake_llm import FakeLLM
 from telaios.core.knowledge_source import (
+    DoclingSource,
     FileSource,
     GitHubSource,
     TextSource,
@@ -62,6 +64,8 @@ from telaios.core.types import (
     VectorStoreConfig,
 )
 
+logger = logging.getLogger(__name__)
+
 # ── Constants ────────────────────────────────────────────────────────────────
 
 _COLLECTION_NAME = "telaios-tui"
@@ -69,6 +73,7 @@ _COLLECTION_NAME = "telaios-tui"
 _SOURCE_TYPES: list[tuple[str, str]] = [
     ("text", "Paste text"),
     ("file", "Local file(s)"),
+    ("document", "PDF/DOCX (Docling)"),
     ("url", "Web URL"),
     ("github", "GitHub repo"),
 ]
@@ -373,6 +378,7 @@ class TelaiOSEval(App[None]):
         placeholders: dict[str, str] = {
             "text": "Paste your text / code here…",
             "file": "/path/to/file.md  or  /path/to/docs/  (directory)",
+            "document": "/path/to/report.pdf  or  /path/to/slides.pptx",
             "url": "https://example.com/article",
             "github": "https://github.com/owner/repo",
         }
@@ -409,6 +415,12 @@ class TelaiOSEval(App[None]):
 
     def _dispatch_ingest(self) -> None:
         source_type, source_value, gh_extra, gh_token = self._read_source_inputs()
+        logger.debug(
+            "Ingest: type=%s value=%s gh=%s",
+            source_type,
+            source_value[:80],
+            gh_extra,
+        )
         try:
             log: RichLog = self.query_one("#source-log", RichLog)
             stats_label: Static = self.query_one("#corpus-stats", Static)
@@ -445,6 +457,9 @@ class TelaiOSEval(App[None]):
                     source = FileSource(*paths, label=f"Files: {', '.join(paths)}")
                 case "url":
                     source = URLSource(source_value)
+                case "document":
+                    paths = [p.strip() for p in source_value.split(",")]
+                    source = DoclingSource(*paths, label=f"Docling: {', '.join(paths)}")
                 case "github":
                     branch = "main"
                     subpath = ""
@@ -482,6 +497,7 @@ class TelaiOSEval(App[None]):
                 f"[dim](press Tab to switch to a capability)[/dim]"
             )
         except Exception as exc:
+            logger.exception("Ingest failed")
             log.write(f"[red]Ingest error:[/red] {exc}")
             log.write(traceback.format_exc())
 
@@ -572,6 +588,7 @@ class TelaiOSEval(App[None]):
 
     def _dispatch_run(self, tab_id: str) -> None:
         provider, model, api_key, query = self._read_inputs(tab_id)
+        logger.debug("Run: tab=%s query=%s api=%s", tab_id, query[:80], bool(api_key))
         try:
             log: RichLog = self.query_one(f"#{tab_id}-log", RichLog)
         except NoMatches:
@@ -621,6 +638,7 @@ class TelaiOSEval(App[None]):
                 strat = strategy_map.get(tab_id, RagStrategy.SIMPLE)
                 await _run_pipeline(strat, query, rag, llm, log)
         except Exception as exc:
+            logger.exception("Run failed: tab=%s query=%s", tab_id, query[:80])
             log.write(f"[red]Error:[/red] {exc}")
             log.write(traceback.format_exc())
 
@@ -629,7 +647,21 @@ class TelaiOSEval(App[None]):
 
 
 def main() -> None:
-    """Launch the TUI."""
+    """Launch the TUI. Logs are written to ``tui.log`` in the current directory."""
+    import logging
+    from pathlib import Path
+
+    log_file = Path("tui.log")
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(str(log_file), mode="w"),
+            logging.StreamHandler(),  # also goes to stderr, visible via textual console
+        ],
+    )
+    logger = logging.getLogger("telaios")
+    logger.info("TUI starting — logs at %s", log_file.absolute())
     TelaiOSEval().run()
 
 

@@ -39,13 +39,13 @@ export default function Login() {
           </span>
         </div>
 
-        <div className="clay-card p-8">
-          <h1 className="text-lg font-semibold text-foreground mb-6">Sign in</h1>
+        <div className="apple-card p-8">
+          <h1 className="text-lg font-semibold text-foreground mb-6">Sign In</h1>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label htmlFor="email" className="block text-sm font-medium text-default-600">
-                Email
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-[13px] font-semibold text-default-500">
+                Email Address
               </label>
               <input
                 id="email"
@@ -54,13 +54,13 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="clay-input w-full px-3 py-2.5 text-foreground text-sm placeholder-default-400"
+                className="apple-input w-full px-3 py-2.5 text-foreground placeholder-default-400"
                 placeholder="you@example.com"
               />
             </div>
 
-            <div className="space-y-1">
-              <label htmlFor="password" className="block text-sm font-medium text-default-600">
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-[13px] font-semibold text-default-500">
                 Password
               </label>
               <input
@@ -70,7 +70,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="clay-input w-full px-3 py-2.5 text-foreground text-sm placeholder-default-400"
+                className="apple-input w-full px-3 py-2.5 text-foreground placeholder-default-400"
                 placeholder="••••••••"
               />
             </div>
@@ -84,9 +84,9 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="clay-btn w-full py-2.5 px-4 bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="apple-btn w-full h-[50px] bg-primary text-primary-foreground font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? "Signing In…" : "Sign In"}
             </button>
           </form>
         </div>

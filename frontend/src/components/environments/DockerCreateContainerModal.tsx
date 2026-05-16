@@ -9,7 +9,7 @@ import {
   ModalBody,
   ModalFooter,
   Textarea,
-} from "@heroui/react";
+} from "../ui";
 import { createDockerContainer } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerCreateContainerOptions, DockerPortMapping, DockerVolumeMount } from "../../types";

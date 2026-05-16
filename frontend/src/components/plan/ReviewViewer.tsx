@@ -1,4 +1,4 @@
-import { Chip } from "@heroui/react";
+import { Chip } from "../ui";
 
 type Severity = "error" | "warning" | "suggestion" | "praise";
 

@@ -8,7 +8,7 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-} from "@heroui/react";
+} from "../ui";
 import { createDockerNetwork } from "../../lib/api";
 import { toast } from "../../lib/toast";
 

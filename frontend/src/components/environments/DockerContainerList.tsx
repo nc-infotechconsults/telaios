@@ -16,7 +16,7 @@ import {
   TableCell,
   Tooltip,
   useDisclosure,
-} from "@heroui/react";
+} from "../ui";
 import {
   listDockerContainers,
   startDockerContainer,

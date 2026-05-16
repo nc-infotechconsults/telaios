@@ -1,4 +1,4 @@
-import { Chip, Button, Divider } from "@heroui/react";
+import { Chip, Button, Divider } from "../ui";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Plan, Task, AgentProfile, Repository } from "../../types";
 import { formatStatus } from "../../lib/statusLabels";

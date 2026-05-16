@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Select, SelectItem } from "@heroui/react";
+import { Button, Select, SelectItem } from "../ui";
 import type { K8sResource } from "../../types";
 import K8sResourceList from "./K8sResourceList";
 import K8sPVCFileBrowserModal from "./K8sPVCFileBrowserModal";

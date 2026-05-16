@@ -1,4 +1,4 @@
-import { Chip } from "@heroui/react";
+import { Chip } from "../ui";
 import type { Document } from "../../types";
 import FileTypeIcon from "./FileTypeIcon";
 

@@ -5,7 +5,7 @@ import {
   Select,
   SelectItem,
   Slider,
-} from "@heroui/react";
+} from "../ui";
 
 export interface LLMConfig {
   llm_provider: string;

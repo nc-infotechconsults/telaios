@@ -6,7 +6,7 @@ import {
   SelectItem,
   Slider,
   Textarea,
-} from "@heroui/react";
+} from "../ui";
 import { createLibraryAgent, updateLibraryAgent, getLlmProviders } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { AgentRole, InlineSkill, LibraryAgent, LlmProviderDefinition, McpServer } from "../../types";

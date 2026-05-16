@@ -14,7 +14,7 @@ import {
   Tab,
   Switch,
   Spinner,
-} from "@heroui/react";
+} from "../ui";
 import { createAgentProfile, updateAgentProfile, getAgentProfiles, discoverMcpTools, getLlmProviders } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { AgentProfile, McpServer, McpToolConfig, McpToolPermission, Skill, JsonSchemaProperty, LlmProviderDefinition } from "../../types";

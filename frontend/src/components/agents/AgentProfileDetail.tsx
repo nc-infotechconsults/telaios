@@ -1,4 +1,4 @@
-import { Chip, Code } from "@heroui/react";
+import { Chip, Code } from "../ui";
 import type { AgentProfile, McpServer, McpToolConfig, Skill } from "../../types";
 import { McpToolBody } from "../McpToolBody";
 
@@ -23,7 +23,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <h3 className="text-xs font-semibold uppercase tracking-wider text-default-400 mb-3">{title}</h3>
-      <div className="clay-card p-4 space-y-2">{children}</div>
+      <div className="apple-card p-4 space-y-2">{children}</div>
     </div>
   );
 }

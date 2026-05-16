@@ -7,7 +7,7 @@ import {
   ModalBody,
   ModalFooter,
   Spinner,
-} from "@heroui/react";
+} from "../ui";
 import { getDockerContainerStats } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerContainer, DockerContainerStats } from "../../types";

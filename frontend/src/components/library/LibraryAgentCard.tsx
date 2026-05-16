@@ -1,4 +1,4 @@
-import { Button, Chip, Tooltip } from "@heroui/react";
+import { Button, Chip, Tooltip } from "../ui";
 import type { AgentRole, LibraryAgent } from "../../types";
 
 const ROLE_COLOR: Record<
@@ -40,7 +40,7 @@ export default function LibraryAgentCard({
   const isBase = agent.is_base;
 
   return (
-    <div className="flex flex-col gap-3 p-4 clay-card transition-shadow">
+    <div className="flex flex-col gap-3 p-4 apple-card transition-shadow">
       {/* Header row */}
       <div className="flex items-start gap-2 min-w-0">
         <div className="flex-1 min-w-0">

@@ -471,7 +471,7 @@ def downgrade() -> None:
     op.drop_table('document_versions')
     op.drop_table('document_favorites')
     op.drop_table('document_comments')
-    op.drop_index('idx_document_chunks_embedding', table_name='document_chunks')
+    op.execute("DROP INDEX IF EXISTS idx_document_chunks_embedding")
     op.drop_table('document_chunks')
     op.drop_table('document_activities')
     op.drop_table('tasks')

@@ -1,307 +1,595 @@
 @import "tailwindcss";
 @config "../tailwind.config.cjs";
 
-/* Tailwind v4 does not scan node_modules automatically.
-   HeroUI stores all component class names in its theme package,
-   so we must explicitly source it to include interactive-state
-   utilities (data-[hover], data-[pressed], data-[focus-visible], …) */
-@source "../node_modules/@heroui/theme/dist";
-@source "../node_modules/@heroui/toast/dist";
+/* ============================================================
+   APPLE HIG DESIGN SYSTEM — Liquid Glass (macOS Tahoe / iOS 26)
+   Authentic San Francisco type, semantic colors, vibrancy
+   ============================================================ */
 
-/* ── ReactFlow dark mode overrides ─────────────────────────────────────────── */
+:root {
+  /* ── San Francisco system font stack ── */
+  --font-sf: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+             "Helvetica Neue", "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-sf-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono",
+                  "JetBrains Mono", "Fira Code", "Source Code Pro", monospace;
+  --font-ny: ui-serif, "New York", Georgia, "Times New Roman", serif;
 
-.dark .react-flow__controls {
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  /* ── Type Scale (Apple HIG) ── */
+  --text-large-title:  34px;
+  --text-title-1:      28px;
+  --text-title-2:      22px;
+  --text-title-3:      20px;
+  --text-headline:     17px;
+  --text-body:         17px;
+  --text-callout:      16px;
+  --text-subheadline:  15px;
+  --text-footnote:     13px;
+  --text-caption-1:    12px;
+  --text-caption-2:    11px;
+
+  /* ── 8pt Spacing Grid ── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* ── Corner Radii (Apple progressive scale) ── */
+  --radius-xs:   6px;   /* badges, chips */
+  --radius-sm:   8px;   /* small buttons, list rows */
+  --radius-md:   10px;  /* inputs */
+  --radius-card: 12px;  /* cards */
+  --radius-lg:   16px;  /* large cards */
+  --radius-xl:   20px;  /* sheets, modals */
+  --radius-2xl:  28px;  /* full-screen modals */
+  --radius-pill: 9999px;
+
+  /* ── Apple System Colors (Light) ── */
+  --color-blue:    #007AFF;
+  --color-green:   #34C759;
+  --color-red:     #FF3B30;
+  --color-orange:  #FF9500;
+  --color-yellow:  #FFCC00;
+  --color-purple:  #AF52DE;
+  --color-pink:    #FF2D55;
+  --color-teal:    #5AC8FA;
+  --color-indigo:  #5856D6;
+  --color-cyan:    #32ADE6;
+  --color-mint:    #00C7BE;
+  --color-brown:   #A2845E;
+
+  /* ── Semantic Backgrounds (Light) ── */
+  --bg-primary:           #ffffff;
+  --bg-secondary:         #f2f2f7;
+  --bg-tertiary:          #ffffff;
+  --bg-grouped-primary:   #f2f2f7;
+  --bg-grouped-secondary: #ffffff;
+  --bg-grouped-tertiary:  #f2f2f7;
+
+  /* ── Labels (Light) ── */
+  --label-primary:    rgba(0, 0, 0, 0.85);
+  --label-secondary:  rgba(60, 60, 67, 0.60);
+  --label-tertiary:   rgba(60, 60, 67, 0.30);
+  --label-quaternary: rgba(60, 60, 67, 0.18);
+
+  /* ── Fills (Light) — used for backgrounds of controls ── */
+  --fill-primary:    rgba(120, 120, 128, 0.20);
+  --fill-secondary:  rgba(120, 120, 128, 0.16);
+  --fill-tertiary:   rgba(118, 118, 128, 0.12);
+  --fill-quaternary: rgba(116, 116, 128, 0.08);
+
+  /* ── Separators ── */
+  --separator:        rgba(60, 60, 67, 0.18);
+  --separator-opaque: #c6c6c8;
+
+  /* ── Liquid Glass materials (Light) ── */
+  --glass-thin:    rgba(255, 255, 255, 0.55);
+  --glass-regular: rgba(255, 255, 255, 0.72);
+  --glass-thick:   rgba(255, 255, 255, 0.85);
+  --glass-chrome:  rgba(246, 246, 246, 0.72);
+  --glass-border:  rgba(255, 255, 255, 0.55);
+  --glass-blur:    saturate(180%) blur(20px);
+  --glass-blur-strong: saturate(180%) blur(40px);
+
+  /* ── Elevation shadows (Apple is *very* restrained with shadows) ── */
+  --shadow-xs:    0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm:    0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:    0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-xl:    0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 24px 64px rgba(0, 0, 0, 0.18);
+  --shadow-glass: inset 0 0.5px 0 rgba(255, 255, 255, 0.7),
+                  0 0 0 0.5px rgba(0, 0, 0, 0.06),
+                  0 12px 32px rgba(0, 0, 0, 0.10);
+
+  /* ── Motion ── */
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth:  cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-sharp:   cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   350ms;
+
+  /* ── Layout ── */
+  --width-narrow:  560px;
+  --width-content: 720px;
+  --width-wide:    1024px;
+  --width-max:     1280px;
+  --nav-height:    52px;
+  --tab-height:    83px;
+  --sidebar-width: 240px;
 }
 
-.dark .react-flow__controls-button {
-  background: #27272a;
-  border-bottom-color: #3f3f46;
-  fill: #e4e4e7;
-  color: #e4e4e7;
+/* ── Dark Mode (Apple HIG values) — only when no explicit class chosen ── */
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    --bg-primary:           #1c1c1e;
+    --bg-secondary:         #2c2c2e;
+    --bg-tertiary:          #3a3a3c;
+    --bg-grouped-primary:   #000000;
+    --bg-grouped-secondary: #1c1c1e;
+    --bg-grouped-tertiary:  #2c2c2e;
+
+    --label-primary:    rgba(255, 255, 255, 0.92);
+    --label-secondary:  rgba(235, 235, 245, 0.60);
+    --label-tertiary:   rgba(235, 235, 245, 0.30);
+    --label-quaternary: rgba(235, 235, 245, 0.18);
+
+    --fill-primary:    rgba(120, 120, 128, 0.36);
+    --fill-secondary:  rgba(120, 120, 128, 0.28);
+    --fill-tertiary:   rgba(118, 118, 128, 0.20);
+    --fill-quaternary: rgba(118, 118, 128, 0.14);
+
+    --separator:        rgba(84, 84, 88, 0.40);
+    --separator-opaque: #38383a;
+
+    --glass-thin:    rgba(28, 28, 30, 0.60);
+    --glass-regular: rgba(28, 28, 30, 0.75);
+    --glass-thick:   rgba(28, 28, 30, 0.88);
+    --glass-chrome:  rgba(40, 40, 42, 0.72);
+    --glass-border:  rgba(255, 255, 255, 0.10);
+
+    --color-blue:    #0A84FF;
+    --color-green:   #30D158;
+    --color-red:     #FF453A;
+    --color-orange:  #FF9F0A;
+    --color-yellow:  #FFD60A;
+    --color-purple:  #BF5AF2;
+    --color-pink:    #FF375F;
+    --color-teal:    #64D2FF;
+    --color-indigo:  #5E5CE6;
+    --color-cyan:    #64D2FF;
+
+    --shadow-xs:    0 0 0 0.5px rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-sm:    0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md:    0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.45);
+    --shadow-lg:    0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.55);
+    --shadow-xl:    0 0 0 0.5px rgba(255, 255, 255, 0.10), 0 24px 64px rgba(0, 0, 0, 0.65);
+    --shadow-glass: inset 0 0.5px 0 rgba(255, 255, 255, 0.08),
+                    0 0 0 0.5px rgba(0, 0, 0, 0.4),
+                    0 12px 32px rgba(0, 0, 0, 0.40);
+  }
 }
 
-.dark .react-flow__controls-button:hover {
-  background: #3f3f46;
+/* ── .dark class overrides (Tailwind class-based dark mode) ── */
+.dark {
+  --bg-primary:           #1c1c1e;
+  --bg-secondary:         #2c2c2e;
+  --bg-tertiary:          #3a3a3c;
+  --bg-grouped-primary:   #000000;
+  --bg-grouped-secondary: #1c1c1e;
+  --bg-grouped-tertiary:  #2c2c2e;
+
+  --label-primary:    rgba(255, 255, 255, 0.92);
+  --label-secondary:  rgba(235, 235, 245, 0.60);
+  --label-tertiary:   rgba(235, 235, 245, 0.30);
+  --label-quaternary: rgba(235, 235, 245, 0.18);
+
+  --fill-primary:    rgba(120, 120, 128, 0.36);
+  --fill-secondary:  rgba(120, 120, 128, 0.28);
+  --fill-tertiary:   rgba(118, 118, 128, 0.20);
+  --fill-quaternary: rgba(118, 118, 128, 0.14);
+
+  --separator:        rgba(84, 84, 88, 0.40);
+  --separator-opaque: #38383a;
+
+  --glass-thin:    rgba(28, 28, 30, 0.60);
+  --glass-regular: rgba(28, 28, 30, 0.75);
+  --glass-thick:   rgba(28, 28, 30, 0.88);
+  --glass-chrome:  rgba(40, 40, 42, 0.72);
+  --glass-border:  rgba(255, 255, 255, 0.10);
+
+  --color-blue:    #0A84FF;
+  --color-green:   #30D158;
+  --color-red:     #FF453A;
+  --color-orange:  #FF9F0A;
+  --color-yellow:  #FFD60A;
+  --color-purple:  #BF5AF2;
+  --color-pink:    #FF375F;
+  --color-teal:    #64D2FF;
+  --color-indigo:  #5E5CE6;
+
+  --shadow-xs:    0 0 0 0.5px rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-sm:    0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md:    0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg:    0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-xl:    0 0 0 0.5px rgba(255, 255, 255, 0.10), 0 24px 64px rgba(0, 0, 0, 0.65);
+  --shadow-glass: inset 0 0.5px 0 rgba(255, 255, 255, 0.08),
+                  0 0 0 0.5px rgba(0, 0, 0, 0.4),
+                  0 12px 32px rgba(0, 0, 0, 0.40);
 }
 
-.dark .react-flow__controls-button:disabled {
-  fill: #71717a;
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
-.dark .react-flow__minimap {
-  background: #18181b;
-  border: 1px solid #3f3f46;
-  border-radius: 8px;
+/* ============================================================
+   GLOBAL BASE
+   ============================================================ */
+
+html {
+  font-family: var(--font-sf);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "ss02", "cv11";
 }
 
-.dark .react-flow__background {
-  background-color: #09090b;
+body {
+  margin: 0;
+  color: var(--label-primary);
+  background-color: var(--bg-grouped-primary);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
-.dark .react-flow__background pattern circle,
-.dark .react-flow__background pattern rect {
-  fill: #3f3f46;
+html.dark body,
+html:not(.light) body {
+  background-color: var(--bg-grouped-primary);
 }
 
-.dark .react-flow__panel {
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
+html.dark body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 0% 0%,    rgba(10, 132, 255, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 0%,  rgba(191, 90, 242, 0.20), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, rgba(255, 159, 10, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 0% 100%,  rgba(48, 209, 88, 0.14),  transparent 55%);
 }
 
-/* ── Claymorphism design system ─────────────────────────────────────────────── */
-
-/* Card surface with depth shadow + subtle gradient */
-.clay-card {
-  border-radius: var(--heroui-radius-large, 20px);
-  background: linear-gradient(160deg, #ffffff 0%, #FEF4EF 100%);
-  border: 1px solid rgba(224, 123, 84, 0.12);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.06) inset,
-    0 8px 24px rgba(224, 123, 84, 0.18),
-    0 2px 6px rgba(0, 0, 0, 0.06);
+@media (prefers-color-scheme: dark) {
+  html:not(.light) body {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 0% 0%,    rgba(10, 132, 255, 0.22), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 0%,  rgba(191, 90, 242, 0.20), transparent 55%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, rgba(255, 159, 10, 0.14), transparent 55%),
+      radial-gradient(ellipse 60% 50% at 0% 100%,  rgba(48, 209, 88, 0.14),  transparent 55%);
+  }
 }
 
-.dark .clay-card {
-  background: linear-gradient(160deg, #2C201A 0%, #231C18 100%);
-  border-color: rgba(224, 123, 84, 0.15);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.3) inset,
-    0 8px 24px rgba(224, 123, 84, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.3);
+html.light body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 0% 0%,    rgba(0, 122, 255, 0.12), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 0%,  rgba(175, 82, 222, 0.12), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, rgba(255, 149, 0, 0.08),  transparent 55%),
+    radial-gradient(ellipse 60% 50% at 0% 100%,  rgba(48, 209, 88, 0.08),  transparent 55%);
 }
 
-/* Pill button with 3D push effect on :active */
-.clay-btn {
+/* Re-base interactive text size to 14px while keeping HIG semantics */
+body, button, input, textarea, select {
+  font-family: var(--font-sf);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(0, 122, 255, 0.25);
+}
+
+/* ── Scrollbars (macOS-style) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--label-quaternary) transparent;
+}
+*::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--label-quaternary);
   border-radius: 9999px;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.35) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.15) inset,
-    0 4px 12px rgba(224, 123, 84, 0.35);
-  transition: box-shadow 0.1s ease, transform 0.1s ease;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--label-tertiary);
+  background-clip: content-box;
+  border: 3px solid transparent;
 }
 
-.clay-btn:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.4) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.18) inset,
-    0 6px 16px rgba(224, 123, 84, 0.45);
+/* ── Focus ring ── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
-.clay-btn:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.2) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.1) inset,
-    0 2px 6px rgba(224, 123, 84, 0.25);
+/* ============================================================
+   LIQUID GLASS PRIMITIVES
+   ============================================================ */
+
+/* Nav bar / toolbar (top chrome) */
+.apple-nav-glass {
+  background-color: var(--glass-chrome);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 0.5px solid var(--separator);
 }
 
-/* Inflated text input with inner shadow */
-.clay-input {
-  border-radius: var(--heroui-radius-medium, 14px);
-  border: 1px solid rgba(224, 123, 84, 0.2);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.04) inset,
-    0 1px 0 rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.95);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+/* Sidebar (Finder/Notes-style vibrancy) */
+.apple-sidebar-glass {
+  background-color: var(--glass-thin);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border-right: 0.5px solid var(--separator);
 }
 
-.clay-input:focus {
+.dark .apple-sidebar-glass {
+  background-color: rgba(28, 28, 30, 0.55);
+}
+
+/* Standard glass surface — for popovers, sheets, floating panels */
+.apple-glass {
+  background-color: var(--glass-regular);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 0.5px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glass);
+}
+
+/* Floating glass card */
+.apple-glass-card {
+  background-color: var(--glass-regular);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 0.5px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glass);
+  transition: transform var(--duration-normal) var(--ease-smooth),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+}
+
+.apple-glass-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* ============================================================
+   CARDS, LISTS, SECTIONS
+   ============================================================ */
+
+.apple-card {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-normal) var(--ease-smooth),
+              transform var(--duration-normal) var(--ease-smooth);
+}
+
+.apple-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.dark .apple-card {
+  background-color: var(--bg-grouped-secondary);
+}
+
+/* Apple Settings-style grouped section */
+.apple-section { margin-bottom: var(--space-6); }
+
+.apple-section-header {
+  font: 600 var(--text-footnote) var(--font-sf);
+  color: var(--label-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 var(--space-4);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.apple-section-body {
+  background: var(--bg-primary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.dark .apple-section-body {
+  background: var(--bg-grouped-secondary);
+}
+
+.apple-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  border-bottom: 0.5px solid var(--separator);
+  gap: var(--space-3);
+}
+.apple-section-row:last-child { border-bottom: none; }
+
+.apple-list-item {
+  transition: background var(--duration-fast) var(--ease-smooth);
+}
+.apple-list-item:hover   { background: var(--fill-quaternary); }
+.apple-list-item:active  { background: var(--fill-tertiary); }
+
+/* ============================================================
+   CONTROLS
+   ============================================================ */
+
+/* Button base — Apple's pill/rounded-rect with proper press feedback */
+.apple-btn {
+  font-family: var(--font-sf);
+  font-weight: 590;       /* SF Pro medium */
+  letter-spacing: -0.01em;
+  border-radius: var(--radius-md);
+  transition: opacity var(--duration-fast) var(--ease-smooth),
+              transform var(--duration-fast) var(--ease-smooth),
+              background var(--duration-fast) var(--ease-smooth),
+              box-shadow var(--duration-fast) var(--ease-smooth);
+}
+.apple-btn:hover  { opacity: 0.92; }
+.apple-btn:active { transform: scale(0.96); opacity: 0.85; }
+.apple-btn:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Input — Apple's subtle fill, not bordered */
+.apple-input {
+  font-family: var(--font-sf);
+  border-radius: var(--radius-md);
+  border: 0.5px solid transparent;
+  background: var(--fill-tertiary);
+  color: var(--label-primary);
+  transition: border-color var(--duration-fast) var(--ease-smooth),
+              background var(--duration-fast) var(--ease-smooth),
+              box-shadow var(--duration-fast) var(--ease-smooth);
+}
+.apple-input::placeholder { color: var(--label-tertiary); }
+.apple-input:hover { background: var(--fill-secondary); }
+.apple-input:focus {
   outline: none;
-  border-color: rgba(224, 123, 84, 0.5);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.06) inset,
-    0 0 0 3px rgba(224, 123, 84, 0.12);
+  background: var(--bg-primary);
+  border-color: var(--color-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.20);
+}
+.dark .apple-input:focus {
+  background: var(--bg-secondary);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.30);
 }
 
-.dark .clay-input {
-  background: rgba(44, 32, 26, 0.9);
-  border-color: rgba(224, 123, 84, 0.2);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.25) inset,
-    0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.dark .clay-input:focus {
-  border-color: rgba(224, 123, 84, 0.5);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.3) inset,
-    0 0 0 3px rgba(224, 123, 84, 0.15);
-}
-
-/* Rounded tag/chip in pastel clay style */
-.clay-badge {
-  border-radius: 9999px;
-  padding: 0.2rem 0.65rem;
-  background: rgba(224, 123, 84, 0.12);
-  color: #cc5e35;
-  border: 1px solid rgba(224, 123, 84, 0.2);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.7) inset,
-    0 2px 4px rgba(224, 123, 84, 0.12);
-  font-weight: 500;
-  font-size: 0.75rem;
+/* Badge / chip */
+.apple-badge {
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font-size: var(--text-caption-1);
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  background: var(--fill-secondary);
+  color: var(--label-secondary);
 }
 
-.dark .clay-badge {
-  background: rgba(224, 123, 84, 0.15);
-  color: #EFA67D;
-  border-color: rgba(224, 123, 84, 0.25);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.05) inset,
-    0 2px 4px rgba(0, 0, 0, 0.2);
+/* Segmented control */
+.apple-toolbar {
+  background: var(--fill-tertiary);
+  border-radius: var(--radius-md);
+  padding: 2px;
 }
 
-/* Sidebar with warm clay surface */
-.clay-sidebar {
-  background: linear-gradient(180deg, #fefaf8 0%, #fdf6f0 100%);
-  box-shadow: 2px 0 16px rgba(224, 123, 84, 0.08), 1px 0 0 rgba(224, 123, 84, 0.1);
-  border-right: none !important;
-}
+/* Tabs underline */
+.apple-tab-bar { border-bottom-color: var(--separator) !important; }
 
-.dark .clay-sidebar {
-  background: linear-gradient(180deg, #231C18 0%, #1e1814 100%);
-  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.3), 1px 0 0 rgba(224, 123, 84, 0.08);
-}
-
-/* Clay-style header bar */
-.clay-header {
-  background: linear-gradient(90deg, #ffffff 0%, #fefaf8 100%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 2px 12px rgba(224, 123, 84, 0.1),
-    0 1px 0 rgba(224, 123, 84, 0.12);
-  border-bottom: none !important;
-}
-
-.dark .clay-header {
-  background: linear-gradient(90deg, #231C18 0%, #1e1814 100%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 2px 12px rgba(0, 0, 0, 0.25),
-    0 1px 0 rgba(224, 123, 84, 0.1);
-}
-
-/* Hover enhancement for clay cards */
-.clay-card {
-  transition: box-shadow 0.2s ease;
-}
-
-.clay-card:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.85) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.06) inset,
-    0 12px 32px rgba(224, 123, 84, 0.25),
-    0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.dark .clay-card:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.3) inset,
-    0 12px 32px rgba(224, 123, 84, 0.18),
-    0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-/* Compact pill toolbar (e.g., view mode toggle, pagination) */
-.clay-toolbar {
-  border-radius: var(--heroui-radius-medium, 12px);
-  background: linear-gradient(135deg, #ffffff 0%, #FEF4EF 100%);
-  border: 1px solid rgba(224, 123, 84, 0.15);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.05) inset,
-    0 3px 10px rgba(224, 123, 84, 0.12),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.dark .clay-toolbar {
-  background: linear-gradient(135deg, #2C201A 0%, #231C18 100%);
-  border-color: rgba(224, 123, 84, 0.15);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.05) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.2) inset,
-    0 3px 10px rgba(224, 123, 84, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Underline tab bar — warm tinted container */
-.clay-tab-bar {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(253, 246, 240, 0.8) 100%);
-  border-bottom-color: rgba(224, 123, 84, 0.18) !important;
-}
-
-.dark .clay-tab-bar {
-  background: linear-gradient(180deg, rgba(44, 32, 26, 0.5) 0%, rgba(30, 24, 20, 0.8) 100%);
-  border-bottom-color: rgba(224, 123, 84, 0.12) !important;
-}
-
-/* List item row with clay hover */
-.clay-list-item {
-  transition: background 0.15s ease;
-}
-
-.clay-list-item:hover {
-  background: rgba(224, 123, 84, 0.05);
-}
-
-.dark .clay-list-item:hover {
-  background: rgba(224, 123, 84, 0.08);
-}
-
-/* Table header cell — warm clay tint */
-.clay-table-th {
-  background: rgba(255, 255, 255, 0.65) !important;
-  border-bottom: 1px solid rgba(224, 123, 84, 0.12) !important;
-  font-size: 0.675rem !important;
+/* Table header */
+.apple-table-th {
+  background: var(--fill-quaternary) !important;
+  border-bottom: 0.5px solid var(--separator) !important;
+  font-size: var(--text-caption-1) !important;
   font-weight: 600 !important;
+  font-family: var(--font-sf) !important;
   text-transform: uppercase !important;
   letter-spacing: 0.06em !important;
+  color: var(--label-secondary) !important;
   padding-top: 10px !important;
   padding-bottom: 10px !important;
 }
 
-.dark .clay-table-th {
-  background: rgba(35, 28, 24, 0.65) !important;
+/* Chat bubbles */
+.apple-bubble-user {
+  background: var(--color-blue);
+  color: white;
+  box-shadow: var(--shadow-xs);
+}
+.apple-bubble-agent {
+  background: var(--bg-secondary);
+  color: var(--label-primary);
+  box-shadow: var(--shadow-xs);
+}
+.dark .apple-bubble-agent {
+  background: var(--bg-tertiary);
 }
 
-/* User chat bubble — clay depth on the primary-coloured bubble */
-.clay-bubble-user {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.25) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.15) inset,
-    0 4px 12px rgba(224, 123, 84, 0.3);
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
-.dark .clay-bubble-user {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.1) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.3) inset,
-    0 4px 12px rgba(224, 123, 84, 0.2);
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
 }
 
-/* Assistant chat bubble — warm clay surface */
-.clay-bubble-agent {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(253, 246, 240, 0.95) 100%);
-  border: 1px solid rgba(224, 123, 84, 0.1);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 3px 8px rgba(224, 123, 84, 0.1);
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-.dark .clay-bubble-agent {
-  background: linear-gradient(135deg, rgba(44, 32, 26, 0.85) 0%, rgba(35, 28, 24, 0.9) 100%);
-  border-color: rgba(224, 123, 84, 0.12);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 3px 8px rgba(0, 0, 0, 0.2);
+/* ============================================================
+   REACTFLOW THEME
+   ============================================================ */
+
+.react-flow__background {
+  background-color: transparent;
+}
+
+.dark .react-flow__controls {
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.dark .react-flow__controls-button {
+  background: var(--bg-secondary);
+  border-bottom-color: var(--separator);
+  fill: var(--label-secondary);
+  color: var(--label-secondary);
+}
+.dark .react-flow__controls-button:hover { background: var(--fill-tertiary); }
+.dark .react-flow__controls-button:disabled { fill: var(--label-tertiary); }
+.dark .react-flow__minimap {
+  background: var(--bg-primary);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius-sm);
+}
+.dark .react-flow__background pattern circle,
+.dark .react-flow__background pattern rect { fill: var(--fill-tertiary); }
+.dark .react-flow__panel {
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius-xs);
 }

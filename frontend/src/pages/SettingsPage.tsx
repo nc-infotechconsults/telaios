@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Button, Input, Select, SelectItem, Spinner, Switch } from "@heroui/react";
+import { Button, Input, Select, SelectItem, Spinner, Switch } from "../components/ui";
 import { getSettings, patchSettings } from "../lib/api";
 import type { AppSettings, CustomTheme, FontFamilyKey, RadiusStep, ShadowStep, ThemePreset } from "../types";
 import { toast } from "../lib/toast";

@@ -1,4 +1,4 @@
-import { Button, Input } from "@heroui/react";
+import { Button, Input } from "../ui";
 import type { SubAgentEntry } from "../../types";
 
 interface Props {

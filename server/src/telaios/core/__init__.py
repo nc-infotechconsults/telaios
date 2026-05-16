@@ -29,6 +29,7 @@ from telaios.core.factory import (
 from telaios.core.fake_llm import FakeLLM
 from telaios.core.graph_store import GraphStore
 from telaios.core.knowledge_source import (
+    DoclingSource,
     FileSource,
     GitHubSource,
     KnowledgeSource,
@@ -66,6 +67,7 @@ __all__ = [  # noqa: RUF022
     "FileSource",
     "URLSource",
     "GitHubSource",
+    "DoclingSource",
     # Strategy
     "StrategySelector",
     # Factory

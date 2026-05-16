@@ -9,7 +9,7 @@ import {
   ModalBody,
   ModalFooter,
   Spinner,
-} from "@heroui/react";
+} from "../ui";
 import { execDockerContainer } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerContainer, DockerExecResult } from "../../types";

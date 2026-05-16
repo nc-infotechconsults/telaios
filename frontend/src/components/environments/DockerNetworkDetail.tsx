@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Spinner } from "@heroui/react";
+import { Button, Spinner } from "../ui";
 import { inspectDockerNetwork } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerNetwork } from "../../types";

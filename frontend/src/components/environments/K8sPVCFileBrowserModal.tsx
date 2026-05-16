@@ -7,7 +7,7 @@ import {
   ModalBody,
   ModalFooter,
   Spinner,
-} from "@heroui/react";
+} from "../ui";
 import Editor from "@monaco-editor/react";
 import {
   listK8sPVCFiles,

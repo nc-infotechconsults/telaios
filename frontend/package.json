@@ -13,11 +13,9 @@
     "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@heroui/react": "^2.6.0",
+    "@heroui/toast": "^2.0.22",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
-    "@heroui/theme": "^2.4.26",
-    "@heroui/toast": "^2.0.22",
     "@monaco-editor/react": "^4.7.0",
     "@xyflow/react": "^12.3.0",
     "axios": "^1.15.0",

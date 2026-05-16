@@ -7,7 +7,7 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-} from "@heroui/react";
+} from "../ui";
 import { tagDockerImage } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerImage } from "../../types";

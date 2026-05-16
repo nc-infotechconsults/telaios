@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from "react";
-import { Button, Textarea } from "@heroui/react";
+import { Button, Textarea } from "../ui";
 
 interface Props {
   onSend: (content: string) => void;

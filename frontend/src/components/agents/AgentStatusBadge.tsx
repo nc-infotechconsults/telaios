@@ -19,7 +19,7 @@ export function AgentStatusBadge({ status }: AgentStatusBadgeProps) {
     : "!bg-warning/10 !text-warning !border-warning/20";
   const dotClass = isIdle ? "bg-success" : "bg-warning";
   return (
-    <span className={`clay-badge ${badgeClass}`}>
+    <span className={`apple-badge ${badgeClass}`}>
       <span className={`w-1.5 h-1.5 rounded-full inline-block mr-1.5 ${dotClass} animate-pulse`} />
       {isIdle ? "Idle" : "Busy"}
     </span>

@@ -16,7 +16,7 @@ import {
   TableCell,
   Tooltip,
   useDisclosure,
-} from "@heroui/react";
+} from "../ui";
 import { listDockerVolumes, removeDockerVolume, pruneDockerVolumes } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { DockerVolume } from "../../types";

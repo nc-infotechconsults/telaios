@@ -11,7 +11,7 @@ import {
   SelectItem,
   Spinner,
   Switch,
-} from "@heroui/react";
+} from "../ui";
 import { discoverMcpTools, listLibraryMCPs } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { LibraryMCP, McpServer, McpToolConfig, McpToolPermission } from "../../types";
