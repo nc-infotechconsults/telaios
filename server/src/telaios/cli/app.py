@@ -3,9 +3,9 @@ telaios.cli.app
 ---------------
 Textual TUI for evaluating TelaiOS RAG and agent capabilities.
 
-Each tab exercises one strategy or capability against an in-memory corpus
-(dry-run mode).  When the ``agents`` optional-dependency group is installed
-AND a valid API key is supplied, the TUI runs live LLM calls.
+Backed by Chroma vector store (ephemeral in-memory) for real semantic search.
+Dry-run uses FakeLLM; supplying an API key enables live LLM calls via the
+full RAG pipeline (RagManager → strategy → LLM).
 
 Layout
 ------
@@ -14,6 +14,10 @@ Layout
   │  Config (left) │ Output log (right)                         │
   └─────────────────────────────────────────────────────────────┘
   Footer  (q: quit  r: run  Tab: navigate)
+
+Launch
+------
+  uv run telaios-eval
 """
 
 from __future__ import annotations
@@ -40,22 +44,98 @@ from textual.widgets import (
     TabPane,
 )
 
-from telaios.cli.mock import InMemoryRetriever
+from telaios.core.fake_llm import FakeLLM
+from telaios.core.rag_manager import RagManager
 from telaios.core.types import (
     AgentInput,
+    EmbeddingConfig,
     LLMConfig,
     Message,
     MessageRole,
     RagConfig,
     RagStrategy,
+    RetrievalQuery,
+    VectorStoreConfig,
 )
+
+# ---------------------------------------------------------------------------
+# Sample corpus — pre-populated into Chroma at startup
+# ---------------------------------------------------------------------------
+
+_CORPUS: list[tuple[str, str]] = [
+    # (doc_id, content)
+    (
+        "doc-python",
+        "Python is a high-level, interpreted programming language created by Guido van Rossum "
+        "and first released in 1991. It emphasises code readability and uses significant indentation. "
+        "Python supports multiple programming paradigms including procedural, object-oriented, "
+        "and functional programming. Its comprehensive standard library is one of its greatest strengths.",
+    ),
+    (
+        "doc-rag",
+        "Retrieval-Augmented Generation (RAG) combines a retrieval component with a generative LLM. "
+        "A query is used to fetch relevant documents from a vector store, which are then provided as "
+        "context to the language model. Hybrid RAG combines dense vector search with sparse keyword "
+        "search (BM25). Results are merged using Reciprocal Rank Fusion (RRF), improving recall. "
+        "Corrective RAG (CRAG) grades retrieved documents for relevance. If documents score below "
+        "a threshold the query is rewritten or a web search fallback is triggered. "
+        "Self-RAG introduces reflection tokens to detect hallucinations and optionally regenerate.",
+    ),
+    (
+        "doc-agents",
+        "A ReAct agent interleaves reasoning steps (Thought) with tool invocations (Action) "
+        "in a loop until it reaches a final answer. LangGraph implements this via a cyclic state graph. "
+        "LangGraph checkpointing persists the agent's state between turns using "
+        "AsyncPostgresSaver or MemorySaver, enabling long-running multi-turn conversations "
+        "and human-in-the-loop interrupts.",
+    ),
+    (
+        "doc-code",
+        "Static analysis tools like ruff and mypy catch issues before runtime. "
+        "ruff combines linting and formatting in a single Rust-based tool; mypy enforces "
+        "type annotations with configurable strictness. "
+        "Security hardening for LLM applications includes input sanitisation to prevent "
+        "prompt injection, output validation to block PII leakage, and rate limiting to "
+        "resist denial-of-service attacks.",
+    ),
+    (
+        "doc-chroma",
+        "Chroma is an open-source vector database for AI applications. It supports "
+        "embeddings storage, metadata filtering, and similarity search. Chroma can run "
+        "in-memory (ephemeral client), with local persistence (PersistentClient), or "
+        "in client-server mode. It provides built-in embedding functions for OpenAI, "
+        "Cohere, Sentence Transformers, and more.",
+    ),
+    (
+        "doc-telaios",
+        "TelaiOS is an AI orchestration platform for senior software engineers. "
+        "It provides multi-agent workflows, RAG pipelines, and autonomous task execution. "
+        "The platform uses FastAPI for its web API layer, SQLAlchemy for database access, "
+        "and Chroma for vector storage. It follows a modular monolith architecture with "
+        "per-module Kubernetes scaling.",
+    ),
+]
+
+_COLLECTION_NAME = "telaios-tui"
+
+
+def _init_rag() -> RagManager:
+    """Create RagManager and pre-populate the Chroma collection."""
+    manager = RagManager(
+        vector_store=VectorStoreConfig(provider="chroma"),
+        embedding=EmbeddingConfig(provider="fastembed", model="BAAI/bge-small-en-v1.5"),
+    )
+    ids = [doc_id for doc_id, _ in _CORPUS]
+    texts = [content for _, content in _CORPUS]
+    manager.ingest(_COLLECTION_NAME, ids=ids, documents=texts)
+    return manager
+
 
 # ---------------------------------------------------------------------------
 # Capability descriptors
 # ---------------------------------------------------------------------------
 
 _CAPABILITIES: list[tuple[str, str, str]] = [
-    # (tab_id, display_name, description)
     (
         "simple_rag",
         "Simple RAG",
@@ -191,173 +271,164 @@ RichLog {
 
 
 # ---------------------------------------------------------------------------
-# Helper: dry-run pipeline steps
+# Helper: Chroma-backed pipeline steps
 # ---------------------------------------------------------------------------
 
 
 async def _dry_run_simple(
     query: str,
-    retriever: InMemoryRetriever,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    from telaios.core.types import RetrievalQuery
-
-    log.write("[bold cyan]── Simple RAG (dry-run) ──[/bold cyan]")
+    """Simple RAG: retrieve from Chroma, generate with FakeLLM."""
+    log.write("[bold cyan]── Simple RAG (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.02)
 
+    # Real Chroma retrieval
+    retriever = rag.create_retriever(_COLLECTION_NAME)
     result = await retriever.aretrieve(RetrievalQuery(text=query, top_k=3))
-    log.write(f"\n[bold]Retrieved {len(result.chunks)} chunks:[/bold]")
-    for i, (chunk, score) in enumerate(zip(result.chunks, result.scores, strict=True), 1):
-        log.write(f"  [{i}] (score={score:.2f}) {chunk.content[:120]}…")
-    await asyncio.sleep(0.05)
 
-    log.write("\n[bold green]LLM[/bold green] [dim](dry-run — no API key provided)[/dim]")
-    log.write(
-        "  Prompt would contain the above chunks as context.\n"
-        "  Supply an API key in the Config panel to run a live call.",
+    log.write(f"\n[bold]Chroma retrieved {len(result.chunks)} chunks:[/bold]")
+    for i, (chunk, score) in enumerate(zip(result.chunks, result.scores, strict=True), 1):
+        log.write(f"  [{i}] (score={score:.2f}) {chunk.content[:140]}…")
+    await asyncio.sleep(0.02)
+
+    # Generate via FakeLLM through the real strategy
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.SIMPLE, top_k=3)
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
     )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
 async def _dry_run_hybrid(
     query: str,
-    retriever: InMemoryRetriever,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
     from telaios.core.fusion import reciprocal_rank_fusion
-    from telaios.core.types import RetrievalQuery
 
-    log.write("[bold cyan]── Hybrid RAG (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── Hybrid RAG (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.02)
 
-    vec = await retriever.aretrieve(RetrievalQuery(text=query, top_k=5))
-    bm25 = await retriever.aretrieve(RetrievalQuery(text=query, top_k=5))  # same backend here
+    lc_retriever = rag.create_retriever(_COLLECTION_NAME)
+    vec = await lc_retriever.aretrieve(RetrievalQuery(text=query, top_k=5))
+    bm25 = await lc_retriever.aretrieve(RetrievalQuery(text=query, top_k=5))
 
     fused = reciprocal_rank_fusion([vec.chunks, bm25.chunks], k=60)
-    log.write(f"\n[bold]RRF fused {len(fused)} chunks:[/bold]")
-    for i, (chunk, _rrf_score) in enumerate(fused[:3], 1):
-        log.write(f"  [{i}] {chunk.content[:120]}…")
+    log.write(f"\n[bold]RRF fused {len(fused)} chunks (dense + sparse):[/bold]")
+    for i, (chunk, _rrf) in enumerate(fused[:3], 1):
+        log.write(f"  [{i}] {chunk.content[:140]}…")
 
-    log.write("\n[bold green]LLM[/bold green] [dim](dry-run)[/dim]")
-    log.write("  Supply an API key for a live call.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.HYBRID, top_k=3, extra={"rrf_k": 60})
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
 async def _dry_run_crag(
     query: str,
-    retriever: InMemoryRetriever,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    from telaios.core.types import RetrievalQuery
-
-    log.write("[bold cyan]── CRAG (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── CRAG (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.02)
 
-    result = await retriever.aretrieve(RetrievalQuery(text=query, top_k=3))
-    log.write(f"\n[bold]Step 1 — Retrieve ({len(result.chunks)} chunks)[/bold]")
-
-    log.write("\n[bold]Step 2 — Grade documents[/bold]  [dim](dry-run: simulated)[/dim]")
-    threshold = 0.6
-    for chunk, score in zip(result.chunks, result.scores, strict=True):
-        verdict = "[green]RELEVANT[/green]" if score >= threshold else "[red]IRRELEVANT[/red]"
-        log.write(f"  {verdict} score={score:.2f}  {chunk.content[:80]}…")
-
-    log.write("\n[bold]Step 3 — Generate[/bold]  [dim](dry-run)[/dim]")
-    log.write("  Supply an API key for a live call.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.CRAG, top_k=3, extra={"max_rewrite_attempts": 1})
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
 async def _dry_run_self_rag(
     query: str,
-    retriever: InMemoryRetriever,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    from telaios.core.types import RetrievalQuery
-
-    log.write("[bold cyan]── Self-RAG (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── Self-RAG (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.02)
 
-    result = await retriever.aretrieve(RetrievalQuery(text=query, top_k=3))
-    log.write(f"\n[bold]Step 1 — Retrieve ({len(result.chunks)} chunks)[/bold]")
-
-    log.write("\n[bold]Step 2 — Generate[/bold]  [dim](dry-run)[/dim]")
-    log.write("  ISREL tokens: [yellow]would grade each chunk for relevance[/yellow]")
-    log.write("  ISSUP tokens: [yellow]would check if generation is grounded[/yellow]")
-    log.write("  ISUSE tokens: [yellow]would check if answer is useful[/yellow]")
-
-    log.write("\n[bold]Step 3 — Reflect[/bold]  [dim](dry-run)[/dim]")
-    log.write("  Supply an API key to see live reflection and possible regeneration.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.SELF_RAG, top_k=3, extra={"max_regeneration_rounds": 1})
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
 async def _dry_run_agentic(
     query: str,
-    retriever: InMemoryRetriever,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    from telaios.core.types import RetrievalQuery
-
-    log.write("[bold cyan]── Agentic RAG (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── Agentic RAG (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.02)
 
-    log.write("\n[bold]Simulated agent loop (max 3 iterations)[/bold]")
-    for i in range(1, 3):
-        log.write(f"\n  [dim]Iteration {i}[/dim]")
-        log.write(f"    Thought: Do I have enough context to answer '{query}'?")
-        result = await retriever.aretrieve(RetrievalQuery(text=query, top_k=2))
-        log.write(f"    Action:  retrieve_docs(query='{query}')")
-        log.write(f"    Result:  {len(result.chunks)} chunks")
-        await asyncio.sleep(0.1)
-
-    log.write("\n  [bold green]Final Answer[/bold green]  [dim](dry-run)[/dim]")
-    log.write("  Supply an API key to run a real ReAct agent via LangGraph.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.AGENTIC, top_k=2, extra={"max_retrieval_rounds": 3})
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
 async def _dry_run_graph(
     query: str,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    log.write("[bold cyan]── Graph RAG (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── Graph RAG (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Query:[/dim] {query}")
-    await asyncio.sleep(0.05)
+    await asyncio.sleep(0.02)
 
-    log.write("\n[bold]Step 1 — Entity extraction[/bold]  [dim](dry-run)[/dim]")
-    log.write("  Entities: [Python, RAG, LangGraph, …]  (simulated)")
-
-    log.write("\n[bold]Step 2 — Graph traversal[/bold]  [dim](dry-run)[/dim]")
-    log.write("  Python → created_by → Guido van Rossum")
-    log.write("  RAG    → uses       → Vector Store")
-    log.write("  RAG    → uses       → LLM")
-
-    log.write("\n[bold]Step 3 — Context assembly → LLM[/bold]  [dim](dry-run)[/dim]")
-    log.write("  Supply a graph store (Neo4j / NetworkX) + API key for a live run.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.GRAPH, top_k=5)
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
 
 
 async def _dry_run_chat(
     query: str,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    log.write("[bold cyan]── Agent Chat (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── Agent Chat (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[bold]User:[/bold] {query}")
-    await asyncio.sleep(0.05)
 
-    log.write("\n[dim]Agent would:[/dim]")
-    log.write("  1. Route message through LangGraph ReAct graph")
-    log.write("  2. Decide whether to invoke tools")
-    log.write("  3. Stream text_chunk events back")
-    log.write("  4. Persist state via MemorySaver checkpoint")
-    log.write("\n[bold green]Assistant[/bold green] [dim](dry-run)[/dim]")
-    log.write("  Supply an API key to start a live agent conversation.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.AGENTIC, top_k=3)
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
+    )
+    log.write(f"\n[bold green]Assistant:[/bold green] {output.content}")
 
 
 async def _dry_run_code_review(
     code: str,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
-    log.write("[bold cyan]── Code Review (dry-run) ──[/bold cyan]")
+    log.write("[bold cyan]── Code Review (Chroma + FakeLLM) ──[/bold cyan]")
     log.write(f"[dim]Snippet ({len(code)} chars)[/dim]")
-    await asyncio.sleep(0.05)
 
     dimensions = [
         ("Correctness", "Does the code do what it claims?"),
@@ -368,13 +439,26 @@ async def _dry_run_code_review(
     ]
     log.write("\n[bold]Review dimensions:[/bold]")
     for name, desc in dimensions:
-        log.write(f"  [yellow]{name}[/yellow]: {desc}  [dim](dry-run)[/dim]")
+        log.write(f"  [yellow]{name}[/yellow]: {desc}")
 
-    log.write("\nSupply an API key to get a full agent-generated review.")
+    llm = FakeLLM()
+    config = RagConfig(strategy=RagStrategy.SIMPLE, top_k=2)
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)  # type: ignore[arg-type]
+    output = await pipeline.answer(
+        AgentInput(
+            messages=[
+                Message(
+                    role=MessageRole.HUMAN,
+                    content=f"Review this code:\n\n```\n{code}\n```",
+                )
+            ]
+        )
+    )
+    log.write(f"\n[bold green]Review:[/bold green] {output.content}")
 
 
 # ---------------------------------------------------------------------------
-# Live pipeline runner (requires agents extras)
+# Live pipeline runner (uses real LLM via RagManager)
 # ---------------------------------------------------------------------------
 
 
@@ -382,11 +466,12 @@ async def _live_run(
     capability: str,
     query: str,
     llm_cfg: LLMConfig,
+    rag: RagManager,
     log: RichLog,
 ) -> None:
+    """Run a live RAG strategy with a real LLM."""
     try:
         from telaios.core.factory import create_llm
-        from telaios.core.strategies.simple import SimpleRAG
     except ImportError:
         log.write(
             "[red]agents extras not installed.[/red]\nRun:  [bold]uv sync --extra agents[/bold]"
@@ -396,14 +481,25 @@ async def _live_run(
     log.write(f"[bold cyan]── {capability} (live) ──[/bold cyan]")
     log.write(f"[dim]Provider:[/dim] {llm_cfg.provider}  [dim]Model:[/dim] {llm_cfg.model}")
 
-    retriever = InMemoryRetriever()
+    strategy_map: dict[str, RagStrategy] = {
+        "simple_rag": RagStrategy.SIMPLE,
+        "hybrid_rag": RagStrategy.HYBRID,
+        "crag": RagStrategy.CRAG,
+        "self_rag": RagStrategy.SELF_RAG,
+        "agentic_rag": RagStrategy.AGENTIC,
+        "graph_rag": RagStrategy.GRAPH,
+        "agent_chat": RagStrategy.AGENTIC,
+        "code_review": RagStrategy.SIMPLE,
+    }
+    strat = strategy_map.get(capability, RagStrategy.SIMPLE)
+
     llm = create_llm(llm_cfg)
-    config = RagConfig(strategy=RagStrategy.SIMPLE)
-    strategy = SimpleRAG(retriever=retriever, llm=llm, config=config)
+    config = RagConfig(strategy=strat, top_k=3)
+    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)
 
     agent_input = AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
     try:
-        output = await strategy.answer(agent_input)
+        output = await pipeline.answer(agent_input)
         log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
     except Exception as exc:
         log.write(f"[red]Error:[/red] {exc}")
@@ -428,7 +524,7 @@ class _Config:
 
 
 class TelaiOSEval(App[None]):
-    """TelaiOS capability evaluator TUI."""
+    """TelaiOS capability evaluator TUI — Chroma-backed."""
 
     TITLE = "TelaiOS Capability Evaluator"
     CSS = CSS
@@ -441,7 +537,13 @@ class TelaiOSEval(App[None]):
     def __init__(self) -> None:
         super().__init__()
         self._cfg = _Config()
-        self._retriever = InMemoryRetriever()
+        self._rag: RagManager | None = None
+
+    def _get_rag(self) -> RagManager:
+        """Lazy-init the RagManager and pre-populate Chroma collection."""
+        if self._rag is None:
+            self._rag = _init_rag()
+        return self._rag
 
     # ── Layout ──────────────────────────────────────────────────────────────
 
@@ -547,11 +649,13 @@ class TelaiOSEval(App[None]):
             return
         log.clear()
 
+        rag = self._get_rag()
+
         if api_key:
             llm_cfg = LLMConfig(provider=provider, model=model, api_key=api_key)
-            self._run_live(tab_id, query, llm_cfg, log)
+            self._run_live(tab_id, query, llm_cfg, rag, log)
         else:
-            self._run_dry(tab_id, query, log)
+            self._run_dry(tab_id, query, rag, log)
 
     @work(exclusive=False)
     async def _run_live(
@@ -559,30 +663,31 @@ class TelaiOSEval(App[None]):
         tab_id: str,
         query: str,
         llm_cfg: LLMConfig,
+        rag: RagManager,
         log: RichLog,
     ) -> None:
-        await _live_run(tab_id.replace("_", " ").title(), query, llm_cfg, log)
+        await _live_run(tab_id.replace("_", " ").title(), query, llm_cfg, rag, log)
 
     @work(exclusive=False)
-    async def _run_dry(self, tab_id: str, query: str, log: RichLog) -> None:
+    async def _run_dry(self, tab_id: str, query: str, rag: RagManager, log: RichLog) -> None:
         try:
             match tab_id:
                 case "simple_rag":
-                    await _dry_run_simple(query, self._retriever, log)
+                    await _dry_run_simple(query, rag, log)
                 case "hybrid_rag":
-                    await _dry_run_hybrid(query, self._retriever, log)
+                    await _dry_run_hybrid(query, rag, log)
                 case "crag":
-                    await _dry_run_crag(query, self._retriever, log)
+                    await _dry_run_crag(query, rag, log)
                 case "self_rag":
-                    await _dry_run_self_rag(query, self._retriever, log)
+                    await _dry_run_self_rag(query, rag, log)
                 case "agentic_rag":
-                    await _dry_run_agentic(query, self._retriever, log)
+                    await _dry_run_agentic(query, rag, log)
                 case "graph_rag":
-                    await _dry_run_graph(query, log)
+                    await _dry_run_graph(query, rag, log)
                 case "agent_chat":
-                    await _dry_run_chat(query, log)
+                    await _dry_run_chat(query, rag, log)
                 case "code_review":
-                    await _dry_run_code_review(query, log)
+                    await _dry_run_code_review(query, rag, log)
                 case _:
                     log.write(f"[red]Unknown capability: {tab_id}[/red]")
         except Exception as exc:

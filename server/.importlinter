@@ -95,6 +95,7 @@ ignore_imports =
     telaios.modules.agent_profiles.router -> telaios.modules.agent_profiles.schemas
     telaios.modules.agent_profiles.router -> telaios.modules.agent_profiles.service
     telaios.modules.agent_profiles.service -> telaios.modules.agent_profiles.schemas
+    telaios.modules.agent_profiles.service -> telaios.modules.library.schemas
     telaios.modules.agent_profiles.service -> telaios.modules.library.service
     # plans module — intra
     telaios.modules.plans -> telaios.modules.plans.router
@@ -102,6 +103,7 @@ ignore_imports =
     telaios.modules.plans -> telaios.modules.plans.schemas
     telaios.modules.plans.router -> telaios.modules.plans.schemas
     telaios.modules.plans.router -> telaios.modules.plans.service
+    telaios.modules.plans.router -> telaios.modules.plans.repository
     telaios.modules.plans.service -> telaios.modules.plans.repository
     telaios.modules.plans.service -> telaios.modules.plans.schemas
     telaios.modules.plans.session -> telaios.modules.plans.parser
@@ -142,10 +144,15 @@ ignore_imports =
     telaios.modules.orchestration -> telaios.modules.orchestration.service
     # chat module — intra + cross-module via service layer
     telaios.modules.chat -> telaios.modules.chat.router
-    telaios.modules.chat -> telaios.modules.chat.service
     telaios.modules.chat.router -> telaios.modules.chat.service
+    telaios.modules.chat.router -> telaios.modules.messages.schemas
+    telaios.modules.chat.router -> telaios.modules.plans.service
+    telaios.modules.chat.service -> telaios.modules.messages.schemas
     telaios.modules.chat.service -> telaios.modules.messages.service
+    telaios.modules.chat.service -> telaios.modules.plans.prompts
+    telaios.modules.chat.service -> telaios.modules.plans.schemas
     telaios.modules.chat.service -> telaios.modules.plans.service
+    telaios.modules.chat.service -> telaios.modules.tasks.schemas
     telaios.modules.chat.service -> telaios.modules.tasks.service
     telaios.modules.chat.service -> telaios.modules.documents.service
     telaios.modules.chat.service -> telaios.modules.documents.chunks.service
@@ -291,7 +298,6 @@ ignore_imports =
      telaios.modules.internal.router -> telaios.modules.users.service
     # containers — uses containers.service which delegates to environments.service
     telaios.modules.containers -> telaios.modules.containers.router
-    telaios.modules.containers -> telaios.modules.containers.service
     telaios.modules.containers.router -> telaios.modules.containers.service
     telaios.modules.containers.service -> telaios.modules.environments.service
      # docker_shell — intra
