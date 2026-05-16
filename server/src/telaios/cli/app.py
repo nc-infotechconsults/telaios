@@ -1,18 +1,22 @@
 """
 telaios.cli.app
 ---------------
-Textual TUI for evaluating TelaiOS RAG and agent capabilities.
+Textual TUI for TelaiOS RAG, planning, and agent execution.
 
-Backed by Chroma vector store (ephemeral). Users select knowledge sources
-(text, files, URLs, GitHub repos); the system auto-selects the best RAG
-strategy based on corpus + query analysis.
+Workflow
+--------
+  1. Knowledge — scan a folder, analyze structure, ingest into Chroma,
+     auto-select best RAG strategy
+  2. Plan — agent reviews ingested knowledge, asks clarification questions,
+     generates a detailed plan with dependencies
+  3. Execute — schedule a team of agents to execute the plan
 
 Layout
 ------
   Header
-  ┌─ Sources ──┬─ Auto ──┬─ Simple ──┬─ Hybrid ──┬─ CRAG ──┬─ Self ──┬─ Agentic ──┬─ Graph ──┬─ Chat ──┬─ Review ──┐
-  │  Config (left) │ Output log (right)                                                       │
-  └───────────────────────────────────────────────────────────────────────────────────────────┘
+  ┌─ Knowledge ──┬─ Plan ──┬─ Execute ──┬─ Activity Log ──────────────┐
+  │  Config (left) │ Output log (right)                               │
+  └────────────────────────────────────────────────────────────────────┘
   Footer  (q: quit  r: run  Tab: navigate)
 
 Launch
@@ -22,8 +26,11 @@ Launch
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import traceback
+from pathlib import Path
 from typing import Any, ClassVar
 
 from textual import on, work
@@ -56,11 +63,11 @@ from telaios.core.rag_manager import RagManager
 from telaios.core.types import (
     AgentInput,
     EmbeddingConfig,
-    LLMConfig,
     Message,
     MessageRole,
     RagConfig,
     RagStrategy,
+    RetrievalQuery,
     VectorStoreConfig,
 )
 
@@ -69,85 +76,25 @@ logger = logging.getLogger(__name__)
 # ── Constants ────────────────────────────────────────────────────────────────
 
 _COLLECTION_NAME = "telaios-tui"
+_PLAN_COLLECTION = "telaios-plans"
 
 _SOURCE_TYPES: list[tuple[str, str]] = [
+    ("folder", "Local folder (auto-scan)"),
     ("text", "Paste text"),
-    ("file", "Local file(s)"),
+    ("file", "Single file"),
     ("document", "PDF/DOCX (Docling)"),
     ("url", "Web URL"),
     ("github", "GitHub repo"),
 ]
 
-_PROVIDER_OPTIONS: list[tuple[str, str]] = [
-    ("openai", "OpenAI"),
-    ("anthropic", "Anthropic"),
-]
-
-_MODEL_OPTIONS: dict[str, list[tuple[str, str]]] = {
-    "openai": [
-        ("gpt-4o-mini", "gpt-4o-mini"),
-        ("gpt-4o", "gpt-4o"),
-        ("o3-mini", "o3-mini"),
-    ],
-    "anthropic": [
-        ("claude-3-5-haiku-20241022", "claude-3-5-haiku"),
-        ("claude-3-5-sonnet-20241022", "claude-3-5-sonnet"),
-        ("claude-opus-4-5", "claude-opus-4-5"),
-    ],
-}
-
-_CAPABILITIES: list[tuple[str, str, str]] = [
-    (
-        "auto_rag",
-        "Auto",
-        "System picks the best RAG strategy automatically "
-        "based on corpus analysis and query intent.",
-    ),
-    (
-        "simple_rag",
-        "Simple RAG",
-        "Retrieve → Prepend context → LLM answer. One-shot: no rewriting, no reflection.",
-    ),
-    (
-        "hybrid_rag",
-        "Hybrid RAG",
-        "Dense + sparse retrieval → RRF fusion → LLM. "
-        "Best for mixed content types and domain-specific vocabulary.",
-    ),
-    (
-        "crag",
-        "CRAG",
-        "Corrective RAG: grade documents → rewrite query or "
-        "web-search fallback → LLM. Rejects irrelevant chunks.",
-    ),
-    (
-        "self_rag",
-        "Self-RAG",
-        "Self-Reflective RAG: reflect on hallucination "
-        "→ regenerate if needed. Grounding-aware generation.",
-    ),
-    (
-        "agentic_rag",
-        "Agentic RAG",
-        "Agent loop decides when and what to retrieve "
-        "across multiple hops. Powered by LangGraph ReAct graph.",
-    ),
-    (
-        "graph_rag",
-        "Graph RAG",
-        "Knowledge-graph traversal for structured relational context. Uses GraphStore abstraction.",
-    ),
-    (
-        "agent_chat",
-        "Agent Chat",
-        "Freeform multi-turn ReAct agent with tool calls. Checkpointed via LangGraph MemorySaver.",
-    ),
-    (
-        "code_review",
-        "Code Review",
-        "Agent-based code review across five "
-        "dimensions: correctness, readability, architecture, security, performance.",
-    ),
+_PROFILES: list[tuple[str, str]] = [
+    ("auto", "Auto — system picks best strategy"),
+    ("simple", "Simple RAG — one-shot retrieve → answer"),
+    ("hybrid", "Hybrid RAG — dense + sparse → RRF fusion"),
+    ("crag", "CRAG — grade → rewrite → fallback"),
+    ("self_rag", "Self-RAG — reflect → regenerate"),
+    ("agentic", "Agentic RAG — multi-hop retrieval"),
+    ("graph", "Graph RAG — knowledge graph traversal"),
 ]
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
@@ -159,10 +106,6 @@ Screen {
 
 #main-tabs {
     height: 1fr;
-}
-
-.cap-pane {
-    padding: 0 1;
 }
 
 .split {
@@ -218,124 +161,131 @@ RichLog {
 }
 """
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Plan data model ──────────────────────────────────────────────────────────
+
+
+class PlanStep:
+    """A single step in an execution plan."""
+
+    def __init__(
+        self,
+        step_id: str,
+        title: str,
+        description: str,
+        agent: str,
+        depends_on: list[str] | None = None,
+        estimated_tokens: int = 0,
+    ) -> None:
+        self.step_id = step_id
+        self.title = title
+        self.description = description
+        self.agent = agent
+        self.depends_on = depends_on or []
+        self.estimated_tokens = estimated_tokens
+        self.status = "pending"  # pending | running | done | failed
+
+    def __repr__(self) -> str:
+        deps = f" (after {', '.join(self.depends_on)})" if self.depends_on else ""
+        return f"[{self.step_id}] {self.title} → {self.agent}{deps}"
+
+
+class ExecutionPlan:
+    """A plan generated by the planning agent."""
+
+    def __init__(self, objective: str = "") -> None:
+        self.objective = objective
+        self.steps: list[PlanStep] = []
+        self.clarification_questions: list[str] = []
+        self.clarification_answers: dict[str, str] = {}
+
+    def add_step(self, **kwargs: Any) -> PlanStep:
+        step = PlanStep(**kwargs)
+        self.steps.append(step)
+        return step
+
+    @property
+    def ready_steps(self) -> list[PlanStep]:
+        """Steps whose dependencies are all done."""
+        done_ids = {s.step_id for s in self.steps if s.status == "done"}
+        return [
+            s
+            for s in self.steps
+            if s.status == "pending" and all(d in done_ids for d in s.depends_on)
+        ]
+
+
+# ── RagManager factory ──────────────────────────────────────────────────────
 
 
 def _init_rag() -> RagManager:
-    """Create RagManager with ephemeral Chroma + fastembed."""
     return RagManager(
         vector_store=VectorStoreConfig(provider="chroma"),
         embedding=EmbeddingConfig(provider="fastembed", model="BAAI/bge-small-en-v1.5"),
     )
 
 
-async def _run_pipeline(
-    strategy: RagStrategy,
-    query: str,
-    rag: RagManager,
-    llm: Any,
-    log: RichLog,
-    top_k: int = 3,
-    extra: dict[str, Any] | None = None,
-) -> None:
-    """Execute a RAG pipeline and write results to the log."""
-
-    config = RagConfig(strategy=strategy, top_k=top_k, extra=extra or {})
-    pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)
-
-    log.write(f"[bold cyan]── {strategy.value.upper()} ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-
-    output = await pipeline.answer(
-        AgentInput(messages=[Message(role=MessageRole.HUMAN, content=query)])
-    )
-    log.write(f"\n[bold green]Answer:[/bold green] {output.content}")
-
-
-async def _run_auto(
-    query: str,
-    rag: RagManager,
-    llm: Any,
-    log: RichLog,
-    corpus_stats: dict[str, Any] | None = None,
-) -> None:
-    """Auto-select strategy and run."""
-    from telaios.core.strategy_selector import StrategySelector
-
-    selector = StrategySelector()
-    qp = selector.analyze_query(query)
-    cp = selector.analyze_corpus(corpus_stats or {})
-
-    strategy, reason = selector.select(cp, qp)
-
-    log.write("[bold cyan]── Auto Strategy Selection ──[/bold cyan]")
-    log.write(f"[dim]Query:[/dim] {query}")
-    log.write(f"\n[bold]Corpus:[/bold] {cp.document_count} docs, {cp.total_chars} chars")
-    log.write(f"[bold]Strategy:[/bold] [yellow]{strategy.value}[/yellow]")
-    log.write(f"[bold]Reason:[/bold] [dim]{reason}[/dim]")
-    log.write("")
-
-    await _run_pipeline(strategy, query, rag, llm, log, extra={"auto_selected": True})
-
-
-# ── Config state ─────────────────────────────────────────────────────────────
-
-
-class _Config:
-    source_type: str = "text"
-    source_value: str = ""
-    provider: str = "openai"
-    model: str = "gpt-4o-mini"
-    api_key: str = ""
-    query: str = "What is RAG and how does it work?"
-
-
 # ── TUI App ──────────────────────────────────────────────────────────────────
 
 
 class TelaiOSEval(App[None]):
-    """TelaiOS capability evaluator TUI."""
+    """TelaiOS RAG + Planning + Execution TUI."""
 
-    TITLE = "TelaiOS Capability Evaluator"
+    TITLE = "TelaiOS — Knowledge · Plan · Execute"
     CSS = CSS
-    BINDINGS: ClassVar[list[Binding]] = [  # type: ignore[assignment]
+    BINDINGS: ClassVar = [
         Binding("q", "quit", "Quit"),
         Binding("r", "run", "Run"),
-        Binding("i", "ingest", "Ingest"),
         Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
     def __init__(self) -> None:
         super().__init__()
-        self._cfg = _Config()
         self._rag: RagManager | None = None
+        self._plan: ExecutionPlan | None = None
         self._corpus_stats: dict[str, Any] | None = None
+        self._activity_log: list[str] = []
 
     def _get_rag(self) -> RagManager:
         if self._rag is None:
             self._rag = _init_rag()
         return self._rag
 
+    def _log(self, text: str) -> None:  # type: ignore[override]
+        """Append to activity log and push to any visible log widgets."""
+        import datetime
+
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        entry = f"[{ts}] {text}"
+        self._activity_log.append(entry)
+        # Push to activity log tab if visible
+        try:
+            log: RichLog = self.query_one("#activity-log", RichLog)
+            log.write(entry)
+        except NoMatches:
+            pass
+
     # ── Layout ──────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with TabbedContent(id="main-tabs"):
-            # Tab 0: Sources (ingest knowledge)
-            with TabPane("Sources", id="sources"):
-                yield from self._compose_sources_pane()
-            # Tabs 1+: Capabilities
-            for tab_id, name, desc in _CAPABILITIES:
-                with TabPane(name, id=tab_id):
-                    yield from self._compose_cap_pane(tab_id, desc)
+            with TabPane("Knowledge", id="knowledge"):
+                yield from self._compose_knowledge_pane()
+            with TabPane("Plan", id="plan"):
+                yield from self._compose_plan_pane()
+            with TabPane("Execute", id="execute"):
+                yield from self._compose_execute_pane()
+            with TabPane("Activity Log", id="activity_log"):
+                yield from self._compose_activity_log_pane()
         yield Footer()
 
-    # ── Sources tab ─────────────────────────────────────────────────────
+    # ── Knowledge tab ───────────────────────────────────────────────────
 
-    def _compose_sources_pane(self) -> ComposeResult:
+    def _compose_knowledge_pane(self) -> ComposeResult:
         yield Static(
-            "Select a knowledge source type and click Ingest [i]. "
-            "The system extracts, embeds, and stores documents in Chroma.",
+            "[bold]1. Knowledge[/bold]\n"
+            "Select a folder to scan. The system analyzes file types, estimates "
+            "corpus size, and recommends the best RAG strategy.",
             classes="desc-block",
         )
         with Horizontal(classes="split"):
@@ -343,57 +293,49 @@ class TelaiOSEval(App[None]):
                 yield Label("Source type")
                 yield Select(
                     options=[(label, val) for val, label in _SOURCE_TYPES],
-                    value="text",
-                    id="source-type",
+                    value="folder",
+                    id="knowledge-source-type",
                 )
-                yield Label("Source value")
+                yield Label("Folder path / source value")
                 yield Input(
-                    placeholder="Paste text, file path, URL, or GitHub URL…",
-                    id="source-value",
+                    placeholder="/path/to/docs/  or  paste text / URL / GitHub URL",
+                    id="knowledge-source-value",
                 )
-                yield Label("GitHub branch (subpath)")
-                yield Input(
-                    placeholder="main  or  main src/",
-                    id="source-github-extra",
+                yield Label("RAG profile")
+                yield Select(
+                    options=[(label, val) for val, label in _PROFILES],
+                    value="auto",
+                    id="knowledge-rag-profile",
                 )
-                yield Label("GitHub token (optional)")
-                yield Input(
-                    placeholder="ghp_… or leave blank",
-                    password=True,
-                    id="source-github-token",
+                yield Button(
+                    "Scan & Ingest [r]", variant="primary", classes="run-btn", id="knowledge-run"
                 )
-                yield Button("Ingest [i]", variant="primary", classes="run-btn", id="source-ingest")
                 yield Static("", id="corpus-stats")
             with Vertical(classes="output-panel"):
-                yield RichLog(highlight=True, markup=True, id="source-log")
+                yield RichLog(highlight=True, markup=True, id="knowledge-log")
 
-    @on(Select.Changed, "#source-type")
-    def _on_source_type_changed(self, event: Select.Changed) -> None:
-        """Update placeholder when source type changes."""
+    @on(Select.Changed, "#knowledge-source-type")
+    def _on_knowledge_type_changed(self, event: Select.Changed) -> None:
         val = str(event.value)
         try:
-            inp: Input = self.query_one("#source-value", Input)
+            inp: Input = self.query_one("#knowledge-source-value", Input)
         except NoMatches:
             return
         placeholders: dict[str, str] = {
+            "folder": "/path/to/docs/  (scans recursively)",
             "text": "Paste your text / code here…",
-            "file": "/path/to/file.md  or  /path/to/docs/  (directory)",
-            "document": "/path/to/report.pdf  or  /path/to/slides.pptx",
+            "file": "/path/to/file.md",
+            "document": "/path/to/report.pdf",
             "url": "https://example.com/article",
             "github": "https://github.com/owner/repo",
         }
         inp.placeholder = placeholders.get(val, inp.placeholder)
 
-    @on(Button.Pressed, "#source-ingest")
-    def _on_ingest_pressed(self, event: Button.Pressed) -> None:
-        self._dispatch_ingest()
+    @on(Button.Pressed, "#knowledge-run")
+    def _on_knowledge_run(self, event: Button.Pressed) -> None:
+        self._dispatch_knowledge_run()
 
-    def action_ingest(self) -> None:
-        self._dispatch_ingest()
-
-    def _read_source_inputs(self) -> tuple[str, str, str, str]:
-        """Return (source_type, source_value, github_extra, github_token)."""
-
+    def _read_knowledge_inputs(self) -> tuple[str, str, str]:
         def _val(wid: str, default: str = "") -> str:
             try:
                 w = self.query_one(f"#{wid}")
@@ -407,240 +349,561 @@ class TelaiOSEval(App[None]):
             return default
 
         return (
-            _val("source-type", "text"),
-            _val("source-value", ""),
-            _val("source-github-extra", "main"),
-            _val("source-github-token", ""),
+            _val("knowledge-source-type", "folder"),
+            _val("knowledge-source-value", ""),
+            _val("knowledge-rag-profile", "auto"),
         )
 
-    def _dispatch_ingest(self) -> None:
-        source_type, source_value, gh_extra, gh_token = self._read_source_inputs()
-        logger.debug(
-            "Ingest: type=%s value=%s gh=%s",
-            source_type,
-            source_value[:80],
-            gh_extra,
-        )
+    def _dispatch_knowledge_run(self) -> None:
+        source_type, source_value, profile = self._read_knowledge_inputs()
         try:
-            log: RichLog = self.query_one("#source-log", RichLog)
-            stats_label: Static = self.query_one("#corpus-stats", Static)
+            log: RichLog = self.query_one("#knowledge-log", RichLog)
         except NoMatches:
             return
-
         log.clear()
         if not source_value.strip():
             log.write("[red]Please enter a source value.[/red]")
             return
-
-        self._run_ingest(source_type, source_value, gh_extra, gh_token, log, stats_label)
+        self._run_knowledge_ingest(source_type, source_value, profile, log)
 
     @work(exclusive=False)
-    async def _run_ingest(
+    async def _run_knowledge_ingest(
         self,
         source_type: str,
         source_value: str,
-        gh_extra: str,
-        gh_token: str,
+        profile: str,
         log: RichLog,
-        stats_label: Static,
     ) -> None:
         rag = self._get_rag()
-        log.write(f"[bold]Ingesting from [yellow]{source_type}[/yellow]:[/bold] {source_value}")
+        self._log(f"Knowledge ingest: type={source_type} value={source_value[:80]}")
+        log.write(f"[bold]Scanning [yellow]{source_type}[/yellow]:[/bold] {source_value}")
 
         try:
             source: Any
             match source_type:
+                case "folder":
+                    folder = Path(source_value)
+                    if not folder.is_dir():  # noqa: ASYNC240
+                        log.write("[red]Folder not found: {source_value}[/red]")
+                        return
+                    # Scan folder structure
+                    files = list(folder.rglob("*"))  # noqa: ASYNC240
+                    text_files = [f for f in files if f.is_file() and _is_text_file(f)]
+                    doc_files = [f for f in files if f.is_file() and _is_docling_file(f)]
+                    log.write("\n[bold]Scan results:[/bold]")
+                    log.write(f"  Total files: {len(files)}")
+                    log.write(f"  Text files: {len(text_files)} (.py, .md, .json, .yaml, …)")
+                    log.write(f"  Documents: {len(doc_files)} (.pdf, .docx, .pptx, .xlsx)")
+
+                    # Ingest text files
+                    if text_files:
+                        log.write(f"\n[bold]Ingesting {len(text_files)} text files…[/bold]")
+                        paths = [str(f) for f in text_files]
+                        source = FileSource(*paths, label=f"Folder: {folder.name}")
+                        stats = await rag.ingest_from_source(
+                            source, collection_name=_COLLECTION_NAME
+                        )
+                        self._corpus_stats = stats
+
+                    # Ingest documents via Docling
+                    if doc_files:
+                        log.write(
+                            f"\n[bold]Ingesting {len(doc_files)} documents via Docling…[/bold]"
+                        )
+                        paths = [str(f) for f in doc_files]
+                        source = DoclingSource(*paths, label=f"Docs: {folder.name}")
+                        doc_stats = await rag.ingest_from_source(
+                            source, collection_name=_COLLECTION_NAME
+                        )
+                        if self._corpus_stats:
+                            self._corpus_stats["document_count"] += doc_stats.get(
+                                "document_count", 0
+                            )
+                            self._corpus_stats["total_chars"] += doc_stats.get("total_chars", 0)
+                        else:
+                            self._corpus_stats = doc_stats
+
+                    # Analyze corpus
+                    if self._corpus_stats:
+                        self._show_corpus_analysis(log, self._corpus_stats, profile)
+
                 case "text":
                     source = TextSource(source_value, title="user-input")
+                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
+                    self._corpus_stats = stats
+                    self._show_corpus_analysis(log, stats, profile)
+
                 case "file":
-                    paths = [p.strip() for p in source_value.split(",")]
-                    source = FileSource(*paths, label=f"Files: {', '.join(paths)}")
+                    source = FileSource(source_value, label=f"File: {source_value}")
+                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
+                    self._corpus_stats = stats
+                    self._show_corpus_analysis(log, stats, profile)
+
+                case "document":
+                    source = DoclingSource(source_value, label=f"Doc: {source_value}")
+                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
+                    self._corpus_stats = stats
+                    self._show_corpus_analysis(log, stats, profile)
+
                 case "url":
                     source = URLSource(source_value)
-                case "document":
-                    paths = [p.strip() for p in source_value.split(",")]
-                    source = DoclingSource(*paths, label=f"Docling: {', '.join(paths)}")
+                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
+                    self._corpus_stats = stats
+                    self._show_corpus_analysis(log, stats, profile)
+
                 case "github":
-                    branch = "main"
-                    subpath = ""
-                    parts = gh_extra.split(maxsplit=1) if gh_extra else []
-                    if parts:
-                        branch = parts[0]
-                        subpath = parts[1] if len(parts) > 1 else ""
-                    source = GitHubSource(
-                        source_value, branch=branch, subpath=subpath, token=gh_token or None
-                    )
+                    source = GitHubSource(source_value, label=f"GitHub: {source_value}")
+                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
+                    self._corpus_stats = stats
+                    self._show_corpus_analysis(log, stats, profile)
+
                 case _:
                     log.write(f"[red]Unknown source type: {source_type}[/red]")
-                    return
 
-            stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
-            self._corpus_stats = stats
-
-            doc_count = stats.get("document_count", 0)
-            total_chars = stats.get("total_chars", 0)
-            code_ratio = stats.get("code_ratio", 0)
-            types = stats.get("source_types", [])
-
-            log.write(f"\n[bold green]Ingested {doc_count} document(s)[/bold green]")
-            log.write(f"  Total chars: {total_chars:,}")
-            log.write(f"  Source types: {', '.join(types) or 'none'}")
-            if code_ratio > 0:
-                log.write(f"  Code ratio: {code_ratio:.0%}")
-            log.write(f"  Collection: [bold]{_COLLECTION_NAME}[/bold]")
-            log.write(
-                "\n[dim]Ready — switch to a capability tab and press [bold]r[/bold] to run.[/dim]"
-            )
-
-            stats_label.update(
-                f"Corpus: {doc_count} docs, {total_chars:,} chars  "
-                f"[dim](press Tab to switch to a capability)[/dim]"
-            )
         except Exception as exc:
+            self._log(f"Ingest error: {exc}")
             logger.exception("Ingest failed")
             log.write(f"[red]Ingest error:[/red] {exc}")
-            log.write(traceback.format_exc())
+            log.write(f"[dim]{traceback.format_exc()}[/dim]")
 
-    # ── Capability tabs ─────────────────────────────────────────────────
+    def _show_corpus_analysis(
+        self,
+        log: RichLog,
+        stats: dict[str, Any],
+        profile: str,
+    ) -> None:
+        """Show corpus stats and recommended RAG strategy."""
+        from telaios.core.strategy_selector import StrategySelector
 
-    def _compose_cap_pane(self, tab_id: str, desc: str) -> ComposeResult:
-        yield Static(desc, classes="desc-block")
-        with Horizontal(classes="split"):
-            with Vertical(classes="config-panel"):
-                yield Label("Provider")
-                yield Select(
-                    options=[(label, val) for val, label in _PROVIDER_OPTIONS],
-                    value="openai",
-                    id=f"{tab_id}-provider",
-                )
-                yield Label("Model")
-                yield Select(
-                    options=[(label, val) for val, label in _MODEL_OPTIONS["openai"]],
-                    value="gpt-4o-mini",
-                    id=f"{tab_id}-model",
-                )
-                yield Label("API Key  (optional)")
-                yield Input(
-                    placeholder="sk-… or leave blank for FakeLLM",
-                    password=True,
-                    id=f"{tab_id}-apikey",
-                )
-                yield Label("Query")
-                yield Input(
-                    value=self._cfg.query,
-                    placeholder="Enter query…",
-                    id=f"{tab_id}-query",
-                )
-                yield Button("Run [r]", variant="primary", classes="run-btn", id=f"{tab_id}-run")
-            with Vertical(classes="output-panel"):
-                yield RichLog(highlight=True, markup=True, id=f"{tab_id}-log")
+        doc_count = stats.get("document_count", 0)
+        total_chars = stats.get("total_chars", 0)
+        code_ratio = stats.get("code_ratio", 0)
+        types = stats.get("source_types", [])
 
-    # ── Events ──────────────────────────────────────────────────────────
+        log.write(f"\n[bold green]Ingested {doc_count} document(s)[/bold green]")
+        log.write(f"  Total chars: {total_chars:,}")
+        log.write(f"  Source types: {', '.join(types) or 'none'}")
+        if code_ratio > 0:
+            log.write(f"  Code ratio: {code_ratio:.0%}")
 
-    @on(Select.Changed)
-    def _on_select_changed(self, event: Select.Changed) -> None:
-        widget_id: str = event.select.id or ""
-        if not widget_id.endswith("-provider"):
-            return
-        tab_id = widget_id[: -len("-provider")]
-        provider = str(event.value)
-        models = _MODEL_OPTIONS.get(provider, _MODEL_OPTIONS["openai"])
+        # Auto strategy recommendation
+        selector = StrategySelector()
+        cp = selector.analyze_corpus(stats)
+        qp = selector.analyze_query("Analyze this corpus")
+        strategy, reason = selector.select(cp, qp)
+
+        log.write("\n[bold cyan]Recommended strategy:[/bold cyan]")
+        log.write(f"  [yellow]{strategy.value}[/yellow]")
+        log.write(f"  [dim]{reason}[/dim]")
+
+        if profile != "auto":
+            log.write(f"\n[dim]User override: {profile}[/dim]")
+
         try:
-            model_select: Select[str] = self.query_one(f"#{tab_id}-model", Select)
-            model_select.set_options([(label, val) for label, val in models])
+            stats_label: Static = self.query_one("#corpus-stats", Static)
+            stats_label.update(
+                f"Corpus: {doc_count} docs, {total_chars:,} chars  "
+                f"Strategy: {strategy.value}  "
+                f"[dim](Tab → Plan)[/dim]"
+            )
         except NoMatches:
             pass
 
-    @on(Button.Pressed)
-    def _on_run_pressed(self, event: Button.Pressed) -> None:
-        btn_id: str = event.button.id or ""
-        if not btn_id.endswith("-run"):
-            return
-        tab_id = btn_id[: -len("-run")]
-        self._dispatch_run(tab_id)
+        self._log(f"Corpus ready: {doc_count} docs, strategy={strategy.value}")
+        log.write("\n[dim]Ready — switch to Plan tab to generate a plan.[/dim]")
 
-    def action_run(self) -> None:
-        active = self.query_one(TabbedContent).active
-        if active:
-            self._dispatch_run(active)
+    # ── Plan tab ────────────────────────────────────────────────────────
 
-    # ── Run dispatch ────────────────────────────────────────────────────
-
-    def _read_inputs(self, tab_id: str) -> tuple[str, str, str, str]:
-        def _val(widget_id: str, default: str = "") -> str:
-            try:
-                w = self.query_one(f"#{widget_id}")
-                if isinstance(w, Input):
-                    return w.value or default
-                if isinstance(w, Select):
-                    v = w.value
-                    return str(v) if v is not None else default
-            except NoMatches:
-                pass
-            return default
-
-        return (
-            _val(f"{tab_id}-provider", "openai"),
-            _val(f"{tab_id}-model", "gpt-4o-mini"),
-            _val(f"{tab_id}-apikey", ""),
-            _val(f"{tab_id}-query", "What is RAG?"),
+    def _compose_plan_pane(self) -> ComposeResult:
+        yield Static(
+            "[bold]2. Plan[/bold]\n"
+            "The planning agent reviews the ingested knowledge, asks clarification "
+            "questions if needed, and generates a detailed plan with dependencies.",
+            classes="desc-block",
         )
+        with Horizontal(classes="split"):
+            with Vertical(classes="config-panel"):
+                yield Label("Objective")
+                yield Input(
+                    placeholder="What do you want to build or analyze?",
+                    id="plan-objective",
+                )
+                yield Button(
+                    "Generate Plan [r]", variant="primary", classes="run-btn", id="plan-run"
+                )
+            with Vertical(classes="output-panel"):
+                yield RichLog(highlight=True, markup=True, id="plan-log")
 
-    def _dispatch_run(self, tab_id: str) -> None:
-        provider, model, api_key, query = self._read_inputs(tab_id)
-        logger.debug("Run: tab=%s query=%s api=%s", tab_id, query[:80], bool(api_key))
+    @on(Button.Pressed, "#plan-run")
+    def _on_plan_run(self, event: Button.Pressed) -> None:
+        self._dispatch_plan_run()
+
+    def _dispatch_plan_run(self) -> None:
         try:
-            log: RichLog = self.query_one(f"#{tab_id}-log", RichLog)
+            log: RichLog = self.query_one("#plan-log", RichLog)
         except NoMatches:
             return
         log.clear()
-
-        rag = self._get_rag()
-        llm = self._build_llm(api_key, provider, model)
-
-        self._run(tab_id, query, rag, llm, log)
-
-    def _build_llm(self, api_key: str, provider: str, model: str) -> Any:
-        """Build LLM: FakeLLM for dry-run, real LLM if API key provided."""
-        if not api_key:
-            return FakeLLM()
-
-        try:
-            from telaios.core.factory import create_llm
-
-            return create_llm(LLMConfig(provider=provider, model=model, api_key=api_key))
-        except Exception:
-            return FakeLLM()
+        objective = ""
+        with contextlib.suppress(NoMatches):
+            objective = self.query_one("#plan-objective", Input).value or ""
+        if not objective.strip():
+            log.write("[red]Please enter an objective.[/red]")
+            return
+        self._run_plan_generation(objective, log)
 
     @work(exclusive=False)
-    async def _run(
+    async def _run_plan_generation(self, objective: str, log: RichLog) -> None:
+        self._log(f"Plan generation: objective={objective[:80]}")
+        log.write(f"[bold]Planning agent reviewing corpus for:[/bold] {objective}")
+
+        self._get_rag()
+        if not self._corpus_stats:
+            log.write("[yellow]No corpus ingested yet. Switch to Knowledge tab first.[/yellow]")
+            return
+
+        # Step 1: Review corpus
+        log.write("\n[bold cyan]── Step 1: Corpus Review ──[/bold cyan]")
+        stats = self._corpus_stats
+        doc_count = stats.get("document_count", 0)
+        types = stats.get("source_types", [])
+        code_ratio = stats.get("code_ratio", 0)
+
+        log.write(f"  Documents: {doc_count}")
+        log.write(f"  Types: {', '.join(types)}")
+        log.write(f"  Code-heavy: {'Yes' if code_ratio > 0.4 else 'No'} ({code_ratio:.0%})")
+        await asyncio.sleep(0.3)
+
+        # Step 2: Agent asks clarification questions
+        log.write("\n[bold cyan]── Step 2: Clarification Questions ──[/bold cyan]")
+        questions = self._generate_clarification_questions(objective, stats)
+        if questions:
+            for i, q in enumerate(questions, 1):
+                log.write(f"  [yellow]Q{i}:[/yellow] {q}")
+                await asyncio.sleep(0.2)
+            log.write("\n[dim]Using default answers for now (TUI mode).[/dim]")
+        else:
+            log.write("  [green]No clarification needed — corpus is sufficient.[/green]")
+        await asyncio.sleep(0.3)
+
+        # Step 3: Generate plan
+        log.write("\n[bold cyan]── Step 3: Plan Generation ──[/bold cyan]")
+        plan = self._generate_plan(objective, stats)
+        self._plan = plan
+
+        log.write(f"\n[bold]Plan: {plan.objective}[/bold]")
+        log.write(f"  Steps: {len(plan.steps)}")
+        log.write("")
+
+        for step in plan.steps:
+            deps = f" (after {', '.join(step.depends_on)})" if step.depends_on else ""
+            log.write(f"  [bold]{step.step_id}[/bold] {step.title}")
+            log.write(f"    Agent: {step.agent}")
+            log.write(f"    {step.description}")
+            if deps:
+                log.write(f"    Dependencies:{deps}")
+            log.write("")
+
+        log.write("[bold green]Plan ready — switch to Execute tab to run.[/bold green]")
+        self._log(f"Plan generated: {len(plan.steps)} steps")
+
+    def _generate_clarification_questions(self, objective: str, stats: dict[str, Any]) -> list[str]:
+        """Generate clarification questions based on corpus and objective."""
+        questions: list[str] = []
+        doc_count = stats.get("document_count", 0)
+        types = stats.get("source_types", [])
+        code_ratio = stats.get("code_ratio", 0)
+
+        if "code" in types and "text" in types:
+            questions.append(
+                "The corpus contains both code and documentation. "
+                "Should the plan prioritize code analysis or documentation review?"
+            )
+        if doc_count > 20:
+            questions.append(
+                f"With {doc_count} documents, should the plan process them "
+                "in batches or all at once?"
+            )
+        if code_ratio > 0.4:
+            questions.append(
+                "The corpus is code-heavy. Should the agent focus on "
+                "architecture analysis, code review, or feature extraction?"
+            )
+        if "web" in types:
+            questions.append(
+                "Web content was ingested. Should it be treated as "
+                "reference material or primary source?"
+            )
+        return questions
+
+    def _generate_plan(self, objective: str, stats: dict[str, Any]) -> ExecutionPlan:
+        """Generate an execution plan based on objective and corpus."""
+        plan = ExecutionPlan(objective=objective)
+        types = stats.get("source_types", [])
+        code_ratio = stats.get("code_ratio", 0)
+
+        # Phase 1: Analysis
+        plan.add_step(
+            step_id="A1",
+            title="Corpus Analysis",
+            description=f"Analyze {stats.get('document_count', 0)} documents "
+            f"({', '.join(types)}). Extract key concepts, relationships, and gaps.",
+            agent="Analyst Agent",
+            depends_on=[],
+        )
+
+        # Phase 2: Planning
+        plan.add_step(
+            step_id="P1",
+            title="Architecture Design",
+            description="Design system architecture based on corpus analysis. "
+            "Identify components, interfaces, and data flow.",
+            agent="Architect Agent",
+            depends_on=["A1"],
+        )
+
+        # Phase 3: Implementation (conditional on code-heavy corpus)
+        if code_ratio > 0.3 or "code" in types:
+            plan.add_step(
+                step_id="I1",
+                title="Code Implementation",
+                description="Implement core components following the architecture design. "
+                "Write tests and documentation.",
+                agent="Developer Agent",
+                depends_on=["P1"],
+            )
+            plan.add_step(
+                step_id="I2",
+                title="Integration & Testing",
+                description="Integrate components and run integration tests. "
+                "Fix issues and verify functionality.",
+                agent="QA Agent",
+                depends_on=["I1"],
+            )
+        else:
+            plan.add_step(
+                step_id="D1",
+                title="Documentation Generation",
+                description="Generate structured documentation from corpus analysis. "
+                "Include summaries, diagrams, and reference materials.",
+                agent="Writer Agent",
+                depends_on=["P1"],
+            )
+
+        # Phase 4: Review
+        plan.add_step(
+            step_id="R1",
+            title="Final Review",
+            description="Review all outputs for accuracy, completeness, and consistency. "
+            "Generate final report.",
+            agent="Reviewer Agent",
+            depends_on=["I2"] if (code_ratio > 0.3 or "code" in types) else ["D1"],
+        )
+
+        return plan
+
+    # ── Execute tab ─────────────────────────────────────────────────────
+
+    def _compose_execute_pane(self) -> ComposeResult:
+        yield Static(
+            "[bold]3. Execute[/bold]\n"
+            "Schedule a team of agents to execute the generated plan. "
+            "Each step runs when its dependencies are complete.",
+            classes="desc-block",
+        )
+        with Horizontal(classes="split"):
+            with Vertical(classes="config-panel"):
+                yield Label("Execution mode")
+                yield Select(
+                    options=[
+                        ("Sequential — one step at a time", "sequential"),
+                        ("Parallel — run independent steps together", "parallel"),
+                    ],
+                    value="sequential",
+                    id="execute-mode",
+                )
+                yield Button(
+                    "Execute Plan [r]", variant="primary", classes="run-btn", id="execute-run"
+                )
+            with Vertical(classes="output-panel"):
+                yield RichLog(highlight=True, markup=True, id="execute-log")
+
+    @on(Button.Pressed, "#execute-run")
+    def _on_execute_run(self, event: Button.Pressed) -> None:
+        self._dispatch_execute_run()
+
+    def _dispatch_execute_run(self) -> None:
+        try:
+            log: RichLog = self.query_one("#execute-log", RichLog)
+        except NoMatches:
+            return
+        log.clear()
+        if not self._plan:
+            log.write("[red]No plan generated yet. Switch to Plan tab first.[/red]")
+            return
+        mode = "sequential"
+        with contextlib.suppress(NoMatches):
+            mode = str(self.query_one("#execute-mode", Select).value)
+        self._run_plan_execution(mode, log)
+
+    @work(exclusive=False)
+    async def _run_plan_execution(self, mode: str, log: RichLog) -> None:
+        self._log(f"Plan execution: mode={mode}")
+        plan = self._plan
+        if not plan:
+            return
+
+        log.write(f"[bold]Executing plan:[/bold] {plan.objective}")
+        log.write(f"  Mode: {mode}")
+        log.write(f"  Steps: {len(plan.steps)}")
+        log.write("")
+
+        rag = self._get_rag()
+        llm = FakeLLM()
+
+        completed = 0
+        max_iterations = len(plan.steps) * 3  # safety limit
+        iteration = 0
+
+        while completed < len(plan.steps) and iteration < max_iterations:
+            iteration += 1
+            ready = plan.ready_steps
+            if not ready:
+                log.write("[yellow]No steps ready — possible dependency cycle.[/yellow]")
+                break
+
+            if mode == "parallel":
+                # Run all ready steps in parallel
+                tasks = [self._execute_step(step, rag, llm, log) for step in ready]
+                await asyncio.gather(*tasks)
+                completed += len(ready)
+            else:
+                # Run one step at a time
+                step = ready[0]
+                await self._execute_step(step, rag, llm, log)
+                completed += 1
+
+            await asyncio.sleep(0.2)
+
+        # Summary
+        log.write(
+            f"\n[bold green]Execution complete: {completed}/{len(plan.steps)} steps done[/bold green]"
+        )
+        for step in plan.steps:
+            status_color = {
+                "done": "green",
+                "failed": "red",
+                "running": "yellow",
+                "pending": "dim",
+            }.get(step.status, "dim")
+            log.write(
+                f"  [{status_color}]{step.status}[/{status_color}] {step.step_id}: {step.title}"
+            )
+
+        self._log(f"Execution complete: {completed}/{len(plan.steps)} steps")
+
+    async def _execute_step(
         self,
-        tab_id: str,
-        query: str,
+        step: PlanStep,
         rag: RagManager,
         llm: Any,
         log: RichLog,
     ) -> None:
-        strategy_map: dict[str, RagStrategy] = {
-            "simple_rag": RagStrategy.SIMPLE,
-            "hybrid_rag": RagStrategy.HYBRID,
-            "crag": RagStrategy.CRAG,
-            "self_rag": RagStrategy.SELF_RAG,
-            "agentic_rag": RagStrategy.AGENTIC,
-            "graph_rag": RagStrategy.GRAPH,
-            "agent_chat": RagStrategy.AGENTIC,
-            "code_review": RagStrategy.SIMPLE,
-        }
-        try:
-            if tab_id == "auto_rag":
-                await _run_auto(query, rag, llm, log, self._corpus_stats)
-            else:
-                strat = strategy_map.get(tab_id, RagStrategy.SIMPLE)
-                await _run_pipeline(strat, query, rag, llm, log)
-        except Exception as exc:
-            logger.exception("Run failed: tab=%s query=%s", tab_id, query[:80])
-            log.write(f"[red]Error:[/red] {exc}")
-            log.write(traceback.format_exc())
+        """Execute a single plan step."""
+        step.status = "running"
+        self._log(f"Starting step {step.step_id}: {step.title} (agent={step.agent})")
+        log.write(f"\n[bold cyan]── [{step.step_id}] {step.title} ──[/bold cyan]")
+        log.write(f"  Agent: {step.agent}")
+        log.write(f"  {step.description}")
+
+        # Query corpus for context
+        retriever = rag.create_retriever(_COLLECTION_NAME)
+        query_text = f"{step.title}: {step.description}"
+        result = retriever.retrieve(RetrievalQuery(text=query_text, top_k=3))
+
+        if result.chunks:
+            log.write(f"\n  [dim]Retrieved {len(result.chunks)} relevant chunks:[/dim]")
+            for i, chunk in enumerate(result.chunks[:2], 1):
+                log.write(f"    [{i}] {chunk.content[:120]}…")
+
+        # Generate step output via LLM
+        config = RagConfig(strategy=RagStrategy.SIMPLE, top_k=3)
+        pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)
+        output = await pipeline.answer(
+            AgentInput(
+                messages=[
+                    Message(
+                        role=MessageRole.SYSTEM,
+                        content=f"You are a {step.agent}. Execute this step:\n{step.description}",
+                    ),
+                    Message(role=MessageRole.HUMAN, content=query_text),
+                ]
+            )
+        )
+
+        log.write(f"\n  [bold green]Output:[/bold green] {output.content[:300]}…")
+        step.status = "done"
+        self._log(f"Step {step.step_id} completed")
+
+    # ── Activity Log tab ────────────────────────────────────────────────
+
+    def _compose_activity_log_pane(self) -> ComposeResult:
+        yield Static(
+            "[bold]Activity Log[/bold]\nReal-time log of all actions across all tabs.",
+            classes="desc-block",
+        )
+        with Vertical(classes="output-panel"):
+            log = RichLog(highlight=True, markup=True, id="activity-log")
+            for entry in self._activity_log:
+                log.write(entry)
+            yield log
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _is_text_file(path: Path) -> bool:
+    text_extensions = {
+        ".py",
+        ".md",
+        ".txt",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".cfg",
+        ".ini",
+        ".env",
+        ".sh",
+        ".bash",
+        ".zsh",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".css",
+        ".html",
+        ".htm",
+        ".xml",
+        ".svg",
+        ".csv",
+        ".sql",
+        ".rst",
+        ".tex",
+        ".conf",
+        ".Makefile",
+        ".dockerfile",
+    }
+    return path.suffix.lower() in text_extensions or path.name.lower() in {
+        "makefile",
+        "dockerfile",
+        "jenkinsfile",
+        "vagrantfile",
+    }
+
+
+def _is_docling_file(path: Path) -> bool:
+    return path.suffix.lower() in {".pdf", ".docx", ".pptx", ".xlsx"}
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -648,7 +911,6 @@ class TelaiOSEval(App[None]):
 
 def main() -> None:
     """Launch the TUI. Logs are written to ``tui.log`` in the current directory."""
-    import logging
     from pathlib import Path
 
     log_file = Path("tui.log")
@@ -657,10 +919,9 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
             logging.FileHandler(str(log_file), mode="w"),
-            logging.StreamHandler(),  # also goes to stderr, visible via textual console
+            logging.StreamHandler(),
         ],
     )
-    logger = logging.getLogger("telaios")
     logger.info("TUI starting — logs at %s", log_file.absolute())
     TelaiOSEval().run()
 

@@ -33,6 +33,7 @@ dependencies = [
     # LangChain Chroma integration — wraps Chroma as a LangChain vectorstore
     # Source: https://python.langchain.com/docs/integrations/vectorstores/chroma
     "langchain-chroma>=0.2",
+    "ocrmac>=1.0.1",
 ]
 
 [project.optional-dependencies]

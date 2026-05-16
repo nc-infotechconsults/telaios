@@ -480,5 +480,6 @@ class DoclingSource(KnowledgeSource):
                 )
             except Exception as exc:
                 logger.error("DoclingSource: failed to convert %s: %s", path.name, exc)
+                raise RuntimeError(f"Docling failed to convert {path.name}: {exc}") from exc
 
         return docs
