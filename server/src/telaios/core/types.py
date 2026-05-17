@@ -33,15 +33,13 @@ class LLMConfig(BaseModel):
     """Configuration for an LLM provider and model."""
 
     provider: str
-    model: str
-    api_key: str = ""
+    model_name: str
+    api_key: str = "change-me"
     base_url: str | None = None
     temperature: float | None = None
     max_tokens: int | None = None
-    top_p: float | None = None
-    frequency_penalty: float | None = None
-    presence_penalty: float | None = None
-    timeout: int = 30
+    timeout: int | None = None
+    max_retries: int = 3
 
 
 # ── Messages ──────────────────────────────────────────────────────────────────
