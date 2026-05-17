@@ -49,6 +49,7 @@ from telaios.modules.health import health_router
 from telaios.modules.internal import internal_router
 from telaios.modules.library import library_router
 from telaios.modules.messages import messages_router
+from telaios.modules.planner import planner_router
 from telaios.modules.plans import plan_router, project_plans_router
 from telaios.modules.projects import agents_router, members_router, projects_router
 from telaios.modules.repositories import repositories_router
@@ -106,6 +107,7 @@ _MODULES: dict[str, list[APIRouter]] = {
     "internal": [internal_router],
     "containers": [containers_router],
     "docker_shell": [docker_shell_router],
+    "planner": [planner_router],
 }
 
 

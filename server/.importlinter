@@ -301,4 +301,10 @@ ignore_imports =
     telaios.modules.containers.router -> telaios.modules.containers.service
     telaios.modules.containers.service -> telaios.modules.environments.service
      # docker_shell — intra
-     telaios.modules.docker_shell -> telaios.modules.docker_shell.router
+      telaios.modules.docker_shell -> telaios.modules.docker_shell.router
+    # planner module — intra (agent/tools live in core; only router+service+schemas here)
+    telaios.modules.planner -> telaios.modules.planner.router
+    telaios.modules.planner -> telaios.modules.planner.service
+    telaios.modules.planner.router -> telaios.modules.planner.schemas
+    telaios.modules.planner.router -> telaios.modules.planner.service
+    telaios.modules.planner.service -> telaios.modules.planner.schemas

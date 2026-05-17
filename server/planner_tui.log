@@ -1,0 +1,106 @@
+2026-05-17 21:23:51,664 [INFO] telaios.cli.planner_tui: Planner TUI starting — logs at /Users/nicocardone/Desktop/DEV/PERSONALI/telaios/server/planner_tui.log
+2026-05-17 21:23:51,667 [DEBUG] asyncio: Using selector: KqueueSelector
+2026-05-17 21:23:52,016 [DEBUG] chromadb.config: Starting component System
+2026-05-17 21:23:52,016 [DEBUG] chromadb.config: Starting component Posthog
+2026-05-17 21:23:52,016 [DEBUG] chromadb.config: Starting component OpenTelemetryClient
+2026-05-17 21:23:52,016 [DEBUG] chromadb.config: Starting component FastAPI
+2026-05-17 21:23:52,016 [DEBUG] httpcore.connection: connect_tcp.started host='localhost' port=8001 local_address=None timeout=None socket_options=None
+2026-05-17 21:23:52,017 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x118821e80>
+2026-05-17 21:23:52,017 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,017 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:23:52,017 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,017 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:23:52,017 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,018 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'content-type', b'application/json'), (b'content-length', b'73'), (b'date', b'Sun, 17 May 2026 19:23:52 GMT')])
+2026-05-17 21:23:52,018 [INFO] httpx: HTTP Request: GET http://localhost:8001/api/v2/auth/identity "HTTP/1.1 200 OK"
+2026-05-17 21:23:52,018 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,018 [DEBUG] httpcore.http11: receive_response_body.complete
+2026-05-17 21:23:52,018 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:23:52,018 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:23:52,020 [DEBUG] chromadb.config: Starting component System
+2026-05-17 21:23:52,021 [DEBUG] chromadb.config: Starting component Posthog
+2026-05-17 21:23:52,021 [DEBUG] chromadb.config: Starting component OpenTelemetryClient
+2026-05-17 21:23:52,021 [DEBUG] chromadb.config: Starting component FastAPI
+2026-05-17 21:23:52,021 [DEBUG] httpcore.connection: connect_tcp.started host='localhost' port=8001 local_address=None timeout=None socket_options=None
+2026-05-17 21:23:52,021 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x11881e990>
+2026-05-17 21:23:52,021 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,021 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:23:52,021 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,021 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:23:52,021 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'content-type', b'application/json'), (b'content-length', b'46'), (b'date', b'Sun, 17 May 2026 19:23:52 GMT')])
+2026-05-17 21:23:52,022 [INFO] httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant "HTTP/1.1 200 OK"
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: receive_response_body.complete
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,022 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'content-type', b'application/json'), (b'content-length', b'97'), (b'date', b'Sun, 17 May 2026 19:23:52 GMT')])
+2026-05-17 21:23:52,023 [INFO] httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database "HTTP/1.1 200 OK"
+2026-05-17 21:23:52,023 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,023 [DEBUG] httpcore.http11: receive_response_body.complete
+2026-05-17 21:23:52,023 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:23:52,023 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:23:52,027 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+2026-05-17 21:23:52,027 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:23:52,027 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+2026-05-17 21:23:52,027 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:23:52,027 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'content-type', b'application/json'), (b'content-length', b'1391'), (b'date', b'Sun, 17 May 2026 19:23:52 GMT')])
+2026-05-17 21:23:52,028 [INFO] httpx: HTTP Request: POST http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections "HTTP/1.1 200 OK"
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: receive_response_body.complete
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:23:52,028 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'GET']>
+2026-05-17 21:23:52,029 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 404, b'Not Found', [(b'content-type', b'application/json'), (b'chroma-trace-id', b'00000000000000000000000000000000'), (b'content-length', b'78'), (b'date', b'Sun, 17 May 2026 19:23:52 GMT')])
+2026-05-17 21:23:52,029 [INFO] httpx: HTTP Request: GET http://localhost:8001/api/v2/tenants/default_tenant/databases/default_database/collections/repositories "HTTP/1.1 404 Not Found"
+2026-05-17 21:23:52,029 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'GET']>
+2026-05-17 21:23:52,029 [DEBUG] httpcore.http11: receive_response_body.complete
+2026-05-17 21:23:52,029 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:23:52,029 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:23:52,029 [INFO] telaios.modules.planner.service: No 'repositories' Chroma collection found; search_repository tool disabled
+2026-05-17 21:23:52,064 [INFO] telaios.modules.planner.service: PlannerService singleton initialised
+2026-05-17 21:24:09,188 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'files': None, 'idempotency_key': 'stainless-python-retry-63207afc-a997-4cc7-aab5-e5bcc47df986', 'security': {'bearer_auth': True}, 'content': None, 'json_data': {'messages': [{'content': 'You are a precise planning agent. Your job is to help the user design a\nclear, detailed, and actionable plan for their software project.\n\nGuidelines:\n- Ask clarifying questions (use the `questions` field) if the request is\n  ambiguous or you need more information to produce a high-quality plan.\n- Search available documents and repositories using the provided tools to\n  ground your plan in real project artifacts before producing tasks.\n- When you have enough information, produce a structured list of tasks\n  (use the `tasks` field) with clear names, short descriptions, and details.\n- Use the `response` field for any natural language explanation or context\n  you want to share with the user alongside questions or tasks.\n- Be concise and precise. Avoid filler text.\n', 'role': 'system'}, {'content': 'i want to go to amsterdam', 'role': 'user'}], 'model': 'mlx-community/Qwen3.5-9B-MLX-4bit', 'stream': True, 'tools': [{'type': 'function', 'function': {'name': 'search_documents', 'description': 'Search indexed project documents and return relevant excerpts.\n\nUse this tool when you need information from design documents,\nspecifications, requirements, or other project artefacts.\n\nArgs:\n    query: Natural language search query.\n\nReturns:\n    Formatted excerpts from the most relevant documents.', 'parameters': {'properties': {'query': {'type': 'string'}}, 'required': ['query'], 'type': 'object'}}}]}}
+2026-05-17 21:24:09,189 [DEBUG] openai._base_client: Sending HTTP Request: POST http://localhost:8000/v1/chat/completions
+2026-05-17 21:24:09,191 [DEBUG] httpcore.connection: connect_tcp.started host='localhost' port=8000 local_address=None timeout=None socket_options=[(65535, 8, 1), (6, 16, 60), (6, 257, 10), (6, 258, 3)]
+2026-05-17 21:24:09,193 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x1193acc20>
+2026-05-17 21:24:09,193 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+2026-05-17 21:24:09,193 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:24:09,193 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+2026-05-17 21:24:09,193 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:24:09,193 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+2026-05-17 21:24:09,196 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Sun, 17 May 2026 19:24:09 GMT'), (b'server', b'uvicorn'), (b'content-type', b'text/event-stream; charset=utf-8'), (b'transfer-encoding', b'chunked')])
+2026-05-17 21:24:09,196 [INFO] httpx: HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-17 21:24:09,196 [DEBUG] openai._base_client: HTTP Response: POST http://localhost:8000/v1/chat/completions "200 OK" Headers({'date': 'Sun, 17 May 2026 19:24:09 GMT', 'server': 'uvicorn', 'content-type': 'text/event-stream; charset=utf-8', 'transfer-encoding': 'chunked'})
+2026-05-17 21:24:09,197 [DEBUG] openai._base_client: request_id: None
+2026-05-17 21:24:09,197 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+2026-05-17 21:24:18,707 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:24:18,707 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:24:18,712 [DEBUG] openai._base_client: Request options: {'method': 'post', 'url': '/chat/completions', 'headers': {'X-Stainless-Helper-Method': 'chat.completions.stream'}, 'files': None, 'idempotency_key': 'stainless-python-retry-0604f880-011f-4a75-8b22-9125ab9131f7', 'security': {'bearer_auth': True}, 'content': None, 'json_data': {'messages': [{'content': 'You are a precise planning agent. Your job is to help the user design a\nclear, detailed, and actionable plan for their software project.\n\nGuidelines:\n- Ask clarifying questions (use the `questions` field) if the request is\n  ambiguous or you need more information to produce a high-quality plan.\n- Search available documents and repositories using the provided tools to\n  ground your plan in real project artifacts before producing tasks.\n- When you have enough information, produce a structured list of tasks\n  (use the `tasks` field) with clear names, short descriptions, and details.\n- Use the `response` field for any natural language explanation or context\n  you want to share with the user alongside questions or tasks.\n- Be concise and precise. Avoid filler text.\n', 'role': 'system'}, {'content': 'i want to go to amsterdam', 'role': 'user'}], 'model': 'mlx-community/Qwen3.5-9B-MLX-4bit', 'response_format': {'type': 'json_schema', 'json_schema': {'schema': {'$defs': {'PlanTask': {'properties': {'id': {'description': 'Unique identifier for the task', 'title': 'Id', 'type': 'string'}, 'name': {'description': 'Name of the task', 'title': 'Name', 'type': 'string'}, 'short_description': {'description': 'Short description of the task', 'title': 'Short Description', 'type': 'string'}, 'details': {'description': 'Detailed description of the task, with specification about the execution, condition and all information required to fully accomplish it.', 'title': 'Details', 'type': 'string'}, 'dependencies': {'description': 'List of task IDs that this task depends on', 'items': {'type': 'string'}, 'title': 'Dependencies', 'type': 'array'}, 'category': {'description': 'Category of the task', 'title': 'Category', 'type': 'string'}}, 'required': ['id', 'name', 'short_description', 'details', 'dependencies', 'category'], 'title': 'PlanTask', 'type': 'object', 'additionalProperties': False}, 'Question': {'properties': {'id': {'description': 'Unique identifier for the question', 'title': 'Id', 'type': 'string'}, 'question': {'description': 'The question to be asked to the user', 'title': 'Question', 'type': 'string'}, 'type': {'description': "The type of question, e.g., 'yes_no', 'free_form', 'choice'", 'title': 'Type', 'type': 'string'}, 'options': {'anyOf': [{'items': {'type': 'string'}, 'type': 'array'}, {'type': 'null'}], 'description': "List of options for 'choice' type questions", 'title': 'Options'}}, 'required': ['id', 'question', 'type', 'options'], 'title': 'Question', 'type': 'object', 'additionalProperties': False}}, 'description': 'Structured output from the planner LLM.\n\nNon-recursive so ``with_structured_output`` can generate a valid JSON schema.', 'properties': {'tasks': {'anyOf': [{'items': {'$ref': '#/$defs/PlanTask'}, 'type': 'array'}, {'type': 'null'}], 'description': 'List of tasks in the plan (present when plan is ready)', 'title': 'Tasks'}, 'questions': {'description': 'Clarifying questions for the user (present when more info needed)', 'items': {'$ref': '#/$defs/Question'}, 'title': 'Questions', 'type': 'array'}, 'response': {'anyOf': [{'type': 'string'}, {'type': 'null'}], 'description': 'Natural language response or explanation to the user', 'title': 'Response'}}, 'title': 'PlanResponseFormat', 'type': 'object', 'additionalProperties': False, 'required': ['tasks', 'questions', 'response']}, 'name': 'PlanResponseFormat', 'strict': True}}, 'stream': True}}
+2026-05-17 21:24:18,712 [DEBUG] openai._base_client: Sending HTTP Request: POST http://localhost:8000/v1/chat/completions
+2026-05-17 21:24:18,712 [DEBUG] httpcore.connection: connect_tcp.started host='localhost' port=8000 local_address=None timeout=None socket_options=[(65535, 8, 1), (6, 16, 60), (6, 257, 10), (6, 258, 3)]
+2026-05-17 21:24:18,713 [DEBUG] httpcore.http11: receive_response_body.failed exception=GeneratorExit()
+2026-05-17 21:24:18,714 [DEBUG] httpcore.connection: connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x119396850>
+2026-05-17 21:24:18,714 [DEBUG] httpcore.http11: send_request_headers.started request=<Request [b'POST']>
+2026-05-17 21:24:18,714 [DEBUG] httpcore.http11: send_request_headers.complete
+2026-05-17 21:24:18,714 [DEBUG] httpcore.http11: send_request_body.started request=<Request [b'POST']>
+2026-05-17 21:24:18,714 [DEBUG] httpcore.http11: send_request_body.complete
+2026-05-17 21:24:18,714 [DEBUG] httpcore.http11: receive_response_headers.started request=<Request [b'POST']>
+2026-05-17 21:24:18,717 [DEBUG] httpcore.http11: receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Sun, 17 May 2026 19:24:18 GMT'), (b'server', b'uvicorn'), (b'content-type', b'text/event-stream; charset=utf-8'), (b'transfer-encoding', b'chunked')])
+2026-05-17 21:24:18,717 [INFO] httpx: HTTP Request: POST http://localhost:8000/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-17 21:24:18,717 [DEBUG] openai._base_client: HTTP Response: POST http://localhost:8000/v1/chat/completions "200 OK" Headers({'date': 'Sun, 17 May 2026 19:24:18 GMT', 'server': 'uvicorn', 'content-type': 'text/event-stream; charset=utf-8', 'transfer-encoding': 'chunked'})
+2026-05-17 21:24:18,718 [DEBUG] openai._base_client: request_id: None
+2026-05-17 21:24:18,718 [DEBUG] httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+2026-05-17 21:25:02,335 [DEBUG] httpcore.http11: response_closed.started
+2026-05-17 21:25:02,335 [DEBUG] httpcore.http11: response_closed.complete
+2026-05-17 21:25:02,344 [DEBUG] httpcore.http11: receive_response_body.failed exception=GeneratorExit()
+2026-05-17 21:25:02,356 [WARNING] langgraph.checkpoint.serde.jsonplus: Deserializing unregistered type telaios.core.agents.planner.schemas.PlanResponseFormat from checkpoint. This will be blocked in a future version. Set LANGGRAPH_STRICT_MSGPACK=true to block now, or add to allowed_msgpack_modules to allow explicitly: [('telaios.core.agents.planner.schemas', 'PlanResponseFormat')]
