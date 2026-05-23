@@ -9,12 +9,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-SystemRole = Literal["admin", "member"]
-
+from telaios.domain.enums import SystemRole
 
 # ─── Auth ─────────────────────────────────────────────────────────────────
 

@@ -43,8 +43,8 @@ from telaios.modules.planner.schemas import (
     PausePlanReadyEventData,
     PauseQuestionsEventData,
     PlannerThreadState,
+    PlanningSessionStatus,
     PlanResponseFormat,
-    PlanStatus,
     SSEEvent,
     ToolCallEventData,
     ToolResultEventData,
@@ -83,7 +83,7 @@ def _make_tool_result(name: str, content: str) -> SSEEvent:
     return SSEEvent(event="tool_result", data=ToolResultEventData(name=name, content=content))
 
 
-def _make_done(status: PlanStatus | str) -> SSEEvent:
+def _make_done(status: PlanningSessionStatus | str) -> SSEEvent:
     return SSEEvent(event="done", data=DoneEventData(status=str(status)))
 
 
@@ -258,7 +258,7 @@ class PlannerService:
         return PlannerThreadState(
             thread_id=thread_id,
             user_id=user_id,
-            status=values.get("status", PlanStatus.PENDING),
+            status=values.get("status", PlanningSessionStatus.PENDING),
             plan=values.get("plan"),
         )
 
@@ -286,7 +286,7 @@ class PlannerService:
                     SystemMessage(content=SYSTEM_PROMPT),
                     HumanMessage(content=content),
                 ],
-                "status": PlanStatus.PENDING,
+                "status": PlanningSessionStatus.PENDING,
                 "plan": None,
             }
 
@@ -349,7 +349,7 @@ class PlannerService:
                 if pause_event is not None:
                     yield pause_event
 
-            final_status = final_values.get("status", PlanStatus.PENDING)
+            final_status = final_values.get("status", PlanningSessionStatus.PENDING)
             yield _make_done(final_status)
 
         except Exception as exc:

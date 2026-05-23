@@ -7,19 +7,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import PlanMessageRole, PlanStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
     from telaios.db.models.tasks import Task
-
-PlanStatus = Literal["draft", "confirmed", "executing", "completed", "failed"]
-MessageRole = Literal["user", "assistant", "system"]
 
 
 class Plan(Base, SoftDeleteMixin):
@@ -56,7 +54,7 @@ class Message(Base, SoftDeleteMixin):
     project_id: Mapped[uuid.UUID] = uuid_fk("projects.id")
     plan_id: Mapped[uuid.UUID | None] = uuid_fk("plans.id", nullable=True)
 
-    role: Mapped[MessageRole] = mapped_column(String, nullable=False)
+    role: Mapped[PlanMessageRole] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

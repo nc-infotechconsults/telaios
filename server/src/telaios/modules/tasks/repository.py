@@ -18,6 +18,7 @@ from telaios.db.models.tasks import (
 from telaios.db.models.tasks import (
     TaskRepository as TaskRepoModel,
 )
+from telaios.domain.enums import TaskStatus
 
 
 class TaskRepository:
@@ -117,7 +118,7 @@ class TaskRepository:
         return len(tasks)
 
     async def cancel_by_plan(self, plan_id: uuid.UUID) -> int:
-        cancellable: tuple[str, ...] = ("pending", "ready", "in_progress")
+        cancellable = (TaskStatus.PENDING, TaskStatus.READY, TaskStatus.IN_PROGRESS)
         result = await self._s.execute(
             select(Task).where(
                 Task.plan_id == plan_id,
@@ -127,7 +128,7 @@ class TaskRepository:
         )
         tasks = list(result.scalars())
         for t in tasks:
-            t.status = "cancelled"
+            t.status = TaskStatus.CANCELLED
         await self._s.flush()
         return len(tasks)
 
@@ -153,7 +154,7 @@ class TaskRepository:
         if not downstream:
             return 0
 
-        skippable: tuple[str, ...] = ("pending", "ready")
+        skippable = (TaskStatus.PENDING, TaskStatus.READY)
         result = await self._s.execute(
             select(Task).where(
                 Task.id.in_(downstream),
@@ -163,7 +164,7 @@ class TaskRepository:
         )
         tasks = list(result.scalars())
         for t in tasks:
-            t.status = "skipped"
+            t.status = TaskStatus.SKIPPED
         await self._s.flush()
         return len(tasks)
 

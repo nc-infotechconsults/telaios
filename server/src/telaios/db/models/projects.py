@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, Float, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import AgentRole, ProjectRole, ProjectStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.design_chat import DesignSession
@@ -23,19 +24,6 @@ if TYPE_CHECKING:
     from telaios.db.models.repositories import Repository
     from telaios.db.models.users import User
     from telaios.db.models.workspaces import Workspace
-
-ProjectStatus = Literal["planning", "executing", "done"]
-ProjectRole = Literal["owner", "editor", "viewer"]
-AgentRole = Literal[
-    "planner",
-    "coder",
-    "reviewer",
-    "tester",
-    "infra",
-    "knowledge",
-    "custom",
-    "document-copilot",
-]
 
 
 class Project(Base, SoftDeleteMixin):

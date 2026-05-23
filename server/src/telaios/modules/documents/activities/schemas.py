@@ -4,20 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-DocumentActivityAction = Literal[
-    "created",
-    "viewed",
-    "edited",
-    "commented",
-    "shared",
-    "deleted",
-    "restored",
-    "version_created",
-]
+from telaios.domain.enums import DocumentActivityAction
 
 
 class ActivityRead(BaseModel):

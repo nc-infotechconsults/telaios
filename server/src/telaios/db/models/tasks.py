@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,14 +15,11 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import ArtifactType, TaskStatus, TaskType
 
 if TYPE_CHECKING:
     from telaios.db.models.plans import Plan
     from telaios.db.models.repositories import Repository
-
-TaskType = Literal["code", "test", "review", "general", "knowledge", "infra"]
-TaskStatus = Literal["pending", "ready", "in_progress", "done", "failed", "cancelled", "skipped"]
-ArtifactType = Literal["diff", "test_result", "review", "log", "file", "link"]
 
 
 class Task(Base, TimestampMixin, SoftDeleteMixin):

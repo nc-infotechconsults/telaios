@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from telaios.domain.enums import TaskStatus
 from telaios.modules.tasks.artifacts.schemas import ArtifactCreate, ArtifactRead
 from telaios.modules.tasks.artifacts.service import ArtifactService
 from telaios.modules.tasks.schemas import TaskCreate, TaskPatch, TaskRead
@@ -26,7 +27,7 @@ def _make_task_mock(
     uid: uuid.UUID | None = None,
     plan_id: uuid.UUID | None = None,
     title: str = "Do work",
-    status: str = "pending",
+    status: str | TaskStatus = TaskStatus.PENDING,
     task_repositories: list | None = None,
     dependencies: list | None = None,
 ) -> MagicMock:
@@ -36,7 +37,7 @@ def _make_task_mock(
     m.title = title
     m.description = None
     m.type = "general"
-    m.status = status
+    m.status = TaskStatus(status) if isinstance(status, str) else status
     m.execution_order = 0
     m.agent_profile_id = None
     m.assigned_instance_id = None

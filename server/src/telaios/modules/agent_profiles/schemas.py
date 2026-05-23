@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-AgentProfileSystemPromptMode = Literal["override", "extend"]
+from telaios.domain.enums import SystemPromptMode
 
 
 class AgentProfileMcpServer(BaseModel):
@@ -46,7 +46,7 @@ class AgentProfileRead(BaseModel):
     llm_temperature: float | None
     llm_max_tokens: int | None
     system_prompt: str | None
-    system_prompt_mode: AgentProfileSystemPromptMode
+    system_prompt_mode: SystemPromptMode
     sub_agent_ids: list[uuid.UUID]
     structured_output: dict[str, Any] | None
     mcp_servers: list[dict[str, Any]]
@@ -67,7 +67,7 @@ class CreateAgentProfileDto(BaseModel):
     mcp_servers: list[AgentProfileMcpServer] | None = None
     skills: list[AgentProfileSkill] | None = None
     system_prompt: str | None = None
-    system_prompt_mode: AgentProfileSystemPromptMode | None = None
+    system_prompt_mode: SystemPromptMode | None = None
     llm_temperature: float | None = Field(default=None, ge=0, le=2)
     llm_max_tokens: int | None = Field(default=None, gt=0)
     llm_top_p: float | None = Field(default=None, ge=0, le=1)
@@ -89,7 +89,7 @@ class PatchAgentProfileDto(BaseModel):
     mcp_servers: list[AgentProfileMcpServer] | None = None
     skills: list[AgentProfileSkill] | None = None
     system_prompt: str | None = None
-    system_prompt_mode: AgentProfileSystemPromptMode | None = None
+    system_prompt_mode: SystemPromptMode | None = None
     llm_temperature: float | None = Field(default=None, ge=0, le=2)
     llm_max_tokens: int | None = Field(default=None, gt=0)
     llm_top_p: float | None = Field(default=None, ge=0, le=1)
@@ -103,7 +103,7 @@ __all__ = [
     "AgentProfileMcpServer",
     "AgentProfileRead",
     "AgentProfileSkill",
-    "AgentProfileSystemPromptMode",
     "CreateAgentProfileDto",
     "PatchAgentProfileDto",
+    "SystemPromptMode",
 ]

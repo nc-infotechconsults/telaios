@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-DesignSessionStatus = Literal["active", "archived"]
-DesignMessageRole = Literal["user", "assistant", "system"]
+from telaios.domain.enums import DesignMessageRole, DesignSessionStatus
 
 
 class DesignSessionCreate(BaseModel):

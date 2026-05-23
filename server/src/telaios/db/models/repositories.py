@@ -10,20 +10,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import RepositoryAuthType, RepositoryProviderType, RepositoryStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
     from telaios.db.models.tasks import TaskRepository
-
-RepositoryProviderType = Literal["github", "gitlab", "bitbucket", "git", "s3"]
-RepositoryAuthType = Literal["none", "token", "ssh"]
-RepositoryStatus = Literal["unconfigured", "cloning", "ready", "error"]
 
 
 class Repository(Base, SoftDeleteMixin):

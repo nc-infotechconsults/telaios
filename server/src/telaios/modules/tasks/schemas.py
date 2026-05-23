@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-TaskType = Literal["code", "test", "review", "general", "knowledge", "infra"]
-TaskStatus = Literal["pending", "ready", "in_progress", "done", "failed", "cancelled", "skipped"]
-
+from telaios.domain.enums import TaskStatus, TaskType
 
 # ── Request DTOs ──────────────────────────────────────────────────────────────
 
@@ -18,8 +16,8 @@ TaskStatus = Literal["pending", "ready", "in_progress", "done", "failed", "cance
 class TaskCreate(BaseModel):
     title: str
     description: str | None = None
-    type: TaskType = "general"
-    status: TaskStatus = "pending"
+    type: TaskType = TaskType.GENERAL
+    status: TaskStatus = TaskStatus.PENDING
     execution_order: int = 0
     agent_profile_id: str | None = None
     repository_ids: list[uuid.UUID] = []

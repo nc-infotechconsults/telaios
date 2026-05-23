@@ -13,6 +13,7 @@ from telaios.modules.projects.schemas import (
     ProjectPatch,
     ProjectQuery,
     ProjectRead,
+    ProjectRole,
 )
 from telaios.utils.errors import NotFoundError
 
@@ -46,7 +47,7 @@ class ProjectService:
         if creator_id is not None:
             from telaios.modules.projects.members.service import MemberService
 
-            await MemberService(self._session).add_member(project.id, creator_id, role="owner")
+            await MemberService(self._session).add_member(project.id, creator_id, role=ProjectRole.OWNER)
 
         return ProjectRead.model_validate(project)
 

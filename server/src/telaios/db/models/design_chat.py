@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy import UUID, DateTime, Integer, String, Text, UniqueConstraint, func
@@ -15,12 +15,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import DesignMessageRole, DesignSessionStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
-
-DesignSessionStatus = Literal["active", "archived"]
-DesignMessageRole = Literal["user", "assistant", "system"]
 
 
 class DesignSession(Base, TimestampMixin, SoftDeleteMixin):

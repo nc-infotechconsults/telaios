@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-DocumentCommentAnchorType = Literal["page", "cell", "text_range", "general"]
+from telaios.domain.enums import DocumentCommentAnchorType
 
 
 class CommentCreate(BaseModel):
     content: str
-    anchor_type: DocumentCommentAnchorType = "general"
+    anchor_type: DocumentCommentAnchorType = DocumentCommentAnchorType.GENERAL
     anchor_data: dict[str, Any] | None = None
     parent_comment_id: uuid.UUID | None = None
 

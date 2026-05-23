@@ -10,16 +10,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 # ── Shared sub-objects ────────────────────────────────────────────────────────
-
-McpTransport = Literal["stdio", "streamable-http"]
-McpToolPermission = Literal["read", "write", "execute", "require-confirmation"]
-
-SystemPromptMode = Literal["append", "override"]
+from telaios.domain.enums import McpToolPermission, McpTransport, SystemPromptMode
 
 
 class McpToolConfig(BaseModel):
@@ -132,7 +128,7 @@ class LibraryAgentCreate(BaseModel):
     description: str | None = None
     role: str | None = None
     system_prompt: str | None = None
-    system_prompt_mode: SystemPromptMode = "append"
+    system_prompt_mode: SystemPromptMode = SystemPromptMode.APPEND
     llm_provider: str | None = None
     llm_model: str | None = None
     llm_api_key: str | None = None
@@ -208,7 +204,7 @@ class LibraryMcpCreate(BaseModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1, pattern=r"^[a-z0-9-]+$")
     description: str | None = None
-    transport: McpTransport = "stdio"
+    transport: McpTransport = McpTransport.STDIO
     command: str | None = None
     args: list[str] | None = None
     env: dict[str, str] | None = None

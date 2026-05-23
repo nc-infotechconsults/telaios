@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-ArtifactType = Literal["diff", "test_result", "review", "log", "file", "link"]
+from telaios.domain.enums import ArtifactType
 
 
 class ArtifactCreate(BaseModel):

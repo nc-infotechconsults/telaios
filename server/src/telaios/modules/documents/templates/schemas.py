@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-DocumentFileType = Literal["pdf", "docx", "xlsx", "md", "txt", "csv", "json", "other"]
+from telaios.domain.enums import DocumentFileType
 
 
 class TemplateCreate(BaseModel):

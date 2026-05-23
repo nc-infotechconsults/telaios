@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-MessageRole = Literal["user", "assistant", "system"]
+from telaios.domain.enums import PlanMessageRole
 
 
 class MessageCreate(BaseModel):
-    role: MessageRole
+    role: PlanMessageRole
     content: str
     plan_id: uuid.UUID | None = None
 
@@ -23,9 +22,9 @@ class MessageRead(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     plan_id: uuid.UUID | None
-    role: MessageRole
+    role: PlanMessageRole
     content: str
     created_at: datetime
 
 
-__all__ = ["MessageCreate", "MessageRead", "MessageRole"]
+__all__ = ["MessageCreate", "MessageRead", "PlanMessageRole"]

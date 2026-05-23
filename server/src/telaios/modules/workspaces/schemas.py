@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-WorkspaceStatus = Literal["idle", "starting", "running", "sleeping", "error"]
+from telaios.domain.enums import WorkspaceStatus
 
 
 class WorkspaceConfig(BaseModel):

@@ -8,17 +8,10 @@ state, node logic).  HTTP/SSE schemas live in modules/planner/schemas.py.
 from __future__ import annotations
 
 import uuid
-from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-
-class PlanStatus(StrEnum):
-    PENDING = "pending"
-    INTERVIEWING = "interviewing"
-    AWAITING_CONFIRMATION = "awaiting_confirmation"
-    ACCEPTED = "accepted"
-    REFUSED = "refused"
+from telaios.domain.enums import PlanningSessionStatus
 
 
 class PlanTask(BaseModel):
@@ -76,7 +69,7 @@ class PlanResponseFormat(BaseModel):
 
 __all__ = [
     "PlanResponseFormat",
-    "PlanStatus",
     "PlanTask",
+    "PlanningSessionStatus",
     "Question",
 ]

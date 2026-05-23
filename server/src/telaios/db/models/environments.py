@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,14 +15,11 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import EnvironmentStatus, EnvironmentType, HelmReleaseStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
     from telaios.db.models.users import User
-
-EnvironmentType = Literal["kubernetes", "docker"]
-EnvironmentStatus = Literal["connected", "disconnected", "error"]
-HelmReleaseStatus = Literal["pending", "deployed", "failed", "uninstalled"]
 
 
 class Environment(Base, TimestampMixin, SoftDeleteMixin):

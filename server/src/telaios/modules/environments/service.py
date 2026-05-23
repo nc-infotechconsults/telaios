@@ -14,10 +14,11 @@ import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telaios.domain.enums import HelmReleaseStatus
 from telaios.infra.helm import WORKSPACES_ROOT, HelmClient
 from telaios.infra.kubernetes import K8sConnectionConfig, KubernetesClient
 from telaios.modules.environments.repository import EnvironmentRepository
@@ -244,7 +245,7 @@ class EnvironmentService:
             raise NotFoundError("Environment not found")
 
         namespace = dto.namespace or getattr(obj, "namespace", None) or "default"
-        status = "deployed"
+        status: HelmReleaseStatus = HelmReleaseStatus.DEPLOYED
         notes: str | None = None
 
         try:
@@ -257,7 +258,7 @@ class EnvironmentService:
                 chart_version=dto.chart_version,
             )
         except Exception as exc:
-            status = "failed"
+            status = HelmReleaseStatus.FAILED
             notes = str(exc)
 
         release = await self._repo.create_release(
@@ -305,7 +306,7 @@ class EnvironmentService:
         repo_url = dto.chart_repo_url or getattr(release, "chart_repo_url", None)
         version = dto.chart_version or getattr(release, "chart_version", None)
 
-        status: Literal["pending", "deployed", "failed", "uninstalled"] = "deployed"
+        status: HelmReleaseStatus = HelmReleaseStatus.DEPLOYED
         notes: str | None = None
 
         try:
@@ -318,7 +319,7 @@ class EnvironmentService:
                 chart_version=version,
             )
         except Exception as exc:
-            status = "failed"
+            status = HelmReleaseStatus.FAILED
             notes = str(exc)
 
         release.status = status
@@ -348,7 +349,7 @@ class EnvironmentService:
         release = await self._repo.find_release(env_id, release_name)
         if release is None:
             raise NotFoundError("Helm release not found")
-        release.status = "uninstalled"
+        release.status = HelmReleaseStatus.UNINSTALLED
         await self._repo.save_release(release)
 
     async def scan_project_charts(self, env_id: uuid.UUID, project_id: uuid.UUID) -> list[Any]:

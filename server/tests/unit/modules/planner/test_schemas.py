@@ -16,8 +16,8 @@ from telaios.modules.planner.schemas import (
     PausePlanReadyEventData,
     PauseQuestionsEventData,
     PlannerThreadState,
+    PlanningSessionStatus,
     PlanResponseFormat,
-    PlanStatus,
     PlanTask,
     Question,
     RefuseRequest,
@@ -28,17 +28,17 @@ from telaios.modules.planner.schemas import (
 )
 
 # ---------------------------------------------------------------------------
-# PlanStatus
+# PlanningSessionStatus
 # ---------------------------------------------------------------------------
 
 
-class TestPlanStatus:
+class TestPlanningSessionStatus:
     def test_values(self) -> None:
-        assert PlanStatus.PENDING == "pending"
-        assert PlanStatus.INTERVIEWING == "interviewing"
-        assert PlanStatus.AWAITING_CONFIRMATION == "awaiting_confirmation"
-        assert PlanStatus.ACCEPTED == "accepted"
-        assert PlanStatus.REFUSED == "refused"
+        assert PlanningSessionStatus.PENDING == "pending"
+        assert PlanningSessionStatus.INTERVIEWING == "interviewing"
+        assert PlanningSessionStatus.AWAITING_CONFIRMATION == "awaiting_confirmation"
+        assert PlanningSessionStatus.ACCEPTED == "accepted"
+        assert PlanningSessionStatus.REFUSED == "refused"
 
 
 # ---------------------------------------------------------------------------
@@ -220,17 +220,17 @@ class TestPlannerThreadState:
         s = PlannerThreadState(
             thread_id="t1",
             user_id="u1",
-            status=PlanStatus.PENDING,
+            status=PlanningSessionStatus.PENDING,
         )
         assert s.plan is None
-        assert s.status == PlanStatus.PENDING
+        assert s.status == PlanningSessionStatus.PENDING
 
     def test_with_plan(self) -> None:
         plan = PlanResponseFormat(response="some response")
         s = PlannerThreadState(
             thread_id="t1",
             user_id="u1",
-            status=PlanStatus.INTERVIEWING,
+            status=PlanningSessionStatus.INTERVIEWING,
             plan=plan,
         )
         assert s.plan is not None

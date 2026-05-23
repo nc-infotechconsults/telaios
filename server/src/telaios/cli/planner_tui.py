@@ -55,7 +55,7 @@ from telaios.modules.planner.schemas import (
     ErrorEventData,
     PausePlanReadyEventData,
     PauseQuestionsEventData,
-    PlanStatus,
+    PlanningSessionStatus,
     ToolCallEventData,
     ToolResultEventData,
 )
@@ -138,7 +138,7 @@ class PlannerTUI(App[None]):
         super().__init__()
         self._service: Any | None = None  # PlannerService; loaded lazily
         self._planner_thread_id: str | None = None
-        self._status: PlanStatus = PlanStatus.PENDING
+        self._status: PlanningSessionStatus = PlanningSessionStatus.PENDING
         self._is_paused: bool = False
         self._pause_type: str | None = None  # "questions" | "plan_ready"
         self._chunk_buffer: str = ""  # accumulates streaming tokens for one response
@@ -272,7 +272,7 @@ class PlannerTUI(App[None]):
 
         try:
             await self._service.confirm(self._planner_thread_id, "tui-user")
-            self._status = PlanStatus.ACCEPTED
+            self._status = PlanningSessionStatus.ACCEPTED
             self._is_paused = False
             self._chat_log("[bold green]Plan accepted. Thread complete.[/bold green]")
             self._set_status("Accepted")
@@ -334,7 +334,7 @@ class PlannerTUI(App[None]):
             elif isinstance(data, PauseQuestionsEventData):
                 self._is_paused = True
                 self._pause_type = "questions"
-                self._status = PlanStatus.INTERVIEWING
+                self._status = PlanningSessionStatus.INTERVIEWING
                 self._chat_log("\n[bold yellow]Agent has questions:[/bold yellow]")
                 for q in data.questions:
                     self._chat_log(f"  [yellow]?[/yellow] {q.question}")
@@ -343,7 +343,7 @@ class PlannerTUI(App[None]):
             elif isinstance(data, PausePlanReadyEventData):
                 self._is_paused = True
                 self._pause_type = "plan_ready"
-                self._status = PlanStatus.AWAITING_CONFIRMATION
+                self._status = PlanningSessionStatus.AWAITING_CONFIRMATION
                 self._chat_log("\n[bold green]Plan ready for review:[/bold green]")
                 self._render_plan_tasks(data)
 
@@ -353,9 +353,9 @@ class PlannerTUI(App[None]):
                     self._chat_log(f"[bold blue]Agent:[/bold blue] {self._chunk_buffer}")
                     self._chunk_buffer = ""
                 self._status = (
-                    PlanStatus(data.status)
-                    if data.status in PlanStatus._value2member_map_
-                    else PlanStatus.PENDING
+                    PlanningSessionStatus(data.status)
+                    if data.status in PlanningSessionStatus._value2member_map_
+                    else PlanningSessionStatus.PENDING
                 )
                 self._set_status(f"Status: {data.status}")
 

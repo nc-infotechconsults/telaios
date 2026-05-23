@@ -7,6 +7,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.db.models.tasks import Task
+from telaios.domain.enums import TaskStatus
 from telaios.modules.tasks.repository import TaskRepository
 from telaios.modules.tasks.schemas import TaskCreate, TaskPatch, TaskRead
 from telaios.utils.errors import ConflictError, NotFoundError
@@ -71,9 +72,9 @@ class TaskService:
         task = await self._repo.find(task_id)
         if task is None:
             raise NotFoundError("Task not found")
-        if task.status not in ("failed", "cancelled"):
+        if not task.status.is_retryable:
             raise ConflictError("Only failed or cancelled tasks can be retried")
-        task.status = "pending"
+        task.status = TaskStatus.PENDING
         task = await self._repo.save(task)
         return TaskRead.from_orm_with_relations(task)
 
@@ -81,9 +82,9 @@ class TaskService:
         task = await self._repo.find(task_id)
         if task is None:
             raise NotFoundError("Task not found")
-        if task.status in ("done", "cancelled"):
-            raise ConflictError("Task is already done or cancelled")
-        task.status = "cancelled"
+        if not task.status.is_cancellable:
+            raise ConflictError("Task cannot be cancelled")
+        task.status = TaskStatus.CANCELLED
         task = await self._repo.save(task)
         return TaskRead.from_orm_with_relations(task)
 

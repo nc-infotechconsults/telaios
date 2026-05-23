@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -32,24 +32,16 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import (
+    DocumentActivityAction,
+    DocumentCommentAnchorType,
+    DocumentFileType,
+    DocumentStatus,
+)
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
     from telaios.db.models.users import User
-
-DocumentFileType = Literal["pdf", "docx", "xlsx", "md", "txt", "csv", "json", "other"]
-DocumentStatus = Literal["uploading", "processing", "ready", "error"]
-DocumentActivityAction = Literal[
-    "created",
-    "viewed",
-    "edited",
-    "commented",
-    "shared",
-    "deleted",
-    "restored",
-    "version_created",
-]
-DocumentCommentAnchorType = Literal["page", "cell", "text_range", "general"]
 
 # Many-to-many junction table: Document ↔ DocumentTag
 document_document_tags = Table(

@@ -12,6 +12,7 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.db.models.documents import Document
+from telaios.domain.enums import DocumentStatus
 from telaios.infra.s3 import (
     build_s3_key,
     delete_from_s3,
@@ -90,7 +91,7 @@ class DocumentService:
             s3_key="__placeholder__",
             size_bytes=len(content),
             checksum_sha256=checksum,
-            status="uploading",
+            status=DocumentStatus.UPLOADING,
             doc_metadata=metadata,
             uploaded_by=uploaded_by,
             folder_id=folder_id,
@@ -98,7 +99,7 @@ class DocumentService:
 
         s3_key = build_s3_key(str(project_id), str(doc.id), filename)
         doc.s3_key = s3_key
-        doc.status = "processing"
+        doc.status = DocumentStatus.PROCESSING
         doc = await self._repo.save(doc)
 
         await upload_to_s3(s3_key, content, mime_type)
@@ -116,13 +117,13 @@ class DocumentService:
     async def update_status(
         self,
         document_id: uuid.UUID,
-        status: str,
+        status: DocumentStatus,
         error_message: str | None = None,
     ) -> DocumentRead:
         doc = await self._repo.find(document_id)
         if doc is None:
             raise NotFoundError("Document not found")
-        doc.status = status  # type: ignore[assignment]
+        doc.status = status
         doc.error_message = error_message
         doc = await self._repo.save(doc)
         return DocumentRead.model_validate(doc)
@@ -192,12 +193,12 @@ class DocumentService:
                 content, doc.mime_type or "application/octet-stream", doc.file_type
             )
             await ChunkService(self._repo._s).store(document_id, chunks)
-            await self.update_status(document_id, "ready")
+            await self.update_status(document_id, DocumentStatus.READY)
         except Exception as err:
             message = str(err)
             logger.error("[document_processor] Error processing %s: %s", document_id, message)
             with contextlib.suppress(Exception):
-                await self.update_status(document_id, "error", message)
+                await self.update_status(document_id, DocumentStatus.ERROR, message)
 
 
 __all__ = ["DocumentService"]

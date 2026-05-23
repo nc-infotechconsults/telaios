@@ -21,8 +21,8 @@ import pytest
 
 from telaios.modules.planner.schemas import (
     PlannerThreadState,
+    PlanningSessionStatus,
     PlanResponseFormat,
-    PlanStatus,
     PlanTask,
     Question,
 )
@@ -60,7 +60,7 @@ def _empty_snapshot() -> MagicMock:
 
 def _paused_snapshot(plan: PlanResponseFormat) -> MagicMock:
     snap = MagicMock()
-    snap.values = {"plan": plan, "status": PlanStatus.AWAITING_CONFIRMATION}
+    snap.values = {"plan": plan, "status": PlanningSessionStatus.AWAITING_CONFIRMATION}
     snap.tasks = [MagicMock()]  # non-empty → paused
     return snap
 
@@ -93,7 +93,7 @@ class TestSSEBuilderHelpers:
         assert ev.data.content == "doc content"  # type: ignore[union-attr]
 
     def test_make_done(self) -> None:
-        ev = _make_done(PlanStatus.ACCEPTED)
+        ev = _make_done(PlanningSessionStatus.ACCEPTED)
         assert ev.event == "done"
         assert ev.data.status == "accepted"  # type: ignore[union-attr]
 
@@ -172,7 +172,7 @@ class TestGetState:
         assert isinstance(result, PlannerThreadState)
         assert result.thread_id == "thread-1"
         assert result.user_id == "user-1"
-        assert result.status == PlanStatus.PENDING
+        assert result.status == PlanningSessionStatus.PENDING
         assert result.plan is None
 
     @pytest.mark.asyncio
@@ -180,12 +180,12 @@ class TestGetState:
         svc, mock_graph = _make_service_with_mock_graph()
         plan = PlanResponseFormat(response="Here is the plan")
         snap = MagicMock()
-        snap.values = {"status": PlanStatus.AWAITING_CONFIRMATION, "plan": plan}
+        snap.values = {"status": PlanningSessionStatus.AWAITING_CONFIRMATION, "plan": plan}
         snap.tasks = []
         mock_graph.aget_state.return_value = snap
 
         result = await svc.get_state("thread-1", "user-1")
-        assert result.status == PlanStatus.AWAITING_CONFIRMATION
+        assert result.status == PlanningSessionStatus.AWAITING_CONFIRMATION
         assert result.plan is not None
         assert result.plan.response == "Here is the plan"
 
@@ -195,7 +195,7 @@ class TestGetState:
         mock_graph.aget_state.return_value = None
 
         result = await svc.get_state("thread-1", "user-1")
-        assert result.status == PlanStatus.PENDING
+        assert result.status == PlanningSessionStatus.PENDING
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ class TestEmitEvents:
         snap_empty = _empty_snapshot()
         snap_after = _empty_snapshot()
         snap_after.tasks = []
-        snap_after.values = {"status": PlanStatus.PENDING}
+        snap_after.values = {"status": PlanningSessionStatus.PENDING}
 
         # aget_state: first call (to decide input type), second call (final state)
         mock_graph.aget_state.side_effect = [snap_empty, snap_after]
@@ -291,7 +291,7 @@ class TestEmitEvents:
         snap_empty = _empty_snapshot()
         snap_after = MagicMock()
         snap_after.tasks = []
-        snap_after.values = {"status": PlanStatus.PENDING}
+        snap_after.values = {"status": PlanningSessionStatus.PENDING}
         mock_graph.aget_state.side_effect = [snap_empty, snap_after]
 
         chunk = MagicMock()
@@ -321,7 +321,7 @@ class TestEmitEvents:
         snap_empty = _empty_snapshot()
         snap_after = MagicMock()
         snap_after.tasks = []
-        snap_after.values = {"status": PlanStatus.PENDING}
+        snap_after.values = {"status": PlanningSessionStatus.PENDING}
         mock_graph.aget_state.side_effect = [snap_empty, snap_after]
 
         async def _with_tool_call(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:

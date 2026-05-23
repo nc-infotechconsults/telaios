@@ -49,8 +49,8 @@ from langgraph.types import Command, interrupt
 from typing_extensions import TypedDict
 
 from telaios.core.agents.planner.schemas import (
+    PlanningSessionStatus,
     PlanResponseFormat,
-    PlanStatus,
 )
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class PlannerState(TypedDict):
     """
 
     messages: Annotated[list[AnyMessage], add_messages]
-    status: PlanStatus
+    status: PlanningSessionStatus
     plan: PlanResponseFormat | None
 
 
@@ -154,11 +154,11 @@ def build_planner_graph(
         # No tool calls — get the final structured plan/questions.
         plan: PlanResponseFormat = await llm_structured.ainvoke(state["messages"], config)  # type: ignore[assignment]
 
-        new_status = state.get("status", PlanStatus.PENDING)
+        new_status = state.get("status", PlanningSessionStatus.PENDING)
         if plan.questions:
-            new_status = PlanStatus.INTERVIEWING
+            new_status = PlanningSessionStatus.INTERVIEWING
         elif plan.tasks:
-            new_status = PlanStatus.AWAITING_CONFIRMATION
+            new_status = PlanningSessionStatus.AWAITING_CONFIRMATION
 
         ai_msg = AIMessage(content=_plan_to_text(plan))
         return {
@@ -196,7 +196,7 @@ def build_planner_graph(
         # --- Route based on what the human sent ----------------------------
         if resume_value == "confirm":
             return Command(
-                update={"status": PlanStatus.ACCEPTED},
+                update={"status": PlanningSessionStatus.ACCEPTED},
                 goto="__end__",
             )
 
@@ -209,7 +209,7 @@ def build_planner_graph(
                             content=f"I have reviewed the plan and I want changes. Reason: {reason}"
                         )
                     ],
-                    "status": PlanStatus.REFUSED,
+                    "status": PlanningSessionStatus.REFUSED,
                 },
                 goto="planner_node",
             )
@@ -218,7 +218,7 @@ def build_planner_graph(
         return Command(
             update={
                 "messages": [HumanMessage(content=str(resume_value))],
-                "status": PlanStatus.INTERVIEWING,
+                "status": PlanningSessionStatus.INTERVIEWING,
             },
             goto="planner_node",
         )

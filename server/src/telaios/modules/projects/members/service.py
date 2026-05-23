@@ -20,7 +20,7 @@ class MemberService:
         return [MemberRead.model_validate(m) for m in members]
 
     async def add_member(
-        self, project_id: uuid.UUID, user_id: uuid.UUID, role: ProjectRole = "viewer"
+        self, project_id: uuid.UUID, user_id: uuid.UUID, role: ProjectRole = ProjectRole.VIEWER
     ) -> MemberRead:
         await self._repo.upsert(project_id, user_id, role)
         member = await self._repo.find_with_user(project_id, user_id)

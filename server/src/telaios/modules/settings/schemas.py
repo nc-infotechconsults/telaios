@@ -8,19 +8,14 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
 
-_HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+from telaios.domain.enums import ThemeFontFamily, ThemePreset, ThemeRadius, ThemeShadow
 
-RadiusLiteral = Literal["none", "small", "medium", "large", "full"]
-ShadowLiteral = Literal["none", "small", "medium", "large"]
-FontFamilyLiteral = Literal["system", "inter", "roboto", "helvetica", "georgia", "mono"]
-PresetLiteral = Literal[
-    "default", "corporate", "midnight", "warm", "minimal", "ocean", "forest", "sunset"
-]
+_HEX_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
 class CustomTheme(BaseModel):
@@ -32,9 +27,9 @@ class CustomTheme(BaseModel):
     content2: str | None = None
     content3: str | None = None
     divider: str | None = None
-    radius: RadiusLiteral | None = None
-    shadow: ShadowLiteral | None = None
-    font_family: FontFamilyLiteral | None = None
+    radius: ThemeRadius | None = None
+    shadow: ThemeShadow | None = None
+    font_family: ThemeFontFamily | None = None
     sidebar_background: str | None = None
 
     @field_validator(
@@ -75,7 +70,7 @@ class PatchSettingsDto(BaseModel):
     logo_url: str | None = Field(default=None, max_length=700_000)  # base64 data URL
     favicon_url: str | None = Field(default=None, max_length=150_000)  # base64 data URL
     default_theme: str | None = Field(default=None, pattern=r"^(light|dark)$")
-    theme_preset: PresetLiteral | None = None
+    theme_preset: ThemePreset | None = None
     custom_theme: CustomTheme | None = None
 
     @field_validator("logo_url", "favicon_url")

@@ -25,6 +25,8 @@ from kubernetes import client as k8s_client  # type: ignore[import-untyped]
 from kubernetes import config as k8s_config
 from kubernetes import stream as k8s_stream
 
+from telaios.domain.enums import K8sResourceKind
+
 __all__ = [
     "K8sConnectionConfig",
     "K8sPVCFileEntry",
@@ -36,22 +38,6 @@ __all__ = [
 MAX_FILE_CONTENT_SIZE = 1024 * 1024  # 1 MB
 _POLL_INTERVAL = 0.5  # seconds between pod-ready polls
 _POD_TIMEOUT = 30.0  # seconds until temp-pod timeout
-
-K8sResourceKind = Literal[
-    "pods",
-    "services",
-    "deployments",
-    "configmaps",
-    "secrets",
-    "ingresses",
-    "persistentvolumeclaims",
-    "namespaces",
-    "replicasets",
-    "statefulsets",
-    "daemonsets",
-    "jobs",
-    "cronjobs",
-]
 
 
 # ── Data classes ──────────────────────────────────────────────────────────────

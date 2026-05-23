@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-DocumentFileType = Literal["pdf", "docx", "xlsx", "md", "txt", "csv", "json", "other"]
-DocumentStatus = Literal["uploading", "processing", "ready", "error"]
-
+from telaios.domain.enums import DocumentFileType, DocumentStatus
 
 # ── Request DTOs ──────────────────────────────────────────────────────────────
 

@@ -15,24 +15,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 # ─── Shared agent JSONB sub-schemas ──────────────────────────────────────────
-
-McpToolPermission = Literal["read", "write", "execute", "require-confirmation"]
-
-McpTransport = Literal["stdio", "streamable-http"]
-
-AgentRole = Literal[
-    "planner",
-    "coder",
-    "reviewer",
-    "tester",
-    "infra",
-    "knowledge",
-    "custom",
-    "document-copilot",
-]
-
-ProjectStatus = Literal["planning", "executing", "done"]
-ProjectRole = Literal["owner", "editor", "viewer"]
+from telaios.domain.enums import (
+    AgentRole,
+    McpToolPermission,
+    McpTransport,
+    ProjectRole,
+    ProjectStatus,
+)
 
 
 class McpToolConfig(BaseModel):
@@ -136,7 +125,7 @@ class MemberRead(BaseModel):
 
 class AddMember(BaseModel):
     user_id: uuid.UUID
-    role: ProjectRole = "viewer"
+    role: ProjectRole = ProjectRole.VIEWER
 
 
 class PatchMember(BaseModel):

@@ -6,19 +6,18 @@ Ported from ``data-api/src/entities/Workspace.entity.ts``.
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.domain.enums import WorkspaceStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
     from telaios.db.models.users import User
-
-WorkspaceStatus = Literal["idle", "starting", "running", "sleeping", "error"]
 
 
 class Workspace(Base, TimestampMixin, SoftDeleteMixin):

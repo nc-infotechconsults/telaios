@@ -7,13 +7,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-EnvironmentType = Literal["kubernetes", "docker"]
-EnvironmentStatus = Literal["connected", "disconnected", "error"]
-HelmReleaseStatus = Literal["pending", "deployed", "failed", "uninstalled"]
+from telaios.domain.enums import EnvironmentStatus, EnvironmentType, HelmReleaseStatus
 
 
 class HelmReleaseRead(BaseModel):
@@ -54,7 +52,7 @@ class EnvironmentRead(BaseModel):
 
 class EnvironmentCreate(BaseModel):
     name: str = Field(min_length=1)
-    type: EnvironmentType = "kubernetes"
+    type: EnvironmentType = EnvironmentType.KUBERNETES
     namespace: str | None = None
     connection_config: dict[str, Any] | None = None
 

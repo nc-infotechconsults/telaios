@@ -6,17 +6,16 @@ Ported from ``data-api/src/entities/User.entity.ts``.
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_pk
+from telaios.domain.enums import SystemRole
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import ProjectMember
-
-SystemRole = Literal["admin", "member"]
 
 
 class User(Base, TimestampMixin, SoftDeleteMixin):

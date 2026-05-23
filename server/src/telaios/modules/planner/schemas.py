@@ -12,8 +12,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from telaios.core.agents.planner.schemas import PlanningSessionStatus as PlanningSessionStatus
 from telaios.core.agents.planner.schemas import PlanResponseFormat as PlanResponseFormat
-from telaios.core.agents.planner.schemas import PlanStatus as PlanStatus
 from telaios.core.agents.planner.schemas import PlanTask as PlanTask
 from telaios.core.agents.planner.schemas import Question as Question
 
@@ -94,7 +94,7 @@ class SSEEvent(BaseModel):
 class PlannerThreadState(BaseModel):
     thread_id: str
     user_id: str
-    status: PlanStatus
+    status: PlanningSessionStatus
     plan: PlanResponseFormat | None = None
 
 
@@ -106,9 +106,9 @@ __all__ = [
     "PausePlanReadyEventData",
     "PauseQuestionsEventData",
     "PlanResponseFormat",
-    "PlanStatus",
     "PlanTask",
     "PlannerThreadState",
+    "PlanningSessionStatus",
     "Question",
     "RefuseRequest",
     "SSEEvent",

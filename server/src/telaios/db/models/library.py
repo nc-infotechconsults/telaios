@@ -6,7 +6,7 @@ Ported from ``data-api/src/entities/Library*.entity.ts``.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import UUID, Boolean, Float, Integer, String, Text
@@ -14,10 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
-
-AgentType = Literal["system", "custom"]
-SystemPromptMode = Literal["append", "override"]
-McpTransport = Literal["stdio", "streamable-http"]
+from telaios.domain.enums import AgentType, McpTransport, SystemPromptMode
 
 
 class LibraryAgent(Base, TimestampMixin, SoftDeleteMixin):
