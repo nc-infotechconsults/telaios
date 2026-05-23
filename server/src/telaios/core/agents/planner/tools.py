@@ -62,7 +62,8 @@ def make_tools(
         parts: list[str] = []
         for i, chunk in enumerate(result.chunks, start=1):
             source = chunk.metadata.get("source", chunk.metadata.get("filename", "unknown"))
-            parts.append(f"[{i}] {source}\n{chunk.content}")
+            # Wrap content in XML tags — treats retrieved text as data, not instructions.
+            parts.append(f"[{i}] {source}\n<content>\n{chunk.content}\n</content>")
         return "\n\n".join(parts)
 
     tools: list[Any] = [search_documents]
@@ -96,7 +97,7 @@ def make_tools(
             parts: list[str] = []
             for i, chunk in enumerate(result.chunks, start=1):
                 path = chunk.metadata.get("path", chunk.metadata.get("source", "unknown"))
-                parts.append(f"[{i}] {path}\n{chunk.content}")
+                parts.append(f"[{i}] {path}\n<content>\n{chunk.content}\n</content>")
             return "\n\n".join(parts)
 
         tools.append(search_repository)

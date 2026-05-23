@@ -10,7 +10,9 @@ from fastapi import APIRouter, HTTPException, status
 from telaios.auth.dependencies import CurrentPrincipal
 from telaios.core.knowledge.factory import KnowledgePipelineFactory
 from telaios.core.knowledge.pipeline import KnowledgeQueryResult
+from telaios.core.knowledge.retrieval import score_to_tier
 from telaios.modules.knowledge.schemas import (
+    CitationRead,
     IngestDocumentsRequest,
     IngestRepositoryRequest,
     IngestResponse,
@@ -48,12 +50,24 @@ async def query_knowledge(
             content=chunk.content,
             source_collection=chunk.metadata.get("_collection", ""),
             metadata={k: v for k, v in chunk.metadata.items() if k != "_collection"},
-            score=score,
+            relevance=score_to_tier(score),
         )
         for chunk, score in zip(result.chunks, result.scores, strict=False)
     ]
+    citations = [
+        CitationRead(
+            index=c.index,
+            source_path=c.source_path,
+            symbol_name=c.symbol_name,
+            start_line=c.start_line,
+            collection=c.collection,
+        )
+        for c in result.citations
+    ]
     return KnowledgeQueryResponse(
         query=result.query,
+        answer=result.answer,
+        citations=citations,
         chunks=chunks,
         sources_searched=result.sources_searched,
         total=len(chunks),
@@ -99,7 +113,6 @@ async def ingest_repository(
     result = await pipeline.ingest_repository(
         project_id=str(project_id),
         source=source,
-        language=body.language,
     )
     return IngestResponse(
         collection=result.collection,
@@ -153,16 +166,32 @@ def _build_document_source(body: IngestDocumentsRequest) -> Any:
 
 
 def _build_repository_source(body: IngestRepositoryRequest) -> Any:
-    from telaios.core.knowledge_source import FileSource, GitHubSource
+    from telaios.core.knowledge_source import FileSource, GitHubSource, GitSource
 
     match body.source_type:
         case "github":
             if not body.repo_url:
                 raise HTTPException(status_code=400, detail="repo_url required")
-            return GitHubSource(repo_url=body.repo_url, branch=body.branch, subpath=body.subpath, token=body.token)
+            return GitHubSource(
+                repo_url=body.repo_url,
+                branch=body.branch,
+                subpath=body.subpath,
+                token=body.token,
+            )
+        case "git":
+            source = body.repo_url or body.local_path
+            if not source:
+                raise HTTPException(status_code=400, detail="repo_url or local_path required for source_type=git")
+            return GitSource(
+                source=source,
+                branch=body.branch or None,
+                subpath=body.subpath,
+                token=body.token,
+                ssh_key=body.ssh_key,
+            )
         case "file":
             if not body.local_path:
                 raise HTTPException(status_code=400, detail="local_path required for source_type=file")
-            return FileSource(path=body.local_path)
+            return FileSource(body.local_path)
         case _:
             raise HTTPException(status_code=400, detail=f"Unsupported source_type: {body.source_type}")

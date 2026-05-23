@@ -44,6 +44,20 @@ class GraphStoreProvider(StrEnum):
     MEMGRAPH = "memgraph"
 
 
+class RelevanceTier(StrEnum):
+    """Normalized RRF relevance bucket for API/UI consumers.
+
+    Derived from the normalized RRF score [0, 1]:
+      HIGH   >= 0.70  — ranked near the top by both dense and sparse retrieval
+      MEDIUM >= 0.35  — solid match in at least one retriever
+      LOW    <  0.35  — weak or single-retriever match
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class RagStrategy(StrEnum):
     SIMPLE = "simple"
     GRAPH = "graph"

@@ -99,6 +99,10 @@ class QdrantVectorStore:
 
         query_filter = Filter(must=must) if must else None
 
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            return []
+
         response = await self._client.query_points(
             collection_name=collection,
             query=vector,
@@ -136,6 +140,10 @@ class QdrantVectorStore:
                 must=[FieldCondition(key="project_id", match=MatchValue(value=project_id))]
             )
 
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            return []
+
         records, _ = await self._client.scroll(
             collection_name=collection,
             scroll_filter=query_filter,
@@ -154,8 +162,13 @@ class QdrantVectorStore:
     # ── Delete ────────────────────────────────────────────────────────────────
 
     async def delete_by_project(self, collection: str, project_id: str) -> None:
-        """Delete all points belonging to *project_id*."""
+        """Delete all points belonging to *project_id*. No-op if collection doesn't exist."""
         from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            logger.debug("Collection %r does not exist — skip delete for project %r", collection, project_id)
+            return
 
         await self._client.delete(
             collection_name=collection,
@@ -164,6 +177,54 @@ class QdrantVectorStore:
             ),
         )
         logger.info("Deleted project %r data from collection %r", project_id, collection)
+
+    async def get_generated_doc_sha(
+        self, collection: str, project_id: str, repo_path: str
+    ) -> str | None:
+        """Return the git SHA stored with previously generated docs for this repo, or None."""
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            return None
+
+        records, _ = await self._client.scroll(
+            collection_name=collection,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                    FieldCondition(key="source_type", match=MatchValue(value="generated_doc")),
+                    FieldCondition(key="repo_path", match=MatchValue(value=repo_path)),
+                ]
+            ),
+            limit=1,
+            with_payload=True,
+        )
+        if records:
+            return (records[0].payload or {}).get("git_sha")
+        return None
+
+    async def delete_generated_docs(
+        self, collection: str, project_id: str, repo_path: str
+    ) -> None:
+        """Delete all previously generated doc chunks for this repo+project."""
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            return
+
+        await self._client.delete(
+            collection_name=collection,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                    FieldCondition(key="source_type", match=MatchValue(value="generated_doc")),
+                    FieldCondition(key="repo_path", match=MatchValue(value=repo_path)),
+                ]
+            ),
+        )
+        logger.info("Deleted generated docs for repo %r project %r", repo_path, project_id)
 
 
 __all__ = ["QdrantVectorStore"]

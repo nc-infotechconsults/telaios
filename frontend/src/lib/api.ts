@@ -1182,6 +1182,25 @@ export const copilotAsk = (_projectId: string, documentId: string, question: str
 export const copilotExtract = (_projectId: string, documentId: string): Promise<CopilotExtractResult> =>
   http.post<CopilotExtractResult>(`/documents/${documentId}/copilot/extract`).then((r) => r.data);
 
+// ─── Knowledge ───────────────────────────────────────────────────────────────
+
+export interface KnowledgeQueryResult {
+  query: string;
+  answer?: string | null;
+  chunks?: Array<{ content: string; source?: string; score?: number }>;
+}
+
+export const queryKnowledge = (
+  projectId: string,
+  text: string,
+  source: "all" | "documents" | "repositories" = "all",
+): Promise<KnowledgeQueryResult> =>
+  DEMO
+    ? delay<KnowledgeQueryResult>({ query: text, answer: `Demo answer for: "${text}"` })
+    : http
+        .post<KnowledgeQueryResult>(`/projects/${projectId}/knowledge/query`, { text, source, top_k: 5 })
+        .then((r) => r.data);
+
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export const getProjectAnalytics = (

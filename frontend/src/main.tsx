@@ -21,6 +21,7 @@ import EnvironmentDetail from "./pages/EnvironmentDetail";
 import DockerShellPage from "./pages/DockerShellPage";
 import LoginPage from "./pages/Login";
 import Layout from "./components/Layout";
+import ProjectLayout from "./components/ProjectLayout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -43,9 +44,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     path="/environments/:envId/docker/shell/:containerId"
                     element={<DockerShellPage />}
                   />
+                  {/* New glassmorphism project shell — wraps all /projects/:projectId routes */}
+                  <Route path="/projects/:projectId" element={<ProjectLayout />} />
+
                   <Route element={<Layout />}>
                     <Route path="/" element={<ProjectList />} />
-                    <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                    {/* Legacy project detail — kept for backward compatibility */}
+                    <Route path="/projects/:projectId/detail" element={<ProjectDetail />} />
                     <Route path="/projects/:projectId/plans/:planId" element={<PlanningChat />} />
                     <Route path="/projects/:projectId/design" element={<DesignChat />} />
                     <Route path="/projects/:projectId/design/:designSessionId" element={<DesignChat />} />

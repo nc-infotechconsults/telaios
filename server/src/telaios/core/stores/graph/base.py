@@ -75,5 +75,17 @@ class GraphStore(ABC):
         """Async close."""
         self.close()
 
+    async def aclear(self) -> None:
+        """Delete all nodes and relationships. Override in implementations that support it."""
+
+    def get_communities(self, resolution: float = 1.0) -> list[set[str]]:
+        """Return entity clusters detected via community detection.
+
+        Each set contains entity names belonging to the same community.
+        Default implementation returns an empty list (no community detection).
+        Override in stores that support graph topology analysis.
+        """
+        return []
+
 
 __all__ = ["GraphStore"]

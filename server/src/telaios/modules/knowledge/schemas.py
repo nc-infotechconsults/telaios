@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from telaios.domain.enums import RelevanceTier
+
 
 class KnowledgeQueryRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
@@ -17,11 +19,34 @@ class KnowledgeChunkRead(BaseModel):
     content: str
     source_collection: str
     metadata: dict[str, Any]
-    score: float
+    relevance: RelevanceTier = Field(
+        ...,
+        description=(
+            "Relevance tier derived from normalized RRF score. "
+            "high ≥ 0.70 · medium ≥ 0.35 · low < 0.35"
+        ),
+    )
+
+
+class CitationRead(BaseModel):
+    index: int
+    source_path: str
+    symbol_name: str | None = None
+    start_line: int | None = None
+    collection: str
 
 
 class KnowledgeQueryResponse(BaseModel):
     query: str
+    answer: str | None = Field(
+        default=None,
+        description="LLM-synthesized answer with inline [N] citations. "
+                    "None when no chunks were retrieved or generation is disabled.",
+    )
+    citations: list[CitationRead] = Field(
+        default_factory=list,
+        description="Sources cited in the answer, in citation order.",
+    )
     chunks: list[KnowledgeChunkRead]
     sources_searched: list[str]
     total: int
@@ -38,11 +63,12 @@ class IngestDocumentsRequest(BaseModel):
 
 
 class IngestRepositoryRequest(BaseModel):
-    source_type: Literal["file", "github"] = "github"
+    source_type: Literal["file", "github", "git"] = "github"
     repo_url: str | None = None
     branch: str = "main"
-    subpath: str = "/"
+    subpath: str = ""
     token: str | None = None
+    ssh_key: str | None = None
     local_path: str | None = None
     language: str = "python"
 

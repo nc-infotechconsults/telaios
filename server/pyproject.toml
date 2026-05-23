@@ -62,6 +62,13 @@ graph = [
     "neo4j>=5.0",
     "falkordb>=1.0",
 ]
+treesitter = [
+    "tree-sitter>=0.24",
+    "tree-sitter-python>=0.24",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-javascript>=0.23",
+]
 
 [dependency-groups]
 dev = [
@@ -85,15 +92,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-telaios-eval = "telaios.cli.app:main"
+telaios-cli = "telaios.cli.app:main"
 telaios-planner = "telaios.cli.planner_tui:main"
 telaios-api = "telaios.main:app"
 serve-llm = "telaios.cli.serve_llm:main"
-
-[tool.uv.scripts]
-# Kept as alias for uv installations that support [tool.uv.scripts].
-# Homebrew uv users: use "uv run serve-llm" via the [project.scripts] entry point above.
-serve-llm = "vllm-mlx serve mlx-community/Qwen3.5-9B-MLX-4bit --port 8000 --continuous-batching --enable-prefix-cache --reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen --max-tokens 16384"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/telaios"]
@@ -110,4 +112,6 @@ markers = [
     "integration: tests that require external services (postgres, redis)",
     "live: tests that call real LLM APIs (requires LIVE_LLM_TESTS=1 and a valid API key)",
     "requires_qdrant: tests that require a running Qdrant instance",
+    "requires_neo4j: tests that require a running Neo4j instance",
+    "requires_falkordb: tests that require a running FalkorDB instance",
 ]

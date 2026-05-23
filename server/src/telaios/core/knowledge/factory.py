@@ -222,6 +222,11 @@ class KnowledgePipelineFactory:
             config=config,
         )
 
+        docgen = None
+        if config.docgen_enabled:
+            from telaios.core.knowledge.docgen import RepoDocGenerator
+            docgen = RepoDocGenerator(llm=llm, config=config)
+
         return KnowledgeBasePipeline(
             vector_store=vector_store,
             bm25_store=bm25_store,
@@ -230,6 +235,7 @@ class KnowledgePipelineFactory:
             llm=llm,
             ingestion=ingestion,
             config=config,
+            docgen=docgen,
         )
 
 

@@ -7,6 +7,18 @@
    ============================================================ */
 
 :root {
+  /* ── Glass design system ── */
+  --blur: 28px;
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-strong: rgba(255, 255, 255, 0.72);
+  --glass-weak: rgba(255, 255, 255, 0.35);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --hairline: rgba(20, 20, 30, 0.08);
+  --hover-glass: rgba(20, 20, 30, 0.045);
+  --shadow-glass-panel: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 6px 18px -8px rgba(20, 20, 40, 0.18);
+  --shadow-glass-lg: 0 30px 80px -30px rgba(20, 20, 40, 0.35), 0 12px 32px -16px rgba(20, 20, 40, 0.2);
+  --radius-glass: 22px;
+
   /* ── San Francisco system font stack ── */
   --font-sf: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
              "Helvetica Neue", "Inter", "Segoe UI", Roboto, Arial, sans-serif;
@@ -176,8 +188,29 @@
   }
 }
 
+/* ── Dark glass overrides ── */
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    --glass: rgba(28, 28, 30, 0.65);
+    --glass-strong: rgba(36, 36, 40, 0.80);
+    --glass-weak: rgba(28, 28, 30, 0.40);
+    --glass-edge: rgba(255, 255, 255, 0.12);
+    --hairline: rgba(255, 255, 255, 0.06);
+    --hover-glass: rgba(255, 255, 255, 0.04);
+    --shadow-glass-panel: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 6px 18px -8px rgba(0, 0, 0, 0.50);
+  }
+}
+
 /* ── .dark class overrides (Tailwind class-based dark mode) ── */
 .dark {
+  --glass: rgba(28, 28, 30, 0.65);
+  --glass-strong: rgba(36, 36, 40, 0.80);
+  --glass-weak: rgba(28, 28, 30, 0.40);
+  --glass-edge: rgba(255, 255, 255, 0.12);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --hover-glass: rgba(255, 255, 255, 0.04);
+  --shadow-glass-panel: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 6px 18px -8px rgba(0, 0, 0, 0.50);
+
   --bg-primary:           #1c1c1e;
   --bg-secondary:         #2c2c2e;
   --bg-tertiary:          #3a3a3c;
@@ -557,6 +590,68 @@ body, button, input, textarea, select {
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* ============================================================
+   PROJECT SHELL GLASS PANELS
+   ============================================================ */
+
+.glass-panel {
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  border: 0.5px solid var(--glass-edge);
+  box-shadow: var(--shadow-glass-panel);
+  border-radius: var(--radius-glass);
+  position: relative;
+}
+
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 38%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark .glass-panel::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 38%);
+}
+
+.glass-panel-strong {
+  background: var(--glass-strong);
+  backdrop-filter: blur(var(--blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(180%);
+  border: 0.5px solid var(--glass-edge);
+  box-shadow: var(--shadow-glass-panel);
+  border-radius: var(--radius-glass);
+  position: relative;
+}
+
+.glass-panel-strong::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 38%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark .glass-panel-strong::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 38%);
+}
+
+@keyframes teosOrbPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(10,132,255,0.18), 0 0 12px rgba(191,90,242,0.5); }
+  50%       { box-shadow: 0 0 0 4px rgba(10,132,255,0.25), 0 0 20px rgba(191,90,242,0.7); }
+}
+
+@keyframes typingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-4px); opacity: 1; }
 }
 
 /* ============================================================

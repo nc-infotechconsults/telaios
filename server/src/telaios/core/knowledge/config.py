@@ -57,7 +57,7 @@ class KnowledgePipelineConfig(BaseModel):
     repositories_collection: str = "repositories"
 
     # Retrieval
-    top_k: int = 5
+    top_k: int = 10
     rrf_k: int = 60
     hyde_enabled: bool = True
 
@@ -72,6 +72,13 @@ class KnowledgePipelineConfig(BaseModel):
 
     # Ingestion — code (AST chunker)
     code_chunk_max_lines: int = 150
+
+    # Generation (RAG answer synthesis)
+    generation_enabled: bool = True
+    generation_max_context_chars: int = 12000  # total chars of chunk content fed to LLM
+
+    # Documentation generation (LLM-driven repo doc synthesis)
+    docgen_enabled: bool = True
 
 
 __all__ = ["EmbeddingConfig", "GraphStoreConfig", "KnowledgePipelineConfig", "QdrantConfig"]

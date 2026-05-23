@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Cypher for batched triplet upsert
 _MERGE_TRIPLETS_CYPHER = """
 UNWIND $triplets AS t
 MERGE (s:Entity {name: t.subject})
@@ -20,13 +19,16 @@ MERGE (o:Entity {name: t.object})
 MERGE (s)-[r:RELATION {type: t.predicate}]->(o)
 """
 
-_SUBGRAPH_CYPHER = """
-MATCH path = (e:Entity)-[*1..{depth}]-(n)
-WHERE e.name IN $entities
-WITH relationships(path) AS rels
-UNWIND rels AS r
-RETURN startNode(r).name AS subject, r.type AS predicate, endNode(r).name AS object
-"""
+# Undirected traversal: expand up to $depth hops from any seed entity,
+# decompose each path into individual edges and return unique triplets.
+_SUBGRAPH_CYPHER = (
+    "MATCH path = (e:Entity)-[*1..{depth}]-(n) "
+    "WHERE e.name IN $entities "
+    "WITH relationships(path) AS rels "
+    "UNWIND rels AS r "
+    "RETURN DISTINCT "
+    "startNode(r).name AS subject, r.type AS predicate, endNode(r).name AS object"
+)
 
 
 class Neo4jGraphStore(GraphStore):
@@ -49,7 +51,7 @@ class Neo4jGraphStore(GraphStore):
         self._driver = AsyncGraphDatabase.driver(config.uri or "bolt://localhost:7687", auth=auth)
         self._database = config.database
 
-    # ── Sync stubs (Neo4j is async-first) ────────────────────────────────────
+    # ── Sync stubs — Neo4j driver is async-first ──────────────────────────────
 
     def add_triplet(self, subject: str, predicate: str, obj: str) -> None:
         raise NotImplementedError("Use aadd_triplet for Neo4jGraphStore.")
@@ -74,42 +76,32 @@ class Neo4jGraphStore(GraphStore):
         await self.aadd_triplets([(subject, predicate, obj)])
 
     async def aadd_triplets(self, triplets: list[tuple[str, str, str]]) -> None:
-        payload = [
-            {"subject": s, "predicate": p, "object": o} for s, p, o in triplets
-        ]
+        payload = [{"subject": s, "predicate": p, "object": o} for s, p, o in triplets]
         async with self._driver.session(database=self._database) as session:
             await session.run(_MERGE_TRIPLETS_CYPHER, triplets=payload)
 
-    async def aquery(self, cypher_or_pattern: str) -> list[dict[str, Any]]:
+    async def aquery(
+        self, cypher_or_pattern: str, **params: Any
+    ) -> list[dict[str, Any]]:
         async with self._driver.session(database=self._database) as session:
-            result = await session.run(cypher_or_pattern)
+            result = await session.run(cypher_or_pattern, **params)
             return [dict(record) async for record in result]
 
     async def aget_subgraph(
         self, center_entities: list[str], depth: int = 2
     ) -> list[tuple[str, str, str]]:
         cypher = _SUBGRAPH_CYPHER.format(depth=depth)
-        rows = await self.aquery(
-            f"MATCH path = (e:Entity)-[*1..{depth}]-(n) WHERE e.name IN $entities "
-            "WITH relationships(path) AS rels UNWIND rels AS r "
-            "RETURN startNode(r).name AS subject, r.type AS predicate, endNode(r).name AS object"
-        )
-        # Re-run with params
         async with self._driver.session(database=self._database) as session:
-            result = await session.run(
-                "MATCH path = (e:Entity)-[*1.."
-                + str(depth)
-                + "]-(n) WHERE e.name IN $entities "
-                "WITH relationships(path) AS rels UNWIND rels AS r "
-                "RETURN startNode(r).name AS subject, r.type AS predicate, endNode(r).name AS object",
-                entities=center_entities,
-            )
+            result = await session.run(cypher, entities=center_entities)
             rows = [dict(r) async for r in result]
         return [(r["subject"], r["predicate"], r["object"]) for r in rows]
 
     async def aextract_entities(self, text: str) -> list[tuple[str, str, str]]:
-        # Entity extraction is LLM-driven; handled by GraphAugmentor, not the store.
         return []
+
+    async def aclear(self) -> None:
+        """Delete all nodes and relationships (used in tests)."""
+        await self.aquery("MATCH (n) DETACH DELETE n")
 
     async def aclose(self) -> None:
         await self._driver.close()

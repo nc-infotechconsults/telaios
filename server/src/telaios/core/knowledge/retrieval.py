@@ -7,8 +7,18 @@ from typing import Any
 
 from telaios.core.retriever import Retriever
 from telaios.core.types import Chunk, RetrievalQuery, RetrievalResult
+from telaios.domain.enums import RelevanceTier
 
 logger = logging.getLogger(__name__)
+
+
+def score_to_tier(normalized_score: float) -> RelevanceTier:
+    """Convert a normalized RRF score [0, 1] to a RelevanceTier."""
+    if normalized_score >= 0.70:
+        return RelevanceTier.HIGH
+    if normalized_score >= 0.35:
+        return RelevanceTier.MEDIUM
+    return RelevanceTier.LOW
 
 
 def _reciprocal_rank_fusion(
@@ -88,21 +98,23 @@ class HybridRetriever(Retriever):
         )
 
         # 4. RRF fusion
-        fused = _reciprocal_rank_fusion(
-            [dense_results, sparse_results],
-            k=self._rrf_k,
-        )[:top_k]
+        ranked_lists = [dense_results, sparse_results]
+        fused = _reciprocal_rank_fusion(ranked_lists, k=self._rrf_k)[:top_k]
+
+        # Normalize to [0, 1]: divide by theoretical max (top rank in every list)
+        # max_rrf = num_lists / (k + 1)
+        max_rrf = len(ranked_lists) / (self._rrf_k + 1)
 
         chunks = []
         scores = []
-        for doc, score in fused:
+        for doc, raw_score in fused:
             chunks.append(Chunk(
                 id=doc.get("id", ""),
                 document_id=doc.get("metadata", {}).get("document_id", ""),
                 content=doc.get("content", ""),
                 metadata=doc.get("metadata", {}),
             ))
-            scores.append(score)
+            scores.append(min(raw_score / max_rrf, 1.0))
 
         return RetrievalResult(chunks=chunks, scores=scores)
 

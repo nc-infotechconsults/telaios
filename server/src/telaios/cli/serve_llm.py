@@ -12,13 +12,16 @@ import sys
 _CMD = [
     "vllm-mlx",
     "serve",
-    "mlx-community/Qwen3.5-9B-MLX-4bit",
+    "mlx-community/gemma-4-e2b-it-4bit",
+    # "mlx-community/Qwen3.5-9B-MLX-4bit",
     "--port", "8000",
-    "--continuous-batching",
+    # "--continuous-batching",
     "--enable-prefix-cache",
-    "--reasoning-parser", "qwen3",
+    # "--reasoning-parser", "qwen3",
+    "--reasoning-parser", "gemma4",
     "--enable-auto-tool-choice",
-    "--tool-call-parser", "qwen",
+    "--tool-call-parser", "gemma4",
+    # "--tool-call-parser", "qwen",
     "--max-tokens", "16384",
 ]
 
