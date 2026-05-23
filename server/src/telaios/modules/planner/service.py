@@ -167,7 +167,7 @@ class PlannerService:
 
             from telaios.config.settings import settings
             from telaios.core.agents.planner.tools import make_tools
-            from telaios.core.chroma_retriever import ChromaRetriever
+            from telaios.core.knowledge.factory import KnowledgePipelineFactory
 
             # LLM -----------------------------------------------------------
             llm_kwargs: dict[str, Any] = {
@@ -180,24 +180,12 @@ class PlannerService:
                 llm_kwargs["base_url"] = settings.LLM_BASE_URL
             llm = init_chat_model(**llm_kwargs)
 
-            # Retrievers ----------------------------------------------------
-            import os
-
-            import chromadb
-
-            chroma_host = os.environ.get("CHROMA_HOST", "localhost")
-            chroma_port = int(os.environ.get("CHROMA_PORT", "8001"))
-            chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
-            docs_retriever = ChromaRetriever.from_client(chroma_client, "documents")
-
-            repos_retriever: ChromaRetriever | None = None
-            try:
-                chroma_client.get_collection("repositories")
-                repos_retriever = ChromaRetriever.from_client(chroma_client, "repositories")
-            except Exception:
-                logger.info(
-                    "No 'repositories' Chroma collection found; search_repository tool disabled"
-                )
+            # Knowledge pipeline — retrieval (no project_id at singleton level;
+            # project context is passed per-query inside the tool closures)
+            pipeline = await KnowledgePipelineFactory.get()
+            docs_retriever = pipeline.get_retriever("documents", project_id=None)
+            repos_retriever = pipeline.get_retriever("repositories", project_id=None)
+            await pipeline.warm_up()
 
             tools_list = make_tools(docs_retriever, repos_retriever)
 

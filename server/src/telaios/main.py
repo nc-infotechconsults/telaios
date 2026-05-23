@@ -49,6 +49,7 @@ from telaios.modules.health import health_router
 from telaios.modules.internal import internal_router
 from telaios.modules.library import library_router
 from telaios.modules.messages import messages_router
+from telaios.modules.knowledge import knowledge_router
 from telaios.modules.planner import planner_router
 from telaios.modules.plans import plan_router, project_plans_router
 from telaios.modules.projects import agents_router, members_router, projects_router
@@ -108,6 +109,7 @@ _MODULES: dict[str, list[APIRouter]] = {
     "containers": [containers_router],
     "docker_shell": [docker_shell_router],
     "planner": [planner_router],
+    "knowledge": [knowledge_router],
 }
 
 
@@ -116,6 +118,12 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     logger.info("telaios starting")
     await ensure_bucket_exists()
+    try:
+        from telaios.core.knowledge.factory import KnowledgePipelineFactory
+        pipeline = await KnowledgePipelineFactory.get()
+        await pipeline.warm_up()
+    except Exception:
+        logger.warning("Knowledge pipeline warm-up failed; continuing startup", exc_info=True)
     try:
         yield
     finally:

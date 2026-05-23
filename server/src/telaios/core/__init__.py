@@ -10,6 +10,11 @@ Factory functions (preferred entry points)::
 Domain types::
 
     from telaios.core.types import AgentConfig, LLMConfig, Message, ...
+
+Knowledge pipeline::
+
+    from telaios.core.knowledge import KnowledgeBasePipeline, KnowledgePipelineConfig
+    from telaios.core.knowledge.factory import KnowledgePipelineFactory
 """
 
 from __future__ import annotations
@@ -18,8 +23,6 @@ import logging
 
 from telaios.core.agent import LangChainAgent
 from telaios.core.checkpoint import PostgresCheckpointer
-from telaios.core.chroma_embedding import ChromaEmbeddingFunction
-from telaios.core.chroma_retriever import ChromaRetriever
 from telaios.core.factory import (
     _build_llm_config,
     create_agent,
@@ -27,7 +30,7 @@ from telaios.core.factory import (
     create_llm,
 )
 from telaios.core.fake_llm import FakeLLM
-from telaios.core.graph_store import GraphStore
+from telaios.core.knowledge import KnowledgeBasePipeline, KnowledgePipelineConfig
 from telaios.core.knowledge_source import (
     DoclingSource,
     FileSource,
@@ -38,8 +41,7 @@ from telaios.core.knowledge_source import (
     URLSource,
 )
 from telaios.core.llm import LLM, LangChainLLM, build_llm
-from telaios.core.rag_manager import RagManager
-from telaios.core.strategy_selector import StrategySelector
+from telaios.core.stores.graph import GraphStore
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +57,11 @@ __all__ = [  # noqa: RUF022
     "build_llm",
     # Graph store
     "GraphStore",
-    # RAG / Chroma
-    "ChromaEmbeddingFunction",
-    "ChromaRetriever",
+    # Knowledge pipeline
+    "KnowledgeBasePipeline",
+    "KnowledgePipelineConfig",
+    # Utils
     "FakeLLM",
-    "RagManager",
     # Knowledge sources
     "KnowledgeSource",
     "SourceDocument",
@@ -68,8 +70,6 @@ __all__ = [  # noqa: RUF022
     "URLSource",
     "GitHubSource",
     "DoclingSource",
-    # Strategy
-    "StrategySelector",
     # Factory
     "create_agent",
     "create_agent_with_config",

@@ -1,25 +1,14 @@
-"""
-tools/builtin/documents/chunking.py
-------------------------------------
-Public document chunking API.
+"""tools/builtin/documents/chunking.py — Public document chunking API.
 
-Strategy implementations live in smaller sibling modules so each file stays
-within the migration size budget.
+Delegates to the canonical chunkers in ``core.chunkers``.
 """
 
 from __future__ import annotations
 
 from typing import Any, ClassVar
 
+from telaios.core.chunkers import ASTChunker, Chunker, ChunkMetadata, SemanticChunker
 from telaios.core.types import Chunk, ChunkingConfig, Document
-from telaios.tools.builtin.documents.chunking_base import Chunker, ChunkMetadata
-from telaios.tools.builtin.documents.chunking_semantic import SemanticChunker
-from telaios.tools.builtin.documents.chunking_structural import (
-    CharacterChunker,
-    HierarchicalChunker,
-    PageChunker,
-    TokenChunker,
-)
 
 
 class ChunkerFactory:
@@ -27,15 +16,11 @@ class ChunkerFactory:
 
     _REGISTRY: ClassVar[dict[str, type[Chunker]]] = {
         "semantic": SemanticChunker,
-        "hierarchical": HierarchicalChunker,
-        "page": PageChunker,
-        "token": TokenChunker,
-        "character": CharacterChunker,
+        "ast": ASTChunker,
     }
 
     @classmethod
     def create(cls, strategy: str, **kwargs: Any) -> Chunker:
-        """Create a chunker by strategy name."""
         chunker_cls = cls._REGISTRY.get(strategy.lower())
         if chunker_cls is None:
             raise ValueError(
@@ -45,7 +30,6 @@ class ChunkerFactory:
 
     @classmethod
     def available_strategies(cls) -> list[str]:
-        """Return list of available chunking strategies."""
         return list(cls._REGISTRY.keys())
 
 
@@ -53,11 +37,7 @@ def chunk_document(
     document: Document,
     config: ChunkingConfig = ChunkingConfig(),
 ) -> list[Chunk]:
-    """
-    Split a document into ``Chunk`` objects based on the configured strategy.
-
-    Returns chunks with ``document_id`` and ``metadata`` populated.
-    """
+    """Split a document into Chunk objects based on the configured strategy."""
     chunker = ChunkerFactory.create(
         config.strategy,
         chunk_size=config.chunk_size,
@@ -81,6 +61,11 @@ def chunk_document(
                     "heading": meta.heading,
                     "level": meta.level,
                     "page": meta.page,
+                    "symbol_name": meta.symbol_name,
+                    "symbol_type": meta.symbol_type,
+                    "start_line": meta.start_line,
+                    "end_line": meta.end_line,
+                    "language": meta.language,
                 },
             )
         )
@@ -89,28 +74,21 @@ def chunk_document(
 
 def chunk_text(
     text: str,
-    chunk_size: int = 500,
-    overlap: int = 50,
-    strategy: str = "character",
+    chunk_size: int = 512,
+    overlap: int = 64,
+    strategy: str = "semantic",
 ) -> list[str]:
-    """
-    Split text into plain chunk strings (no metadata).
-
-    Backward-compatible wrapper. Defaults to ``"character"`` strategy.
-    """
+    """Split text into plain chunk strings (no metadata)."""
     chunker = ChunkerFactory.create(strategy, chunk_size=chunk_size, overlap=overlap)
     return [chunk for chunk, _ in chunker.chunk(text)]
 
 
 __all__ = [
-    "CharacterChunker",
+    "ASTChunker",
     "ChunkMetadata",
     "Chunker",
     "ChunkerFactory",
-    "HierarchicalChunker",
-    "PageChunker",
     "SemanticChunker",
-    "TokenChunker",
     "chunk_document",
     "chunk_text",
 ]

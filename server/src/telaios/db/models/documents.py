@@ -183,8 +183,8 @@ class DocumentTemplate(Base, TimestampMixin):
 class DocumentChunk(Base):
     """RAG chunk of a document (``document_chunks`` table).
 
-    Embeddings are stored in Chroma, not PostgreSQL.  The ``chroma_doc_id``
-    field links this row to its embedding in the Chroma collection.
+    Embeddings are stored in Qdrant, not PostgreSQL.  The ``qdrant_point_id``
+    field links this row to its point in the Qdrant collection.
     """
 
     __tablename__ = "document_chunks"
@@ -195,7 +195,7 @@ class DocumentChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    chroma_doc_id: Mapped[str | None] = mapped_column(
+    qdrant_point_id: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
     )

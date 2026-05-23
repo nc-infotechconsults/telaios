@@ -1,8 +1,4 @@
-"""Document chunks service — Chroma-backed.
-
-Embeddings are stored in Chroma; PostgreSQL holds text content and
-metadata only.
-"""
+"""Document chunks service — Qdrant-backed."""
 
 from __future__ import annotations
 
@@ -11,27 +7,15 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telaios.core.rag_manager import RagManager
 from telaios.modules.documents.chunks.repository import ChunkRepository
 
 
 class ChunkService:
-    def __init__(
-        self,
-        session: AsyncSession,
-        rag: RagManager | None = None,
-    ) -> None:
-        self._repo = ChunkRepository(session, rag=rag)
+    def __init__(self, session: AsyncSession) -> None:
+        self._repo = ChunkRepository(session)
 
-    async def store(
-        self,
-        document_id: uuid.UUID,
-        chunks: list[dict[str, Any]],
-    ) -> int:
-        """Replace existing chunks with *chunks* (text + optional metadata).
-
-        Chroma handles embedding generation automatically.
-        """
+    async def store(self, document_id: uuid.UUID, chunks: list[dict[str, Any]]) -> int:
+        """Replace existing chunks. Qdrant handles embedding generation."""
         await self._repo.delete_by_document(document_id)
         stored = await self._repo.bulk_create(document_id, chunks)
         return len(stored)
@@ -46,11 +30,6 @@ class ChunkService:
         limit: int = 8,
         document_id: uuid.UUID | None = None,
     ) -> list[dict[str, Any]]:
-        """Similarity search via Chroma (embedding + retrieval).
-
-        The *query* parameter is now a text string — Chroma embeds it
-        automatically.
-        """
         return await self._repo.search_by_embedding(
             project_id, query, limit=limit, document_id=document_id
         )

@@ -34,8 +34,8 @@ def make_tools(
     """Build and return the planner tool list.
 
     Args:
-        documents_retriever: ChromaRetriever for the ``documents`` collection.
-        repositories_retriever: Optional ChromaRetriever for ``repositories``.
+        documents_retriever: HybridRetriever for the ``documents`` collection.
+        repositories_retriever: Optional HybridRetriever for ``repositories``.
             When ``None``, ``search_repository`` is omitted from the tool list.
 
     Returns:

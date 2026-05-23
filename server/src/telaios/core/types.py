@@ -304,13 +304,9 @@ class EmbeddingConfig(BaseModel):
 
 
 class VectorStoreConfig(BaseModel):
-    """
-    Connection and collection settings for a vector database.
+    """Connection and collection settings for a vector database (Qdrant)."""
 
-    Supported providers: chroma, chroma:persistent, chroma:http, chroma:cloud
-    """
-
-    provider: str
+    provider: str = "qdrant"
     connection_string: str | None = None
     collection: str = "default"
     extra: dict[str, Any] = {}
@@ -346,77 +342,15 @@ class ChunkingConfig(BaseModel):
     max_chunks: int | None = None
 
 
-class RerankerConfig(BaseModel):
-    """Configuration for document reranking."""
-
-    provider: str = ""  # cross_encoder | voyage | cohere
-    model: str | None = None
-    api_key: str = ""
-    base_url: str | None = None
-    top_k: int | None = None
-    extra: dict[str, Any] = {}
-
-
-class HybridRAGConfig(BaseModel):
-    """Strategy-specific settings for hybrid retrieval."""
-
-    vector_weight: float = 0.5
-    bm25_weight: float = 0.5
-    top_k: int = 5
-    rrf_k: int = 60
-
-
-class AgenticRAGConfig(BaseModel):
-    """Strategy-specific settings for agentic RAG."""
-
-    max_iterations: int = 3
-    retrieval_threshold: float = 0.7
-
-
-class CRAGConfig(BaseModel):
-    """Strategy-specific settings for corrective RAG."""
-
-    grade_threshold: float = 0.6
-    max_retries: int = 2
-
-
-class SelfRAGConfig(BaseModel):
-    """Strategy-specific settings for self-reflective RAG."""
-
-    reflection_threshold: float = 0.7
-    max_reflections: int = 2
-
-
-class CompressorConfig(BaseModel):
-    """Configuration for contextual compression."""
-
-    strategy: str = "keyword"  # llm | embedding | keyword
-    max_sentences: int = 3
-    min_sentence_length: int = 20
-
-
 class RagConfig(BaseModel):
-    """Full configuration for a RAG pipeline."""
+    """Legacy RAG config — kept for backwards compatibility. Use KnowledgePipelineConfig."""
 
-    strategy: RagStrategy = RagStrategy.SIMPLE
-    llm: LLMConfig | None = None  # LLM used for the generation step
-    embedding: EmbeddingConfig | None = None
-    vector_store: VectorStoreConfig | None = None
-    graph_store: GraphStoreConfig | None = None
+    strategy: RagStrategy = RagStrategy.HYBRID
     top_k: int = 5
     chunk_size: int = 512
     chunk_overlap: int = 64
     chunking: ChunkingConfig = ChunkingConfig()
-    reranker: RerankerConfig | None = None
-    compressor: CompressorConfig | None = None
-    hybrid: HybridRAGConfig | None = None
-    agentic: AgenticRAGConfig | None = None
-    crag: CRAGConfig | None = None
-    self_rag: SelfRAGConfig | None = None
-    max_retrieval_rounds: int = 3
-    fallback_search_provider: str | None = None  # tavily | brave | serper
-    framework: str = "langchain"
-    extra: dict[str, Any] = {}  # strategy-specific parameters (rrf_k, depth, etc.)
+    extra: dict[str, Any] = {}
 
 
 # ── Agent configuration ───────────────────────────────────────────────────────
@@ -446,11 +380,8 @@ __all__ = [
     "AgentConfig",
     "AgentInput",
     "AgentOutput",
-    "AgenticRAGConfig",
-    "CRAGConfig",
     "Chunk",
     "ChunkingConfig",
-    "CompressorConfig",
     "Document",
     "DocumentMetadata",
     "EmbeddingConfig",
@@ -459,7 +390,6 @@ __all__ = [
     "GuardrailAction",
     "GuardrailConfig",
     "GuardrailRule",
-    "HybridRAGConfig",
     "InputGuardrailConfig",
     "LLMConfig",
     "McpAudioContent",
@@ -474,10 +404,8 @@ __all__ = [
     "OutputGuardrailConfig",
     "RagConfig",
     "RagStrategy",
-    "RerankerConfig",
     "RetrievalQuery",
     "RetrievalResult",
-    "SelfRAGConfig",
     "Skill",
     "StreamEvent",
     "StreamEventType",

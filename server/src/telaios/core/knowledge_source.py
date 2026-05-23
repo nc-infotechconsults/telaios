@@ -46,11 +46,8 @@ class SourceDocument:
         self.source_path = source_path
         self.metadata = metadata or {}
 
-    def to_chroma(self) -> tuple[str, str, dict[str, Any]]:
-        """Return (id, document, metadata) for Chroma ``collection.add()``.
-
-        Source: https://docs.trychroma.com/docs/collections/add-data
-        """
+    def to_dict(self) -> tuple[str, str, dict[str, Any]]:
+        """Return (id, content, metadata) for vector store ingestion."""
         meta = {
             **self.metadata,
             "title": self.title,
@@ -58,6 +55,10 @@ class SourceDocument:
             "source_path": self.source_path,
         }
         return self.id, self.content, meta
+
+    def to_chroma(self) -> tuple[str, str, dict[str, Any]]:
+        """Backwards-compatible alias for to_dict."""
+        return self.to_dict()
 
 
 # ── Knowledge source ABC ─────────────────────────────────────────────────────
@@ -67,7 +68,7 @@ class KnowledgeSource(ABC):
     """Abstract base for any knowledge source (file, URL, repo, text).
 
     Subclasses implement ``extract()`` which returns a list of
-    ``SourceDocument`` objects ready for Chroma ingestion.
+    ``SourceDocument`` objects ready for vector store ingestion.
     """
 
     def __init__(self, label: str = "") -> None:

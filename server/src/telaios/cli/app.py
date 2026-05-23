@@ -59,16 +59,12 @@ from telaios.core.knowledge_source import (
     TextSource,
     URLSource,
 )
-from telaios.core.rag_manager import RagManager
+from telaios.core.knowledge.factory import KnowledgePipelineFactory
 from telaios.core.types import (
     AgentInput,
-    EmbeddingConfig,
     Message,
     MessageRole,
-    RagConfig,
-    RagStrategy,
     RetrievalQuery,
-    VectorStoreConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,13 +84,7 @@ _SOURCE_TYPES: list[tuple[str, str]] = [
 ]
 
 _PROFILES: list[tuple[str, str]] = [
-    ("auto", "Auto — system picks best strategy"),
-    ("simple", "Simple RAG — one-shot retrieve → answer"),
-    ("hybrid", "Hybrid RAG — dense + sparse → RRF fusion"),
-    ("crag", "CRAG — grade → rewrite → fallback"),
-    ("self_rag", "Self-RAG — reflect → regenerate"),
-    ("agentic", "Agentic RAG — multi-hop retrieval"),
-    ("graph", "Graph RAG — knowledge graph traversal"),
+    ("hybrid", "Hybrid RAG — HyDE + dense + BM25 + RRF + graph augmentation"),
 ]
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
@@ -214,14 +204,11 @@ class ExecutionPlan:
         ]
 
 
-# ── RagManager factory ──────────────────────────────────────────────────────
+# ── Pipeline helper ──────────────────────────────────────────────────────────
 
 
-def _init_rag() -> RagManager:
-    return RagManager(
-        vector_store=VectorStoreConfig(provider="chroma"),
-        embedding=EmbeddingConfig(provider="fastembed", model="BAAI/bge-small-en-v1.5"),
-    )
+async def _get_pipeline():
+    return await KnowledgePipelineFactory.get()
 
 
 # ── TUI App ──────────────────────────────────────────────────────────────────
@@ -240,15 +227,9 @@ class TelaiOSEval(App[None]):
 
     def __init__(self) -> None:
         super().__init__()
-        self._rag: RagManager | None = None
         self._plan: ExecutionPlan | None = None
         self._corpus_stats: dict[str, Any] | None = None
         self._activity_log: list[str] = []
-
-    def _get_rag(self) -> RagManager:
-        if self._rag is None:
-            self._rag = _init_rag()
-        return self._rag
 
     def _log(self, text: str) -> None:  # type: ignore[override]
         """Append to activity log and push to any visible log widgets."""
@@ -374,88 +355,68 @@ class TelaiOSEval(App[None]):
         profile: str,
         log: RichLog,
     ) -> None:
-        rag = self._get_rag()
+        pipeline = await _get_pipeline()
+        project_id = "tui-default"
         self._log(f"Knowledge ingest: type={source_type} value={source_value[:80]}")
         log.write(f"[bold]Scanning [yellow]{source_type}[/yellow]:[/bold] {source_value}")
 
         try:
-            source: Any
             match source_type:
                 case "folder":
                     folder = Path(source_value)
                     if not folder.is_dir():  # noqa: ASYNC240
                         log.write("[red]Folder not found: {source_value}[/red]")
                         return
-                    # Scan folder structure
                     files = list(folder.rglob("*"))  # noqa: ASYNC240
                     text_files = [f for f in files if f.is_file() and _is_text_file(f)]
                     doc_files = [f for f in files if f.is_file() and _is_docling_file(f)]
                     log.write("\n[bold]Scan results:[/bold]")
-                    log.write(f"  Total files: {len(files)}")
-                    log.write(f"  Text files: {len(text_files)} (.py, .md, .json, .yaml, …)")
-                    log.write(f"  Documents: {len(doc_files)} (.pdf, .docx, .pptx, .xlsx)")
+                    log.write(f"  Text files: {len(text_files)}, Documents: {len(doc_files)}")
 
-                    # Ingest text files
+                    doc_count = 0
+                    chunk_count = 0
                     if text_files:
-                        log.write(f"\n[bold]Ingesting {len(text_files)} text files…[/bold]")
-                        paths = [str(f) for f in text_files]
-                        source = FileSource(*paths, label=f"Folder: {folder.name}")
-                        stats = await rag.ingest_from_source(
-                            source, collection_name=_COLLECTION_NAME
-                        )
-                        self._corpus_stats = stats
-
-                    # Ingest documents via Docling
+                        source = FileSource(*[str(f) for f in text_files])
+                        r = await pipeline.ingest_repository(project_id, source)
+                        doc_count += r.document_count
+                        chunk_count += r.chunk_count
                     if doc_files:
-                        log.write(
-                            f"\n[bold]Ingesting {len(doc_files)} documents via Docling…[/bold]"
-                        )
-                        paths = [str(f) for f in doc_files]
-                        source = DoclingSource(*paths, label=f"Docs: {folder.name}")
-                        doc_stats = await rag.ingest_from_source(
-                            source, collection_name=_COLLECTION_NAME
-                        )
-                        if self._corpus_stats:
-                            self._corpus_stats["document_count"] += doc_stats.get(
-                                "document_count", 0
-                            )
-                            self._corpus_stats["total_chars"] += doc_stats.get("total_chars", 0)
-                        else:
-                            self._corpus_stats = doc_stats
-
-                    # Analyze corpus
-                    if self._corpus_stats:
-                        self._show_corpus_analysis(log, self._corpus_stats, profile)
+                        source = DoclingSource(*[str(f) for f in doc_files])
+                        r = await pipeline.ingest_documents(project_id, source)
+                        doc_count += r.document_count
+                        chunk_count += r.chunk_count
+                    self._corpus_stats = {"document_count": doc_count, "chunk_count": chunk_count}
+                    self._show_corpus_analysis(log, self._corpus_stats)
 
                 case "text":
                     source = TextSource(source_value, title="user-input")
-                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
-                    self._corpus_stats = stats
-                    self._show_corpus_analysis(log, stats, profile)
+                    r = await pipeline.ingest_documents(project_id, source)
+                    self._corpus_stats = {"document_count": r.document_count, "chunk_count": r.chunk_count}
+                    self._show_corpus_analysis(log, self._corpus_stats)
 
                 case "file":
-                    source = FileSource(source_value, label=f"File: {source_value}")
-                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
-                    self._corpus_stats = stats
-                    self._show_corpus_analysis(log, stats, profile)
+                    source = FileSource(source_value)
+                    r = await pipeline.ingest_documents(project_id, source)
+                    self._corpus_stats = {"document_count": r.document_count, "chunk_count": r.chunk_count}
+                    self._show_corpus_analysis(log, self._corpus_stats)
 
                 case "document":
-                    source = DoclingSource(source_value, label=f"Doc: {source_value}")
-                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
-                    self._corpus_stats = stats
-                    self._show_corpus_analysis(log, stats, profile)
+                    source = DoclingSource(source_value)
+                    r = await pipeline.ingest_documents(project_id, source)
+                    self._corpus_stats = {"document_count": r.document_count, "chunk_count": r.chunk_count}
+                    self._show_corpus_analysis(log, self._corpus_stats)
 
                 case "url":
                     source = URLSource(source_value)
-                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
-                    self._corpus_stats = stats
-                    self._show_corpus_analysis(log, stats, profile)
+                    r = await pipeline.ingest_documents(project_id, source)
+                    self._corpus_stats = {"document_count": r.document_count, "chunk_count": r.chunk_count}
+                    self._show_corpus_analysis(log, self._corpus_stats)
 
                 case "github":
-                    source = GitHubSource(source_value, label=f"GitHub: {source_value}")
-                    stats = await rag.ingest_from_source(source, collection_name=_COLLECTION_NAME)
-                    self._corpus_stats = stats
-                    self._show_corpus_analysis(log, stats, profile)
+                    source = GitHubSource(source_value)
+                    r = await pipeline.ingest_repository(project_id, source)
+                    self._corpus_stats = {"document_count": r.document_count, "chunk_count": r.chunk_count}
+                    self._show_corpus_analysis(log, self._corpus_stats)
 
                 case _:
                     log.write(f"[red]Unknown source type: {source_type}[/red]")
@@ -466,50 +427,23 @@ class TelaiOSEval(App[None]):
             log.write(f"[red]Ingest error:[/red] {exc}")
             log.write(f"[dim]{traceback.format_exc()}[/dim]")
 
-    def _show_corpus_analysis(
-        self,
-        log: RichLog,
-        stats: dict[str, Any],
-        profile: str,
-    ) -> None:
-        """Show corpus stats and recommended RAG strategy."""
-        from telaios.core.strategy_selector import StrategySelector
-
+    def _show_corpus_analysis(self, log: RichLog, stats: dict[str, Any]) -> None:
+        """Show corpus stats after ingestion."""
         doc_count = stats.get("document_count", 0)
-        total_chars = stats.get("total_chars", 0)
-        code_ratio = stats.get("code_ratio", 0)
-        types = stats.get("source_types", [])
+        chunk_count = stats.get("chunk_count", 0)
 
-        log.write(f"\n[bold green]Ingested {doc_count} document(s)[/bold green]")
-        log.write(f"  Total chars: {total_chars:,}")
-        log.write(f"  Source types: {', '.join(types) or 'none'}")
-        if code_ratio > 0:
-            log.write(f"  Code ratio: {code_ratio:.0%}")
-
-        # Auto strategy recommendation
-        selector = StrategySelector()
-        cp = selector.analyze_corpus(stats)
-        qp = selector.analyze_query("Analyze this corpus")
-        strategy, reason = selector.select(cp, qp)
-
-        log.write("\n[bold cyan]Recommended strategy:[/bold cyan]")
-        log.write(f"  [yellow]{strategy.value}[/yellow]")
-        log.write(f"  [dim]{reason}[/dim]")
-
-        if profile != "auto":
-            log.write(f"\n[dim]User override: {profile}[/dim]")
+        log.write(f"\n[bold green]Ingested {doc_count} document(s), {chunk_count} chunks[/bold green]")
+        log.write("[dim]Pipeline: HyDE → Hybrid (Qdrant + BM25 + RRF) → Graph augmentation[/dim]")
 
         try:
             stats_label: Static = self.query_one("#corpus-stats", Static)
             stats_label.update(
-                f"Corpus: {doc_count} docs, {total_chars:,} chars  "
-                f"Strategy: {strategy.value}  "
-                f"[dim](Tab → Plan)[/dim]"
+                f"Corpus: {doc_count} docs, {chunk_count} chunks  [dim](Tab → Plan)[/dim]"
             )
         except NoMatches:
             pass
 
-        self._log(f"Corpus ready: {doc_count} docs, strategy={strategy.value}")
+        self._log(f"Corpus ready: {doc_count} docs, {chunk_count} chunks")
         log.write("\n[dim]Ready — switch to Plan tab to generate a plan.[/dim]")
 
     # ── Plan tab ────────────────────────────────────────────────────────
@@ -758,7 +692,6 @@ class TelaiOSEval(App[None]):
         log.write(f"  Steps: {len(plan.steps)}")
         log.write("")
 
-        rag = self._get_rag()
         llm = FakeLLM()
 
         completed = 0
@@ -773,14 +706,12 @@ class TelaiOSEval(App[None]):
                 break
 
             if mode == "parallel":
-                # Run all ready steps in parallel
-                tasks = [self._execute_step(step, rag, llm, log) for step in ready]
+                tasks = [self._execute_step(step, llm, log) for step in ready]
                 await asyncio.gather(*tasks)
                 completed += len(ready)
             else:
-                # Run one step at a time
                 step = ready[0]
-                await self._execute_step(step, rag, llm, log)
+                await self._execute_step(step, llm, log)
                 completed += 1
 
             await asyncio.sleep(0.2)
@@ -805,43 +736,34 @@ class TelaiOSEval(App[None]):
     async def _execute_step(
         self,
         step: PlanStep,
-        rag: RagManager,
         llm: Any,
         log: RichLog,
     ) -> None:
-        """Execute a single plan step."""
+        """Execute a single plan step using the knowledge pipeline for context."""
         step.status = "running"
+        project_id = "tui-default"
         self._log(f"Starting step {step.step_id}: {step.title} (agent={step.agent})")
         log.write(f"\n[bold cyan]── [{step.step_id}] {step.title} ──[/bold cyan]")
         log.write(f"  Agent: {step.agent}")
         log.write(f"  {step.description}")
 
-        # Query corpus for context
-        retriever = rag.create_retriever(_COLLECTION_NAME)
+        pipeline = await _get_pipeline()
         query_text = f"{step.title}: {step.description}"
-        result = retriever.retrieve(RetrievalQuery(text=query_text, top_k=3))
+        result = await pipeline.query(project_id=project_id, text=query_text, top_k=3)
 
         if result.chunks:
             log.write(f"\n  [dim]Retrieved {len(result.chunks)} relevant chunks:[/dim]")
             for i, chunk in enumerate(result.chunks[:2], 1):
                 log.write(f"    [{i}] {chunk.content[:120]}…")
 
-        # Generate step output via LLM
-        config = RagConfig(strategy=RagStrategy.SIMPLE, top_k=3)
-        pipeline = rag.create_pipeline(config, llm=llm, collection_name=_COLLECTION_NAME)
-        output = await pipeline.answer(
-            AgentInput(
-                messages=[
-                    Message(
-                        role=MessageRole.SYSTEM,
-                        content=f"You are a {step.agent}. Execute this step:\n{step.description}",
-                    ),
-                    Message(role=MessageRole.HUMAN, content=query_text),
-                ]
-            )
-        )
+        context = "\n\n".join(c.content for c in result.chunks[:3])
+        from langchain_core.messages import HumanMessage, SystemMessage
+        response = await llm.ainvoke([
+            SystemMessage(content=f"You are a {step.agent}. Use this context:\n{context}"),
+            HumanMessage(content=f"Execute this step:\n{step.description}"),
+        ])
 
-        log.write(f"\n  [bold green]Output:[/bold green] {output.content[:300]}…")
+        log.write(f"\n  [bold green]Output:[/bold green] {response.content[:300]}…")
         step.status = "done"
         self._log(f"Step {step.step_id} completed")
 

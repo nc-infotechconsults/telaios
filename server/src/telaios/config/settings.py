@@ -98,18 +98,40 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str | None = Field(default=None)
 
     # ─── Embeddings ───────────────────────────────────────────────────────
-    EMBEDDING_PROVIDER: str = Field(default="")
-    EMBEDDING_MODEL: str = Field(default="BAAI/bge-small-en-v1.5")
+    # EMBEDDING_PROVIDER: fastembed (default, in-process) | tei (TEI HTTP server)
+    EMBEDDING_PROVIDER: str = Field(default="fastembed")
+    # fastembed default: intfloat/multilingual-e5-large (1024 dims, 100+ languages, in-process)
+    # tei default:       BAAI/bge-m3 (1024 dims, superior quality, requires TEI server)
+    EMBEDDING_MODEL: str = Field(default="intfloat/multilingual-e5-large")
     EMBEDDING_API_KEY: str | None = Field(default=None)
+    # Required when EMBEDDING_PROVIDER=tei, e.g. http://localhost:8080
     EMBEDDING_BASE_URL: str | None = Field(default=None)
+
+    # ─── Qdrant vector store ──────────────────────────────────────────────
+    # Set QDRANT_URL for cloud/remote (takes precedence over host:port).
+    QDRANT_URL: str | None = Field(default=None)
+    QDRANT_HOST: str = Field(default="localhost")
+    QDRANT_PORT: int = Field(default=6333)
+    QDRANT_API_KEY: str | None = Field(default=None)
+
+    # ─── Knowledge graph store ────────────────────────────────────────────
+    # GRAPH_STORE_PROVIDER: networkx (in-memory) | neo4j | falkordb
+    GRAPH_STORE_PROVIDER: str = Field(default="networkx")
+    NEO4J_URI: str | None = Field(default=None)
+    NEO4J_USERNAME: str = Field(default="neo4j")
+    NEO4J_PASSWORD: str = Field(default="")
+    NEO4J_DATABASE: str = Field(default="knowledge")
+    FALKORDB_URI: str | None = Field(default=None)
+    FALKORDB_USERNAME: str = Field(default="")
+    FALKORDB_PASSWORD: str = Field(default="")
     # Embedding dimension used when creating Chroma collections.
     # Defaults match BAAI/bge-small-en-v1.5 (fastembed) at 384. Set to:
-    #   384  — BAAI/bge-small-en-v1.5
-    #   768  — BAAI/bge-base-en-v1.5
-    #   1024 — voyage-3-lite / voyage-3.5-lite
+    #   384  — BAAI/bge-small-en-v1.5 (English only)
+    #   768  — BAAI/bge-base-en-v1.5, paraphrase-multilingual-mpnet-base-v2
+    #   1024 — BAAI/bge-m3 (multilingual), BAAI/bge-large-en-v1.5
     #   1536 — text-embedding-3-small, text-embedding-ada-002 (OpenAI)
     #   3072 — text-embedding-3-large (OpenAI)
-    EMBEDDING_DIM: int = Field(default=384)
+    EMBEDDING_DIM: int = Field(default=1024)
 
     # ─── Workspaces / agents ──────────────────────────────────────────────
     WORKSPACES_ROOT: str = Field(default="/tmp/telaios-workspaces")

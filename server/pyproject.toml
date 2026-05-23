@@ -27,12 +27,12 @@ dependencies = [
     "python-multipart>=0.0.28",
     "kubernetes>=35.0.0",
     "fastembed>=0.8.0",
-    # Chroma — vector store for RAG pipelines
-    # Source: https://docs.trychroma.com/docs/overview/getting-started
-    "chromadb>=1.3",
-    # LangChain Chroma integration — wraps Chroma as a LangChain vectorstore
-    # Source: https://python.langchain.com/docs/integrations/vectorstores/chroma
-    "langchain-chroma>=0.2",
+    # Qdrant — vector store for RAG pipelines
+    # Source: https://qdrant.tech/documentation/
+    "qdrant-client>=1.14",
+    # LangChain Qdrant integration
+    # Source: https://python.langchain.com/docs/integrations/vectorstores/qdrant
+    "langchain-qdrant>=0.2",
     "ocrmac>=1.0.1"
 ]
 
@@ -57,6 +57,10 @@ documents = [
 ]
 storage = [
     "aioboto3>=15.5.0",
+]
+graph = [
+    "neo4j>=5.0",
+    "falkordb>=1.0",
 ]
 
 [dependency-groups]
@@ -84,8 +88,11 @@ build-backend = "hatchling.build"
 telaios-eval = "telaios.cli.app:main"
 telaios-planner = "telaios.cli.planner_tui:main"
 telaios-api = "telaios.main:app"
+serve-llm = "telaios.cli.serve_llm:main"
 
 [tool.uv.scripts]
+# Kept as alias for uv installations that support [tool.uv.scripts].
+# Homebrew uv users: use "uv run serve-llm" via the [project.scripts] entry point above.
 serve-llm = "vllm-mlx serve mlx-community/Qwen3.5-9B-MLX-4bit --port 8000 --continuous-batching --enable-prefix-cache --reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen --max-tokens 16384"
 
 [tool.hatch.build.targets.wheel]
@@ -102,4 +109,5 @@ addopts = "-ra --strict-markers"
 markers = [
     "integration: tests that require external services (postgres, redis)",
     "live: tests that call real LLM APIs (requires LIVE_LLM_TESTS=1 and a valid API key)",
+    "requires_qdrant: tests that require a running Qdrant instance",
 ]
