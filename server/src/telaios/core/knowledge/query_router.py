@@ -39,7 +39,7 @@ _PATTERNS: list[tuple[QueryIntent, list[str]]] = [
         r"\brest api[s]?\b.{0,30}\b(available|exist|defined|exposed)\b",
         r"\bexposed (api[s]?|endpoint[s]?)\b",
         r"\b(flask|fastapi|django|nestjs|express)\b.{0,30}\b(endpoint[s]?|route[s]?)\b",
-        r"\broute[s]?\b.{0,20}\b(expose[sd]?|defined|available)\b",
+        r"\broute[s]?.{0,30}\b(exposes?|exposed|defined|available)\b",
     ]),
     (QueryIntent.INHERITANCE, [
         r"\b(extend[s]?|implement[s]?|subclass(?:es)?|inherit[s]?)\b",

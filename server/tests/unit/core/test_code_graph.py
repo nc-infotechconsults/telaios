@@ -721,11 +721,11 @@ class TestCodeGraphExtractorLanguageParity:
         entities = extractor.extract(src, "foo.js", language="javascript")
         assert entities is not None
 
-    def test_supports_python(self, extractor):
+    def test_supports_python(self):
         assert CodeGraphExtractor.supports("python")
 
-    def test_supports_typescript(self, extractor):
+    def test_supports_typescript(self):
         assert CodeGraphExtractor.supports("typescript")
 
-    def test_supports_javascript(self, extractor):
+    def test_supports_javascript(self):
         assert CodeGraphExtractor.supports("javascript")

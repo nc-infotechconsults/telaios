@@ -179,3 +179,7 @@ class TestPythonStructuralPatterns:
     def test_python_inheritance(self):
         intent, _ = classify_query("what classes extend BaseService?")
         assert intent == QueryIntent.INHERITANCE
+
+    def test_route_expose_pattern(self):
+        intent, _ = classify_query("which routes are exposed by the payment service?")
+        assert intent == QueryIntent.ENDPOINT_LIST
