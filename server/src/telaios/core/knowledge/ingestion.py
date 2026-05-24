@@ -108,8 +108,11 @@ class IngestionService:
         point_ids: list[str] = []
         chunk_objects: list[Chunk] = []
         triplet_count = 0
-        # (doc, raw_chunks, doc_language) — collected for graph indexing after upsert
-        _doc_index_targets: list[tuple[Any, list, str | None]] = []
+        # (doc, raw_chunks, doc_language, doc_entities) — collected for graph indexing after upsert
+        _doc_index_targets: list[tuple[Any, list, str | None, Any]] = []
+
+        from telaios.core.knowledge.code_graph import CodeGraphExtractor
+        _code_extractor = CodeGraphExtractor()
 
         callable_chunker = callable(chunker)
         for doc in docs:
@@ -124,6 +127,16 @@ class IngestionService:
                     doc_language = meta.language
                 if meta.symbol_name and meta.symbol_type:
                     doc_symbol_names.append((meta.symbol_name, meta.symbol_type))
+
+            # Run AST extraction early so file_index can include inheritance info
+            doc_entities = None
+            if doc_language in _CODE_LANGUAGES and _code_extractor.supports(doc_language):
+                try:
+                    doc_entities = _code_extractor.extract(
+                        doc.content, doc.source_path or doc.id, doc_language
+                    )
+                except Exception:
+                    logger.debug("AST extraction failed for %s — will retry at graph phase", doc.source_path)
 
             # Extract HTTP routes if this is a code file
             doc_routes = []
@@ -174,11 +187,15 @@ class IngestionService:
             # Emit a file-level index chunk for code files so aggregation queries
             # ("how many REST APIs?") can retrieve a per-file overview.
             if doc_language in _CODE_LANGUAGES and (doc_symbol_names or doc_routes):
+                superclasses: list[str] = []
+                if doc_entities:
+                    superclasses = [c.superclass for c in doc_entities.classes if c.superclass]
                 index_text = build_file_index(
                     source_path=doc.source_path or "",
                     language=doc_language,
                     symbol_names=doc_symbol_names,
                     routes=doc_routes,
+                    superclasses=superclasses or None,
                 )
                 index_pid = str(uuid.uuid4())
                 index_meta: dict[str, Any] = {
@@ -207,7 +224,7 @@ class IngestionService:
                 )
 
             # Stash for graph indexing (after upsert, so we don't block embedding)
-            _doc_index_targets.append((doc, raw_chunks, doc_language))
+            _doc_index_targets.append((doc, raw_chunks, doc_language, doc_entities))
 
         _emit(f"Chunked → {len(texts)} chunk(s) — embedding + upserting to Qdrant…")
         await self._vs.upsert(
@@ -223,14 +240,14 @@ class IngestionService:
 
         if self._graph is not None:
             _emit(f"Indexing graph entities for {len(docs)} document(s)…")
-            from telaios.core.knowledge.code_graph import CodeGraphExtractor
-            _code_extractor = CodeGraphExtractor()
-            for doc, raw_chunks, doc_language in _doc_index_targets:
+            for doc, raw_chunks, doc_language, doc_entities in _doc_index_targets:
                 if doc_language in _CODE_LANGUAGES and _code_extractor.supports(doc_language):
-                    # AST-based extraction: deterministic, typed, no LLM
-                    entities = _code_extractor.extract(
-                        doc.content, doc.source_path or doc.id, doc_language
-                    )
+                    # Reuse entities extracted in Phase 1; re-extract only if that attempt failed
+                    entities = doc_entities
+                    if entities is None:
+                        entities = _code_extractor.extract(
+                            doc.content, doc.source_path or doc.id, doc_language
+                        )
                     if entities and not entities.is_empty():
                         await self._graph.index_code_entities(doc.id, entities, project_id)
                     else:
@@ -242,6 +259,10 @@ class IngestionService:
                 else:
                     # Non-code documents: LLM triplet extraction over full content
                     await self._graph.index_document(doc.id, doc.content)
+
+            _emit("Resolving inherited REST endpoints via class hierarchy…")
+            await self._graph.resolve_inherited_endpoints(project_id)
+
             _emit("Rebuilding graph community summaries…")
             await self._graph.rebuild_communities()
 

@@ -139,6 +139,24 @@ class GraphAugmentor:
         except Exception:
             logger.warning("Graph indexing failed for doc %s", doc_id, exc_info=True)
 
+    async def resolve_inherited_endpoints(self, project_id: str) -> None:
+        """Propagate inherited REST endpoints to child classes via EXTENDS edges.
+
+        Call this once after all documents for a project have been indexed so the
+        full class hierarchy is available for resolution.
+        """
+        try:
+            count = await self._graph.aresolve_inherited_endpoints(project_id)
+            if count:
+                logger.info(
+                    "Inherited %d endpoint(s) via class hierarchy for project %s",
+                    count, project_id,
+                )
+        except Exception:
+            logger.warning(
+                "Inherited endpoint resolution failed for project %s", project_id, exc_info=True
+            )
+
     async def index_code_entities(
         self,
         doc_id: str,

@@ -186,13 +186,14 @@ class FalkorDBGraphStore(GraphStore):
                 "MERGE (c:CodeClass {name: $name, project_id: $pid}) "
                 "SET c.package = $pkg, c.file_path = $fp, c.qualified_name = $qname, "
                 "c.is_abstract = $abstract, c.is_interface = $iface, c.is_enum = $enum, "
-                "c.component_type = $comp",
+                "c.component_type = $comp, c.request_mapping_prefix = $prefix",
                 {
                     "name": cls.name, "pid": pid,
                     "pkg": cls.package, "fp": cls.file_path,
                     "qname": cls.qualified_name,
                     "abstract": cls.is_abstract, "iface": cls.is_interface,
                     "enum": cls.is_enum, "comp": cls.component_type or "",
+                    "prefix": cls.request_mapping_prefix,
                 },
             )
 
@@ -241,11 +242,13 @@ class FalkorDBGraphStore(GraphStore):
             self._graph.query(
                 "MERGE (e:RestEndpoint {http_method: $method, path: $path, project_id: $pid}) "
                 "SET e.handler_class = $hc, e.handler_method = $hm, "
-                "e.request_body_type = $rbt, e.response_type = $rt",
+                "e.request_body_type = $rbt, e.response_type = $rt, "
+                "e.method_path = $mp",
                 {
                     "method": ep.http_method, "path": ep.path, "pid": pid,
                     "hc": ep.handler_class, "hm": ep.handler_method,
                     "rbt": ep.request_body_type or "", "rt": ep.response_type or "",
+                    "mp": ep.method_path,
                 },
             )
             # RestEndpoint → HANDLED_BY → CodeClass
@@ -354,15 +357,114 @@ class FalkorDBGraphStore(GraphStore):
         except Exception as exc:
             logger.debug("Graph edge query skipped: %s — %s", exc, cypher[:80])
 
+    def resolve_inherited_endpoints(self, project_id: str) -> int:
+        """Propagate REST endpoints from parent classes to child classes via EXTENDS edges.
+
+        Runs multiple passes so deep chains (A→B→C) are fully resolved: each pass
+        propagates one additional level until no new endpoints are created.
+
+        Returns the total count of inherited endpoint nodes created.
+        """
+        total = 0
+        for _ in range(10):  # bound depth; typical hierarchies are 1-3 levels
+            n = self._resolve_inherited_endpoints_pass(project_id)
+            total += n
+            if n == 0:
+                break
+        if total:
+            logger.info("Resolved %d inherited endpoint(s) for project %s", total, project_id)
+        return total
+
+    def _resolve_inherited_endpoints_pass(self, project_id: str) -> int:
+        """Single inheritance propagation pass — returns count of new endpoints created."""
+        # All child→parent pairs where the parent has endpoints with known method_path
+        inherit_rows = self.query(
+            "MATCH (child:CodeClass {project_id: $pid})-[:EXTENDS]->(parent:CodeClass {project_id: $pid}) "
+            "MATCH (e:RestEndpoint {project_id: $pid})-[:HANDLED_BY]->(parent) "
+            "RETURN child.name AS child_name, "
+            "       child.request_mapping_prefix AS child_prefix, "
+            "       e.http_method AS http_method, e.method_path AS method_path, "
+            "       e.handler_method AS handler_method, "
+            "       e.request_body_type AS request_body_type, "
+            "       e.response_type AS response_type",
+            {"pid": project_id},
+        )
+
+        # Build a set of (class_name, http_method, path) already in the graph
+        existing_rows = self.query(
+            "MATCH (e:RestEndpoint {project_id: $pid})-[:HANDLED_BY]->(c:CodeClass {project_id: $pid}) "
+            "RETURN c.name AS class_name, e.http_method AS http_method, e.path AS path",
+            {"pid": project_id},
+        )
+        existing: set[tuple[str, str, str]] = {
+            (str(r.get("class_name") or ""), str(r.get("http_method") or ""), str(r.get("path") or ""))
+            for r in existing_rows
+            if r.get("class_name") and r.get("http_method") and r.get("path")
+        }
+
+        count = 0
+        for row in inherit_rows:
+            child_name = row.get("child_name") or ""
+            child_prefix = row.get("child_prefix") or ""
+            http_method = row.get("http_method") or ""
+            method_path = row.get("method_path") or ""
+            handler_method = row.get("handler_method") or ""
+            rbt = row.get("request_body_type") or ""
+            rt = row.get("response_type") or ""
+
+            # Skip endpoints ingested before method_path was tracked
+            if not (child_name and http_method and method_path):
+                continue
+
+            combined_path = _combine_paths(child_prefix, method_path)
+            key = (child_name, http_method, combined_path)
+            if key in existing:
+                continue
+
+            self._safe_query(
+                "MERGE (e:RestEndpoint {http_method: $method, path: $path, project_id: $pid}) "
+                "SET e.handler_class = $hc, e.handler_method = $hm, "
+                "e.request_body_type = $rbt, e.response_type = $rt, "
+                "e.method_path = $mp",
+                {
+                    "method": http_method, "path": combined_path, "pid": project_id,
+                    "hc": child_name, "hm": handler_method,
+                    "rbt": rbt, "rt": rt, "mp": method_path,
+                },
+            )
+            self._safe_query(
+                "MERGE (e:RestEndpoint {http_method: $method, path: $path, project_id: $pid}) "
+                "MERGE (c:CodeClass {name: $hc, project_id: $pid}) "
+                "MERGE (e)-[:HANDLED_BY]->(c)",
+                {"method": http_method, "path": combined_path, "pid": project_id, "hc": child_name},
+            )
+            existing.add(key)
+            count += 1
+
+        return count
+
     async def aupsert_code_entities(self, entities: "CodeEntities", project_id: str) -> None:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.upsert_code_entities, entities, project_id)
+
+    async def aresolve_inherited_endpoints(self, project_id: str) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.resolve_inherited_endpoints, project_id)
 
     async def aquery_structural(
         self, intent: str, params: dict[str, str], project_id: str
     ) -> list[dict[str, Any]]:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.query_structural, intent, params, project_id)
+
+
+def _combine_paths(prefix: str, suffix: str) -> str:
+    prefix = prefix.rstrip("/")
+    if not suffix or suffix == "/":
+        return prefix or "/"
+    if not suffix.startswith("/"):
+        suffix = "/" + suffix
+    return prefix + suffix
 
 
 __all__ = ["FalkorDBGraphStore"]

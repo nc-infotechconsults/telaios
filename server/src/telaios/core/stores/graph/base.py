@@ -121,5 +121,18 @@ class GraphStore(ABC):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.query_structural, intent, params, project_id)
 
+    def resolve_inherited_endpoints(self, project_id: str) -> int:
+        """Propagate REST endpoints through EXTENDS edges to child classes.
+
+        Override in typed-schema stores (e.g. FalkorDB). Default no-op returns 0.
+        """
+        return 0
+
+    async def aresolve_inherited_endpoints(self, project_id: str) -> int:
+        """Async resolve_inherited_endpoints."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.resolve_inherited_endpoints, project_id)
+
 
 __all__ = ["GraphStore"]

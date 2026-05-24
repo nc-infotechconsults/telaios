@@ -48,6 +48,7 @@ class ClassInfo:
     interfaces: list[str] = field(default_factory=list)
     annotations: list[str] = field(default_factory=list)
     component_type: str | None = None  # "controller" | "service" | "repository" | "component"
+    request_mapping_prefix: str = ""  # class-level @RequestMapping path
 
     @property
     def qualified_name(self) -> str:
@@ -92,11 +93,12 @@ class ImportInfo:
 @dataclass
 class RestEndpointInfo:
     http_method: str
-    path: str
+    path: str                    # fully-qualified: class_prefix + method_suffix
     handler_class: str
     handler_method: str
     request_body_type: str | None = None
     response_type: str | None = None
+    method_path: str = "/"       # method-level suffix only (before combining with class prefix)
 
 
 @dataclass
@@ -240,6 +242,9 @@ class JavaAstExtractor:
             elif ann == "Component" and not component_type:
                 component_type = "component"
 
+        # Class-level @RequestMapping prefix — computed before ClassInfo so it can be stored
+        class_http_prefix = annotation_values.get("RequestMapping", "")
+
         cls_info = ClassInfo(
             name=name,
             package=package,
@@ -251,11 +256,9 @@ class JavaAstExtractor:
             interfaces=interfaces,
             annotations=annotations,
             component_type=component_type,
+            request_mapping_prefix=class_http_prefix,
         )
         entities.classes.append(cls_info)
-
-        # Class-level @RequestMapping prefix
-        class_http_prefix = annotation_values.get("RequestMapping", "")
 
         # Body members
         for child in node.children:  # type: ignore[union-attr]
@@ -372,17 +375,20 @@ class JavaAstExtractor:
 
         http_method: str | None = None
         http_path: str | None = None
+        method_path_suffix: str = "/"
 
         for ann in annotations:
             if ann in _SPRING_HTTP_ANNOTATIONS:
                 http_method = _SPRING_HTTP_ANNOTATIONS[ann]
-                method_suffix = annotation_values.get(ann, "")
-                http_path = _combine_paths(class_http_prefix, method_suffix)
+                raw_suffix = annotation_values.get(ann, "")
+                method_path_suffix = raw_suffix or "/"
+                http_path = _combine_paths(class_http_prefix, raw_suffix)
                 break
             elif ann == "RequestMapping":
                 http_method = "REQUEST"
-                method_suffix = annotation_values.get("RequestMapping", "")
-                http_path = _combine_paths(class_http_prefix, method_suffix)
+                raw_suffix = annotation_values.get("RequestMapping", "")
+                method_path_suffix = raw_suffix or "/"
+                http_path = _combine_paths(class_http_prefix, raw_suffix)
                 break
 
         entities.methods.append(MethodInfo(
@@ -408,6 +414,7 @@ class JavaAstExtractor:
                 handler_method=method_name,
                 request_body_type=request_body_type,
                 response_type=effective_response,
+                method_path=method_path_suffix,
             ))
 
     def _extract_params(
