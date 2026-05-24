@@ -185,7 +185,7 @@ def make_result_evaluator_node(llm: Any):
         evidence = state["evidence"]
         max_iter = state["max_iterations"]
 
-        if not evidence or new_iteration > max_iter:
+        if not evidence or new_iteration >= max_iter:
             return {"is_sufficient": True, "iteration": new_iteration, "pending_steps": [], "follow_up_queries": []}
 
         # Build a compact evidence summary for the evaluator

@@ -120,6 +120,8 @@ class TestRetrievalDispatcherNode:
         result = await node(state)
 
         assert result["pending_steps"] == []
+        assert result["evidence"] == []
+        assert result["evidence_scores"] == []
 
 
 class TestResultEvaluatorNode:
@@ -200,6 +202,22 @@ class TestResultEvaluatorNode:
         result = await node(state)
 
         assert result["is_sufficient"] is True
+
+    @pytest.mark.asyncio
+    async def test_empty_evidence_treated_as_sufficient(self):
+        from telaios.core.agents.retrieval.nodes import make_result_evaluator_node
+
+        mock_llm = MagicMock()
+        structured = MagicMock()
+        structured.ainvoke = AsyncMock(side_effect=Exception("should not be called"))
+        mock_llm.with_structured_output = MagicMock(return_value=structured)
+
+        node = make_result_evaluator_node(mock_llm)
+        state = _base_state(evidence=[])  # no evidence
+        result = await node(state)
+
+        assert result["is_sufficient"] is True
+        structured.ainvoke.assert_not_called()  # LLM should NOT be called
 
 
 class TestSynthesizerNode:
