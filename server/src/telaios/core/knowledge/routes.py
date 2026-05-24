@@ -207,6 +207,7 @@ def build_file_index(
     language: str | None,
     symbol_names: list[tuple[str, str]],  # (name, type)
     routes: list[RouteInfo],
+    superclasses: list[str] | None = None,
 ) -> str:
     """Build a natural-language index chunk for a source file.
 
@@ -217,6 +218,9 @@ def build_file_index(
     parts: list[str] = [f"File: {source_path}"]
     if language:
         parts[0] += f" ({language})"
+
+    if superclasses:
+        parts.append(f"Inherits from: {', '.join(superclasses)} (may expose additional inherited REST endpoints)")
 
     if symbol_names:
         by_type: dict[str, list[str]] = {}

@@ -90,6 +90,43 @@ public class OrderService {
 }
 """
 
+# Controller that extends a generic CRUD base class — typical inheritance scenario.
+# The base class (BaseCrudController) is defined elsewhere; only the child is here.
+_CHILD_CONTROLLER = """\
+package com.example.controller;
+
+@RestController
+@RequestMapping("/api/products")
+public class ProductController extends BaseCrudController<ProductDto, Long> {
+
+    @GetMapping("/search")
+    public List<ProductDto> search(@RequestParam String q) {
+        return service.search(q);
+    }
+}
+"""
+
+# Simulated base class that the child inherits from.
+_BASE_CONTROLLER = """\
+package com.example.base;
+
+@RestController
+public class BaseCrudController<T, ID> {
+
+    @GetMapping
+    public List<T> getAll() { return service.findAll(); }
+
+    @GetMapping("/{id}")
+    public T getById(@PathVariable ID id) { return service.findById(id); }
+
+    @PostMapping
+    public T create(@RequestBody T body) { return service.save(body); }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable ID id) { service.delete(id); }
+}
+"""
+
 
 # ── JavaAstExtractor ──────────────────────────────────────────────────────────
 
@@ -229,6 +266,44 @@ class TestJavaAstExtractorRestEndpoints:
         ep = next(e for e in entities.endpoints if e.http_method == "GET")
         assert ep.handler_class == "UserController"
         assert ep.handler_method == "getUser"
+
+    def test_request_mapping_prefix_stored_on_class(self, extractor):
+        entities = extractor.extract(_CONTROLLER, "UserController.java")
+        cls = next(c for c in entities.classes if c.name == "UserController")
+        assert cls.request_mapping_prefix == "/api/users"
+
+    def test_method_path_suffix_stored_on_endpoint(self, extractor):
+        entities = extractor.extract(_CONTROLLER, "UserController.java")
+        get_ep = next(e for e in entities.endpoints if e.http_method == "GET")
+        # method_path is the suffix before combining with class prefix
+        assert get_ep.method_path == "/{id}"
+
+    def test_post_method_path_is_root_when_no_suffix(self, extractor):
+        entities = extractor.extract(_CONTROLLER, "UserController.java")
+        post_ep = next(e for e in entities.endpoints if e.http_method == "POST")
+        assert post_ep.method_path == "/"
+
+    def test_class_with_no_request_mapping_has_empty_prefix(self, extractor):
+        entities = extractor.extract(_BASE_CONTROLLER, "BaseCrudController.java")
+        cls = next(c for c in entities.classes if c.name == "BaseCrudController")
+        assert cls.request_mapping_prefix == ""
+
+    def test_base_controller_endpoints_have_method_paths(self, extractor):
+        entities = extractor.extract(_BASE_CONTROLLER, "BaseCrudController.java")
+        get_eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        method_paths = {e.method_path for e in get_eps}
+        assert "/" in method_paths      # @GetMapping (no path)
+        assert "/{id}" in method_paths  # @GetMapping("/{id}")
+
+    def test_child_controller_extracts_own_endpoint(self, extractor):
+        entities = extractor.extract(_CHILD_CONTROLLER, "ProductController.java")
+        paths = [e.path for e in entities.endpoints]
+        assert "/api/products/search" in paths
+
+    def test_child_controller_stores_superclass(self, extractor):
+        entities = extractor.extract(_CHILD_CONTROLLER, "ProductController.java")
+        cls = next(c for c in entities.classes if c.name == "ProductController")
+        assert cls.superclass == "BaseCrudController"
 
 
 class TestJavaAstExtractorImports:
