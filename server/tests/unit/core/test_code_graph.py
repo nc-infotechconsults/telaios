@@ -1,7 +1,7 @@
-"""Unit tests for JavaAstExtractor and CodeGraphExtractor.
+"""Unit tests for JavaAstExtractor, PythonAstExtractor, TypeScriptAstExtractor, JavaScriptAstExtractor, and CodeGraphExtractor.
 
-tree-sitter-java must be installed (uv sync --extra treesitter).
-Tests skipped if not available.
+tree-sitter language packages must be installed (uv sync --extra treesitter).
+Tests are skipped individually if the relevant package is not available.
 """
 
 from __future__ import annotations
@@ -513,8 +513,6 @@ class TestPythonAstExtractorImports:
 
 # ── TypeScriptAstExtractor ────────────────────────────────────────────────────
 
-pytest.importorskip("tree_sitter_typescript", reason="tree-sitter-typescript not installed")
-
 _TS_SIMPLE_CLASS = """\
 import { Injectable } from '@nestjs/common';
 import { UserRepository } from './user.repository';
@@ -562,6 +560,7 @@ export class AdminService extends UserService implements Auditable {
 class TestTypeScriptAstExtractorClass:
     @pytest.fixture
     def extractor(self):
+        pytest.importorskip("tree_sitter_typescript", reason="tree-sitter-typescript not installed")
         from telaios.core.knowledge.code_graph import TypeScriptAstExtractor
         return TypeScriptAstExtractor()
 
@@ -597,6 +596,7 @@ class TestTypeScriptAstExtractorClass:
 class TestTypeScriptAstExtractorEndpoints:
     @pytest.fixture
     def extractor(self):
+        pytest.importorskip("tree_sitter_typescript", reason="tree-sitter-typescript not installed")
         from telaios.core.knowledge.code_graph import TypeScriptAstExtractor
         return TypeScriptAstExtractor()
 
@@ -624,6 +624,49 @@ class TestTypeScriptAstExtractorEndpoints:
         entities = extractor.extract(_TS_NESTJS_CONTROLLER, "user.controller.ts")
         ep = next(e for e in entities.endpoints if e.http_method == "GET")
         assert ep.handler_class == "UserController"
+
+    def test_empty_controller_decorator_prefix_is_empty(self, extractor):
+        """@Controller() with no path arg → prefix is empty string, endpoint path is just the method path."""
+        src = """\
+@Controller()
+export class RootController {
+  @Get('/health')
+  health(): string { return 'ok'; }
+}
+"""
+        entities = extractor.extract(src, "root.controller.ts")
+        eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        assert len(eps) >= 1
+        assert eps[0].path == "/health"
+
+    def test_get_no_path_arg_no_trailing_slash(self, extractor):
+        """@Get() with no path arg on a class with a prefix → full path equals just the prefix, no trailing slash."""
+        src = """\
+@Controller('/api/users')
+export class UserController {
+  @Get()
+  listUsers(): Promise<User[]> { return this.service.list(); }
+}
+"""
+        entities = extractor.extract(src, "user.controller.ts")
+        eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        assert len(eps) >= 1
+        assert eps[0].path == "/api/users"
+        assert not eps[0].path.endswith("/") or eps[0].path == "/"
+
+
+class TestTypeScriptAstExtractorMalformed:
+    @pytest.fixture
+    def extractor(self):
+        pytest.importorskip("tree_sitter_typescript", reason="tree-sitter-typescript not installed")
+        from telaios.core.knowledge.code_graph import TypeScriptAstExtractor
+        return TypeScriptAstExtractor()
+
+    def test_malformed_source_returns_empty_not_raises(self, extractor):
+        """Malformed/syntax-error TypeScript should return a valid (possibly empty) CodeEntities, not raise."""
+        entities = extractor.extract("class { @@@ ", "bad.ts")
+        assert entities is not None
+        assert entities.file_path == "bad.ts"
 
 
 class TestJavaScriptAstExtractorEndpoints:

@@ -3,12 +3,13 @@
 Extracts typed entities (classes, methods, fields, REST endpoints) directly from
 source code via tree-sitter — no LLM, no hallucination, no character-window loss.
 
-Supported languages: Java, Python (others extensible via CodeGraphExtractor).
+Supported languages: Java, Python, TypeScript, JavaScript (others extensible via CodeGraphExtractor).
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -705,7 +706,6 @@ _EXPRESS_HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch"})
 
 def _parse_decorator_text(raw: str) -> tuple[str, str]:
     """Parse '@Controller(\'/path\')' → ('Controller', '/path') or '@Injectable()' → ('Injectable', '')."""
-    import re
     raw = raw.lstrip("@").strip()
     m = re.match(r"(\w+)\(['\"]([^'\"]*)['\"]", raw)
     if m:
@@ -827,6 +827,8 @@ class _TsBaseExtractor:
                 self._handle_method(child, txt, entities, class_name, class_prefix, pending_decorators)
                 pending_decorators = []
             else:
+                # Intentional: decorators that are not immediately followed by a
+                # method_definition (e.g. class fields, semicolons) are dropped.
                 pending_decorators = []
 
     def _handle_method(self, node, txt, entities: CodeEntities, class_name: str, class_prefix: str, decorators: list[tuple[str, str]]) -> None:
@@ -874,11 +876,14 @@ class _TsBaseExtractor:
         for dec_name, dec_arg in decorators:
             if dec_name in _TS_HTTP_DECORATORS:
                 http_method = _TS_HTTP_DECORATORS[dec_name]
+                # Pass dec_arg (possibly empty) to _combine_paths so that an empty
+                # method path does not produce a trailing slash on the prefix.
+                full_path = _combine_paths(class_prefix, dec_arg)
                 method_path = dec_arg or "/"
-                full_path = _combine_paths(class_prefix, method_path)
+                endpoint_path = full_path or "/"
                 entities.endpoints.append(RestEndpointInfo(
                     http_method=http_method,
-                    path=full_path,
+                    path=endpoint_path,
                     handler_class=class_name,
                     handler_method=name,
                     method_path=method_path,
@@ -886,7 +891,11 @@ class _TsBaseExtractor:
                 break
 
     def _try_express(self, node, txt, entities: CodeEntities) -> None:
-        """Detect router.get('/path', handler) Express-style routes."""
+        """Detect router.get('/path', handler) Express-style routes.
+
+        Note: only direct ``router.method('/path', handler)`` calls are handled.
+        Chained patterns such as ``app.route('/x').get(handler)`` are not detected.
+        """
         http_method: str | None = None
         path: str | None = None
 
@@ -968,7 +977,6 @@ __all__ = [
     "CodeEntities",
     "JavaAstExtractor",
     "PythonAstExtractor",
-    "_TsBaseExtractor",
     "TypeScriptAstExtractor",
     "JavaScriptAstExtractor",
     "CodeGraphExtractor",
