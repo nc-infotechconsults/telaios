@@ -694,6 +694,240 @@ class PythonAstExtractor:
         return self._name_from_expr(node) or ""
 
 
+# ── TypeScript / JavaScript AST extractor ─────────────────────────────────────
+
+_TS_HTTP_DECORATORS: dict[str, str] = {
+    "Get": "GET", "Post": "POST", "Put": "PUT",
+    "Delete": "DELETE", "Patch": "PATCH",
+}
+_EXPRESS_HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch"})
+
+
+def _parse_decorator_text(raw: str) -> tuple[str, str]:
+    """Parse '@Controller(\'/path\')' → ('Controller', '/path') or '@Injectable()' → ('Injectable', '')."""
+    import re
+    raw = raw.lstrip("@").strip()
+    m = re.match(r"(\w+)\(['\"]([^'\"]*)['\"]", raw)
+    if m:
+        return m.group(1), m.group(2)
+    m2 = re.match(r"(\w+)", raw)
+    if m2:
+        return m2.group(1), ""
+    return "", ""
+
+
+class _TsBaseExtractor:
+    _language: str  # set by subclass
+    _parser_cache: dict[str, object] = {}
+
+    @classmethod
+    def _get_parser(cls, language: str):
+        if language not in cls._parser_cache:
+            from tree_sitter import Language, Parser
+            if language == "typescript":
+                import tree_sitter_typescript as _m
+                cls._parser_cache[language] = Parser(Language(_m.language_typescript()))
+            else:
+                import tree_sitter_javascript as _m
+                cls._parser_cache[language] = Parser(Language(_m.language()))
+        return cls._parser_cache[language]
+
+    def extract(self, source: str, file_path: str) -> CodeEntities:
+        try:
+            return self._do_extract(source, file_path)
+        except Exception as exc:
+            logger.warning("%s failed for %s: %s", type(self).__name__, file_path, exc)
+            return CodeEntities(file_path=file_path)
+
+    def _do_extract(self, source: str, file_path: str) -> CodeEntities:
+        if not source.strip():
+            return CodeEntities(file_path=file_path)
+        parser = self._get_parser(self._language)
+        src = source.encode("utf-8", errors="replace")
+        root = parser.parse(src).root_node
+        entities = CodeEntities(file_path=file_path)
+
+        def txt(node) -> str:
+            return src[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
+
+        self._walk_top_level(root, src, txt, entities, file_path)
+        return entities
+
+    def _walk_top_level(self, root, src, txt, entities: CodeEntities, file_path: str) -> None:
+        for child in root.children:
+            ntype = child.type
+            if ntype in ("class_declaration", "abstract_class_declaration"):
+                self._handle_class(child, txt, entities, file_path, [])
+            elif ntype == "export_statement":
+                # Decorators appear as children of export_statement before class_declaration
+                inner_decorators: list[tuple[str, str]] = []
+                for gc in child.children:
+                    if gc.type == "decorator":
+                        name, arg = _parse_decorator_text(txt(gc))
+                        if name:
+                            inner_decorators.append((name, arg))
+                    elif gc.type in ("class_declaration", "abstract_class_declaration"):
+                        self._handle_class(gc, txt, entities, file_path, inner_decorators)
+                        break
+            elif ntype == "expression_statement":
+                for gc in child.children:
+                    if gc.type == "call_expression":
+                        self._try_express(gc, txt, entities)
+            elif ntype == "import_statement":
+                self._extract_import(child, txt, entities)
+
+    def _handle_class(self, node, txt, entities: CodeEntities, file_path: str, decorators: list[tuple[str, str]]) -> None:
+        name: str | None = None
+        superclass: str | None = None
+        interfaces: list[str] = []
+        class_prefix = ""
+
+        # Extract @Controller path prefix
+        for dec_name, dec_arg in decorators:
+            if dec_name == "Controller":
+                class_prefix = dec_arg
+
+        for child in node.children:
+            if child.type in ("type_identifier", "identifier") and name is None:
+                name = txt(child)
+            elif child.type == "class_heritage":
+                for hc in child.children:
+                    if hc.type == "extends_clause":
+                        for ec in hc.children:
+                            if ec.type in ("type_identifier", "identifier"):
+                                superclass = txt(ec)
+                                break
+                    elif hc.type == "implements_clause":
+                        for ic in hc.children:
+                            if ic.type in ("type_identifier", "identifier"):
+                                interfaces.append(txt(ic))
+            elif child.type == "class_body" and name:
+                cls_info = ClassInfo(
+                    name=name,
+                    package="",
+                    file_path=file_path,
+                    superclass=superclass,
+                    interfaces=interfaces,
+                    annotations=[n for n, _ in decorators],
+                    request_mapping_prefix=class_prefix,
+                )
+                entities.classes.append(cls_info)
+                self._walk_class_body(child, txt, entities, class_name=name, class_prefix=class_prefix)
+
+    def _walk_class_body(self, body_node, txt, entities: CodeEntities, class_name: str, class_prefix: str) -> None:
+        pending_decorators: list[tuple[str, str]] = []
+
+        for child in body_node.children:
+            ntype = child.type
+            if ntype == "decorator":
+                name, arg = _parse_decorator_text(txt(child))
+                if name:
+                    pending_decorators.append((name, arg))
+            elif ntype == "method_definition":
+                self._handle_method(child, txt, entities, class_name, class_prefix, pending_decorators)
+                pending_decorators = []
+            else:
+                pending_decorators = []
+
+    def _handle_method(self, node, txt, entities: CodeEntities, class_name: str, class_prefix: str, decorators: list[tuple[str, str]]) -> None:
+        name: str | None = None
+        return_type = "void"
+        params: list[tuple[str, str]] = []
+
+        for child in node.children:
+            if child.type in ("property_identifier", "identifier") and name is None:
+                name = txt(child)
+            elif child.type == "type_annotation":
+                # first non-punctuation child is the type
+                for tc in child.children:
+                    if tc.type not in (":", " "):
+                        return_type = txt(tc)
+                        break
+            elif child.type == "formal_parameters":
+                for param in child.children:
+                    if param.type in ("required_parameter", "optional_parameter"):
+                        pname = None
+                        ptype = "any"
+                        for pc in param.children:
+                            if pc.type == "identifier" and pname is None:
+                                pname = txt(pc)
+                            elif pc.type == "type_annotation":
+                                for tc in pc.children:
+                                    if tc.type not in (":", " "):
+                                        ptype = txt(tc)
+                                        break
+                        if pname and pname != "self":
+                            params.append((ptype, pname))
+
+        if not name or name == "constructor":
+            return
+
+        entities.methods.append(MethodInfo(
+            class_name=class_name,
+            name=name,
+            return_type=return_type,
+            params=params,
+            annotations=[n for n, _ in decorators],
+        ))
+
+        # NestJS endpoint detection
+        for dec_name, dec_arg in decorators:
+            if dec_name in _TS_HTTP_DECORATORS:
+                http_method = _TS_HTTP_DECORATORS[dec_name]
+                method_path = dec_arg or "/"
+                full_path = _combine_paths(class_prefix, method_path)
+                entities.endpoints.append(RestEndpointInfo(
+                    http_method=http_method,
+                    path=full_path,
+                    handler_class=class_name,
+                    handler_method=name,
+                    method_path=method_path,
+                ))
+                break
+
+    def _try_express(self, node, txt, entities: CodeEntities) -> None:
+        """Detect router.get('/path', handler) Express-style routes."""
+        http_method: str | None = None
+        path: str | None = None
+
+        for child in node.children:
+            if child.type == "member_expression":
+                callee_txt = txt(child)
+                parts = callee_txt.split(".")
+                if len(parts) >= 2 and parts[-1].lower() in _EXPRESS_HTTP_METHODS:
+                    http_method = parts[-1].upper()
+            elif child.type == "arguments":
+                for ac in child.children:
+                    if ac.type == "string":
+                        raw = txt(ac)
+                        path = raw.strip("'\"")
+                        break
+
+        if http_method and path:
+            entities.endpoints.append(RestEndpointInfo(
+                http_method=http_method,
+                path=path,
+                handler_class="<module>",
+                handler_method="<anonymous>",
+            ))
+
+    def _extract_import(self, node, txt, entities: CodeEntities) -> None:
+        for child in node.children:
+            if child.type == "string":
+                module = txt(child).strip("'\"")
+                owner = entities.classes[0].name if entities.classes else "<module>"
+                entities.imports.append(ImportInfo(importing_class=owner, imported_fqn=module))
+                break
+
+
+class TypeScriptAstExtractor(_TsBaseExtractor):
+    _language = "typescript"
+
+
+class JavaScriptAstExtractor(_TsBaseExtractor):
+    _language = "javascript"
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 class CodeGraphExtractor:
@@ -734,5 +968,8 @@ __all__ = [
     "CodeEntities",
     "JavaAstExtractor",
     "PythonAstExtractor",
+    "_TsBaseExtractor",
+    "TypeScriptAstExtractor",
+    "JavaScriptAstExtractor",
     "CodeGraphExtractor",
 ]

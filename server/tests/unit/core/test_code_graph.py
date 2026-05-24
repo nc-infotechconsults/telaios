@@ -509,3 +509,144 @@ class TestPythonAstExtractorImports:
         entities = extractor.extract(_PY_IMPORTS, "ctrl.py")
         fqns = [i.imported_fqn for i in entities.imports]
         assert any("UserService" in f for f in fqns)
+
+
+# ── TypeScriptAstExtractor ────────────────────────────────────────────────────
+
+pytest.importorskip("tree_sitter_typescript", reason="tree-sitter-typescript not installed")
+
+_TS_SIMPLE_CLASS = """\
+import { Injectable } from '@nestjs/common';
+import { UserRepository } from './user.repository';
+
+@Injectable()
+export class UserService {
+  constructor(private readonly repo: UserRepository) {}
+
+  async getUser(id: number): Promise<User> {
+    return this.repo.findById(id);
+  }
+}
+"""
+
+_TS_NESTJS_CONTROLLER = """\
+import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
+
+@Controller('/api/users')
+export class UserController {
+
+  @Get('/:id')
+  getUser(@Param('id') id: string): Promise<User> {
+    return this.service.getUser(id);
+  }
+
+  @Post('/')
+  createUser(@Body() dto: CreateUserDto): Promise<User> {
+    return this.service.createUser(dto);
+  }
+
+  @Delete('/:id')
+  deleteUser(@Param('id') id: string): Promise<void> {
+    return this.service.delete(id);
+  }
+}
+"""
+
+_TS_INHERITANCE = """\
+export class AdminService extends UserService implements Auditable {
+  promote(userId: string): void {}
+}
+"""
+
+
+class TestTypeScriptAstExtractorClass:
+    @pytest.fixture
+    def extractor(self):
+        from telaios.core.knowledge.code_graph import TypeScriptAstExtractor
+        return TypeScriptAstExtractor()
+
+    def test_extracts_class_name(self, extractor):
+        entities = extractor.extract(_TS_SIMPLE_CLASS, "user.service.ts")
+        names = [c.name for c in entities.classes]
+        assert "UserService" in names
+
+    def test_extracts_method_name(self, extractor):
+        entities = extractor.extract(_TS_SIMPLE_CLASS, "user.service.ts")
+        names = [m.name for m in entities.methods]
+        assert "getUser" in names
+
+    def test_superclass_extracted(self, extractor):
+        entities = extractor.extract(_TS_INHERITANCE, "admin.service.ts")
+        cls = next(c for c in entities.classes if c.name == "AdminService")
+        assert cls.superclass == "UserService"
+
+    def test_interface_in_interfaces(self, extractor):
+        entities = extractor.extract(_TS_INHERITANCE, "admin.service.ts")
+        cls = next(c for c in entities.classes if c.name == "AdminService")
+        assert "Auditable" in cls.interfaces
+
+    def test_file_path_stored(self, extractor):
+        entities = extractor.extract(_TS_SIMPLE_CLASS, "user.service.ts")
+        assert entities.file_path == "user.service.ts"
+
+    def test_empty_source_returns_empty(self, extractor):
+        entities = extractor.extract("", "empty.ts")
+        assert entities.is_empty()
+
+
+class TestTypeScriptAstExtractorEndpoints:
+    @pytest.fixture
+    def extractor(self):
+        from telaios.core.knowledge.code_graph import TypeScriptAstExtractor
+        return TypeScriptAstExtractor()
+
+    def test_nestjs_get_endpoint(self, extractor):
+        entities = extractor.extract(_TS_NESTJS_CONTROLLER, "user.controller.ts")
+        get_eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        assert len(get_eps) >= 1
+
+    def test_nestjs_post_endpoint(self, extractor):
+        entities = extractor.extract(_TS_NESTJS_CONTROLLER, "user.controller.ts")
+        post_eps = [e for e in entities.endpoints if e.http_method == "POST"]
+        assert len(post_eps) >= 1
+
+    def test_nestjs_delete_endpoint(self, extractor):
+        entities = extractor.extract(_TS_NESTJS_CONTROLLER, "user.controller.ts")
+        del_eps = [e for e in entities.endpoints if e.http_method == "DELETE"]
+        assert len(del_eps) >= 1
+
+    def test_nestjs_path_includes_controller_prefix(self, extractor):
+        entities = extractor.extract(_TS_NESTJS_CONTROLLER, "user.controller.ts")
+        paths = [e.path for e in entities.endpoints]
+        assert any("/api/users" in p for p in paths)
+
+    def test_handler_class_set(self, extractor):
+        entities = extractor.extract(_TS_NESTJS_CONTROLLER, "user.controller.ts")
+        ep = next(e for e in entities.endpoints if e.http_method == "GET")
+        assert ep.handler_class == "UserController"
+
+
+class TestJavaScriptAstExtractorEndpoints:
+    @pytest.fixture
+    def extractor(self):
+        pytest.importorskip("tree_sitter_javascript", reason="tree-sitter-javascript not installed")
+        from telaios.core.knowledge.code_graph import JavaScriptAstExtractor
+        return JavaScriptAstExtractor()
+
+    def test_express_get_endpoint(self, extractor):
+        src = "const router = require('express').Router();\nrouter.get('/users', handler);\n"
+        entities = extractor.extract(src, "routes.js")
+        get_eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        assert len(get_eps) >= 1
+
+    def test_express_post_endpoint(self, extractor):
+        src = "const router = require('express').Router();\nrouter.post('/users', handler);\n"
+        entities = extractor.extract(src, "routes.js")
+        post_eps = [e for e in entities.endpoints if e.http_method == "POST"]
+        assert len(post_eps) >= 1
+
+    def test_express_path_extracted(self, extractor):
+        src = "router.get('/users', listUsers);\n"
+        entities = extractor.extract(src, "routes.js")
+        paths = [e.path for e in entities.endpoints]
+        assert "/users" in paths
