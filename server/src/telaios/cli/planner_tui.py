@@ -21,10 +21,13 @@ Workflow
 Layout
 ------
   Header
-  ┌─ Chat log (left) ─────────────┬─ Plan tasks (right) ─────────┐
-  │  Streaming events, questions  │  Task list once ready        │
-  └───────────────────────────────┴──────────────────────────────┘
-  ┌─ [Input] ─────────────── [Send]  [Confirm]  [Refuse] ────────┐
+  ┌─ Left ──────────────────────────────┬─ Log ────────────────────┐
+  │  ┌─ Chat (2fr) ──┬─ Plan (1fr) ──┐  │  Python log records      │
+  │  │               │               │  │                          │
+  │  └───────────────┴───────────────┘  │                          │
+  └─────────────────────────────────────┴──────────────────────────┘
+  ┌─ Status ──────────────────────────────────────────────────────┐
+  ┌─ [Input] ─────────────── [Send]  [Confirm]  [Refuse] ─────────┐
   Footer
 """
 
@@ -75,6 +78,15 @@ Screen {
     height: 1fr;
 }
 
+#left-side {
+    width: 3fr;
+    height: 1fr;
+}
+
+#inner-split {
+    height: 1fr;
+}
+
 #chat-panel {
     width: 2fr;
     border: solid $primary-darken-2;
@@ -85,6 +97,13 @@ Screen {
 #plan-panel {
     width: 1fr;
     border: solid $primary-darken-2;
+    padding: 0 1;
+    height: 1fr;
+}
+
+#log-panel {
+    width: 1fr;
+    border: solid $warning-darken-2;
     padding: 0 1;
     height: 1fr;
 }
@@ -119,6 +138,26 @@ RichLog {
 
 
 # ---------------------------------------------------------------------------
+# Logging handler — pipes records into the log panel
+# ---------------------------------------------------------------------------
+
+
+class _TUILogHandler(logging.Handler):
+    def __init__(self, app: PlannerTUI) -> None:
+        super().__init__()
+        self._app = app
+        self.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            level = record.levelno
+            self._app.call_from_thread(self._app._append_log, msg, level)
+        except Exception:
+            self.handleError(record)
+
+
+# ---------------------------------------------------------------------------
 # TUI App
 # ---------------------------------------------------------------------------
 
@@ -136,24 +175,30 @@ class PlannerTUI(App[None]):
 
     def __init__(self) -> None:
         super().__init__()
-        self._service: Any | None = None  # PlannerService; loaded lazily
+        self._service: Any | None = None
         self._planner_thread_id: str | None = None
         self._status: PlanningSessionStatus = PlanningSessionStatus.PENDING
         self._is_paused: bool = False
-        self._pause_type: str | None = None  # "questions" | "plan_ready"
-        self._chunk_buffer: str = ""  # accumulates streaming tokens for one response
+        self._pause_type: str | None = None
+        self._chunk_buffer: str = ""
+        self._log_handler: _TUILogHandler | None = None
 
     # ── Layout ───────────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="main-split"):
-            with Vertical(id="chat-panel"):
-                yield Static("[bold]Chat[/bold]", classes="panel-title")
-                yield RichLog(highlight=True, markup=True, id="chat-log")
-            with Vertical(id="plan-panel"):
-                yield Static("[bold]Plan[/bold]", classes="panel-title")
-                yield RichLog(highlight=True, markup=True, id="plan-log")
+            with Vertical(id="left-side"):
+                with Horizontal(id="inner-split"):
+                    with Vertical(id="chat-panel"):
+                        yield Static("[bold]Chat[/bold]", classes="panel-title")
+                        yield RichLog(highlight=True, markup=True, id="chat-log")
+                    with Vertical(id="plan-panel"):
+                        yield Static("[bold]Plan[/bold]", classes="panel-title")
+                        yield RichLog(highlight=True, markup=True, id="plan-log")
+            with Vertical(id="log-panel"):
+                yield Static("[bold]Log[/bold]", classes="panel-title")
+                yield RichLog(highlight=False, markup=True, id="app-log")
         yield Static("Status: initialising…", id="status-bar")
         with Horizontal(id="input-bar"):
             yield Input(
@@ -172,7 +217,21 @@ class PlannerTUI(App[None]):
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def on_mount(self) -> None:
+        self._install_log_handler()
         self._init_service()
+
+    def on_unmount(self) -> None:
+        self._remove_log_handler()
+
+    def _install_log_handler(self) -> None:
+        self._log_handler = _TUILogHandler(self)
+        self._log_handler.setLevel(logging.DEBUG)
+        logging.getLogger().addHandler(self._log_handler)
+
+    def _remove_log_handler(self) -> None:
+        if self._log_handler is not None:
+            logging.getLogger().removeHandler(self._log_handler)
+            self._log_handler = None
 
     @work(exclusive=True)
     async def _init_service(self) -> None:
@@ -312,12 +371,9 @@ class PlannerTUI(App[None]):
         data = event.data
 
         if isinstance(data, ChunkEventData):
-            # Accumulate streaming tokens; flush to log on the next non-chunk event
-            # or when the done event arrives.
             self._chunk_buffer += data.content
 
         else:
-            # Flush any accumulated chunk buffer before rendering the next event.
             if self._chunk_buffer:
                 self._chat_log(f"[bold blue]Agent:[/bold blue] {self._chunk_buffer}")
                 self._chunk_buffer = ""
@@ -348,7 +404,6 @@ class PlannerTUI(App[None]):
                 self._render_plan_tasks(data)
 
             elif isinstance(data, DoneEventData):
-                # Flush any remaining buffer
                 if self._chunk_buffer:
                     self._chat_log(f"[bold blue]Agent:[/bold blue] {self._chunk_buffer}")
                     self._chunk_buffer = ""
@@ -394,6 +449,18 @@ class PlannerTUI(App[None]):
         except NoMatches:
             pass
 
+    def _append_log(self, msg: str, level: int) -> None:
+        try:
+            log: RichLog = self.query_one("#app-log", RichLog)
+            if level >= logging.ERROR:
+                log.write(f"[red]{msg}[/red]")
+            elif level >= logging.WARNING:
+                log.write(f"[yellow]{msg}[/yellow]")
+            else:
+                log.write(f"[dim]{msg}[/dim]")
+        except NoMatches:
+            pass
+
     def _set_status(self, text: str) -> None:
         try:
             bar: Static = self.query_one("#status-bar", Static)
@@ -419,7 +486,6 @@ class PlannerTUI(App[None]):
                 pass
 
     def _update_button_states(self) -> None:
-        """Update buttons based on current state."""
         with contextlib.suppress(NoMatches):
             self.query_one("#btn-send", Button).disabled = False
 
@@ -437,17 +503,12 @@ class PlannerTUI(App[None]):
 def main() -> None:
     """Launch the Planner TUI."""
     import sys
-    from pathlib import Path
 
-    log_file = Path("planner_tui.log")
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(str(log_file), mode="w"),
-        ],
+        handlers=[],  # TUI captures all records via _TUILogHandler
     )
-    logger.info("Planner TUI starting — logs at %s", log_file.absolute())
     PlannerTUI().run()
     sys.exit(0)
 

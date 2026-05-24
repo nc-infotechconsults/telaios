@@ -3,7 +3,7 @@
 Extracts typed entities (classes, methods, fields, REST endpoints) directly from
 source code via tree-sitter — no LLM, no hallucination, no character-window loss.
 
-Supported languages: Java (others extensible via CodeGraphExtractor).
+Supported languages: Java, Python (others extensible via CodeGraphExtractor).
 """
 
 from __future__ import annotations
@@ -602,7 +602,7 @@ class PythonAstExtractor:
             ann = self._annotation_str(arg.annotation) if arg.annotation else "Any"
             params.append((ann, arg.arg))
         return_type = self._annotation_str(node.returns) if node.returns else "None"
-        decorators = [self._name_from_expr(d) or "" for d in node.decorator_list]
+        decorators = [self._decorator_name(d) for d in node.decorator_list]
         method_info = MethodInfo(
             class_name=class_name,
             name=node.name,
@@ -686,6 +686,12 @@ class PythonAstExtractor:
         if isinstance(node, _ast.Constant) and isinstance(node.value, str):
             return node.value
         return None
+
+    def _decorator_name(self, node) -> str:
+        import ast as _ast
+        if isinstance(node, _ast.Call):
+            return self._name_from_expr(node.func) or ""
+        return self._name_from_expr(node) or ""
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
