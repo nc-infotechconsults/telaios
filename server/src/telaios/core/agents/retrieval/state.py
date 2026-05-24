@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from telaios.core.knowledge.pipeline import Citation
@@ -27,7 +27,7 @@ class EvaluationResult(BaseModel):
     is_sufficient: bool
     missing_aspects: list[str]
     follow_up_queries: list[str]
-    confidence: float
+    confidence: float = Field(ge=0.0, le=1.0)
 
 
 class RetrievalState(TypedDict):

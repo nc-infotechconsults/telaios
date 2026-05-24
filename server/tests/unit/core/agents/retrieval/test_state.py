@@ -57,3 +57,12 @@ class TestEvaluationResult:
         )
         assert not result.is_sufficient
         assert len(result.follow_up_queries) == 1
+
+    def test_confidence_out_of_bounds_raises(self):
+        with pytest.raises(Exception):
+            EvaluationResult(
+                is_sufficient=True,
+                missing_aspects=[],
+                follow_up_queries=[],
+                confidence=1.5,
+            )
