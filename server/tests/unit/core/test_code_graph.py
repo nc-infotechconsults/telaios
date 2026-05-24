@@ -693,3 +693,39 @@ class TestJavaScriptAstExtractorEndpoints:
         entities = extractor.extract(src, "routes.js")
         paths = [e.path for e in entities.endpoints]
         assert "/users" in paths
+
+
+# ── CodeGraphExtractor dispatcher — language parity ──────────────────────────
+
+
+class TestCodeGraphExtractorLanguageParity:
+    @pytest.fixture
+    def extractor(self):
+        return CodeGraphExtractor()
+
+    def test_python_file_dispatches(self, extractor):
+        src = "class Foo:\n    pass\n"
+        entities = extractor.extract(src, "foo.py", language="python")
+        assert entities is not None
+        assert len(entities.classes) >= 1
+
+    def test_typescript_file_dispatches(self, extractor):
+        pytest.importorskip("tree_sitter_typescript")
+        src = "export class Foo {}\n"
+        entities = extractor.extract(src, "foo.ts", language="typescript")
+        assert entities is not None
+
+    def test_javascript_file_dispatches(self, extractor):
+        pytest.importorskip("tree_sitter_javascript")
+        src = "class Foo {}\n"
+        entities = extractor.extract(src, "foo.js", language="javascript")
+        assert entities is not None
+
+    def test_supports_python(self, extractor):
+        assert CodeGraphExtractor.supports("python")
+
+    def test_supports_typescript(self, extractor):
+        assert CodeGraphExtractor.supports("typescript")
+
+    def test_supports_javascript(self, extractor):
+        assert CodeGraphExtractor.supports("javascript")

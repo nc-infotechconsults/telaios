@@ -943,7 +943,10 @@ class CodeGraphExtractor:
     """Language-aware dispatcher for deterministic code entity extraction."""
 
     _SUPPORTED: dict[str, type] = {
-        "java": JavaAstExtractor,
+        "java":       JavaAstExtractor,
+        "python":     PythonAstExtractor,
+        "typescript": TypeScriptAstExtractor,
+        "javascript": JavaScriptAstExtractor,
     }
 
     @classmethod

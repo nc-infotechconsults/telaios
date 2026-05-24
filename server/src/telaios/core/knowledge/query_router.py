@@ -38,6 +38,8 @@ _PATTERNS: list[tuple[QueryIntent, list[str]]] = [
         r"\bwhat endpoints?\b",
         r"\brest api[s]?\b.{0,30}\b(available|exist|defined|exposed)\b",
         r"\bexposed (api[s]?|endpoint[s]?)\b",
+        r"\b(flask|fastapi|django|nestjs|express)\b.{0,30}\b(endpoint[s]?|route[s]?)\b",
+        r"\broute[s]?\b.{0,20}\b(expose[sd]?|defined|available)\b",
     ]),
     (QueryIntent.INHERITANCE, [
         r"\b(extend[s]?|implement[s]?|subclass(?:es)?|inherit[s]?)\b",
@@ -48,14 +50,15 @@ _PATTERNS: list[tuple[QueryIntent, list[str]]] = [
         r"\bsuper(class|type|interface)\b",
     ]),
     (QueryIntent.DEPENDENCY, [
-        r"\b(which|what)\s+(class(?:es)?|service[s]?|component[s]?|bean[s]?)\s+(use[sd]?|depend[s]? on|import[s]?|reference[s]?|call[s]?|inject[s]?|autowire[sd]?)\b",
+        r"\b(which|what)\s+(class(?:es)?|service[s]?|component[s]?|bean[s]?|function[s]?|module[s]?)\s+(use[sd]?|depend[s]? on|import[s]?|reference[s]?|call[s]?|inject[s]?|autowire[sd]?)\b",
         r"\bwho\s+(use[sd]?|call[sd]?|depend[s]?\s+on|inject[s]?)\b",
         r"\bdepend[s]? on\b",
         r"\bdependencies\s+(of|for)\b",
         r"\bwhat uses?\b.{0,30}\b[A-Z]\w+\b",
-        r"\bwhich\s+(class(?:es)?|service[s]?)\s+use[s]?\b",
+        r"\bwhich\s+(class(?:es)?|service[s]?|function[s]?)\s+use[s]?\b",
         r"\bimport[s]?\b.{0,30}\b[A-Z]\w+\b",
         r"\bwhere is\b.{0,30}\b[A-Z]\w+(Repository|Service|Controller|Manager|Handler)\b.{0,20}\bused\b",
+        r"\bwhich functions?\s+call\s+\w+\b",
     ]),
 ]
 

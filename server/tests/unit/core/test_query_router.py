@@ -155,3 +155,27 @@ class TestParamExtraction:
         # "REST", "API" etc. are in the exclude list
         _, params = classify_query("what REST APIs exist?")
         assert params.get("class_name") not in ("REST", "API")
+
+
+# ── Python / TypeScript structural patterns ───────────────────────────────────
+
+class TestPythonStructuralPatterns:
+    def test_snake_case_function_dependency(self):
+        intent, params = classify_query("which functions call process_payment?")
+        assert intent == QueryIntent.DEPENDENCY
+
+    def test_python_class_dependency(self):
+        intent, _ = classify_query("what uses UserRepository?")
+        assert intent == QueryIntent.DEPENDENCY
+
+    def test_fastapi_route_list(self):
+        intent, _ = classify_query("what routes does the users router expose?")
+        assert intent == QueryIntent.ENDPOINT_LIST
+
+    def test_flask_endpoint_list(self):
+        intent, _ = classify_query("list all flask endpoints")
+        assert intent == QueryIntent.ENDPOINT_LIST
+
+    def test_python_inheritance(self):
+        intent, _ = classify_query("what classes extend BaseService?")
+        assert intent == QueryIntent.INHERITANCE
