@@ -26,13 +26,13 @@ class InMemoryGraphStore(GraphStore):
 
     @staticmethod
     def _normalize(entity: str) -> str:
-        return entity.strip().lower()
+        return entity.strip()
 
     # ── Sync interface ────────────────────────────────────────────────────────
 
     def add_triplet(self, subject: str, predicate: str, obj: str) -> None:
         s = self._normalize(subject)
-        p = predicate.strip().lower()
+        p = predicate.strip()
         o = self._normalize(obj)
         self._entities.setdefault(s, {"name": s, "type": "unknown", "properties": {}})
         self._entities.setdefault(o, {"name": o, "type": "unknown", "properties": {}})

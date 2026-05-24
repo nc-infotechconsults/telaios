@@ -184,9 +184,16 @@ class KnowledgePipelineFactory:
         # Embedder — provider-agnostic (fastembed | tei)
         embedder = EmbedderFactory.create(config.embedding)
 
+        # Optional code-specific embedder for the repositories collection
+        collection_embedder_map = {}
+        if config.code_embedding is not None:
+            code_embedder = EmbedderFactory.create(config.code_embedding)
+            collection_embedder_map[config.repositories_collection] = code_embedder
+
         vector_store = QdrantVectorStore(
             client=qdrant_client,
             embedder=embedder,
+            collection_embedder_map=collection_embedder_map or None,
         )
 
         bm25_store = BM25Store()
@@ -227,6 +234,11 @@ class KnowledgePipelineFactory:
             from telaios.core.knowledge.docgen import RepoDocGenerator
             docgen = RepoDocGenerator(llm=llm, config=config)
 
+        reranker = None
+        if config.reranker_enabled:
+            from telaios.core.knowledge.reranker import CrossEncoderReranker
+            reranker = CrossEncoderReranker(model=config.reranker_model)
+
         return KnowledgeBasePipeline(
             vector_store=vector_store,
             bm25_store=bm25_store,
@@ -236,6 +248,7 @@ class KnowledgePipelineFactory:
             ingestion=ingestion,
             config=config,
             docgen=docgen,
+            reranker=reranker,
         )
 
 

@@ -87,6 +87,7 @@ class KnowledgeBasePipeline:
         ingestion: IngestionService,
         config: KnowledgePipelineConfig,
         docgen: RepoDocGenerator | None = None,
+        reranker: Any | None = None,
     ) -> None:
         self._vs = vector_store
         self._bm25 = bm25_store
@@ -96,6 +97,7 @@ class KnowledgeBasePipeline:
         self._ingestion = ingestion
         self._config = config
         self._docgen = docgen
+        self._reranker = reranker
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
 
@@ -108,6 +110,8 @@ class KnowledgeBasePipeline:
         on_progress: ProgressFn | None = None,
     ) -> KnowledgeQueryResult:
         """Hybrid retrieve across documents, repositories, or both."""
+        from telaios.core.knowledge.query_router import QueryIntent, classify_query
+
         def _emit(msg: str) -> None:
             if on_progress:
                 on_progress(msg)
@@ -117,6 +121,20 @@ class KnowledgeBasePipeline:
         all_chunks: list[Chunk] = []
         all_scores: list[float] = []
 
+        # ── Structural query routing ──────────────────────────────────────────
+        intent, params = classify_query(text)
+        graph_chunks: list[Chunk] = []
+        is_structural = intent != QueryIntent.SEMANTIC
+
+        if is_structural and self._config.graph_augmentation_enabled:
+            _emit(f"Structural query [{intent.value}] — querying knowledge graph…")
+            graph_chunks = await self._graph.query_structural(intent.value, params, project_id)
+            if graph_chunks:
+                _emit(f"  Graph → {len(graph_chunks)} structural result(s)")
+            else:
+                _emit("  Graph → no results, falling back to vector search")
+
+        # ── Vector retrieval ──────────────────────────────────────────────────
         collections = self._resolve_collections(source)
         for collection in collections:
             hyde_note = " + HyDE" if self._config.hyde_enabled else ""
@@ -136,12 +154,18 @@ class KnowledgeBasePipeline:
             all_chunks = [c for c, _ in paired[:k]]
             all_scores = [s for _, s in paired[:k]]
 
-        # Graph augmentation
-        if self._config.graph_augmentation_enabled:
+        # Prepend graph structural results (highest priority context)
+        if graph_chunks:
+            all_chunks = graph_chunks + all_chunks
+            all_scores = [1.0] * len(graph_chunks) + all_scores
+
+        # ── Generic graph augmentation (semantic queries only) ────────────────
+        # Skip for structural queries: graph already queried deterministically above.
+        if self._config.graph_augmentation_enabled and not is_structural:
             _emit("Graph augmentation — expanding via entity links…")
             all_chunks = await self._graph.augment(all_chunks, text)
 
-        # Answer generation
+        # ── Answer generation ─────────────────────────────────────────────────
         answer: str | None = None
         citations: list[Citation] = []
         if self._config.generation_enabled and all_chunks:
@@ -274,6 +298,7 @@ class KnowledgeBasePipeline:
             document_count=code_result.document_count,
             chunk_count=code_result.chunk_count + doc_chunk_count,
             triplet_count=code_result.triplet_count,
+            chunks=code_result.chunks,
         )
 
     async def _ingest_generated_docs(
@@ -454,6 +479,8 @@ class KnowledgeBasePipeline:
             hyde=self._hyde if self._config.hyde_enabled else None,
             top_k=self._config.top_k,
             rrf_k=self._config.rrf_k,
+            reranker=self._reranker,
+            rerank_candidates=self._config.rerank_candidates,
         )
 
 

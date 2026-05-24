@@ -28,10 +28,18 @@ class QdrantVectorStore:
     def __init__(
         self,
         client: Any,  # qdrant_client.AsyncQdrantClient
-        embedder: Embedder,
+        embedder: "Embedder",
+        collection_embedder_map: dict[str, "Embedder"] | None = None,
     ) -> None:
         self._client = client
         self._embedder = embedder
+        # Per-collection embedder overrides, e.g. code-specific model for repositories
+        self._collection_embedders: dict[str, "Embedder"] = collection_embedder_map or {}
+
+    def _get_embedder(self, collection: str | None = None) -> "Embedder":
+        if collection and collection in self._collection_embedders:
+            return self._collection_embedders[collection]
+        return self._embedder
 
     # ── Collection lifecycle ──────────────────────────────────────────────────
 
@@ -39,18 +47,19 @@ class QdrantVectorStore:
         """Create collection if it does not exist."""
         from qdrant_client.models import Distance, VectorParams
 
+        embedder = self._get_embedder(collection)
         existing = {c.name for c in (await self._client.get_collections()).collections}
         if collection not in existing:
             await self._client.create_collection(
                 collection_name=collection,
                 vectors_config=VectorParams(
-                    size=self._embedder.dimensions,
+                    size=embedder.dimensions,
                     distance=Distance.COSINE,
                 ),
             )
             logger.info(
                 "Created Qdrant collection %r (dims=%d)",
-                collection, self._embedder.dimensions,
+                collection, embedder.dimensions,
             )
 
     # ── Ingestion ─────────────────────────────────────────────────────────────
@@ -67,7 +76,7 @@ class QdrantVectorStore:
 
         await self.ensure_collection(collection)
 
-        vectors = await self._embedder.embed(texts)
+        vectors = await self._get_embedder(collection).embed(texts)
         point_ids = ids or [str(uuid.uuid4()) for _ in texts]
 
         points = [
@@ -120,9 +129,9 @@ class QdrantVectorStore:
             for hit in response.points
         ]
 
-    async def embed_query(self, text: str) -> list[float]:
-        """Embed a single query string."""
-        return await self._embedder.embed_query(text)
+    async def embed_query(self, text: str, collection: str | None = None) -> list[float]:
+        """Embed a single query string, using the collection-specific embedder if set."""
+        return await self._get_embedder(collection).embed_query(text)
 
     # ── Scroll (for BM25 rebuild) ─────────────────────────────────────────────
 

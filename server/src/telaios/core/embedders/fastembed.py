@@ -26,6 +26,9 @@ _DIMENSIONS: dict[str, int] = {
     "BAAI/bge-m3": 1024,
     "intfloat/multilingual-e5-large": 1024,
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2": 768,
+    # Code-specific — recommended for repositories collection
+    "jinaai/jina-embeddings-v2-base-code": 768,
+    "nomic-ai/nomic-embed-text-v1.5": 768,
 }
 
 

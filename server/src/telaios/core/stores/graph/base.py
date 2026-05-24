@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from telaios.core.knowledge.code_graph import CodeEntities
 
 
 class GraphStore(ABC):
@@ -86,6 +89,37 @@ class GraphStore(ABC):
         Override in stores that support graph topology analysis.
         """
         return []
+
+    # ── Typed code-graph operations (optional, default no-ops) ───────────────
+
+    def upsert_code_entities(self, entities: "CodeEntities", project_id: str) -> None:
+        """Upsert typed code entities (classes, endpoints, relations) into the graph.
+
+        Override in stores that support a typed code schema (e.g. FalkorDB).
+        Default is a no-op so existing stores don't break.
+        """
+
+    async def aupsert_code_entities(self, entities: "CodeEntities", project_id: str) -> None:
+        """Async upsert_code_entities."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.upsert_code_entities, entities, project_id)
+
+    def query_structural(self, intent: str, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
+        """Run a structured code-graph query and return raw rows.
+
+        *intent* is a QueryIntent string value. Override in typed-schema stores.
+        Default returns empty list (no structural graph available).
+        """
+        return []
+
+    async def aquery_structural(
+        self, intent: str, params: dict[str, str], project_id: str
+    ) -> list[dict[str, Any]]:
+        """Async query_structural."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.query_structural, intent, params, project_id)
 
 
 __all__ = ["GraphStore"]

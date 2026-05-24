@@ -25,6 +25,32 @@ ProgressFn = Callable[[str], None]
 logger = logging.getLogger(__name__)
 
 
+def _build_structural_header(meta: dict[str, Any]) -> str:
+    """Prepend a context header to chunk text before embedding.
+
+    Format: [language | path/file.java | class:ClassName | function:methodName]
+
+    This anchors the embedding in the code structure space so that queries like
+    "UserController.getUser method" reliably retrieve the right chunk even when
+    the method body doesn't mention the class name.
+    """
+    from pathlib import Path
+    parts: list[str] = []
+    if lang := meta.get("language"):
+        parts.append(lang)
+    if sp := meta.get("source_path"):
+        # Keep last two path segments for brevity: com/example/UserController.java
+        p = Path(sp)
+        parts.append("/".join(p.parts[-2:]) if len(p.parts) > 1 else sp)
+    if cls := meta.get("enclosing_class"):
+        parts.append(f"class:{cls}")
+    sym_type = meta.get("symbol_type") or ""
+    sym_name = meta.get("symbol_name") or ""
+    if sym_type and sym_name and sym_type not in ("file_index", "preamble"):
+        parts.append(f"{sym_type}:{sym_name}")
+    return f"[{' | '.join(parts)}]\n" if parts else ""
+
+
 @dataclass
 class IngestResult:
     collection: str
@@ -120,6 +146,7 @@ class IngestionService:
                     "title": doc.title,
                     "symbol_name": meta.symbol_name,
                     "symbol_type": meta.symbol_type,
+                    "enclosing_class": meta.enclosing_class,
                     "start_line": meta.start_line,
                     "end_line": meta.end_line,
                     "language": meta.language,
@@ -132,8 +159,12 @@ class IngestionService:
                     chunk_meta["http_method"] = route.method
                     chunk_meta["route_path"] = route.path
 
+                # Structural header prepended to embedded text only (payload keeps raw content)
+                header = _build_structural_header(chunk_meta)
+                embed_text = header + chunk_text if header else chunk_text
+
                 payload = {"content": chunk_text, **chunk_meta}
-                texts.append(chunk_text)
+                texts.append(embed_text)
                 payloads.append(payload)
                 point_ids.append(pid)
                 chunk_objects.append(
@@ -192,12 +223,24 @@ class IngestionService:
 
         if self._graph is not None:
             _emit(f"Indexing graph entities for {len(docs)} document(s)…")
+            from telaios.core.knowledge.code_graph import CodeGraphExtractor
+            _code_extractor = CodeGraphExtractor()
             for doc, raw_chunks, doc_language in _doc_index_targets:
-                if doc_language in _CODE_LANGUAGES:
-                    # Code: extract per-symbol chunk — precise, no character-window loss
+                if doc_language in _CODE_LANGUAGES and _code_extractor.supports(doc_language):
+                    # AST-based extraction: deterministic, typed, no LLM
+                    entities = _code_extractor.extract(
+                        doc.content, doc.source_path or doc.id, doc_language
+                    )
+                    if entities and not entities.is_empty():
+                        await self._graph.index_code_entities(doc.id, entities, project_id)
+                    else:
+                        # AST yielded nothing — fall back to LLM triplets
+                        await self._graph.index_chunks(doc.id, raw_chunks)
+                elif doc_language in _CODE_LANGUAGES:
+                    # Language not yet supported by AST extractor — LLM triplets
                     await self._graph.index_chunks(doc.id, raw_chunks)
                 else:
-                    # Text/docs: extract from full content via sliding windows (no cap)
+                    # Non-code documents: LLM triplet extraction over full content
                     await self._graph.index_document(doc.id, doc.content)
             _emit("Rebuilding graph community summaries…")
             await self._graph.rebuild_communities()

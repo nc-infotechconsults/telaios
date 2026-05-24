@@ -48,6 +48,7 @@ class HybridRetriever(Retriever):
       2. Qdrant dense search (cosine similarity)
       3. BM25 sparse search (in-memory)
       4. RRF fusion of both ranked lists
+      5. Optional cross-encoder reranking
     """
 
     def __init__(
@@ -59,6 +60,8 @@ class HybridRetriever(Retriever):
         hyde: Any | None,           # HyDE | None
         top_k: int = 5,
         rrf_k: int = 60,
+        reranker: Any | None = None,        # CrossEncoderReranker | None
+        rerank_candidates: int = 50,
     ) -> None:
         self._vs = vector_store
         self._bm25 = bm25_store
@@ -67,6 +70,8 @@ class HybridRetriever(Retriever):
         self._hyde = hyde
         self._top_k = top_k
         self._rrf_k = rrf_k
+        self._reranker = reranker
+        self._rerank_candidates = rerank_candidates
 
     def retrieve(self, query: RetrievalQuery) -> RetrievalResult:
         import asyncio
@@ -74,19 +79,21 @@ class HybridRetriever(Retriever):
 
     async def aretrieve(self, query: RetrievalQuery) -> RetrievalResult:
         top_k = query.top_k or self._top_k
+        # Over-fetch for reranker; at least 2x for RRF quality
+        fetch_k = max(self._rerank_candidates, top_k * 2) if self._reranker else top_k * 2
 
         # 1. Embed query (via HyDE if enabled, else direct)
         if self._hyde is not None:
             vector = await self._hyde.embed_query(query.text, self._collection)
         else:
-            vector = await self._vs.embed_query(query.text)
+            vector = await self._vs.embed_query(query.text, collection=self._collection)
 
         # 2. Dense retrieval
         dense_results = await self._vs.search(
             collection=self._collection,
             vector=vector,
             project_id=self._project_id,
-            top_k=top_k * 2,  # over-fetch for RRF
+            top_k=fetch_k,
         )
 
         # 3. Sparse retrieval
@@ -94,20 +101,41 @@ class HybridRetriever(Retriever):
             collection=self._collection,
             query=query.text,
             project_id=self._project_id,
-            top_k=top_k * 2,
+            top_k=fetch_k,
         )
 
-        # 4. RRF fusion
+        # 4. RRF fusion — fuse into candidate pool
         ranked_lists = [dense_results, sparse_results]
-        fused = _reciprocal_rank_fusion(ranked_lists, k=self._rrf_k)[:top_k]
+        candidate_k = self._rerank_candidates if self._reranker else top_k
+        fused = _reciprocal_rank_fusion(ranked_lists, k=self._rrf_k)[:candidate_k]
 
+        # 5. Cross-encoder reranking (optional)
+        if self._reranker and fused:
+            fused_docs = [doc for doc, _ in fused]
+            reranked = await self._reranker.arerank(query.text, fused_docs, top_k)
+            # Assign uniform normalized score; reranker ordering is what matters
+            max_rrf = len(ranked_lists) / (self._rrf_k + 1)
+            chunks = []
+            scores = []
+            for doc in reranked:
+                raw = next((s for d, s in fused if d.get("id") == doc.get("id")), 0.0)
+                chunks.append(Chunk(
+                    id=doc.get("id", ""),
+                    document_id=doc.get("metadata", {}).get("document_id", ""),
+                    content=doc.get("content", ""),
+                    metadata=doc.get("metadata", {}),
+                ))
+                scores.append(min(raw / max_rrf, 1.0))
+            return RetrievalResult(chunks=chunks, scores=scores)
+
+        # No reranker — normalize and return top_k
         # Normalize to [0, 1]: divide by theoretical max (top rank in every list)
         # max_rrf = num_lists / (k + 1)
         max_rrf = len(ranked_lists) / (self._rrf_k + 1)
 
         chunks = []
         scores = []
-        for doc, raw_score in fused:
+        for doc, raw_score in fused[:top_k]:
             chunks.append(Chunk(
                 id=doc.get("id", ""),
                 document_id=doc.get("metadata", {}).get("document_id", ""),

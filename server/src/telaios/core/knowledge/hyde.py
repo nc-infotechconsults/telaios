@@ -7,9 +7,22 @@ Source: "Precise Zero-Shot Dense Retrieval without Relevance Labels"
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Queries matching these patterns are code-identifier lookups — HyDE prose
+# generation drifts away from the exact tokens BM25 and dense search need.
+_CODE_IDENTIFIER_RE = re.compile(
+    r"\b[A-Z][a-zA-Z0-9]*(?:Service|Repository|Controller|Manager|Handler|"
+    r"Impl|Factory|DTO|VO|Entity|Mapper|Exception|Error|Config|Util|Helper)\b"
+    r"|(?:NullPointer|StackOverflow|ClassNotFound|IllegalArgument)"
+    r"|[a-z][a-zA-Z0-9]*(?:Exception|Error)\b"
+    r"|import\s+[a-zA-Z]"
+    r"|class\s+[A-Z]"
+    r"|/[a-zA-Z0-9_/-]{3,}",  # path-like segments
+)
 
 # System: fixed instructions — never contains user data.
 _HYDE_SYSTEM = (
@@ -43,18 +56,22 @@ class HyDE:
         self._vector_store = vector_store
 
     async def embed_query(self, query: str, collection: str) -> list[float]:
-        """
-        Generate a hypothetical document, embed it, return the vector.
+        """Generate a hypothetical document, embed it, return the vector.
 
-        Falls back to direct query embedding on LLM failure.
+        Skips HyDE for code-identifier queries (class names, exception types, paths)
+        where generated prose drifts away from the exact tokens needed for recall.
+        Falls back to direct embedding on LLM failure.
         """
+        if _CODE_IDENTIFIER_RE.search(query):
+            logger.debug("HyDE skipped — code-identifier query: %s", query[:80])
+            return await self._vector_store.embed_query(query, collection=collection)
         try:
             hypothetical = await self._generate_hypothetical(query)
             logger.debug("HyDE hypothetical doc: %s", hypothetical[:120])
-            return await self._vector_store.embed_query(hypothetical)
+            return await self._vector_store.embed_query(hypothetical, collection=collection)
         except Exception:
             logger.warning("HyDE generation failed, falling back to direct embedding", exc_info=True)
-            return await self._vector_store.embed_query(query)
+            return await self._vector_store.embed_query(query, collection=collection)
 
     async def _generate_hypothetical(self, query: str) -> str:
         from langchain_core.messages import HumanMessage, SystemMessage

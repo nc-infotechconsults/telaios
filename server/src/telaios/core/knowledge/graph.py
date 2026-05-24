@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from telaios.core.types import Chunk
+
+if TYPE_CHECKING:
+    from telaios.core.knowledge.code_graph import CodeEntities
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +138,137 @@ class GraphAugmentor:
                 logger.debug("Indexed %d triplets for doc %s", len(triplets), doc_id)
         except Exception:
             logger.warning("Graph indexing failed for doc %s", doc_id, exc_info=True)
+
+    async def index_code_entities(
+        self,
+        doc_id: str,
+        entities: "CodeEntities",
+        project_id: str,
+    ) -> None:
+        """Ingest typed code entities from AST extraction — no LLM, deterministic.
+
+        Preferred over index_chunks() for supported languages (Java).
+        Creates typed nodes (CodeClass, RestEndpoint) with typed edges.
+        """
+        try:
+            await self._graph.aupsert_code_entities(entities, project_id)
+            logger.debug(
+                "Indexed code entities for doc %s: %d class(es), %d endpoint(s)",
+                doc_id, len(entities.classes), len(entities.endpoints),
+            )
+        except Exception:
+            logger.warning("Code entity graph indexing failed for doc %s", doc_id, exc_info=True)
+
+    async def query_structural(
+        self,
+        intent: str,
+        params: dict[str, str],
+        project_id: str,
+    ) -> list[Chunk]:
+        """Query graph for structural code information and return formatted Chunks.
+
+        Called by the pipeline when a query is classified as structural (not semantic).
+        Returns empty list when no results found or graph unsupported.
+        """
+        try:
+            rows = await self._graph.aquery_structural(intent, params, project_id)
+            if not rows:
+                return []
+            return self._format_structural_results(intent, rows, params)
+        except Exception:
+            logger.warning("Structural graph query failed for intent %r", intent, exc_info=True)
+            return []
+
+    @staticmethod
+    def _format_structural_results(
+        intent: str, rows: list[dict[str, Any]], params: dict[str, str]
+    ) -> list[Chunk]:
+        """Convert graph query rows into Chunk objects for LLM consumption."""
+        if not rows:
+            return []
+
+        if intent == "endpoint_count":
+            by_method: dict[str, int] = {}
+            for row in rows:
+                m = str(row.get("http_method") or "UNKNOWN")
+                by_method[m] = by_method.get(m, 0) + 1
+            total = sum(by_method.values())
+            lines = [f"Total REST endpoints: {total}"]
+            for method in sorted(by_method):
+                lines.append(f"  {method}: {by_method[method]}")
+            return [Chunk(
+                id="graph-endpoint-count",
+                document_id="knowledge-graph",
+                content="\n".join(lines),
+                metadata={"source": "knowledge_graph", "_collection": "graph"},
+            )]
+
+        elif intent == "endpoint_list":
+            lines = [f"REST API Endpoints ({len(rows)} total):"]
+            for row in rows:
+                method = row.get("http_method", "?")
+                path = row.get("path", "?")
+                handler = f"{row.get('handler_class', '')}.{row.get('handler_method', '')}()"
+                line = f"  {method} {path} → {handler}"
+                rbt = row.get("request_body_type")
+                if rbt:
+                    line += f"  [body: {rbt}]"
+                lines.append(line)
+            return [Chunk(
+                id="graph-endpoint-list",
+                document_id="knowledge-graph",
+                content="\n".join(lines),
+                metadata={"source": "knowledge_graph", "_collection": "graph"},
+            )]
+
+        elif intent == "endpoint_detail":
+            chunks: list[Chunk] = []
+            for row in rows:
+                lines = [f"{row.get('http_method', '?')} {row.get('path', '?')}"]
+                hc = row.get("handler_class", "")
+                hm = row.get("handler_method", "")
+                if hc or hm:
+                    lines.append(f"Handler: {hc}.{hm}()")
+                rbt = row.get("request_body_type")
+                if rbt:
+                    lines.append(f"Request body: {rbt}")
+                rt = row.get("response_type")
+                if rt:
+                    lines.append(f"Response type: {rt}")
+                path_key = str(row.get("path", ""))
+                chunks.append(Chunk(
+                    id=f"graph-ep-{abs(hash(path_key)) % 100000}",
+                    document_id="knowledge-graph",
+                    content="\n".join(lines),
+                    metadata={"source": "knowledge_graph", "_collection": "graph"},
+                ))
+            return chunks
+
+        elif intent in ("dependency", "inheritance"):
+            class_name = params.get("class_name", "target")
+            rel_label = "depend on" if intent == "dependency" else "extend or implement"
+            lines = [f"Classes that {rel_label} {class_name} ({len(rows)} found):"]
+            for row in rows:
+                name = row.get("class_name", "?")
+                pkg = row.get("package", "")
+                fp = row.get("file_path", "")
+                rel = row.get("relation_type", "")
+                line = f"  {name}"
+                if pkg:
+                    line += f" ({pkg})"
+                if rel:
+                    line += f" via {rel}"
+                if fp:
+                    line += f"  ← {fp}"
+                lines.append(line)
+            return [Chunk(
+                id=f"graph-{intent}-{abs(hash(class_name)) % 100000}",
+                document_id="knowledge-graph",
+                content="\n".join(lines),
+                metadata={"source": "knowledge_graph", "_collection": "graph"},
+            )]
+
+        return []
 
     async def index_chunks(
         self,

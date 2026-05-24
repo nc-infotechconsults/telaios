@@ -145,6 +145,25 @@ class TestPythonChunker:
 # ── Java ──────────────────────────────────────────────────────────────────────
 
 
+_JAVA_CLASS_WITH_METHODS = """\
+package com.example;
+
+import java.util.List;
+
+public class UserService {
+    private UserRepository userRepository;
+
+    public User getUserById(Long id) {
+        return userRepository.findById(id).orElse(null);
+    }
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+}
+"""
+
+
 class TestJavaChunker:
     @pytest.fixture
     def chunker(self):
@@ -168,6 +187,70 @@ class TestJavaChunker:
     def test_metadata_invariants(self, chunker):
         code = "public class A {}\nenum B { X }\n"
         _assert_metadata_invariants(chunker.chunk(code), "java")
+
+    # ── Per-method chunking (A1) ──────────────────────────────────────────────
+
+    def test_per_method_chunks_emitted(self, chunker):
+        """Java class body recursed — methods produce separate chunks."""
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        method_names = [m.symbol_name for _, m in chunks if m.symbol_type == "function"]
+        assert "getUserById" in method_names
+        assert "getAllUsers" in method_names
+
+    def test_class_header_chunk_emitted(self, chunker):
+        """A class-level header chunk is emitted alongside method chunks."""
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        class_chunks = [m for _, m in chunks if m.symbol_name == "UserService"]
+        assert len(class_chunks) >= 1
+        assert class_chunks[0].symbol_type == "class"
+
+    def test_method_chunks_have_enclosing_class(self, chunker):
+        """Each method chunk carries enclosing_class = the surrounding class name."""
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        method_chunks = [(t, m) for t, m in chunks if m.symbol_type == "function"]
+        assert len(method_chunks) >= 1
+        for _, meta in method_chunks:
+            assert meta.enclosing_class == "UserService", (
+                f"Method {meta.symbol_name!r} missing enclosing_class"
+            )
+
+    def test_class_header_no_enclosing_class(self, chunker):
+        """Class header chunk must NOT have an enclosing_class (it IS the class)."""
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        class_chunk_meta = next(m for _, m in chunks if m.symbol_name == "UserService")
+        assert class_chunk_meta.enclosing_class is None
+
+    def test_preamble_chunk_emitted_for_java(self, chunker):
+        """Package + import declarations produce a preamble chunk before class symbols."""
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        preamble_chunks = [m for _, m in chunks if m.symbol_type == "preamble"]
+        assert len(preamble_chunks) == 1, (
+            f"Expected 1 preamble chunk, got {len(preamble_chunks)}"
+        )
+
+    def test_preamble_contains_package_and_import(self, chunker):
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        preamble_text = next(t for t, m in chunks if m.symbol_type == "preamble")
+        assert "package" in preamble_text
+        assert "import" in preamble_text
+
+    def test_preamble_has_no_symbol_name(self, chunker):
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        preamble_meta = next(m for _, m in chunks if m.symbol_type == "preamble")
+        assert preamble_meta.symbol_name is None
+
+    def test_indices_sequential_after_preamble(self, chunker):
+        """Preamble resets chunk index ordering — all indices must be sequential."""
+        chunks = chunker.chunk(_JAVA_CLASS_WITH_METHODS)
+        for i, (_, meta) in enumerate(chunks):
+            assert meta.index == i, f"Index mismatch at position {i}: got {meta.index}"
+
+    def test_no_preamble_when_no_package_or_import(self, chunker):
+        """No preamble emitted when no package or import declarations."""
+        code = "public class Simple {\n    public void go() {}\n}\n"
+        chunks = chunker.chunk(code)
+        preamble_chunks = [m for _, m in chunks if m.symbol_type == "preamble"]
+        assert len(preamble_chunks) == 0
 
 
 # ── TypeScript ────────────────────────────────────────────────────────────────

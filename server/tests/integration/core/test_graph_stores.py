@@ -327,3 +327,154 @@ async def test_falkordb_depth2_bfs(falkordb_store: GraphStore) -> None:
 
     assert "Italy" in nodes_d1, f"depth-1: {nodes_d1}"
     assert "Europe" in nodes_d2, f"depth-2: {nodes_d2}"
+
+
+# ── FalkorDB code entity tests ────────────────────────────────────────────────
+
+
+def _make_entities(project_id: str):
+    """Build a minimal CodeEntities fixture for FalkorDB tests."""
+    pytest.importorskip("tree_sitter_java", reason="tree-sitter-java not installed")
+    from telaios.core.knowledge.code_graph import (
+        ClassInfo,
+        CodeEntities,
+        FieldInfo,
+        ImportInfo,
+        MethodInfo,
+        RestEndpointInfo,
+    )
+
+    entities = CodeEntities(file_path="com/example/UserController.java")
+
+    entities.classes.append(ClassInfo(
+        name="UserController",
+        package="com.example",
+        file_path="com/example/UserController.java",
+        annotations=["RestController"],
+        component_type="controller",
+    ))
+    entities.classes.append(ClassInfo(
+        name="UserService",
+        package="com.example",
+        file_path="com/example/UserService.java",
+        component_type="service",
+    ))
+
+    entities.methods.append(MethodInfo(
+        class_name="UserController",
+        name="getUser",
+        return_type="User",
+        http_method="GET",
+        http_path="/api/users/{id}",
+    ))
+
+    entities.fields.append(FieldInfo(
+        class_name="UserController",
+        name="userService",
+        field_type="UserService",
+        is_autowired=True,
+    ))
+
+    entities.imports.append(ImportInfo(
+        importing_class="UserController",
+        imported_fqn="com.example.UserService",
+    ))
+
+    entities.endpoints.append(RestEndpointInfo(
+        http_method="GET",
+        path="/api/users/{id}",
+        handler_class="UserController",
+        handler_method="getUser",
+        request_body_type=None,
+    ))
+    entities.endpoints.append(RestEndpointInfo(
+        http_method="POST",
+        path="/api/users",
+        handler_class="UserController",
+        handler_method="createUser",
+        request_body_type="UserCreateDTO",
+    ))
+
+    return entities
+
+
+@pytest.mark.integration
+@pytest.mark.requires_falkordb
+def test_falkordb_upsert_code_entities(falkordb_store: GraphStore) -> None:
+    """upsert_code_entities writes CodeClass and RestEndpoint nodes."""
+    from telaios.core.stores.graph.falkordb import FalkorDBGraphStore
+    assert isinstance(falkordb_store, FalkorDBGraphStore)
+
+    entities = _make_entities("proj-test")
+    falkordb_store.upsert_code_entities(entities, project_id="proj-test")
+    # If no exception raised, nodes were created; Cypher queries validate below
+
+
+@pytest.mark.integration
+@pytest.mark.requires_falkordb
+def test_falkordb_query_structural_endpoints(falkordb_store: GraphStore) -> None:
+    """query_structural(endpoint_list) returns REST endpoints after upsert."""
+    from telaios.core.knowledge.query_router import QueryIntent
+    from telaios.core.stores.graph.falkordb import FalkorDBGraphStore
+    assert isinstance(falkordb_store, FalkorDBGraphStore)
+
+    entities = _make_entities("proj-ep")
+    falkordb_store.upsert_code_entities(entities, project_id="proj-ep")
+
+    rows = falkordb_store.query_structural(
+        intent=QueryIntent.ENDPOINT_LIST,
+        params={},
+        project_id="proj-ep",
+    )
+    assert len(rows) >= 1
+    assert any(r.get("http_method") in ("GET", "POST") for r in rows)
+
+
+@pytest.mark.integration
+@pytest.mark.requires_falkordb
+def test_falkordb_query_structural_dependency(falkordb_store: GraphStore) -> None:
+    """query_structural(dependency) returns classes that DEPEND_ON/IMPORTS target."""
+    from telaios.core.knowledge.query_router import QueryIntent
+    from telaios.core.stores.graph.falkordb import FalkorDBGraphStore
+    assert isinstance(falkordb_store, FalkorDBGraphStore)
+
+    entities = _make_entities("proj-dep")
+    falkordb_store.upsert_code_entities(entities, project_id="proj-dep")
+
+    rows = falkordb_store.query_structural(
+        intent=QueryIntent.DEPENDENCY,
+        params={"class_name": "UserService"},
+        project_id="proj-dep",
+    )
+    # UserController DEPENDS_ON UserService via field + import
+    assert len(rows) >= 1
+    class_names = [r.get("class_name") for r in rows]
+    assert "UserController" in class_names
+
+
+@pytest.mark.integration
+@pytest.mark.requires_falkordb
+def test_falkordb_upsert_idempotent_code_entities(falkordb_store: GraphStore) -> None:
+    """Upserting same entities twice must not duplicate nodes (MERGE semantics)."""
+    from telaios.core.stores.graph.falkordb import FalkorDBGraphStore
+    assert isinstance(falkordb_store, FalkorDBGraphStore)
+
+    entities = _make_entities("proj-idem")
+    falkordb_store.upsert_code_entities(entities, project_id="proj-idem")
+    falkordb_store.upsert_code_entities(entities, project_id="proj-idem")
+
+    rows = falkordb_store.query_structural(
+        intent=__import__("telaios.core.knowledge.query_router", fromlist=["QueryIntent"]).QueryIntent.ENDPOINT_LIST,
+        params={},
+        project_id="proj-idem",
+    )
+    # Exactly 2 endpoints (GET + POST), not doubled to 4
+    assert len(rows) == 2
+
+
+@pytest.mark.integration
+@pytest.mark.requires_falkordb
+async def test_falkordb_aupsert_code_entities_async(falkordb_store: GraphStore) -> None:
+    """aupsert_code_entities (async wrapper) succeeds without exception."""
+    entities = _make_entities("proj-async")
+    await falkordb_store.aupsert_code_entities(entities, project_id="proj-async")

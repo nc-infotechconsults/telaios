@@ -134,12 +134,20 @@ def fake_llm() -> Any:
 
 @pytest.fixture(scope="module")
 def pipeline_config() -> KnowledgePipelineConfig:
-    """Test pipeline config pointing at local Qdrant with in-memory graph."""
+    """Test pipeline config pointing at local Qdrant with in-memory graph.
+
+    Uses BAAI/bge-small-en-v1.5 (384 dims, ~33 MB) instead of multilingual-e5-large
+    so the test suite downloads fast and works without a pre-cached large model.
+    """
     host = os.environ.get("QDRANT_HOST", "localhost")
     port = int(os.environ.get("QDRANT_PORT", "6333"))
     return KnowledgePipelineConfig(
         qdrant=QdrantConfig(host=host, port=port),
-        embedding=EmbeddingConfig(provider="fastembed", model="intfloat/multilingual-e5-large"),
+        embedding=EmbeddingConfig(
+            provider="fastembed",
+            model="BAAI/bge-small-en-v1.5",
+            dimensions=384,
+        ),
         graph_store=GraphStoreConfig(),  # networkx in-memory
         # Use prefixed test collection names so we don't pollute production data.
         documents_collection="test_documents",
@@ -583,6 +591,271 @@ class TestProjectLifecycle:
             assert len(after.chunks) == 0, (
                 f"Expected 0 chunks after delete, got {len(after.chunks)}"
             )
+
+        asyncio.run(_run())
+
+
+# ─── Java ingestion tests ─────────────────────────────────────────────────────
+
+_JAVA_SOURCE = """\
+package com.example.service;
+
+import java.util.List;
+
+public class OrderService {
+
+    private OrderRepository orderRepository;
+
+    public Order getOrderById(Long id) {
+        return orderRepository.findById(id).orElse(null);
+    }
+
+    public List<Order> getAllOrders() {
+        return orderRepository.findAll();
+    }
+}
+"""
+
+_JAVA_CONTROLLER = """\
+package com.example.controller;
+
+import com.example.dto.OrderDTO;
+
+@RestController
+@RequestMapping("/api/orders")
+public class OrderController {
+
+    private final OrderService orderService;
+
+    @GetMapping("/{id}")
+    public Order getOrder(@PathVariable Long id) {
+        return orderService.getOrderById(id);
+    }
+
+    @PostMapping
+    public Order createOrder(@RequestBody OrderDTO dto) {
+        return orderService.createOrder(dto);
+    }
+}
+"""
+
+
+class TestJavaIngestion:
+    """Java files accepted by denylist and chunked with per-method + preamble."""
+
+    def test_java_file_ingested(
+        self, pipeline: KnowledgeBasePipeline, tmp_path: Path
+    ) -> None:
+        async def _run() -> None:
+            java_file = tmp_path / "OrderService.java"
+            java_file.write_text(_JAVA_SOURCE, encoding="utf-8")
+            result = await pipeline.ingest_repository(
+                project_id=_project_id(),
+                source=FileSource(java_file),
+            )
+            assert result.chunk_count >= 1
+
+        asyncio.run(_run())
+
+    def test_java_produces_method_chunks(
+        self, pipeline: KnowledgeBasePipeline, tmp_path: Path
+    ) -> None:
+        async def _run() -> None:
+            java_file = tmp_path / "OrderService2.java"
+            java_file.write_text(_JAVA_SOURCE, encoding="utf-8")
+            result = await pipeline.ingest_repository(
+                project_id=_project_id(),
+                source=FileSource(java_file),
+            )
+            method_chunks = [
+                c for c in result.chunks
+                if c.metadata.get("symbol_type") == "function"
+            ]
+            assert len(method_chunks) >= 1, (
+                f"Expected method chunks; got symbol_types: "
+                f"{[c.metadata.get('symbol_type') for c in result.chunks]}"
+            )
+
+        asyncio.run(_run())
+
+    def test_java_method_chunks_have_enclosing_class(
+        self, pipeline: KnowledgeBasePipeline, tmp_path: Path
+    ) -> None:
+        async def _run() -> None:
+            java_file = tmp_path / "OrderService3.java"
+            java_file.write_text(_JAVA_SOURCE, encoding="utf-8")
+            result = await pipeline.ingest_repository(
+                project_id=_project_id(),
+                source=FileSource(java_file),
+            )
+            method_chunks = [
+                c for c in result.chunks
+                if c.metadata.get("symbol_type") == "function"
+            ]
+            for chunk in method_chunks:
+                assert chunk.metadata.get("enclosing_class") == "OrderService", (
+                    f"Method chunk missing enclosing_class: {chunk.metadata}"
+                )
+
+        asyncio.run(_run())
+
+    def test_java_preamble_chunk_emitted(
+        self, pipeline: KnowledgeBasePipeline, tmp_path: Path
+    ) -> None:
+        async def _run() -> None:
+            java_file = tmp_path / "OrderService4.java"
+            java_file.write_text(_JAVA_SOURCE, encoding="utf-8")
+            result = await pipeline.ingest_repository(
+                project_id=_project_id(),
+                source=FileSource(java_file),
+            )
+            preamble_chunks = [
+                c for c in result.chunks
+                if c.metadata.get("symbol_type") == "preamble"
+            ]
+            assert len(preamble_chunks) >= 1, (
+                "Expected a preamble chunk for Java import/package declarations"
+            )
+
+        asyncio.run(_run())
+
+    def test_java_queryable_by_method_name(
+        self, pipeline: KnowledgeBasePipeline, tmp_path: Path
+    ) -> None:
+        async def _run() -> None:
+            pid = _project_id()
+            java_file = tmp_path / "OrderService5.java"
+            java_file.write_text(_JAVA_SOURCE, encoding="utf-8")
+            await pipeline.ingest_repository(
+                project_id=pid,
+                source=FileSource(java_file),
+            )
+            result = await pipeline.query(
+                project_id=pid,
+                text="getOrderById method",
+                source="repositories",
+            )
+            assert len(result.chunks) >= 1
+
+        asyncio.run(_run())
+
+
+# ─── Structural query routing tests ──────────────────────────────────────────
+
+
+class TestStructuralQueryRouting:
+    """Structural queries should route to graph before vector search."""
+
+    def test_semantic_query_does_not_raise(
+        self, pipeline: KnowledgeBasePipeline
+    ) -> None:
+        pid = _project_id()
+
+        async def _run() -> None:
+            result = await pipeline.query(
+                project_id=pid,
+                text="how does caching work?",
+                source="all",
+            )
+            assert hasattr(result, "chunks")
+
+        asyncio.run(_run())
+
+    def test_dependency_query_returns_result(
+        self, pipeline: KnowledgeBasePipeline
+    ) -> None:
+        pid = _project_id()
+
+        async def _run() -> None:
+            result = await pipeline.query(
+                project_id=pid,
+                text="which classes use UserService?",
+                source="repositories",
+            )
+            # Graph may be empty (no data ingested for this pid), but must not raise
+            assert hasattr(result, "chunks")
+            assert hasattr(result, "answer")
+
+        asyncio.run(_run())
+
+    def test_endpoint_count_query_does_not_raise(
+        self, pipeline: KnowledgeBasePipeline
+    ) -> None:
+        pid = _project_id()
+
+        async def _run() -> None:
+            result = await pipeline.query(
+                project_id=pid,
+                text="how many REST APIs are there?",
+                source="repositories",
+            )
+            assert hasattr(result, "chunks")
+
+        asyncio.run(_run())
+
+
+# ─── Reranker wiring tests ────────────────────────────────────────────────────
+
+
+class TestRerankerPipeline:
+    """Verify reranker is accepted by the pipeline without breaking retrieval."""
+
+    def test_pipeline_with_reranker_returns_results(
+        self, pipeline_config: KnowledgePipelineConfig, fake_llm: Any, tmp_path: Path
+    ) -> None:
+        """Pipeline built with a mock reranker still returns chunks."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        async def _run() -> None:
+            from qdrant_client import AsyncQdrantClient
+
+            from telaios.core.knowledge.graph import GraphAugmentor
+            from telaios.core.knowledge.hyde import HyDE
+            from telaios.core.knowledge.ingestion import IngestionService
+            from telaios.core.stores.graph.memory import InMemoryGraphStore
+
+            cfg = pipeline_config
+            qdrant_client = AsyncQdrantClient(host=cfg.qdrant.host, port=cfg.qdrant.port)
+            embedder = EmbedderFactory.create(cfg.embedding)
+            vs = QdrantVectorStore(client=qdrant_client, embedder=embedder)
+            bm25 = BM25Store()
+            graph_store = InMemoryGraphStore()
+            graph_aug = GraphAugmentor(graph_store=graph_store, llm=fake_llm, depth=1)
+            hyde = HyDE(llm=fake_llm, vector_store=vs)
+            ingestion = IngestionService(
+                vector_store=vs,
+                bm25_store=bm25,
+                graph_augmentor=graph_aug,
+                config=cfg,
+            )
+
+            # Mock reranker that returns top_k docs unchanged
+            reranker = MagicMock()
+            reranker.arerank = AsyncMock(side_effect=lambda q, docs, top_k: docs[:top_k])
+
+            p = KnowledgeBasePipeline(
+                vector_store=vs,
+                bm25_store=bm25,
+                graph_augmentor=graph_aug,
+                hyde=hyde,
+                llm=fake_llm,
+                ingestion=ingestion,
+                config=cfg,
+                reranker=reranker,
+            )
+
+            pid = _project_id()
+            await p.ingest_documents(
+                project_id=pid,
+                source=TextSource(_PLATFORM_TEXT, title="reranker-test"),
+            )
+            result = await p.query(
+                project_id=pid,
+                text="Telaios platform",
+                source="documents",
+            )
+            assert len(result.chunks) >= 1
+            reranker.arerank.assert_called()
 
         asyncio.run(_run())
 

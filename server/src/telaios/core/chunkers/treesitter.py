@@ -33,6 +33,7 @@ _SYMBOL_NODES: dict[str, frozenset[str]] = {
         "enum_declaration",
         "method_declaration",
         "constructor_declaration",
+        "field_declaration",
     }),
     "typescript": frozenset({
         "function_declaration",
@@ -67,6 +68,27 @@ _WRAPPER_NODES = frozenset({"export_statement"})
 
 # Node types that may contain arrow functions assigned to const
 _DECL_NODES = frozenset({"lexical_declaration", "variable_declaration"})
+
+# Languages where class bodies should be recursed into (emit per-method chunks)
+# rather than emitting the whole class as a single chunk.
+_RECURSE_CLASS_BODY: dict[str, frozenset[str]] = {
+    "java": frozenset({
+        "class_declaration", "interface_declaration", "enum_declaration",
+    }),
+}
+
+# Class body container node types per language
+_CLASS_BODY_NODE_TYPES = frozenset({"class_body", "interface_body", "enum_body"})
+
+# Preamble node types: meaningful content before first symbol that should be
+# emitted as a separate "preamble" chunk (imports, package, module docstring).
+_PREAMBLE_TYPES: dict[str, frozenset[str]] = {
+    "java": frozenset({"package_declaration", "import_declaration"}),
+    "python": frozenset({"import_statement", "import_from_statement", "expression_statement"}),
+    "typescript": frozenset({"import_statement", "import_declaration"}),
+    "tsx": frozenset({"import_statement", "import_declaration"}),
+    "javascript": frozenset({"import_statement", "import_declaration"}),
+}
 
 
 def _load_parser(language: str):
@@ -155,21 +177,27 @@ class TreeSitterChunker(Chunker):
         root = parser.parse(src).root_node
 
         symbol_types = _SYMBOL_NODES.get(self.language, frozenset())
+        recurse_class_types = _RECURSE_CLASS_BODY.get(self.language, frozenset())
+        preamble_types = _PREAMBLE_TYPES.get(self.language, frozenset())
         chunks: list[tuple[str, ChunkMetadata]] = []
 
         def _bytes(node) -> str:
             return src[node.start_byte:node.end_byte].decode("utf-8", errors="replace")
 
         def _name(node) -> str | None:
+            # Prefer plain `identifier` over `type_identifier` so method return
+            # types (type_identifier) don't shadow the method name (identifier).
+            fallback: str | None = None
             for child in node.children:
-                if child.type in ("identifier", "type_identifier"):
+                if child.type == "identifier":
                     return _bytes(child)
-                # const/let/var declarations: name lives in variable_declarator
+                if child.type == "type_identifier" and fallback is None:
+                    fallback = _bytes(child)
                 if child.type == "variable_declarator":
                     for grandchild in child.children:
                         if grandchild.type in ("identifier", "type_identifier"):
                             return _bytes(grandchild)
-            return None
+            return fallback
 
         def _sym_type(ntype: str) -> str:
             if "function" in ntype or ntype in ("method_declaration", "constructor_declaration"):
@@ -178,12 +206,13 @@ class TreeSitterChunker(Chunker):
                 return "class"
             if ntype in ("type_alias_declaration", "enum_declaration", "enum"):
                 return "type"
+            if ntype in ("field_declaration",):
+                return "field"
             if ntype in ("lexical_declaration", "variable_declaration"):
                 return "variable"
             return "symbol"
 
         def _is_arrow_fn(node) -> bool:
-            """True when lexical_declaration wraps a const arrow-function assignment."""
             for child in node.children:
                 if child.type in ("variable_declarator",):
                     for grandchild in child.children:
@@ -191,39 +220,15 @@ class TreeSitterChunker(Chunker):
                             return True
             return False
 
-        def _walk(node) -> None:
-            if node.type in symbol_types:
-                if node.type in _WRAPPER_NODES:
-                    # Unwrap export_statement: extract the inner declaration
-                    for child in node.children:
-                        if child.type in symbol_types or child.type in (
-                            "function_declaration",
-                            "class_declaration",
-                            "interface_declaration",
-                            "type_alias_declaration",
-                            "enum_declaration",
-                            "abstract_class_declaration",
-                            "lexical_declaration",
-                        ):
-                            _emit(child, wrapper=node)
-                            return
-                    _emit(node)  # nothing extractable inside — emit wrapper as-is
-                elif node.type in _DECL_NODES and not _is_arrow_fn(node):
-                    # Skip bare const/let/var that aren't arrow functions
-                    for child in node.children:
-                        _walk(child)
-                else:
-                    _emit(node)
-                return  # don't recurse into extracted symbols
-            for child in node.children:
-                _walk(child)
-
-        def _emit(node, wrapper=None) -> None:
+        def _emit(
+            node,
+            wrapper=None,
+            enclosing_class: str | None = None,
+        ) -> None:
             outer = wrapper or node
             content = _bytes(outer)
-            start_line = outer.start_point[0]   # 0-indexed
-            end_line = outer.end_point[0]       # 0-indexed, inclusive
-            # Unwrap decorated_definition to get the inner declaration node
+            start_line = outer.start_point[0]
+            end_line = outer.end_point[0]
             if node.type == "decorated_definition":
                 for child in node.children:
                     if child.type not in ("decorator", "comment"):
@@ -234,7 +239,9 @@ class TreeSitterChunker(Chunker):
             idx = len(chunks)
 
             if (end_line - start_line + 1) > self.max_lines:
-                chunks.extend(_split_long(content, start_line, name, stype, idx))
+                chunks.extend(
+                    _split_long(content, start_line, name, stype, idx, enclosing_class)
+                )
             else:
                 chunks.append((
                     content,
@@ -244,14 +251,89 @@ class TreeSitterChunker(Chunker):
                         end_char=outer.end_byte,
                         symbol_name=name,
                         symbol_type=stype,
+                        enclosing_class=enclosing_class,
                         start_line=start_line + 1,
                         end_line=end_line + 1,
                         language=self.language,
                     ),
                 ))
 
+        def _emit_class_header(node) -> None:
+            """Emit class-level signature chunk: header + field declarations only."""
+            class_name = _name(node)
+            lines: list[str] = []
+            for child in node.children:
+                if child.type in _CLASS_BODY_NODE_TYPES:
+                    # Include only field declarations from the body
+                    fields = [
+                        "  " + _bytes(m)
+                        for m in child.children
+                        if m.type == "field_declaration"
+                    ]
+                    lines.append("{")
+                    lines.extend(fields)
+                    lines.append("}")
+                else:
+                    lines.append(_bytes(child))
+            content = " ".join(lines)
+            start_line = node.start_point[0]
+            end_line = node.end_point[0]
+            idx = len(chunks)
+            chunks.append((
+                content,
+                ChunkMetadata(
+                    index=idx,
+                    start_char=node.start_byte,
+                    end_char=node.end_byte,
+                    symbol_name=class_name,
+                    symbol_type=_sym_type(node.type),
+                    enclosing_class=None,
+                    start_line=start_line + 1,
+                    end_line=end_line + 1,
+                    language=self.language,
+                ),
+            ))
+
+        def _walk(node, enclosing_class: str | None = None) -> None:
+            if node.type in symbol_types:
+                if node.type in _WRAPPER_NODES:
+                    for child in node.children:
+                        if child.type in symbol_types or child.type in (
+                            "function_declaration",
+                            "class_declaration",
+                            "interface_declaration",
+                            "type_alias_declaration",
+                            "enum_declaration",
+                            "abstract_class_declaration",
+                            "lexical_declaration",
+                        ):
+                            _emit(child, wrapper=node, enclosing_class=enclosing_class)
+                            return
+                    _emit(node, enclosing_class=enclosing_class)
+                elif node.type in recurse_class_types:
+                    # Class-level: emit header chunk + recurse into body for methods
+                    cls_name = _name(node)
+                    _emit_class_header(node)
+                    for child in node.children:
+                        if child.type in _CLASS_BODY_NODE_TYPES:
+                            for member in child.children:
+                                _walk(member, enclosing_class=cls_name)
+                elif node.type in _DECL_NODES and not _is_arrow_fn(node):
+                    for child in node.children:
+                        _walk(child, enclosing_class=enclosing_class)
+                else:
+                    _emit(node, enclosing_class=enclosing_class)
+                return
+            for child in node.children:
+                _walk(child, enclosing_class=enclosing_class)
+
         def _split_long(
-            content: str, base_line: int, sym_name: str | None, stype: str, base_idx: int
+            content: str,
+            base_line: int,
+            sym_name: str | None,
+            stype: str,
+            base_idx: int,
+            enclosing_class: str | None = None,
         ) -> list[tuple[str, ChunkMetadata]]:
             result: list[tuple[str, ChunkMetadata]] = []
             sub_lines = content.splitlines(keepends=True)
@@ -266,6 +348,7 @@ class TreeSitterChunker(Chunker):
                         end_char=len(part),
                         symbol_name=sym_name,
                         symbol_type=stype,
+                        enclosing_class=enclosing_class,
                         start_line=base_line + offset + 1,
                         end_line=base_line + offset + len(part_lines),
                         language=self.language,
@@ -273,6 +356,34 @@ class TreeSitterChunker(Chunker):
                 ))
             return result
 
+        # ── Preamble chunk ────────────────────────────────────────────────────
+        # Collect top-level nodes that appear before the first symbol node.
+        preamble_parts: list[str] = []
+        for child in root.children:
+            if child.type in symbol_types or child.type in recurse_class_types:
+                break
+            if child.type in preamble_types:
+                preamble_parts.append(_bytes(child))
+
+        if preamble_parts:
+            preamble_text = "\n".join(preamble_parts).strip()
+            if preamble_text:
+                chunks.append((
+                    preamble_text,
+                    ChunkMetadata(
+                        index=0,
+                        start_char=0,
+                        end_char=len(preamble_text),
+                        symbol_name=None,
+                        symbol_type="preamble",
+                        enclosing_class=None,
+                        start_line=1,
+                        end_line=preamble_text.count("\n") + 1,
+                        language=self.language,
+                    ),
+                ))
+
+        # ── Symbol chunks ─────────────────────────────────────────────────────
         _walk(root)
 
         if not chunks:

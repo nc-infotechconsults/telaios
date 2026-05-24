@@ -190,45 +190,75 @@ class FileSource(KnowledgeSource):
         return docs
 
 
+_BINARY_EXTENSIONS: frozenset[str] = frozenset({
+    # Compiled / packaged
+    ".class", ".jar", ".war", ".ear", ".aar",
+    ".zip", ".tar", ".gz", ".bz2", ".xz", ".rar", ".7z", ".tgz",
+    ".exe", ".dll", ".so", ".dylib", ".o", ".a", ".lib", ".wasm",
+    # Images
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".tiff", ".tif", ".webp",
+    ".psd", ".ai", ".sketch",
+    # Media
+    ".mp3", ".mp4", ".wav", ".avi", ".mov", ".mkv", ".flac", ".ogg", ".webm",
+    # Documents (handled separately by DoclingSource)
+    ".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".ppt", ".odt",
+    # Compiled Python
+    ".pyc", ".pyo", ".pyd",
+    # Source maps / minified markers
+    ".map",
+    # Large binary data
+    ".parquet", ".avro", ".arrow", ".bin", ".dat", ".db", ".sqlite",
+    # Font
+    ".ttf", ".otf", ".woff", ".woff2", ".eot",
+})
+
+_EXCLUDED_DIRS: frozenset[str] = frozenset({
+    "node_modules", ".git", "dist", "build", "target", ".venv", "venv",
+    "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache",
+    ".idea", ".vscode", "vendor", "bower_components", ".gradle",
+    "out", "generated", ".next", ".nuxt",
+})
+
+_EXCLUDED_FILENAMES: frozenset[str] = frozenset({
+    "package-lock.json", "yarn.lock", "Pipfile.lock", "poetry.lock",
+    "uv.lock", "Cargo.lock", "composer.lock", "Gemfile.lock",
+    "pnpm-lock.yaml", ".DS_Store", "Thumbs.db",
+})
+
+
 def _is_text_file(path: Path) -> bool:
-    """Check whether a file is a readable text file."""
-    text_extensions = {
-        ".py",
-        ".md",
-        ".txt",
-        ".json",
-        ".yaml",
-        ".yml",
-        ".toml",
-        ".cfg",
-        ".ini",
-        ".env",
-        ".sh",
-        ".bash",
-        ".zsh",
-        ".js",
-        ".ts",
-        ".tsx",
-        ".jsx",
-        ".css",
-        ".html",
-        ".htm",
-        ".xml",
-        ".svg",
-        ".csv",
-        ".sql",
-        ".rst",
-        ".tex",
-        ".conf",
-        ".Makefile",
-        ".dockerfile",
-    }
-    return path.suffix.lower() in text_extensions or path.name.lower() in {
-        "makefile",
-        "dockerfile",
-        "jenkinsfile",
-        "vagrantfile",
-    }
+    """Accept file unless it is binary, excluded by directory, or a known lockfile.
+
+    Uses a denylist instead of an allowlist so new languages are automatically
+    included rather than silently skipped.
+    """
+    # Excluded directories anywhere in the path
+    for part in path.parts:
+        if part in _EXCLUDED_DIRS:
+            return False
+
+    # Lockfiles and other large, low-signal files
+    if path.name in _EXCLUDED_FILENAMES:
+        return False
+
+    # Minified files (*.min.js, *.min.css, etc.)
+    if ".min." in path.name:
+        return False
+
+    # Binary extensions
+    if path.suffix.lower() in _BINARY_EXTENSIONS:
+        return False
+
+    # Binary content check: null bytes in first 512 bytes indicate binary
+    try:
+        with open(path, "rb") as f:
+            sample = f.read(512)
+        if b"\x00" in sample:
+            return False
+    except OSError:
+        return False
+
+    return True
 
 
 def _is_code_content(text: str) -> bool:

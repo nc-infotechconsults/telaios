@@ -21,7 +21,8 @@ class ChunkMetadata:
 
     # Code-level (populated by ASTChunker)
     symbol_name: str | None = None
-    symbol_type: str | None = None  # "function" | "class" | "module"
+    symbol_type: str | None = None  # "function" | "class" | "module" | "preamble"
+    enclosing_class: str | None = None  # class name when chunk is a method/field
     start_line: int | None = None
     end_line: int | None = None
     language: str | None = None

@@ -51,6 +51,11 @@ class KnowledgePipelineConfig(BaseModel):
     # Qdrant
     qdrant: QdrantConfig = QdrantConfig()
     embedding: EmbeddingConfig = EmbeddingConfig()
+    # Optional code-specific embedder for the repositories collection.
+    # When set, repositories use this model; documents use `embedding`.
+    # Recommended: jinaai/jina-embeddings-v2-base-code (768 dims)
+    # Note: changing this requires re-creating the repositories Qdrant collection.
+    code_embedding: EmbeddingConfig | None = None
 
     # Collection names (global, filtered by project_id)
     documents_collection: str = "documents"
@@ -60,6 +65,12 @@ class KnowledgePipelineConfig(BaseModel):
     top_k: int = 10
     rrf_k: int = 60
     hyde_enabled: bool = True
+
+    # Reranker — cross-encoder applied after RRF fusion
+    reranker_enabled: bool = False
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    # Over-fetch this many candidates before reranking; must be >= top_k
+    rerank_candidates: int = 50
 
     # Graph
     graph_store: GraphStoreConfig = GraphStoreConfig()

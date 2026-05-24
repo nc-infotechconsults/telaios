@@ -9,7 +9,30 @@ from typing import Any
 
 
 def _tokenize(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9_]+", text.lower())
+    """Code-aware tokenizer.
+
+    Splits on non-alphanumeric boundaries, then sub-splits camelCase/PascalCase
+    so that ``getUserById`` produces tokens [getuserbyid, get, user, by, id].
+    Both the original token and its sub-parts are included to preserve recall
+    for both exact and partial identifier matches.
+    """
+    tokens: list[str] = []
+    # First-pass split: dots, slashes, colons, spaces, braces, dashes, etc.
+    words = re.split(r"[^a-zA-Z0-9]+", text)
+    for word in words:
+        if len(word) < 2:
+            continue
+        lower = word.lower()
+        tokens.append(lower)
+        # Sub-split camelCase / PascalCase:  getUserById → get user by id
+        # Step 1: insert separator before a run of caps followed by lower: XMLParser → XML_Parser
+        sub = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", word)
+        # Step 2: insert separator between lower/digit and upper:  userId → user_Id
+        sub = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", sub)
+        parts = [p.lower() for p in sub.split("_") if len(p) >= 2]
+        if len(parts) > 1:
+            tokens.extend(parts)
+    return tokens
 
 
 class _BM25Index:
