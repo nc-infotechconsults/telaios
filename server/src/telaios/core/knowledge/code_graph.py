@@ -524,6 +524,170 @@ class JavaAstExtractor:
         return None
 
 
+# ── Python AST extractor ──────────────────────────────────────────────────────
+
+_PY_HTTP_ATTRS = frozenset({"get", "post", "put", "delete", "patch"})
+
+
+class PythonAstExtractor:
+    """Extracts typed code entities from Python source via the built-in ast module."""
+
+    def extract(self, source: str, file_path: str) -> CodeEntities:
+        try:
+            return self._do_extract(source, file_path)
+        except Exception as exc:
+            logger.warning("PythonAstExtractor failed for %s: %s", file_path, exc)
+            return CodeEntities(file_path=file_path)
+
+    def _do_extract(self, source: str, file_path: str) -> CodeEntities:
+        import ast as _ast
+        if not source.strip():
+            return CodeEntities(file_path=file_path)
+        tree = _ast.parse(source)
+        entities = CodeEntities(file_path=file_path)
+
+        raw_imports: list[str] = []
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Import):
+                for alias in node.names:
+                    raw_imports.append(alias.name)
+            elif isinstance(node, _ast.ImportFrom):
+                module = node.module or ""
+                for alias in node.names:
+                    raw_imports.append(f"{module}.{alias.name}" if module else alias.name)
+
+        for node in tree.body:
+            if isinstance(node, _ast.ClassDef):
+                self._extract_class(node, file_path, entities)
+            elif isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                method_info, endpoint = self._extract_function(node, class_name="<module>")
+                if method_info:
+                    entities.methods.append(method_info)
+                if endpoint:
+                    entities.endpoints.append(endpoint)
+
+        owner = entities.classes[0].name if entities.classes else "<module>"
+        for fqn in raw_imports:
+            entities.imports.append(ImportInfo(importing_class=owner, imported_fqn=fqn))
+
+        return entities
+
+    def _extract_class(self, node, file_path: str, entities: CodeEntities) -> None:
+        import ast as _ast
+        bases = [self._name_from_expr(b) for b in node.bases]
+        bases = [b for b in bases if b]
+        cls_info = ClassInfo(
+            name=node.name,
+            package="",
+            file_path=file_path,
+            superclass=bases[0] if bases else None,
+            interfaces=bases[1:],
+        )
+        entities.classes.append(cls_info)
+        for item in node.body:
+            if isinstance(item, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                method_info, endpoint = self._extract_function(item, class_name=node.name)
+                if method_info:
+                    entities.methods.append(method_info)
+                if endpoint:
+                    entities.endpoints.append(endpoint)
+
+    def _extract_function(self, node, class_name: str):
+        import ast as _ast
+        visibility = "private" if (node.name.startswith("_") and not node.name.startswith("__")) else "public"
+        params: list[tuple[str, str]] = []
+        for arg in node.args.args:
+            if arg.arg == "self":
+                continue
+            ann = self._annotation_str(arg.annotation) if arg.annotation else "Any"
+            params.append((ann, arg.arg))
+        return_type = self._annotation_str(node.returns) if node.returns else "None"
+        decorators = [self._name_from_expr(d) or "" for d in node.decorator_list]
+        method_info = MethodInfo(
+            class_name=class_name,
+            name=node.name,
+            return_type=return_type,
+            params=params,
+            annotations=decorators,
+            visibility=visibility,
+        )
+        endpoint = self._detect_endpoint(node, class_name)
+        return method_info, endpoint
+
+    def _detect_endpoint(self, node, class_name: str):
+        import ast as _ast
+        for dec in node.decorator_list:
+            http_method, path = self._parse_route_decorator(dec)
+            if http_method and path:
+                return RestEndpointInfo(
+                    http_method=http_method,
+                    path=path,
+                    handler_class=class_name,
+                    handler_method=node.name,
+                )
+        return None
+
+    def _parse_route_decorator(self, dec) -> tuple[str | None, str | None]:
+        import ast as _ast
+        if not isinstance(dec, _ast.Call):
+            return None, None
+        func = dec.func
+        attr = ""
+        if isinstance(func, _ast.Attribute):
+            attr = func.attr.lower()
+        path: str | None = None
+        if dec.args:
+            path = self._const_str(dec.args[0])
+        if attr in _PY_HTTP_ATTRS and path:
+            return attr.upper(), path
+        if attr == "route" and path:
+            for kw in dec.keywords:
+                if kw.arg == "methods" and isinstance(kw.value, _ast.List):
+                    methods = [self._const_str(e) for e in kw.value.elts]
+                    methods = [m.upper() for m in methods if m]
+                    if methods:
+                        return methods[0], path
+            return "GET", path
+        if isinstance(func, _ast.Name) and func.id == "api_view":
+            if dec.args and isinstance(dec.args[0], _ast.List):
+                methods = [self._const_str(e) for e in dec.args[0].elts]
+                methods = [m.upper() for m in methods if m]
+                if methods:
+                    return methods[0], "/"
+        return None, None
+
+    def _name_from_expr(self, node) -> str | None:
+        import ast as _ast
+        if isinstance(node, _ast.Name):
+            return node.id
+        if isinstance(node, _ast.Attribute):
+            v = self._name_from_expr(node.value)
+            return f"{v}.{node.attr}" if v else node.attr
+        return None
+
+    def _annotation_str(self, node) -> str:
+        import ast as _ast
+        if node is None:
+            return "Any"
+        if isinstance(node, _ast.Name):
+            return node.id
+        if isinstance(node, _ast.Attribute):
+            return self._name_from_expr(node) or "Any"
+        if isinstance(node, _ast.Subscript):
+            return f"{self._annotation_str(node.value)}[{self._annotation_str(node.slice)}]"
+        if isinstance(node, _ast.Constant):
+            return str(node.value)
+        if isinstance(node, _ast.BinOp):
+            return f"{self._annotation_str(node.left)} | {self._annotation_str(node.right)}"
+        return "Any"
+
+    def _const_str(self, node) -> str | None:
+        import ast as _ast
+        if isinstance(node, _ast.Constant) and isinstance(node.value, str):
+            return node.value
+        return None
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 class CodeGraphExtractor:
@@ -563,5 +727,6 @@ __all__ = [
     "RestEndpointInfo",
     "CodeEntities",
     "JavaAstExtractor",
+    "PythonAstExtractor",
     "CodeGraphExtractor",
 ]

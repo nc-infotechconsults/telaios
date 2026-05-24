@@ -359,3 +359,153 @@ class TestCodeGraphExtractor:
 
     def test_does_not_support_rust(self, extractor):
         assert not CodeGraphExtractor.supports("rust")
+
+
+# ── PythonAstExtractor ────────────────────────────────────────────────────────
+
+_PY_SIMPLE_CLASS = """\
+class UserService:
+    def __init__(self, repo):
+        self.repo = repo
+
+    def get_user(self, user_id: int) -> "User":
+        return self.repo.find(user_id)
+
+    def _internal(self):
+        pass
+"""
+
+_PY_FLASK_ROUTES = """\
+from flask import Flask
+app = Flask(__name__)
+
+@app.route('/users', methods=['GET'])
+def list_users():
+    return []
+
+@app.post('/users')
+def create_user():
+    return {}
+"""
+
+_PY_FASTAPI_ROUTES = """\
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.get('/items/{item_id}')
+async def get_item(item_id: int):
+    return {}
+
+@router.delete('/items/{item_id}')
+async def delete_item(item_id: int):
+    pass
+"""
+
+_PY_INHERITANCE = """\
+class AdminService(UserService, AuditMixin):
+    def promote(self, user_id: int) -> None:
+        pass
+"""
+
+_PY_IMPORTS = """\
+import os
+from pathlib import Path
+from myapp.services import UserService
+
+class Controller:
+    pass
+"""
+
+
+class TestPythonAstExtractorClass:
+    @pytest.fixture
+    def extractor(self):
+        from telaios.core.knowledge.code_graph import PythonAstExtractor
+        return PythonAstExtractor()
+
+    def test_extracts_class_name(self, extractor):
+        entities = extractor.extract(_PY_SIMPLE_CLASS, "user_service.py")
+        names = [c.name for c in entities.classes]
+        assert "UserService" in names
+
+    def test_extracts_public_method(self, extractor):
+        entities = extractor.extract(_PY_SIMPLE_CLASS, "user_service.py")
+        names = [m.name for m in entities.methods]
+        assert "get_user" in names
+
+    def test_private_method_visibility(self, extractor):
+        entities = extractor.extract(_PY_SIMPLE_CLASS, "user_service.py")
+        m = next(m for m in entities.methods if m.name == "_internal")
+        assert m.visibility == "private"
+
+    def test_public_method_visibility(self, extractor):
+        entities = extractor.extract(_PY_SIMPLE_CLASS, "user_service.py")
+        m = next(m for m in entities.methods if m.name == "get_user")
+        assert m.visibility == "public"
+
+    def test_superclass_extracted(self, extractor):
+        entities = extractor.extract(_PY_INHERITANCE, "admin.py")
+        cls = next(c for c in entities.classes if c.name == "AdminService")
+        assert cls.superclass == "UserService"
+
+    def test_second_base_in_interfaces(self, extractor):
+        entities = extractor.extract(_PY_INHERITANCE, "admin.py")
+        cls = next(c for c in entities.classes if c.name == "AdminService")
+        assert "AuditMixin" in cls.interfaces
+
+    def test_empty_source_returns_empty(self, extractor):
+        entities = extractor.extract("", "empty.py")
+        assert entities.is_empty()
+
+    def test_file_path_stored(self, extractor):
+        entities = extractor.extract(_PY_SIMPLE_CLASS, "user_service.py")
+        assert entities.file_path == "user_service.py"
+
+
+class TestPythonAstExtractorEndpoints:
+    @pytest.fixture
+    def extractor(self):
+        from telaios.core.knowledge.code_graph import PythonAstExtractor
+        return PythonAstExtractor()
+
+    def test_flask_get_endpoint(self, extractor):
+        entities = extractor.extract(_PY_FLASK_ROUTES, "routes.py")
+        get_eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        assert len(get_eps) >= 1
+
+    def test_flask_get_path(self, extractor):
+        entities = extractor.extract(_PY_FLASK_ROUTES, "routes.py")
+        paths = [e.path for e in entities.endpoints]
+        assert "/users" in paths
+
+    def test_flask_post_shorthand(self, extractor):
+        entities = extractor.extract(_PY_FLASK_ROUTES, "routes.py")
+        post_eps = [e for e in entities.endpoints if e.http_method == "POST"]
+        assert len(post_eps) >= 1
+
+    def test_fastapi_get_endpoint(self, extractor):
+        entities = extractor.extract(_PY_FASTAPI_ROUTES, "routes.py")
+        get_eps = [e for e in entities.endpoints if e.http_method == "GET"]
+        assert len(get_eps) >= 1
+
+    def test_fastapi_delete_endpoint(self, extractor):
+        entities = extractor.extract(_PY_FASTAPI_ROUTES, "routes.py")
+        del_eps = [e for e in entities.endpoints if e.http_method == "DELETE"]
+        assert len(del_eps) >= 1
+
+    def test_fastapi_path_extracted(self, extractor):
+        entities = extractor.extract(_PY_FASTAPI_ROUTES, "routes.py")
+        paths = [e.path for e in entities.endpoints]
+        assert any("/items" in p for p in paths)
+
+
+class TestPythonAstExtractorImports:
+    @pytest.fixture
+    def extractor(self):
+        from telaios.core.knowledge.code_graph import PythonAstExtractor
+        return PythonAstExtractor()
+
+    def test_imports_extracted(self, extractor):
+        entities = extractor.extract(_PY_IMPORTS, "ctrl.py")
+        fqns = [i.imported_fqn for i in entities.imports]
+        assert any("UserService" in f for f in fqns)
