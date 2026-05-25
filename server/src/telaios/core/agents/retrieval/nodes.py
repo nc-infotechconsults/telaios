@@ -102,6 +102,9 @@ _EXACT_PATTERN = re.compile(r'\b[A-Z][a-zA-Z0-9]+\b|\b[a-z_]+\(\)')
 
 def _query_to_step(query: str) -> SearchStep:
     """Assign a tool to a follow-up query using keyword heuristics (no LLM call)."""
+    if query.startswith("read_source:"):
+        path = query[len("read_source:"):].strip()
+        return SearchStep(sub_query=path, tool="read_source", reason="evaluator follow-up")
     lower = query.lower()
     words = set(re.findall(r'\w+', lower))
     if words & _STRUCTURAL_KEYWORDS:
@@ -215,11 +218,39 @@ def make_result_evaluator_node(llm: Any):
                 "follow_up_queries": [],
             }
 
-        new_steps = [_query_to_step(q) for q in evaluation.follow_up_queries[:3]]
+        # Source paths already covered by existing read_source steps
+        already_read = {
+            step.sub_query
+            for step in state["search_plan"]
+            if step.tool == "read_source"
+        }
+
+        # Count how many evidence chunks reference each source file
+        source_path_counts: dict[str, int] = {}
+        for chunk in state["evidence"]:
+            sp = chunk.metadata.get("source_path", "")
+            if sp and "/" in sp and sp not in already_read:
+                source_path_counts[sp] = source_path_counts.get(sp, 0) + 1
+
+        # Top-2 most-referenced paths get a read_source step
+        read_steps = [
+            SearchStep(
+                sub_query=sp,
+                tool="read_source",
+                reason="full file read for completeness",
+            )
+            for sp, _ in sorted(source_path_counts.items(), key=lambda x: -x[1])[:2]
+        ]
+
+        # LLM follow-ups (limit to 2 since read_source steps add context)
+        llm_steps = [_query_to_step(q) for q in evaluation.follow_up_queries[:2]]
+
+        new_steps = read_steps + llm_steps
         return {
             "is_sufficient": False,
             "iteration": new_iteration,
             "pending_steps": new_steps,
+            "search_plan": state["search_plan"] + new_steps,
             "follow_up_queries": evaluation.follow_up_queries,
         }
 

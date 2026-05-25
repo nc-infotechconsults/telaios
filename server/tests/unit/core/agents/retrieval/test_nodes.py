@@ -220,6 +220,102 @@ class TestResultEvaluatorNode:
         structured.ainvoke.assert_not_called()  # LLM should NOT be called
 
 
+@pytest.fixture
+def mock_llm():
+    llm = MagicMock()
+    structured = MagicMock()
+    llm.with_structured_output = MagicMock(return_value=structured)
+    return llm
+
+
+@pytest.mark.asyncio
+async def test_evaluator_injects_read_source_for_evidence_source_paths(mock_llm):
+    """Evaluator adds read_source steps for source_paths found in evidence."""
+    from telaios.core.agents.retrieval.nodes import make_result_evaluator_node
+
+    eval_result = EvaluationResult(
+        is_sufficient=False,
+        missing_aspects=["constructor"],
+        follow_up_queries=["UserService constructor"],
+        confidence=0.4,
+    )
+    mock_llm.with_structured_output.return_value.ainvoke = AsyncMock(return_value=eval_result)
+
+    node = make_result_evaluator_node(mock_llm)
+    chunk = Chunk(
+        id="c1", document_id="d1", content="class UserService {}",
+        metadata={"source_path": "src/main/UserService.java"},
+    )
+    state = {
+        "query": "what does UserService do",
+        "iteration": 0,
+        "max_iterations": 3,
+        "evidence": [chunk, chunk],
+        "evidence_scores": [1.0, 1.0],
+        "search_plan": [
+            SearchStep(sub_query="UserService", tool="bm25", reason="initial")
+        ],
+        "pending_steps": [],
+        "follow_up_queries": [],
+    }
+
+    result = await node(state)
+
+    assert result["is_sufficient"] is False
+    pending = result["pending_steps"]
+    read_steps = [s for s in pending if s.tool == "read_source"]
+    assert len(read_steps) == 1
+    assert read_steps[0].sub_query == "src/main/UserService.java"
+    # search_plan is extended to include new steps (for dedup in next iteration)
+    assert any(s.tool == "read_source" for s in result["search_plan"])
+
+
+@pytest.mark.asyncio
+async def test_evaluator_does_not_duplicate_already_read_paths(mock_llm):
+    """Evaluator skips source_paths that already have a read_source in search_plan."""
+    from telaios.core.agents.retrieval.nodes import make_result_evaluator_node
+
+    eval_result = EvaluationResult(
+        is_sufficient=False,
+        missing_aspects=["details"],
+        follow_up_queries=[],
+        confidence=0.3,
+    )
+    mock_llm.with_structured_output.return_value.ainvoke = AsyncMock(return_value=eval_result)
+
+    node = make_result_evaluator_node(mock_llm)
+    chunk = Chunk(
+        id="c2", document_id="d2", content="class A {}",
+        metadata={"source_path": "src/A.java"},
+    )
+    state = {
+        "query": "what is class A",
+        "iteration": 0,
+        "max_iterations": 3,
+        "evidence": [chunk],
+        "evidence_scores": [1.0],
+        "search_plan": [
+            SearchStep(sub_query="src/A.java", tool="read_source", reason="already queued"),
+        ],
+        "pending_steps": [],
+        "follow_up_queries": [],
+    }
+
+    result = await node(state)
+
+    pending = result["pending_steps"]
+    read_steps = [s for s in pending if s.tool == "read_source"]
+    assert len(read_steps) == 0
+
+
+def test_query_to_step_recognises_read_source_prefix():
+    """_query_to_step handles 'read_source: <path>' prefix."""
+    from telaios.core.agents.retrieval.nodes import _query_to_step
+    step = _query_to_step("read_source: src/main/UserService.java")
+    assert step.tool == "read_source"
+    assert step.sub_query == "src/main/UserService.java"
+
+
 class TestSynthesizerNode:
     @pytest.mark.asyncio
     async def test_produces_answer(self):
