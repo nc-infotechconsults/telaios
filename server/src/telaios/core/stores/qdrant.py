@@ -168,6 +168,41 @@ class QdrantVectorStore:
             for r in records
         ]
 
+    async def fetch_by_source_path(
+        self,
+        collection: str,
+        project_id: str,
+        source_path: str,
+    ) -> list["Chunk"]:
+        """Return all chunks for a specific source file."""
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+        from telaios.core.types import Chunk
+
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            return []
+
+        records, _ = await self._client.scroll(
+            collection_name=collection,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(key="project_id", match=MatchValue(value=project_id)),
+                    FieldCondition(key="source_path", match=MatchValue(value=source_path)),
+                ]
+            ),
+            limit=500,
+            with_payload=True,
+        )
+        return [
+            Chunk(
+                id=str(r.id),
+                document_id=(r.payload or {}).get("document_id", ""),
+                content=(r.payload or {}).get("content", ""),
+                metadata={k: v for k, v in (r.payload or {}).items() if k != "content"},
+            )
+            for r in records
+        ]
+
     # ── Delete ────────────────────────────────────────────────────────────────
 
     async def delete_by_project(self, collection: str, project_id: str) -> None:
