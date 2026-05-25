@@ -22,6 +22,10 @@ class TestSearchStep:
         with pytest.raises(Exception):
             SearchStep(sub_query="q", tool="nonexistent_tool", reason="r")
 
+    def test_search_step_read_source_tool_is_valid(self):
+        step = SearchStep(sub_query="src/main/UserService.java", tool="read_source", reason="full read")
+        assert step.tool == "read_source"
+
 
 class TestSearchPlan:
     def test_empty_plan(self):

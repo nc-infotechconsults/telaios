@@ -105,3 +105,79 @@ class TestRetrievalToolsGeneratedDocs:
         step = SearchStep(sub_query="how does this app work overall", tool="generated_docs", reason="architecture")
         chunks, scores = await tools.execute(step)
         assert isinstance(chunks, list)
+
+
+@pytest.fixture
+def tools():
+    return _make_tools()
+
+
+class TestRetrievalToolsReadSource:
+    @pytest.mark.asyncio
+    async def test_read_source_with_path_query(self, tools):
+        """When sub_query contains '/', fetch_by_source_path is called with it directly."""
+        chunk = Chunk(
+            id="c1", document_id="d1", content="class A {}",
+            metadata={"start_line": 1, "source_path": "src/A.java"},
+        )
+        tools.vector_store.fetch_by_source_path = AsyncMock(return_value=[chunk])
+
+        step = SearchStep(sub_query="src/A.java", tool="read_source", reason="test")
+        chunks, scores = await tools.execute(step)
+
+        assert len(chunks) == 1
+        assert chunks[0].id == "c1"
+        assert scores == [1.0]
+        tools.vector_store.fetch_by_source_path.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_read_source_with_symbol_resolves_via_bm25(self, tools):
+        """When sub_query has no '/', BM25 top-1 resolves the source_path."""
+        tools.bm25_store.search.return_value = [
+            {
+                "id": "x",
+                "content": "class UserService {}",
+                "metadata": {"source_path": "src/UserService.java"},
+            }
+        ]
+        chunk = Chunk(
+            id="c2", document_id="d2", content="class UserService {}",
+            metadata={"start_line": 1},
+        )
+        tools.vector_store.fetch_by_source_path = AsyncMock(return_value=[chunk])
+
+        step = SearchStep(sub_query="UserService", tool="read_source", reason="test")
+        chunks, scores = await tools.execute(step)
+
+        assert len(chunks) == 1
+        # fetch_by_source_path must have been called with the resolved path
+        all_calls = tools.vector_store.fetch_by_source_path.call_args_list
+        resolved_paths = [
+            (c.kwargs.get("source_path") or (c.args[2] if len(c.args) > 2 else None))
+            for c in all_calls
+        ]
+        assert "src/UserService.java" in resolved_paths
+
+    @pytest.mark.asyncio
+    async def test_read_source_returns_empty_when_no_chunks(self, tools):
+        """Returns empty lists when fetch_by_source_path finds nothing."""
+        tools.vector_store.fetch_by_source_path = AsyncMock(return_value=[])
+
+        step = SearchStep(sub_query="src/Missing.java", tool="read_source", reason="test")
+        chunks, scores = await tools.execute(step)
+
+        assert chunks == []
+        assert scores == []
+
+    @pytest.mark.asyncio
+    async def test_read_source_sorts_chunks_by_start_line(self, tools):
+        """Chunks are returned sorted by start_line ascending."""
+        c1 = Chunk(id="c1", document_id="d", content="line10", metadata={"start_line": 10})
+        c2 = Chunk(id="c2", document_id="d", content="line1", metadata={"start_line": 1})
+        c3 = Chunk(id="c3", document_id="d", content="line5", metadata={"start_line": 5})
+        tools.vector_store.fetch_by_source_path = AsyncMock(return_value=[c1, c2, c3])
+
+        step = SearchStep(sub_query="src/A.java", tool="read_source", reason="test")
+        chunks, _ = await tools.execute(step)
+
+        assert [c.id for c in chunks] == ["c2", "c3", "c1"]

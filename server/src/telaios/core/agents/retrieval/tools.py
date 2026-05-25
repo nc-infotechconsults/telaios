@@ -42,6 +42,8 @@ class RetrievalTools:
                 return await self._bm25(step.sub_query)
             case "generated_docs":
                 return await self._generated_docs(step.sub_query)
+            case "read_source":
+                return await self._read_source(step.sub_query)
             case _:
                 logger.warning("Unknown tool %r — falling back to vector_search", step.tool)
                 return await self._vector_search(step.sub_query)
@@ -141,6 +143,54 @@ class RetrievalTools:
         chunks = [c for c, _ in filtered[:self.top_k]]
         scores = [s for _, s in filtered[:self.top_k]]
         return chunks, scores
+
+    async def _read_source(self, sub_query: str) -> tuple[list[Chunk], list[float]]:
+        """Fetch all chunks for a source file, sorted by start_line.
+
+        sub_query is either a source_path (contains '/') or a symbol name
+        resolved to a path via BM25 top-1.
+        """
+        source_path = sub_query
+
+        if "/" not in sub_query:
+            # Resolve symbol name → source_path via BM25 top-1
+            collections = _resolve_collections(self.source, self.config)
+            for collection in collections:
+                results = self.bm25_store.search(
+                    collection=collection,
+                    query=sub_query,
+                    project_id=self.project_id,
+                    top_k=1,
+                )
+                if results:
+                    sp = results[0].get("metadata", {}).get("source_path", "")
+                    if sp:
+                        source_path = sp
+                        break
+
+        collections = _resolve_collections(self.source, self.config)
+        all_chunks: list[Chunk] = []
+        seen_ids: set[str] = set()
+
+        for collection in collections:
+            try:
+                chunks = await self.vector_store.fetch_by_source_path(
+                    collection=collection,
+                    project_id=self.project_id,
+                    source_path=source_path,
+                )
+            except Exception:
+                logger.warning(
+                    "read_source: fetch_by_source_path failed for %r", source_path, exc_info=True
+                )
+                chunks = []
+            for c in chunks:
+                if c.id not in seen_ids:
+                    seen_ids.add(c.id)
+                    all_chunks.append(c)
+
+        all_chunks.sort(key=lambda c: c.metadata.get("start_line") or 0)
+        return all_chunks, [1.0] * len(all_chunks)
 
 
 __all__ = ["RetrievalTools"]
