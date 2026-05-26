@@ -239,6 +239,19 @@ class KnowledgePipelineFactory:
             from telaios.core.knowledge.reranker import CrossEncoderReranker
             reranker = CrossEncoderReranker(model=config.reranker_model)
 
+        # FileReader — local disk or S3 depending on config
+        from telaios.core.knowledge.file_reader import FileReaderFactory
+        if config.file_reader_type == "s3" and config.s3_bucket:
+            import boto3
+            s3_client = boto3.client("s3")
+            file_reader = FileReaderFactory.s3(
+                s3_client=s3_client,
+                bucket=config.s3_bucket,
+                key_prefix=config.s3_key_prefix,
+            )
+        else:
+            file_reader = FileReaderFactory.local()
+
         return KnowledgeBasePipeline(
             vector_store=vector_store,
             bm25_store=bm25_store,
@@ -249,6 +262,7 @@ class KnowledgePipelineFactory:
             config=config,
             docgen=docgen,
             reranker=reranker,
+            file_reader=file_reader,
         )
 
 

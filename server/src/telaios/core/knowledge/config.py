@@ -95,5 +95,11 @@ class KnowledgePipelineConfig(BaseModel):
     # repositories collection and uses FalkorDB + direct file reads instead.
     code_graph_only: bool = False
 
+    # File reader type for read_source tool: "local" or "s3"
+    file_reader_type: str = "local"
+    # S3 settings (used when file_reader_type == "s3")
+    s3_bucket: str = ""
+    s3_key_prefix: str = ""
+
 
 __all__ = ["EmbeddingConfig", "GraphStoreConfig", "KnowledgePipelineConfig", "QdrantConfig"]

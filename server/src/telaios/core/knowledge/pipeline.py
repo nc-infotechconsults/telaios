@@ -67,6 +67,7 @@ class KnowledgeBasePipeline:
         config: KnowledgePipelineConfig,
         docgen: RepoDocGenerator | None = None,
         reranker: Any | None = None,
+        file_reader: Any | None = None,
     ) -> None:
         self._vs = vector_store
         self._bm25 = bm25_store
@@ -77,6 +78,7 @@ class KnowledgeBasePipeline:
         self._config = config
         self._docgen = docgen
         self._reranker = reranker
+        self._file_reader = file_reader
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
 
@@ -108,6 +110,7 @@ class KnowledgeBasePipeline:
             project_id=project_id,
             source=source,
             top_k=top_k,
+            file_reader=self._file_reader,
         )
         return RetrievalAgent(
             llm=self._llm,
@@ -138,6 +141,7 @@ class KnowledgeBasePipeline:
         project_id: str,
         source: Any,  # KnowledgeSource
         on_progress: ProgressFn | None = None,
+        doc_kind: str = "guide",
     ) -> IngestResult:
         """Ingest documents (PDF, DOCX, MD, etc.) using SemanticChunker."""
         from telaios.core.chunkers.semantic import SemanticChunker
@@ -145,13 +149,37 @@ class KnowledgeBasePipeline:
             chunk_size=self._config.document_chunk_size,
             overlap=self._config.document_chunk_overlap,
         )
-        return await self._ingestion.ingest(
+        result = await self._ingestion.ingest(
             source=source,
             collection=self._config.documents_collection,
             project_id=project_id,
             chunker=chunker,
             on_progress=on_progress,
         )
+
+        # Parse markdown files into Doc_Section graph nodes
+        if self._graph is not None and hasattr(self._graph, '_graph'):
+            graph_store = self._graph._graph
+            if hasattr(graph_store, 'upsert_doc_section'):
+                from telaios.core.knowledge.markdown_ingester import MarkdownDocIngester
+                ingester = MarkdownDocIngester()
+                docs = await source.extract()
+                for doc in docs:
+                    if doc.source_path and doc.source_path.endswith(".md"):
+                        try:
+                            ingester.ingest(
+                                content=doc.content,
+                                source_doc=doc.source_path,
+                                project_id=project_id,
+                                kind=doc_kind,
+                                graph_store=graph_store,
+                            )
+                        except Exception:
+                            logger.warning(
+                                "Markdown graph ingestion failed for %r", doc.source_path, exc_info=True
+                            )
+
+        return result
 
     async def ingest_repository(
         self,

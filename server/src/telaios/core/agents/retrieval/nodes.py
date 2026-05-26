@@ -24,19 +24,23 @@ You are a retrieval planning assistant. Given a user's question, produce a searc
 a list of sub-queries to retrieve relevant information, each paired with the best retrieval tool.
 
 Available tools:
+- "graph_navigate": Use for code symbol lookups — find a class, function, or file by name. \
+Returns file coordinates (path, start_line, end_line). Always follow with "read_source".
+- "read_source": Fetch the actual source code at a file path (and optional line range). \
+Use after graph_navigate, or directly when you know the file path. \
+Accepts "path/to/File.java" or "path/to/File.java:10:50" format.
+- "doc_to_code": Find code that implements a documentation section. \
+Pass the Doc_Section ID or heading as the sub_query.
 - "graph_structural": Use for structural code questions — dependency queries \
-("which classes use X"), inheritance ("what extends Y"), endpoint listing/counting. \
-Requires code to be indexed.
+("which classes use X"), inheritance ("what extends Y"), endpoint listing/counting.
 - "generated_docs": Use for high-level architecture, "how does X work overall", \
-project structure, design intent. Searches LLM-synthesized repository documentation.
-- "bm25": Use for exact symbol lookups where you know the precise identifier \
-(function name, class name, variable name).
-- "vector_search": Default. Use for all semantic questions about implementation \
-details, behavior, logic, or when unsure.
+project structure, design intent.
+- "bm25": Use for exact identifier lookups in documentation.
+- "vector_search": Default for semantic questions about documentation content.
 
 Rules:
 - Produce 1-4 steps. No more.
-- Each step targets a different angle of the question.
+- For code questions: prefer graph_navigate → read_source over vector_search.
 - A simple, direct question needs only one step.
 - Do not repeat the same sub_query with different tools.
 """
@@ -105,12 +109,15 @@ def _query_to_step(query: str) -> SearchStep:
     if query.startswith("read_source:"):
         path = query[len("read_source:"):].strip()
         return SearchStep(sub_query=path, tool="read_source", reason="evaluator follow-up")
+    if query.startswith("doc_to_code:"):
+        section = query[len("doc_to_code:"):].strip()
+        return SearchStep(sub_query=section, tool="doc_to_code", reason="evaluator follow-up")
     lower = query.lower()
     words = set(re.findall(r'\w+', lower))
     if words & _STRUCTURAL_KEYWORDS:
         tool = "graph_structural"
     elif _EXACT_PATTERN.search(query):
-        tool = "bm25"
+        tool = "graph_navigate"
     else:
         tool = "vector_search"
     return SearchStep(sub_query=query, tool=tool, reason="evaluator follow-up")
