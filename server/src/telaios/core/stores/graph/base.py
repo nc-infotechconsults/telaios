@@ -81,6 +81,15 @@ class GraphStore(ABC):
     async def aclear(self) -> None:
         """Delete all nodes and relationships. Override in implementations that support it."""
 
+    def delete_project(self, project_id: str) -> None:  # noqa: B027
+        """Delete all nodes belonging to *project_id*. Override in typed-schema stores."""
+
+    async def adelete_project(self, project_id: str) -> None:
+        """Async delete_project."""
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self.delete_project, project_id)
+
     def get_communities(self, resolution: float = 1.0) -> list[set[str]]:
         """Return entity clusters detected via community detection.
 

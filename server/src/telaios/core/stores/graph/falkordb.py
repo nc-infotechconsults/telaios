@@ -151,6 +151,13 @@ class FalkorDBGraphStore(GraphStore):
         """Delete all nodes and relationships (used in tests)."""
         self._graph.query("MATCH (n) DETACH DELETE n")
 
+    def delete_project(self, project_id: str) -> None:
+        """Delete all nodes tagged with *project_id* (preserves other projects)."""
+        self._graph.query(
+            "MATCH (n {project_id: $pid}) DETACH DELETE n",
+            {"pid": project_id},
+        )
+
     # ── Async interface (sync driver — offload to thread pool) ────────────────
 
     async def aadd_triplet(self, subject: str, predicate: str, obj: str) -> None:

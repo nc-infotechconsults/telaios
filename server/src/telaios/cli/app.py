@@ -573,8 +573,7 @@ class TelaiOSEval(App[None]):
 
         try:
             t = self._step(log, f"Deleting all data for project [{_PROJECT_ID}]…")
-            pipeline = await KnowledgePipelineFactory.get()
-            await pipeline.delete_project_data(_PROJECT_ID)
+            await KnowledgePipelineFactory.delete_project_data(_PROJECT_ID)
             self._done(log, f"Cleared project [cyan]{_PROJECT_ID}[/cyan]", t)
             log.write("")
         except Exception as exc:

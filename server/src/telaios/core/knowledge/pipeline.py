@@ -350,13 +350,18 @@ class KnowledgeBasePipeline:
                 logger.warning("BM25 warm-up failed for %r", collection, exc_info=True)
 
     async def delete_project_data(self, project_id: str) -> None:
-        """Remove all vectors and BM25 index belonging to *project_id* from both collections."""
+        """Remove all data belonging to *project_id* from Qdrant, BM25, and the graph store."""
         for collection in [
             self._config.documents_collection,
             self._config.repositories_collection,
         ]:
             await self._vs.delete_by_project(collection=collection, project_id=project_id)
             self._bm25.delete_project(collection=collection, project_id=project_id)
+
+        if self._graph is not None:
+            graph_store = getattr(self._graph, "_graph", None)
+            if graph_store is not None:
+                await graph_store.adelete_project(project_id)
 
     # ── Internals ─────────────────────────────────────────────────────────────
 

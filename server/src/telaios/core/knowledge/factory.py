@@ -96,6 +96,60 @@ class KnowledgePipelineFactory:
         logger.info("KnowledgeBasePipeline singleton cleared")
 
     @staticmethod
+    async def delete_project_data(project_id: str) -> None:
+        """Delete all data for *project_id* without requiring a full pipeline initialisation.
+
+        If the singleton is already built it is reused.  Otherwise a minimal set of
+        store clients (Qdrant + BM25 + graph store) is created from settings — no
+        embedder or LLM is loaded — so this is safe to call before any ingestion.
+        """
+        global _instance
+        if _instance is not None:
+            await _instance.delete_project_data(project_id)
+            return
+
+        cfg = KnowledgePipelineFactory.from_settings()
+        await KnowledgePipelineFactory._delete_minimal(project_id, cfg)
+
+    @staticmethod
+    async def _delete_minimal(project_id: str, config: KnowledgePipelineConfig) -> None:
+        """Build only the store clients needed for deletion and run the cleanup."""
+        from qdrant_client import AsyncQdrantClient
+
+        from telaios.core.stores.bm25 import BM25Store
+        from telaios.core.stores.graph import GraphStoreFactory
+        from telaios.core.stores.qdrant import QdrantVectorStore
+
+        if config.qdrant.url:
+            qdrant_client = AsyncQdrantClient(
+                url=config.qdrant.url,
+                api_key=config.qdrant.api_key,
+            )
+        else:
+            qdrant_client = AsyncQdrantClient(
+                host=config.qdrant.host,
+                port=config.qdrant.port,
+            )
+
+        vs = QdrantVectorStore(client=qdrant_client, embedder=None)  # type: ignore[arg-type]
+        bm25 = BM25Store()
+
+        for collection in [config.documents_collection, config.repositories_collection]:
+            await vs.delete_by_project(collection=collection, project_id=project_id)
+            bm25.delete_project(collection=collection, project_id=project_id)
+
+        try:
+            graph_store = GraphStoreFactory.create(config.graph_store)
+            await graph_store.adelete_project(project_id)
+        except Exception:
+            logger.warning(
+                "Graph store delete for project %r failed (store may be offline)",
+                project_id,
+                exc_info=True,
+            )
+        logger.info("Deleted project %r data (minimal path)", project_id)
+
+    @staticmethod
     def from_settings() -> KnowledgePipelineConfig:
         """Build a ``KnowledgePipelineConfig`` from the current application settings.
 
