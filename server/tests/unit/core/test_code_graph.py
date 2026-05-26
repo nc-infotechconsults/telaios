@@ -729,3 +729,52 @@ class TestCodeGraphExtractorLanguageParity:
 
     def test_supports_javascript(self):
         assert CodeGraphExtractor.supports("javascript")
+
+
+class TestJavaLineNumbers:
+    """JavaAstExtractor must capture start_line/end_line on ClassInfo and MethodInfo."""
+
+    _SOURCE = """\
+package com.example;
+
+public class UserService {
+
+    public User getUser(Long id) {
+        return null;
+    }
+}
+"""
+
+    def test_class_line_numbers(self):
+        entities = JavaAstExtractor().extract(self._SOURCE, "UserService.java")
+        cls = entities.classes[0]
+        assert cls.start_line == 3
+        assert cls.end_line == 8
+
+    def test_method_line_numbers(self):
+        entities = JavaAstExtractor().extract(self._SOURCE, "UserService.java")
+        method = next(m for m in entities.methods if m.name == "getUser")
+        assert method.start_line == 5
+        assert method.end_line == 7
+
+
+class TestPythonLineNumbers:
+    _SOURCE = """\
+class Foo:
+    def bar(self):
+        pass
+"""
+
+    def test_class_line_numbers(self):
+        from telaios.core.knowledge.code_graph import PythonAstExtractor
+        entities = PythonAstExtractor().extract(self._SOURCE, "foo.py")
+        cls = entities.classes[0]
+        assert cls.start_line == 1
+        assert cls.end_line == 3
+
+    def test_method_line_numbers(self):
+        from telaios.core.knowledge.code_graph import PythonAstExtractor
+        entities = PythonAstExtractor().extract(self._SOURCE, "foo.py")
+        method = next(m for m in entities.methods if m.name == "bar")
+        assert method.start_line == 2
+        assert method.end_line == 3

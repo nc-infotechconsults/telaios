@@ -50,6 +50,8 @@ class ClassInfo:
     annotations: list[str] = field(default_factory=list)
     component_type: str | None = None  # "controller" | "service" | "repository" | "component"
     request_mapping_prefix: str = ""  # class-level @RequestMapping path
+    start_line: int = 0
+    end_line: int = 0
 
     @property
     def qualified_name(self) -> str:
@@ -69,6 +71,8 @@ class MethodInfo:
     request_body_type: str | None = None
     http_method: str | None = None
     http_path: str | None = None
+    start_line: int = 0
+    end_line: int = 0
 
 
 @dataclass
@@ -258,6 +262,8 @@ class JavaAstExtractor:
             annotations=annotations,
             component_type=component_type,
             request_mapping_prefix=class_http_prefix,
+            start_line=node.start_point[0] + 1,  # type: ignore[union-attr]
+            end_line=node.end_point[0] + 1,  # type: ignore[union-attr]
         )
         entities.classes.append(cls_info)
 
@@ -404,6 +410,8 @@ class JavaAstExtractor:
             request_body_type=request_body_type,
             http_method=http_method,
             http_path=http_path,
+            start_line=node.start_point[0] + 1,  # type: ignore[union-attr]
+            end_line=node.end_point[0] + 1,  # type: ignore[union-attr]
         ))
 
         if http_method and http_path:
@@ -583,6 +591,8 @@ class PythonAstExtractor:
             file_path=file_path,
             superclass=bases[0] if bases else None,
             interfaces=bases[1:],
+            start_line=node.lineno,
+            end_line=node.end_lineno or node.lineno,
         )
         entities.classes.append(cls_info)
         for item in node.body:
@@ -611,6 +621,8 @@ class PythonAstExtractor:
             params=params,
             annotations=decorators,
             visibility=visibility,
+            start_line=node.lineno,
+            end_line=node.end_lineno or node.lineno,
         )
         endpoint = self._detect_endpoint(node, class_name)
         return method_info, endpoint
@@ -810,6 +822,8 @@ class _TsBaseExtractor:
                     interfaces=interfaces,
                     annotations=[n for n, _ in decorators],
                     request_mapping_prefix=class_prefix,
+                    start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
                 )
                 entities.classes.append(cls_info)
                 self._walk_class_body(child, txt, entities, class_name=name, class_prefix=class_prefix)
@@ -870,6 +884,8 @@ class _TsBaseExtractor:
             return_type=return_type,
             params=params,
             annotations=[n for n, _ in decorators],
+            start_line=node.start_point[0] + 1,
+            end_line=node.end_point[0] + 1,
         ))
 
         # NestJS endpoint detection
