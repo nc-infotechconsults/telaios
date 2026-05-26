@@ -19,6 +19,11 @@ _PRIMITIVE_TYPES = frozenset({
     "Optional", "ResponseEntity", "HttpStatus", "Pageable", "Page",
 })
 
+_EXTENSION_LANGUAGE: dict[str, str] = {
+    ".py": "python", ".java": "java", ".ts": "typescript",
+    ".tsx": "tsx", ".js": "javascript", ".jsx": "javascript",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -178,15 +183,26 @@ class FalkorDBGraphStore(GraphStore):
 
     def upsert_code_entities(self, entities: "CodeEntities", project_id: str) -> None:
         """Create/update typed nodes and edges from AST-extracted code entities."""
+        from pathlib import Path
         pid = project_id
+        fp = entities.file_path
 
-        # 1. Class nodes
+        # ── 0. CodeFile node ──────────────────────────────────────────────────
+        lang = _EXTENSION_LANGUAGE.get(Path(fp).suffix.lower(), "")
+        self._graph.query(
+            "MERGE (f:CodeFile {file_path: $fp, project_id: $pid}) "
+            "SET f.language = $lang",
+            {"fp": fp, "pid": pid, "lang": lang},
+        )
+
+        # ── 1. Class nodes (enriched with start_line/end_line) ────────────────
         for cls in entities.classes:
             self._graph.query(
                 "MERGE (c:CodeClass {name: $name, project_id: $pid}) "
                 "SET c.package = $pkg, c.file_path = $fp, c.qualified_name = $qname, "
                 "c.is_abstract = $abstract, c.is_interface = $iface, c.is_enum = $enum, "
-                "c.component_type = $comp, c.request_mapping_prefix = $prefix",
+                "c.component_type = $comp, c.request_mapping_prefix = $prefix, "
+                "c.start_line = $sl, c.end_line = $el",
                 {
                     "name": cls.name, "pid": pid,
                     "pkg": cls.package, "fp": cls.file_path,
@@ -194,10 +210,18 @@ class FalkorDBGraphStore(GraphStore):
                     "abstract": cls.is_abstract, "iface": cls.is_interface,
                     "enum": cls.is_enum, "comp": cls.component_type or "",
                     "prefix": cls.request_mapping_prefix,
+                    "sl": cls.start_line, "el": cls.end_line,
                 },
             )
+            # CodeFile -[:CONTAINS]-> CodeClass
+            self._safe_query(
+                "MATCH (f:CodeFile {file_path: $fp, project_id: $pid}) "
+                "MATCH (c:CodeClass {name: $cn, project_id: $pid}) "
+                "MERGE (f)-[:CONTAINS]->(c)",
+                {"fp": fp, "pid": pid, "cn": cls.name},
+            )
 
-        # 2. Inheritance edges
+        # ── 2. Inheritance edges ──────────────────────────────────────────────
         for cls in entities.classes:
             if cls.superclass and cls.superclass not in _PRIMITIVE_TYPES:
                 self._safe_query(
@@ -215,7 +239,7 @@ class FalkorDBGraphStore(GraphStore):
                         {"a": cls.name, "b": iface, "pid": pid},
                     )
 
-        # 3. Import edges (class-level dependency)
+        # ── 3. Import edges (class-level dependency) ──────────────────────────
         for imp in entities.imports:
             sn = imp.simple_name
             if sn and sn not in _PRIMITIVE_TYPES and sn[0].isupper():
@@ -226,7 +250,7 @@ class FalkorDBGraphStore(GraphStore):
                     {"a": imp.importing_class, "b": sn, "pid": pid},
                 )
 
-        # 4. Field dependency edges
+        # ── 4. Field dependency edges ─────────────────────────────────────────
         for fld in entities.fields:
             ft = fld.field_type
             if ft and ft not in _PRIMITIVE_TYPES and ft[0].isupper():
@@ -237,7 +261,7 @@ class FalkorDBGraphStore(GraphStore):
                     {"a": fld.class_name, "b": ft, "pid": pid, "fn": fld.name},
                 )
 
-        # 5. REST endpoint nodes + edges
+        # ── 5. REST endpoint nodes + edges ────────────────────────────────────
         for ep in entities.endpoints:
             self._graph.query(
                 "MERGE (e:RestEndpoint {http_method: $method, path: $path, project_id: $pid}) "
@@ -268,10 +292,42 @@ class FalkorDBGraphStore(GraphStore):
                     {"method": ep.http_method, "path": ep.path, "pid": pid, "bt": rbt},
                 )
 
+        # ── 6. CodeFunction nodes + HAS_METHOD edges ──────────────────────────
+        for method in entities.methods:
+            self._graph.query(
+                "MERGE (fn:CodeFunction {name: $name, class_name: $cn, "
+                "file_path: $fp, project_id: $pid}) "
+                "SET fn.start_line = $sl, fn.end_line = $el, "
+                "fn.return_type = $rt, fn.visibility = $vis, fn.is_static = $static",
+                {
+                    "name": method.name, "cn": method.class_name,
+                    "fp": fp, "pid": pid,
+                    "sl": method.start_line, "el": method.end_line,
+                    "rt": method.return_type, "vis": method.visibility,
+                    "static": method.is_static,
+                },
+            )
+            if method.class_name:
+                self._safe_query(
+                    "MATCH (c:CodeClass {name: $cn, project_id: $pid}) "
+                    "MATCH (fn:CodeFunction {name: $fn, class_name: $cn, project_id: $pid}) "
+                    "MERGE (c)-[:HAS_METHOD]->(fn)",
+                    {"cn": method.class_name, "fn": method.name, "pid": pid},
+                )
+            else:
+                # Module-level function: CodeFile -[:CONTAINS]-> CodeFunction
+                self._safe_query(
+                    "MATCH (f:CodeFile {file_path: $fp, project_id: $pid}) "
+                    "MATCH (fn:CodeFunction {name: $fn, class_name: '', project_id: $pid}) "
+                    "MERGE (f)-[:CONTAINS]->(fn)",
+                    {"fp": fp, "fn": method.name, "pid": pid},
+                )
+
         logger.debug(
-            "Upserted %d classes, %d fields, %d imports, %d endpoints for project %s in %s",
-            len(entities.classes), len(entities.fields), len(entities.imports),
-            len(entities.endpoints), project_id, entities.file_path,
+            "Upserted %d classes, %d methods, %d fields, %d imports, %d endpoints "
+            "for project %s in %s",
+            len(entities.classes), len(entities.methods), len(entities.fields),
+            len(entities.imports), len(entities.endpoints), project_id, entities.file_path,
         )
 
     def query_structural(self, intent: str, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
