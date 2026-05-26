@@ -15,7 +15,15 @@ MAX_ITERATIONS = 3
 
 class SearchStep(BaseModel):
     sub_query: str
-    tool: Literal["vector_search", "graph_structural", "bm25", "generated_docs", "read_source"]
+    tool: Literal[
+        "vector_search",
+        "graph_structural",
+        "graph_navigate",
+        "bm25",
+        "generated_docs",
+        "read_source",
+        "doc_to_code",
+    ]
     reason: str
 
 
