@@ -111,3 +111,54 @@ class TestContainsEdge:
         store.upsert_code_entities(_entities(), "proj-1")
         edge_calls = [str(c) for c in store._graph.query.call_args_list]
         assert any("HAS_METHOD" in c for c in edge_calls)
+
+
+class TestDocSectionMethods:
+    def test_upsert_doc_section_calls_merge(self):
+        store = _make_store()
+        store.upsert_doc_section(
+            section_id="auth-requirements",
+            heading="Authentication Requirements",
+            content_summary="Users must authenticate via JWT.",
+            kind="requirement",
+            source_doc="docs/auth.md",
+            start_line=10,
+            project_id="proj-1",
+        )
+        calls = [str(c) for c in store._graph.query.call_args_list]
+        assert any("Doc_Section" in c and "auth-requirements" in c for c in calls)
+
+    def test_add_references_edge_creates_edge(self):
+        store = _make_store()
+        store.add_references_edge(
+            section_id="auth-requirements",
+            target_label="CodeClass",
+            target_name="AuthService",
+            via="annotation",
+            project_id="proj-1",
+        )
+        calls = [str(c) for c in store._graph.query.call_args_list]
+        assert any("REFERENCES" in c for c in calls)
+
+    def test_query_doc_sections_returns_rows(self):
+        store = _make_store()
+        store._graph.query.return_value = [
+            {"id": "s1", "heading": "Foo", "kind": "guide", "source_doc": "x.md", "content_summary": ""},
+        ]
+        rows = store.query_doc_sections("proj-1")
+        assert len(rows) == 1
+        assert rows[0]["id"] == "s1"
+
+    def test_query_unlinked_sections_uses_not_pattern(self):
+        store = _make_store()
+        store._graph.query.return_value = []
+        store.query_unlinked_sections("proj-1")
+        call_cypher = store._graph.query.call_args[0][0]
+        assert "NOT" in call_cypher
+        assert "REFERENCES" in call_cypher
+
+    def test_query_sections_for_changed_files_empty_returns_early(self):
+        store = _make_store()
+        rows = store.query_sections_for_changed_files("proj-1", [])
+        assert rows == []
+        store._graph.query.assert_not_called()

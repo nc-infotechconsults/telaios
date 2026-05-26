@@ -499,6 +499,86 @@ class FalkorDBGraphStore(GraphStore):
 
         return count
 
+    # ── Doc_Section operations ────────────────────────────────────────────────
+
+    def upsert_doc_section(
+        self,
+        section_id: str,
+        heading: str,
+        content_summary: str,
+        kind: str,
+        source_doc: str,
+        start_line: int,
+        project_id: str,
+    ) -> None:
+        self._graph.query(
+            "MERGE (d:Doc_Section {id: $id, project_id: $pid}) "
+            "SET d.heading = $heading, d.content_summary = $summary, "
+            "d.kind = $kind, d.source_doc = $source, d.start_line = $sl",
+            {
+                "id": section_id, "pid": project_id,
+                "heading": heading, "summary": content_summary[:500],
+                "kind": kind, "source": source_doc, "sl": start_line,
+            },
+        )
+
+    def add_references_edge(
+        self,
+        section_id: str,
+        target_label: str,
+        target_name: str,
+        via: str,
+        project_id: str,
+    ) -> None:
+        cypher = (
+            f"MATCH (d:Doc_Section {{id: $sid, project_id: $pid}}) "
+            f"MATCH (t:{target_label} {{name: $tn, project_id: $pid}}) "
+            f"MERGE (d)-[:REFERENCES {{via: $via}}]->(t)"
+        )
+        self._safe_query(cypher, {"sid": section_id, "pid": project_id, "tn": target_name, "via": via})
+
+    def query_doc_sections(self, project_id: str, kind: str | None = None) -> list[dict]:
+        if kind:
+            return self._graph.query(
+                "MATCH (d:Doc_Section {project_id: $pid, kind: $kind}) "
+                "RETURN d.id AS id, d.heading AS heading, d.kind AS kind, "
+                "d.source_doc AS source_doc, d.content_summary AS content_summary",
+                {"pid": project_id, "kind": kind},
+            )
+        return self._graph.query(
+            "MATCH (d:Doc_Section {project_id: $pid}) "
+            "RETURN d.id AS id, d.heading AS heading, d.kind AS kind, "
+            "d.source_doc AS source_doc, d.content_summary AS content_summary",
+            {"pid": project_id},
+        )
+
+    def query_unlinked_sections(self, project_id: str) -> list[dict]:
+        return self._graph.query(
+            "MATCH (d:Doc_Section {project_id: $pid}) "
+            "WHERE NOT (d)-[:REFERENCES]->() "
+            "RETURN d.id AS id, d.heading AS heading, d.kind AS kind, "
+            "d.source_doc AS source_doc "
+            "ORDER BY d.kind, d.heading",
+            {"pid": project_id},
+        )
+
+    def query_sections_for_changed_files(
+        self, project_id: str, changed_files: list[str]
+    ) -> list[dict]:
+        if not changed_files:
+            return []
+        files_list = "[" + ", ".join(f'"{f}"' for f in changed_files) + "]"
+        return self._graph.query(
+            "MATCH (d:Doc_Section)-[:REFERENCES]->(t) "
+            "WHERE t.project_id = $pid "
+            "AND (t:CodeFile OR t:CodeClass OR t:RestEndpoint) "
+            f"AND t.file_path IN {files_list} "
+            "RETURN d.id AS id, d.heading AS heading, "
+            "d.source_doc AS source_doc, t.file_path AS file_path "
+            "ORDER BY d.source_doc",
+            {"pid": project_id},
+        )
+
     async def aupsert_code_entities(self, entities: "CodeEntities", project_id: str) -> None:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.upsert_code_entities, entities, project_id)
@@ -512,6 +592,30 @@ class FalkorDBGraphStore(GraphStore):
     ) -> list[dict[str, Any]]:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.query_structural, intent, params, project_id)
+
+    async def aupsert_doc_section(self, **kwargs) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, lambda: self.upsert_doc_section(**kwargs))
+
+    async def aadd_references_edge(self, **kwargs) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, lambda: self.add_references_edge(**kwargs))
+
+    async def aquery_doc_sections(self, project_id: str, kind: str | None = None) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.query_doc_sections, project_id, kind)
+
+    async def aquery_unlinked_sections(self, project_id: str) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.query_unlinked_sections, project_id)
+
+    async def aquery_sections_for_changed_files(
+        self, project_id: str, changed_files: list[str]
+    ) -> list[dict]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, self.query_sections_for_changed_files, project_id, changed_files
+        )
 
 
 def _combine_paths(prefix: str, suffix: str) -> str:
