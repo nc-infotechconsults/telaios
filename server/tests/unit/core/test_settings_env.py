@@ -24,3 +24,9 @@ def test_settings_reads_env_aliases_from_env_file(tmp_path: Path) -> None:
 
     assert settings.PORT == 9001
     assert settings.ALLOWED_ORIGINS == "http://localhost:5173"
+
+
+def test_code_graph_only_defaults_false():
+    from telaios.core.knowledge.config import KnowledgePipelineConfig
+    cfg = KnowledgePipelineConfig()
+    assert cfg.code_graph_only is False

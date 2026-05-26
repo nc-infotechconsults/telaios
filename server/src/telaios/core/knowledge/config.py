@@ -91,5 +91,9 @@ class KnowledgePipelineConfig(BaseModel):
     # Documentation generation (LLM-driven repo doc synthesis)
     docgen_enabled: bool = True
 
+    # Stage 1 migration flag: when True, ingestion skips Qdrant+BM25 for the
+    # repositories collection and uses FalkorDB + direct file reads instead.
+    code_graph_only: bool = False
+
 
 __all__ = ["EmbeddingConfig", "GraphStoreConfig", "KnowledgePipelineConfig", "QdrantConfig"]
