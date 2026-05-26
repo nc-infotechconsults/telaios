@@ -103,3 +103,84 @@ class TestBuildStructuralHeader:
         header = _build_structural_header(meta)
         assert "class:OrderService" in header
         assert "function:createOrder" in header
+
+
+class TestCodeGraphOnlyFlag:
+    """When code_graph_only=True, Qdrant upsert and BM25 rebuild are skipped
+    for the repositories collection but NOT for the documents collection."""
+
+    def _make_service(self, code_graph_only: bool):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from telaios.core.knowledge.config import KnowledgePipelineConfig
+        from telaios.core.knowledge.ingestion import IngestionService
+
+        config = KnowledgePipelineConfig(
+            code_graph_only=code_graph_only,
+        )
+        vs = MagicMock()
+        vs.upsert = AsyncMock(return_value=[])
+        vs.scroll_all = AsyncMock(return_value=[])
+        bm25 = MagicMock()
+        graph = MagicMock()
+        graph.index_code_entities = AsyncMock()
+        graph.index_chunks = AsyncMock()
+        graph.index_document = AsyncMock()
+        graph.resolve_inherited_endpoints = AsyncMock()
+        graph.rebuild_communities = AsyncMock()
+        svc = IngestionService(
+            vector_store=vs, bm25_store=bm25, graph_augmentor=graph, config=config
+        )
+        return svc, vs, bm25
+
+    def _make_source_and_chunker(self):
+        """Return a minimal mock source (one plain-text doc) and a simple chunker."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from telaios.core.chunkers.base import ChunkMetadata
+        from telaios.core.knowledge_source import SourceDocument
+
+        doc = SourceDocument(
+            content="hello world",
+            doc_id="doc-1",
+            title="Test Doc",
+            source_type="text",
+            source_path="test.txt",
+        )
+        source = MagicMock()
+        source.extract = AsyncMock(return_value=[doc])
+
+        meta = ChunkMetadata(index=0, start_char=0, end_char=11)
+        chunker = MagicMock()
+        chunker.chunk = MagicMock(return_value=[("hello world", meta)])
+
+        return source, chunker
+
+    @pytest.mark.asyncio
+    async def test_repositories_skips_qdrant_when_code_graph_only(self):
+        svc, vs, bm25 = self._make_service(code_graph_only=True)
+        source, chunker = self._make_source_and_chunker()
+
+        await svc.ingest(
+            source=source,
+            collection=svc._config.repositories_collection,
+            project_id="proj-1",
+            chunker=chunker,
+        )
+
+        vs.upsert.assert_not_called()
+        bm25.rebuild.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_documents_still_uses_qdrant_when_code_graph_only(self):
+        svc, vs, bm25 = self._make_service(code_graph_only=True)
+        source, chunker = self._make_source_and_chunker()
+
+        await svc.ingest(
+            source=source,
+            collection=svc._config.documents_collection,
+            project_id="proj-1",
+            chunker=chunker,
+        )
+
+        vs.upsert.assert_called_once()

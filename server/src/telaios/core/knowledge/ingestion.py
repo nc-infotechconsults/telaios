@@ -226,17 +226,25 @@ class IngestionService:
             # Stash for graph indexing (after upsert, so we don't block embedding)
             _doc_index_targets.append((doc, raw_chunks, doc_language, doc_entities))
 
-        _emit(f"Chunked → {len(texts)} chunk(s) — embedding + upserting to Qdrant…")
-        await self._vs.upsert(
-            collection=collection, texts=texts, payloads=payloads, ids=point_ids
-        )
-        logger.info(
-            "Ingested %d docs / %d chunks into %r for project %r",
-            len(docs), len(texts), collection, project_id,
-        )
+        _is_code_collection = (collection == self._config.repositories_collection)
+        _skip_vector = _is_code_collection and self._config.code_graph_only
 
-        _emit("Rebuilding BM25 index…")
-        await self._rebuild_bm25(collection, project_id)
+        if not _skip_vector:
+            _emit(f"Chunked → {len(texts)} chunk(s) — embedding + upserting to Qdrant…")
+            await self._vs.upsert(
+                collection=collection, texts=texts, payloads=payloads, ids=point_ids
+            )
+            logger.info(
+                "Ingested %d docs / %d chunks into %r for project %r",
+                len(docs), len(texts), collection, project_id,
+            )
+            _emit("Rebuilding BM25 index…")
+            await self._rebuild_bm25(collection, project_id)
+        else:
+            logger.info(
+                "code_graph_only=True: skipped Qdrant+BM25 for %r (%d docs / %d chunks)",
+                collection, len(docs), len(texts),
+            )
 
         if self._graph is not None:
             _emit(f"Indexing graph entities for {len(docs)} document(s)…")
