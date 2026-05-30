@@ -53,6 +53,7 @@ class RetrievalState(TypedDict):
     follow_up_queries: list[str]
     answer: str
     citations: list[Citation]
+    stage_timings: dict[str, float]   # node_name → elapsed seconds
 
 
 __all__ = [

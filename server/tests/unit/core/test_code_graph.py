@@ -778,3 +778,101 @@ class Foo:
         method = next(m for m in entities.methods if m.name == "bar")
         assert method.start_line == 2
         assert method.end_line == 3
+
+
+# ── module_path extraction ─────────────────────────────────────────────────────
+
+class TestPythonModulePath:
+    """module_path must be populated correctly for all Python import forms."""
+
+    def _imports(self, source: str) -> list:
+        from telaios.core.knowledge.code_graph import PythonAstExtractor
+        return PythonAstExtractor().extract(source, "pkg/mod.py").imports
+
+    def test_absolute_import(self):
+        imps = self._imports("import os.path\n")
+        assert any(i.imported_fqn == "os.path" and i.module_path == "os.path" for i in imps)
+
+    def test_from_import_module_path(self):
+        imps = self._imports("from telaios.core.knowledge import pipeline\n")
+        assert any(
+            i.imported_fqn == "telaios.core.knowledge.pipeline"
+            and i.module_path == "telaios.core.knowledge"
+            for i in imps
+        )
+
+    def test_relative_single_dot(self):
+        imps = self._imports("from .utils import helper\n")
+        assert any(i.module_path == ".utils" and i.imported_fqn == ".utils.helper" for i in imps)
+
+    def test_relative_double_dot(self):
+        imps = self._imports("from ..core import base\n")
+        assert any(i.module_path == "..core" and i.imported_fqn == "..core.base" for i in imps)
+
+    def test_from_only_relative(self):
+        imps = self._imports("from . import sibling\n")
+        assert any(i.module_path == "." and ".sibling" in i.imported_fqn for i in imps)
+
+
+class TestJavaModulePath:
+    """Java module_path must be the package portion (FQN minus simple name)."""
+
+    def test_module_path_is_package(self):
+        from telaios.core.knowledge.code_graph import JavaAstExtractor
+        source = """\
+package com.example;
+import com.example.service.UserService;
+public class Foo {}
+"""
+        entities = JavaAstExtractor().extract(source, "Foo.java")
+        imp = next(i for i in entities.imports if "UserService" in i.imported_fqn)
+        assert imp.module_path == "com.example.service"
+        assert imp.simple_name == "UserService"
+
+    def test_module_path_empty_for_top_level(self):
+        from telaios.core.knowledge.code_graph import JavaAstExtractor
+        source = """\
+package com.example;
+import TopLevel;
+public class Bar {}
+"""
+        entities = JavaAstExtractor().extract(source, "Bar.java")
+        imp = next((i for i in entities.imports if "TopLevel" in i.imported_fqn), None)
+        if imp:
+            assert imp.module_path == ""
+
+
+class TestTypeScriptNamedImports:
+    """TypeScript _extract_import must produce one ImportInfo per named export."""
+
+    def _imports(self, source: str) -> list:
+        from telaios.core.knowledge.code_graph import TypeScriptAstExtractor
+        return TypeScriptAstExtractor().extract(source, "src/foo.ts").imports
+
+    def test_named_imports_split(self):
+        imps = self._imports("import { Foo, Bar } from './services/bar';\n")
+        names = {i.imported_fqn for i in imps}
+        assert "Foo" in names
+        assert "Bar" in names
+
+    def test_module_path_set_for_named(self):
+        imps = self._imports("import { Widget } from '../components/widget';\n")
+        imp = next(i for i in imps if i.imported_fqn == "Widget")
+        assert imp.module_path == "../components/widget"
+
+    def test_default_import(self):
+        imps = self._imports("import Router from 'express';\n")
+        assert any(i.imported_fqn == "Router" and i.module_path == "express" for i in imps)
+
+    def test_namespace_import(self):
+        imps = self._imports("import * as fs from 'fs';\n")
+        assert any(i.imported_fqn == "fs" and i.module_path == "fs" for i in imps)
+
+    def test_relative_module_path(self):
+        imps = self._imports("import { KnowledgeQueryResult } from './pipeline';\n")
+        imp = next(i for i in imps if i.imported_fqn == "KnowledgeQueryResult")
+        assert imp.module_path == "./pipeline"
+
+    def test_side_effect_import(self):
+        imps = self._imports("import './styles.css';\n")
+        assert any(i.module_path == "./styles.css" for i in imps)

@@ -139,6 +139,24 @@ class GraphAugmentor:
         except Exception:
             logger.warning("Graph indexing failed for doc %s", doc_id, exc_info=True)
 
+    async def resolve_cross_file_calls(self, project_id: str) -> None:
+        """Re-wire CALLS ghost nodes to real CodeFunction nodes after all files are indexed."""
+        try:
+            count = await self._graph.aresolve_cross_file_calls(project_id)
+            if count:
+                logger.info("Re-wired %d cross-file CALLS edge(s) for project %s", count, project_id)
+        except Exception:
+            logger.warning("Cross-file CALLS resolution failed for project %s", project_id, exc_info=True)
+
+    async def resolve_import_file_edges(self, project_id: str) -> None:
+        """Create IMPORTS_FILE edges from class-level IMPORTS and cross-file CALLS."""
+        try:
+            count = await self._graph.aresolve_import_file_edges(project_id)
+            if count:
+                logger.info("Created %d IMPORTS_FILE edge(s) for project %s", count, project_id)
+        except Exception:
+            logger.warning("IMPORTS_FILE edge creation failed for project %s", project_id, exc_info=True)
+
     async def resolve_inherited_endpoints(self, project_id: str) -> None:
         """Propagate inherited REST endpoints to child classes via EXTENDS edges.
 
@@ -281,6 +299,73 @@ class GraphAugmentor:
                 lines.append(line)
             return [Chunk(
                 id=f"graph-{intent}-{abs(hash(class_name)) % 100000}",
+                document_id="knowledge-graph",
+                content="\n".join(lines),
+                metadata={"source": "knowledge_graph", "_collection": "graph"},
+            )]
+
+        elif intent == "callers_of":
+            target = params.get("function_name") or params.get("name", "?")
+            lines = [f"Callers of '{target}' ({len(rows)} found):"]
+            for row in rows:
+                caller = row.get("caller_name", "?")
+                cls = row.get("class_name", "")
+                fp = row.get("file_path", "")
+                callee_cls = row.get("callee_class", "")
+                line = f"  {cls}.{caller}()" if cls else f"  {caller}()"
+                if fp:
+                    line += f"  ← {fp}"
+                lines.append(line)
+                if row.get("callee_file"):
+                    lines.append(f"    → callee defined in {row['callee_file']} ({callee_cls})")
+            return [Chunk(
+                id=f"graph-callers-{abs(hash(target)) % 100000}",
+                document_id="knowledge-graph",
+                content="\n".join(lines),
+                metadata={"source": "knowledge_graph", "_collection": "graph"},
+            )]
+
+        elif intent == "dependents_of":
+            target = params.get("class_name") or params.get("name", "?")
+            lines = [f"Dependents of '{target}' ({len(rows)} found):"]
+            for row in rows:
+                name = row.get("class_name") or row.get("file_path", "?")
+                rel = row.get("relation_type", "")
+                fp = row.get("file_path", "")
+                line = f"  {name}"
+                if rel:
+                    line += f" via {rel}"
+                if fp and fp != name:
+                    line += f"  ← {fp}"
+                lines.append(line)
+            return [Chunk(
+                id=f"graph-dependents-{abs(hash(target)) % 100000}",
+                document_id="knowledge-graph",
+                content="\n".join(lines),
+                metadata={"source": "knowledge_graph", "_collection": "graph"},
+            )]
+
+        elif intent == "impact_set":
+            target = params.get("name") or params.get("class_name") or params.get("function_name", "?")
+            lines = [f"Impact set for '{target}' — entities that would break if it changes ({len(rows)} found):"]
+            by_depth: dict[int, list[str]] = {}
+            for row in rows:
+                depth = int(row.get("depth", 1))
+                name = row.get("name") or row.get("file_path", "?")
+                rel = row.get("relation_type", "")
+                fp = row.get("file_path", "")
+                line = f"  {name}"
+                if rel:
+                    line += f" via {rel}"
+                if fp and fp != name:
+                    line += f"  ← {fp}"
+                by_depth.setdefault(depth, []).append(line)
+            for depth in sorted(by_depth):
+                label = "Direct dependents" if depth == 1 else f"Indirect (depth {depth})"
+                lines.append(f"\n{label}:")
+                lines.extend(by_depth[depth])
+            return [Chunk(
+                id=f"graph-impact-{abs(hash(target)) % 100000}",
                 document_id="knowledge-graph",
                 content="\n".join(lines),
                 metadata={"source": "knowledge_graph", "_collection": "graph"},

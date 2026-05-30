@@ -28,7 +28,7 @@ class GraphStore(ABC):
         ...
 
     @abstractmethod
-    def query(self, cypher_or_pattern: str) -> list[dict[str, Any]]:
+    def query(self, cypher_or_pattern: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Query the graph. Neo4j/FalkorDB expect Cypher; NetworkX expects a pattern."""
         ...
 
@@ -55,7 +55,7 @@ class GraphStore(ABC):
         ...
 
     @abstractmethod
-    async def aquery(self, cypher_or_pattern: str) -> list[dict[str, Any]]:
+    async def aquery(self, cypher_or_pattern: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Async query."""
         ...
 

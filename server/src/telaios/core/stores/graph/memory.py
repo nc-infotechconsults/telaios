@@ -44,7 +44,7 @@ class InMemoryGraphStore(GraphStore):
         for s, p, o in triplets:
             self.add_triplet(s, p, o)
 
-    def query(self, cypher_or_pattern: str) -> list[dict[str, Any]]:
+    def query(self, cypher_or_pattern: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         return list(self._relations)
 
     def get_subgraph(
@@ -75,6 +75,9 @@ class InMemoryGraphStore(GraphStore):
 
     def extract_entities(self, text: str) -> list[tuple[str, str, str]]:
         return []
+
+    def delete_project(self, project_id: str) -> None:
+        pass
 
     def get_communities(self, resolution: float = 1.0) -> list[set[str]]:
         """Detect entity communities via Louvain algorithm (requires networkx).
@@ -171,8 +174,8 @@ class InMemoryGraphStore(GraphStore):
     async def aadd_triplets(self, triplets: list[tuple[str, str, str]]) -> None:
         self.add_triplets(triplets)
 
-    async def aquery(self, cypher_or_pattern: str) -> list[dict[str, Any]]:
-        return self.query(cypher_or_pattern)
+    async def aquery(self, cypher_or_pattern: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        return self.query(cypher_or_pattern, params)
 
     async def aget_subgraph(
         self, center_entities: list[str], depth: int = 2

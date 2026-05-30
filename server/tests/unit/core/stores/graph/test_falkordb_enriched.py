@@ -141,10 +141,12 @@ class TestDocSectionMethods:
         assert any("REFERENCES" in c for c in calls)
 
     def test_query_doc_sections_returns_rows(self):
+        from unittest.mock import MagicMock
         store = _make_store()
-        store._graph.query.return_value = [
-            {"id": "s1", "heading": "Foo", "kind": "guide", "source_doc": "x.md", "content_summary": ""},
-        ]
+        expected = [{"id": "s1", "heading": "Foo", "kind": "guide", "source_doc": "x.md", "content_summary": ""}]
+        # Mock the parsed `query()` wrapper (not the raw `_graph.query()`) so the test
+        # exercises query_doc_sections routing without depending on FalkorDB result format.
+        store.query = MagicMock(return_value=expected)
         rows = store.query_doc_sections("proj-1")
         assert len(rows) == 1
         assert rows[0]["id"] == "s1"

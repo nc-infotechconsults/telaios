@@ -127,6 +127,8 @@ class TestCodeGraphOnlyFlag:
         graph.index_chunks = AsyncMock()
         graph.index_document = AsyncMock()
         graph.resolve_inherited_endpoints = AsyncMock()
+        graph.resolve_cross_file_calls = AsyncMock()
+        graph.resolve_import_file_edges = AsyncMock()
         graph.rebuild_communities = AsyncMock()
         svc = IngestionService(
             vector_store=vs, bm25_store=bm25, graph_augmentor=graph, config=config

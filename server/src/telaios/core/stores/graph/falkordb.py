@@ -330,11 +330,34 @@ class FalkorDBGraphStore(GraphStore):
                     {"fp": fp, "fn": method.name, "pid": pid},
                 )
 
+        # ── 7. CALLS edges (caller function → callee function) ────────────────
+        # Callee MERGE uses only {name, project_id} — if callee hasn't been indexed
+        # yet (cross-file, different processing order), a ghost node is created with
+        # those two properties only (no class_name/file_path).
+        # resolve_cross_file_calls() post-pass re-wires ghosts to real nodes.
+        for call in entities.calls:
+            callee = call.callee_name
+            if not callee or callee[0].islower() is False and len(callee) < 3:
+                continue
+            self._safe_query(
+                "MERGE (caller:CodeFunction {name: $caller_m, class_name: $caller_c, project_id: $pid}) "
+                "MERGE (callee:CodeFunction {name: $callee, project_id: $pid}) "
+                "ON CREATE SET callee.is_ghost = true "
+                "MERGE (caller)-[:CALLS]->(callee)",
+                {
+                    "caller_m": call.caller_method,
+                    "caller_c": call.caller_class,
+                    "callee": callee,
+                    "pid": pid,
+                },
+            )
+
         logger.debug(
-            "Upserted %d classes, %d methods, %d fields, %d imports, %d endpoints "
+            "Upserted %d classes, %d methods, %d fields, %d imports, %d endpoints, %d calls "
             "for project %s in %s",
             len(entities.classes), len(entities.methods), len(entities.fields),
-            len(entities.imports), len(entities.endpoints), project_id, entities.file_path,
+            len(entities.imports), len(entities.endpoints), len(entities.calls),
+            project_id, entities.file_path,
         )
 
     def query_structural(self, intent: str, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
@@ -350,6 +373,12 @@ class FalkorDBGraphStore(GraphStore):
                 return self._query_endpoint_list(project_id)
             case "endpoint_detail":
                 return self._query_endpoint_detail(params, project_id)
+            case "callers_of":
+                return self._query_callers_of(params, project_id)
+            case "dependents_of":
+                return self._query_dependents_of(params, project_id)
+            case "impact_set":
+                return self._query_impact_set(params, project_id)
             case _:
                 return []
 
@@ -357,14 +386,24 @@ class FalkorDBGraphStore(GraphStore):
         class_name = params.get("class_name", "")
         if not class_name:
             return []
-        cypher = (
+        # Class-level dependency (DEPENDS_ON, IMPORTS)
+        class_rows = self.query(
             "MATCH (c:CodeClass {project_id: $pid})-[r]->(t:CodeClass) "
             "WHERE (t.name = $cn OR t.name CONTAINS $cn) "
             "AND type(r) IN ['DEPENDS_ON', 'IMPORTS'] "
             "RETURN c.name AS class_name, c.file_path AS file_path, "
-            "c.package AS package, type(r) AS relation_type"
+            "c.package AS package, type(r) AS relation_type",
+            {"pid": project_id, "cn": class_name},
         )
-        return self.query(cypher, {"pid": project_id, "cn": class_name})
+        # Function-level CALLS edges
+        fn_rows = self.query(
+            "MATCH (caller:CodeFunction {project_id: $pid})-[:CALLS]->(callee:CodeFunction) "
+            "WHERE callee.name = $cn OR callee.name CONTAINS $cn "
+            "RETURN caller.class_name AS class_name, caller.name AS method_name, "
+            "caller.file_path AS file_path, 'CALLS' AS relation_type",
+            {"pid": project_id, "cn": class_name},
+        )
+        return class_rows + fn_rows
 
     def _query_inheritance(self, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
         class_name = params.get("class_name", "")
@@ -413,6 +452,206 @@ class FalkorDBGraphStore(GraphStore):
             "e.request_body_type AS request_body_type, e.response_type AS response_type"
         )
         return self.query(cypher, qparams)
+
+    def _query_callers_of(self, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
+        """Find all functions/methods that call a given function."""
+        name = params.get("function_name") or params.get("name") or params.get("class_name", "")
+        if not name:
+            return []
+        return self.query(
+            "MATCH (caller:CodeFunction {project_id: $pid})-[:CALLS]->(callee:CodeFunction {project_id: $pid}) "
+            "WHERE callee.name = $fn OR callee.name CONTAINS $fn "
+            "RETURN caller.name AS caller_name, caller.class_name AS class_name, "
+            "caller.file_path AS file_path, callee.name AS callee_name, "
+            "callee.class_name AS callee_class, callee.file_path AS callee_file",
+            {"pid": project_id, "fn": name},
+        )
+
+    def _query_dependents_of(self, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
+        """Find all classes/files that depend on a given class or file."""
+        name = params.get("class_name") or params.get("name", "")
+        if not name:
+            return []
+        class_rows = self.query(
+            "MATCH (dep:CodeClass {project_id: $pid})-[r]->(target:CodeClass {project_id: $pid}) "
+            "WHERE (target.name = $cn OR target.name CONTAINS $cn) "
+            "AND type(r) IN ['IMPORTS', 'DEPENDS_ON', 'EXTENDS', 'IMPLEMENTS'] "
+            "RETURN dep.name AS class_name, dep.file_path AS file_path, type(r) AS relation_type",
+            {"pid": project_id, "cn": name},
+        )
+        file_rows = self.query(
+            "MATCH (fa:CodeFile {project_id: $pid})-[:IMPORTS_FILE]->(fb:CodeFile {project_id: $pid}) "
+            "WHERE fb.file_path CONTAINS $name "
+            "RETURN fa.file_path AS file_path, 'IMPORTS_FILE' AS relation_type, '' AS class_name",
+            {"pid": project_id, "name": name},
+        )
+        return class_rows + file_rows
+
+    def _query_impact_set(self, params: dict[str, str], project_id: str) -> list[dict[str, Any]]:
+        """BFS impact analysis: which entities would break if this entity changed?"""
+        name = (
+            params.get("name")
+            or params.get("class_name")
+            or params.get("function_name", "")
+        )
+        if not name:
+            return []
+
+        direct_class = self.query(
+            "MATCH (dep)-[r]->(target:CodeClass {project_id: $pid}) "
+            "WHERE (target.name = $name OR target.name CONTAINS $name) "
+            "AND type(r) IN ['IMPORTS', 'DEPENDS_ON', 'EXTENDS', 'IMPLEMENTS'] "
+            "RETURN labels(dep)[0] AS entity_type, dep.name AS name, "
+            "dep.file_path AS file_path, type(r) AS relation_type, 1 AS depth",
+            {"pid": project_id, "name": name},
+        )
+        direct_fn = self.query(
+            "MATCH (caller:CodeFunction {project_id: $pid})-[:CALLS]->(callee:CodeFunction {project_id: $pid}) "
+            "WHERE callee.name = $name OR callee.name CONTAINS $name "
+            "RETURN 'CodeFunction' AS entity_type, caller.name AS name, "
+            "caller.file_path AS file_path, 'CALLS' AS relation_type, 1 AS depth",
+            {"pid": project_id, "name": name},
+        )
+        direct = direct_class + direct_fn
+
+        # Second hop: files that import the impacted files
+        impacted_fps = list({row.get("file_path", "") for row in direct if row.get("file_path")})
+        if not impacted_fps:
+            return direct
+
+        fps_list = "[" + ", ".join(f'"{fp}"' for fp in impacted_fps) + "]"
+        indirect = self.query(
+            f"MATCH (fa:CodeFile {{project_id: $pid}})-[:IMPORTS_FILE]->(fb:CodeFile {{project_id: $pid}}) "
+            f"WHERE fb.file_path IN {fps_list} "
+            "RETURN 'CodeFile' AS entity_type, fa.file_path AS name, "
+            "fa.file_path AS file_path, 'IMPORTS_FILE' AS relation_type, 2 AS depth",
+            {"pid": project_id},
+        )
+        return direct + indirect
+
+    def resolve_cross_file_calls(self, project_id: str) -> int:
+        """Re-wire CALLS edges from ghost CodeFunction nodes to real nodes.
+
+        Ghost nodes are created by step 7 MERGE when the callee file hasn't been
+        indexed yet. They have no file_path or class_name. This post-pass finds
+        them, links callers to real nodes, and deletes the ghosts.
+        """
+        pid = project_id
+        ghosts = self.query(
+            "MATCH (ghost:CodeFunction {project_id: $pid}) "
+            "WHERE ghost.class_name IS NULL OR ghost.is_ghost = true "
+            "RETURN ghost.name AS name",
+            {"pid": pid},
+        )
+        if not ghosts:
+            return 0
+
+        resolved = 0
+        for ghost_row in ghosts:
+            ghost_name = ghost_row.get("name", "")
+            if not ghost_name:
+                continue
+
+            reals = self.query(
+                "MATCH (real:CodeFunction {name: $name, project_id: $pid}) "
+                "WHERE real.file_path IS NOT NULL AND (real.class_name IS NOT NULL OR real.class_name <> '') "
+                "RETURN real.name AS name, real.class_name AS class_name, real.file_path AS file_path",
+                {"name": ghost_name, "pid": pid},
+            )
+            if not reals:
+                continue
+
+            callers = self.query(
+                "MATCH (caller:CodeFunction {project_id: $pid})-[:CALLS]->"
+                "(ghost:CodeFunction {name: $gname, project_id: $pid}) "
+                "WHERE ghost.class_name IS NULL OR ghost.is_ghost = true "
+                "RETURN caller.name AS caller_name, caller.class_name AS caller_class",
+                {"pid": pid, "gname": ghost_name},
+            )
+
+            for caller_row in callers:
+                caller_name = caller_row.get("caller_name", "")
+                caller_class = caller_row.get("caller_class", "")
+                for real_row in reals:
+                    self._safe_query(
+                        "MATCH (caller:CodeFunction {name: $cn, class_name: $cc, project_id: $pid}) "
+                        "MATCH (real:CodeFunction {name: $rn, class_name: $rc, project_id: $pid}) "
+                        "MERGE (caller)-[:CALLS]->(real)",
+                        {
+                            "cn": caller_name, "cc": caller_class,
+                            "rn": real_row.get("name", ""), "rc": real_row.get("class_name", ""),
+                            "pid": pid,
+                        },
+                    )
+                    resolved += 1
+
+            self._safe_query(
+                "MATCH (ghost:CodeFunction {name: $gname, project_id: $pid}) "
+                "WHERE ghost.class_name IS NULL OR ghost.is_ghost = true "
+                "DETACH DELETE ghost",
+                {"pid": pid, "gname": ghost_name},
+            )
+
+        if resolved:
+            logger.info("Resolved %d cross-file CALLS edges for project %s", resolved, project_id)
+        return resolved
+
+    def resolve_import_file_edges(self, project_id: str) -> int:
+        """Create IMPORTS_FILE edges between CodeFile nodes.
+
+        Derives file-level dependencies from:
+        1. CodeClass IMPORTS edges: if class A imports class B, A's file imports B's file.
+        2. Cross-file CALLS edges: if function in file A calls function in file B.
+        Run after resolve_cross_file_calls so CALLS edges are clean.
+        """
+        pid = project_id
+        pairs: set[tuple[str, str]] = set()
+
+        cls_rows = self.query(
+            "MATCH (a:CodeClass {project_id: $pid})-[:IMPORTS]->(b:CodeClass {project_id: $pid}) "
+            "WHERE a.file_path IS NOT NULL AND b.file_path IS NOT NULL "
+            "AND a.file_path <> b.file_path "
+            "RETURN DISTINCT a.file_path AS afp, b.file_path AS bfp",
+            {"pid": pid},
+        )
+        for row in cls_rows:
+            afp, bfp = row.get("afp", ""), row.get("bfp", "")
+            if afp and bfp:
+                pairs.add((afp, bfp))
+
+        fn_rows = self.query(
+            "MATCH (a:CodeFunction {project_id: $pid})-[:CALLS]->(b:CodeFunction {project_id: $pid}) "
+            "WHERE a.file_path IS NOT NULL AND b.file_path IS NOT NULL "
+            "AND a.file_path <> b.file_path "
+            "RETURN DISTINCT a.file_path AS afp, b.file_path AS bfp",
+            {"pid": pid},
+        )
+        for row in fn_rows:
+            afp, bfp = row.get("afp", ""), row.get("bfp", "")
+            if afp and bfp:
+                pairs.add((afp, bfp))
+
+        count = 0
+        for afp, bfp in pairs:
+            self._safe_query(
+                "MATCH (fa:CodeFile {file_path: $afp, project_id: $pid}) "
+                "MATCH (fb:CodeFile {file_path: $bfp, project_id: $pid}) "
+                "MERGE (fa)-[:IMPORTS_FILE]->(fb)",
+                {"afp": afp, "bfp": bfp, "pid": pid},
+            )
+            count += 1
+
+        if count:
+            logger.info("Created %d IMPORTS_FILE edges for project %s", count, project_id)
+        return count
+
+    async def aresolve_cross_file_calls(self, project_id: str) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.resolve_cross_file_calls, project_id)
+
+    async def aresolve_import_file_edges(self, project_id: str) -> int:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.resolve_import_file_edges, project_id)
 
     def _safe_query(self, cypher: str, params: dict[str, Any]) -> None:
         try:
@@ -546,13 +785,13 @@ class FalkorDBGraphStore(GraphStore):
 
     def query_doc_sections(self, project_id: str, kind: str | None = None) -> list[dict]:
         if kind:
-            return self._graph.query(
+            return self.query(
                 "MATCH (d:Doc_Section {project_id: $pid, kind: $kind}) "
                 "RETURN d.id AS id, d.heading AS heading, d.kind AS kind, "
                 "d.source_doc AS source_doc, d.content_summary AS content_summary",
                 {"pid": project_id, "kind": kind},
             )
-        return self._graph.query(
+        return self.query(
             "MATCH (d:Doc_Section {project_id: $pid}) "
             "RETURN d.id AS id, d.heading AS heading, d.kind AS kind, "
             "d.source_doc AS source_doc, d.content_summary AS content_summary",

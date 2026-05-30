@@ -99,12 +99,33 @@ class RetrievalTools:
         return all_chunks, all_scores
 
     async def _graph_structural(self, query: str) -> tuple[list[Chunk], list[float]]:
-        intent, params = classify_query(query)
-        if intent == QueryIntent.SEMANTIC:
-            intent_str = "dependency"
-            params = {}
-        else:
-            intent_str = intent.value
+        # Check for explicit intent prefix: "callers_of: processPayment"
+        _EXPLICIT_PREFIXES = (
+            "callers_of:", "dependents_of:", "impact_set:",
+            "dependency:", "inheritance:", "endpoint_list:", "endpoint_detail:", "endpoint_count:",
+        )
+        intent_str: str | None = None
+        params: dict[str, str] = {}
+        for prefix in _EXPLICIT_PREFIXES:
+            if query.lower().startswith(prefix):
+                intent_str = prefix.rstrip(":")
+                name = query[len(prefix):].strip()
+                if name:
+                    if intent_str == "callers_of":
+                        params["function_name"] = name
+                    else:
+                        params["name"] = name
+                        params["class_name"] = name
+                break
+
+        if intent_str is None:
+            intent, params = classify_query(query)
+            if intent == QueryIntent.SEMANTIC:
+                intent_str = "dependency"
+                params = {}
+            else:
+                intent_str = intent.value
+
         try:
             chunks = await self.graph_augmentor.query_structural(intent_str, params, self.project_id)
         except Exception:

@@ -89,6 +89,7 @@ class FieldInfo:
 class ImportInfo:
     importing_class: str
     imported_fqn: str
+    module_path: str = ""  # raw module specifier: './bar', 'telaios.core', 'com.example'
 
     @property
     def simple_name(self) -> str:
@@ -107,6 +108,13 @@ class RestEndpointInfo:
 
 
 @dataclass
+class CallInfo:
+    caller_class: str
+    caller_method: str
+    callee_name: str             # simple name of the called function/method
+
+
+@dataclass
 class CodeEntities:
     file_path: str
     classes: list[ClassInfo] = field(default_factory=list)
@@ -114,9 +122,10 @@ class CodeEntities:
     fields: list[FieldInfo] = field(default_factory=list)
     imports: list[ImportInfo] = field(default_factory=list)
     endpoints: list[RestEndpointInfo] = field(default_factory=list)
+    calls: list[CallInfo] = field(default_factory=list)
 
     def is_empty(self) -> bool:
-        return not (self.classes or self.methods or self.fields or self.endpoints)
+        return not (self.classes or self.methods or self.fields or self.endpoints or self.imports)
 
 
 # ── Java AST extractor ────────────────────────────────────────────────────────
@@ -177,9 +186,12 @@ class JavaAstExtractor:
                 cls_info = self._extract_class(child, package, file_path, src, txt, entities)
                 if cls_info:
                     for fqn in raw_imports:
+                        parts = fqn.rsplit(".", 1)
+                        mod = parts[0] if len(parts) > 1 else ""
                         entities.imports.append(ImportInfo(
                             importing_class=cls_info.name,
                             imported_fqn=fqn,
+                            module_path=mod,
                         ))
 
         return entities
@@ -555,29 +567,34 @@ class PythonAstExtractor:
         tree = _ast.parse(source)
         entities = CodeEntities(file_path=file_path)
 
-        raw_imports: list[str] = []
+        raw_imports: list[tuple[str, str]] = []  # (fqn, module_path)
         for node in _ast.walk(tree):
             if isinstance(node, _ast.Import):
                 for alias in node.names:
-                    raw_imports.append(alias.name)
+                    raw_imports.append((alias.name, alias.name))
             elif isinstance(node, _ast.ImportFrom):
                 module = node.module or ""
+                level = node.level  # 0=absolute, 1=., 2=..
+                dots = "." * level
+                module_path = dots + module
                 for alias in node.names:
-                    raw_imports.append(f"{module}.{alias.name}" if module else alias.name)
+                    fqn = f"{dots}{module}.{alias.name}" if module else f"{dots}{alias.name}"
+                    raw_imports.append((fqn, module_path))
 
         for node in tree.body:
             if isinstance(node, _ast.ClassDef):
                 self._extract_class(node, file_path, entities)
             elif isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
-                method_info, endpoint = self._extract_function(node, class_name="<module>")
+                method_info, endpoint, calls = self._extract_function(node, class_name="<module>")
                 if method_info:
                     entities.methods.append(method_info)
                 if endpoint:
                     entities.endpoints.append(endpoint)
+                entities.calls.extend(calls)
 
         owner = entities.classes[0].name if entities.classes else "<module>"
-        for fqn in raw_imports:
-            entities.imports.append(ImportInfo(importing_class=owner, imported_fqn=fqn))
+        for fqn, mod in raw_imports:
+            entities.imports.append(ImportInfo(importing_class=owner, imported_fqn=fqn, module_path=mod))
 
         return entities
 
@@ -597,11 +614,12 @@ class PythonAstExtractor:
         entities.classes.append(cls_info)
         for item in node.body:
             if isinstance(item, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
-                method_info, endpoint = self._extract_function(item, class_name=node.name)
+                method_info, endpoint, calls = self._extract_function(item, class_name=node.name)
                 if method_info:
                     entities.methods.append(method_info)
                 if endpoint:
                     entities.endpoints.append(endpoint)
+                entities.calls.extend(calls)
 
     def _extract_function(self, node, class_name: str):
         import ast as _ast
@@ -625,7 +643,34 @@ class PythonAstExtractor:
             end_line=node.end_lineno or node.lineno,
         )
         endpoint = self._detect_endpoint(node, class_name)
-        return method_info, endpoint
+        calls = self._extract_calls(node, class_name)
+        return method_info, endpoint, calls
+
+    def _extract_calls(self, node, class_name: str) -> list["CallInfo"]:
+        """Walk the function body and collect direct function/method calls."""
+        import ast as _ast
+        result: list[CallInfo] = []
+        seen: set[str] = set()
+        for child in _ast.walk(node):
+            if not isinstance(child, _ast.Call):
+                continue
+            callee = self._callee_name(child.func)
+            if callee and callee not in seen and callee != node.name:
+                seen.add(callee)
+                result.append(CallInfo(
+                    caller_class=class_name,
+                    caller_method=node.name,
+                    callee_name=callee,
+                ))
+        return result
+
+    def _callee_name(self, node) -> str | None:
+        import ast as _ast
+        if isinstance(node, _ast.Name):
+            return node.id
+        if isinstance(node, _ast.Attribute):
+            return node.attr
+        return None
 
     def _detect_endpoint(self, node, class_name: str):
         import ast as _ast
@@ -770,6 +815,10 @@ class _TsBaseExtractor:
             ntype = child.type
             if ntype in ("class_declaration", "abstract_class_declaration"):
                 self._handle_class(child, txt, entities, file_path, [])
+            elif ntype == "function_declaration":
+                self._handle_toplevel_fn(child, txt, entities)
+            elif ntype == "enum_declaration":
+                self._handle_enum(child, txt, entities, file_path)
             elif ntype == "export_statement":
                 # Decorators appear as children of export_statement before class_declaration
                 inner_decorators: list[tuple[str, str]] = []
@@ -780,6 +829,15 @@ class _TsBaseExtractor:
                             inner_decorators.append((name, arg))
                     elif gc.type in ("class_declaration", "abstract_class_declaration"):
                         self._handle_class(gc, txt, entities, file_path, inner_decorators)
+                        break
+                    elif gc.type == "function_declaration":
+                        self._handle_toplevel_fn(gc, txt, entities)
+                        break
+                    elif gc.type == "enum_declaration":
+                        self._handle_enum(gc, txt, entities, file_path)
+                        break
+                    elif gc.type in ("lexical_declaration", "variable_declaration"):
+                        self._handle_toplevel_const(gc, txt, entities)
                         break
             elif ntype == "expression_statement":
                 for gc in child.children:
@@ -936,13 +994,147 @@ class _TsBaseExtractor:
                 handler_method="<anonymous>",
             ))
 
+    def _handle_toplevel_fn(self, node, txt, entities: CodeEntities) -> None:
+        """Extract a top-level function_declaration as MethodInfo with class_name='<module>'."""
+        name: str | None = None
+        return_type = "void"
+        params: list[tuple[str, str]] = []
+
+        for child in node.children:
+            if child.type == "identifier" and name is None:
+                name = txt(child)
+            elif child.type == "type_annotation":
+                for tc in child.children:
+                    if tc.type not in (":", " "):
+                        return_type = txt(tc)
+                        break
+            elif child.type == "formal_parameters":
+                params = self._extract_params(child, txt)
+
+        if not name:
+            return
+
+        entities.methods.append(MethodInfo(
+            class_name="<module>",
+            name=name,
+            return_type=return_type,
+            params=params,
+            start_line=node.start_point[0] + 1,
+            end_line=node.end_point[0] + 1,
+        ))
+
+    def _handle_toplevel_const(self, node, txt, entities: CodeEntities) -> None:
+        """Extract exported const/let arrow-function bindings as MethodInfo with class_name='<module>'."""
+        for decl in node.children:
+            if decl.type != "variable_declarator":
+                continue
+            name: str | None = None
+            arrow = None
+            for child in decl.children:
+                if child.type == "identifier" and name is None:
+                    name = txt(child)
+                elif child.type == "arrow_function":
+                    arrow = child
+            if not (name and arrow):
+                continue
+            params: list[tuple[str, str]] = []
+            return_type = "void"
+            for ac in arrow.children:
+                if ac.type == "formal_parameters":
+                    params = self._extract_params(ac, txt)
+                elif ac.type == "type_annotation":
+                    for tc in ac.children:
+                        if tc.type not in (":", " "):
+                            return_type = txt(tc)
+                            break
+            entities.methods.append(MethodInfo(
+                class_name="<module>",
+                name=name,
+                return_type=return_type,
+                params=params,
+                start_line=decl.start_point[0] + 1,
+                end_line=decl.end_point[0] + 1,
+            ))
+
+    def _handle_enum(self, node, txt, entities: CodeEntities, file_path: str) -> None:
+        """Extract an enum_declaration as a ClassInfo with is_enum=True."""
+        name: str | None = None
+        for child in node.children:
+            if child.type in ("type_identifier", "identifier") and name is None:
+                name = txt(child)
+        if name:
+            entities.classes.append(ClassInfo(
+                name=name,
+                package="",
+                file_path=file_path,
+                is_enum=True,
+                start_line=node.start_point[0] + 1,
+                end_line=node.end_point[0] + 1,
+            ))
+
+    def _extract_params(self, params_node, txt) -> list[tuple[str, str]]:
+        params: list[tuple[str, str]] = []
+        for param in params_node.children:
+            if param.type in ("required_parameter", "optional_parameter"):
+                pname = None
+                ptype = "any"
+                for pc in param.children:
+                    if pc.type == "identifier" and pname is None:
+                        pname = txt(pc)
+                    elif pc.type == "type_annotation":
+                        for tc in pc.children:
+                            if tc.type not in (":", " "):
+                                ptype = txt(tc)
+                                break
+                if pname and pname != "self":
+                    params.append((ptype, pname))
+        return params
+
     def _extract_import(self, node, txt, entities: CodeEntities) -> None:
+        module_path: str | None = None
+        imported_names: list[str] = []
+
         for child in node.children:
             if child.type == "string":
-                module = txt(child).strip("'\"")
-                owner = entities.classes[0].name if entities.classes else "<module>"
-                entities.imports.append(ImportInfo(importing_class=owner, imported_fqn=module))
-                break
+                module_path = txt(child).strip("'\"")
+            elif child.type == "import_clause":
+                for ic in child.children:
+                    if ic.type == "named_imports":
+                        for spec in ic.children:
+                            if spec.type == "import_specifier":
+                                # First identifier is the original export name
+                                for sc in spec.children:
+                                    if sc.type == "identifier":
+                                        imported_names.append(txt(sc))
+                                        break
+                    elif ic.type == "identifier":
+                        # Default import: import Foo from '...'
+                        imported_names.append(txt(ic))
+                    elif ic.type == "namespace_import":
+                        # Namespace import: import * as ns from '...'
+                        for nc in ic.children:
+                            if nc.type == "identifier":
+                                imported_names.append(txt(nc))
+                                break
+
+        if not module_path:
+            return
+
+        owner = entities.classes[0].name if entities.classes else "<module>"
+        if not imported_names:
+            # Side-effect or unrecognized import clause — use module as fqn
+            entities.imports.append(ImportInfo(
+                importing_class=owner,
+                imported_fqn=module_path,
+                module_path=module_path,
+            ))
+        else:
+            for name in imported_names:
+                entities.imports.append(ImportInfo(
+                    importing_class=owner,
+                    imported_fqn=name,
+                    module_path=module_path,
+                ))
 
 
 class TypeScriptAstExtractor(_TsBaseExtractor):
@@ -988,6 +1180,7 @@ def _combine_paths(prefix: str, suffix: str) -> str:
 
 
 __all__ = [
+    "CallInfo",
     "ClassInfo",
     "MethodInfo",
     "FieldInfo",

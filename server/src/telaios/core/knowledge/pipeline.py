@@ -41,6 +41,7 @@ class KnowledgeQueryResult:
     sources_searched: list[str]
     answer: str | None = None
     citations: list[Citation] = field(default_factory=list)
+    latency_ms: dict[str, float] = field(default_factory=dict)  # stage → ms
 
 
 class KnowledgeBasePipeline:

@@ -271,6 +271,12 @@ class IngestionService:
             _emit("Resolving inherited REST endpoints via class hierarchy…")
             await self._graph.resolve_inherited_endpoints(project_id)
 
+            _emit("Resolving cross-file CALLS edges…")
+            await self._graph.resolve_cross_file_calls(project_id)
+
+            _emit("Building IMPORTS_FILE dependency graph…")
+            await self._graph.resolve_import_file_edges(project_id)
+
             _emit("Rebuilding graph community summaries…")
             await self._graph.rebuild_communities()
 

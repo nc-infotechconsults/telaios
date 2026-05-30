@@ -41,10 +41,13 @@ class RetrievalAgent:
             "follow_up_queries": [],
             "answer": "",
             "citations": [],
+            "stage_timings": {},
         }
         final = await self._graph.ainvoke(initial)
 
         sources_searched = list({step.tool for step in final.get("search_plan", [])})
+        raw_timings = final.get("stage_timings", {})
+        latency_ms = {k: round(v * 1000, 1) for k, v in raw_timings.items()}
         return KnowledgeQueryResult(
             query=query,
             chunks=final.get("evidence", []),
@@ -52,6 +55,7 @@ class RetrievalAgent:
             sources_searched=sources_searched,
             answer=final.get("answer", ""),
             citations=final.get("citations", []),
+            latency_ms=latency_ms,
         )
 
 

@@ -35,14 +35,28 @@ class TestDependencyIntent:
     @pytest.mark.parametrize("query", [
         "which classes use UserService?",
         "what services depend on UserRepository?",
-        "who calls OrderService?",
         "which components inject PaymentGateway?",
-        "what uses NotificationService",
         "dependencies of UserService",
     ])
     def test_dependency_queries(self, query: str):
         intent, _ = classify_query(query)
         assert intent == QueryIntent.DEPENDENCY, f"Expected DEPENDENCY for: {query!r}"
+
+    @pytest.mark.parametrize("query", [
+        "who calls OrderService?",
+        "what calls processPayment()?",
+    ])
+    def test_callers_queries(self, query: str):
+        intent, _ = classify_query(query)
+        assert intent == QueryIntent.CALLERS_OF, f"Expected CALLERS_OF for: {query!r}"
+
+    @pytest.mark.parametrize("query", [
+        "what uses NotificationService",
+        "what depends on UserService",
+    ])
+    def test_dependents_queries(self, query: str):
+        intent, _ = classify_query(query)
+        assert intent == QueryIntent.DEPENDENTS_OF, f"Expected DEPENDENTS_OF for: {query!r}"
 
     def test_dependency_extracts_class_name(self):
         _, params = classify_query("which classes use UserRepository?")
@@ -166,7 +180,7 @@ class TestPythonStructuralPatterns:
 
     def test_python_class_dependency(self):
         intent, _ = classify_query("what uses UserRepository?")
-        assert intent == QueryIntent.DEPENDENCY
+        assert intent == QueryIntent.DEPENDENTS_OF
 
     def test_fastapi_route_list(self):
         intent, _ = classify_query("what routes does the users router expose?")
