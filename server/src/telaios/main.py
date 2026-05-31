@@ -55,7 +55,14 @@ from telaios.modules.messages import messages_router
 from telaios.modules.knowledge import knowledge_router
 from telaios.modules.planner import planner_router
 from telaios.modules.plans import plan_router, project_plans_router
-from telaios.modules.projects import agents_router, members_router, projects_router
+from telaios.modules.projects import (
+    agents_router,
+    conversation_router,
+    members_router,
+    project_mcps_router,
+    project_skills_router,
+    projects_router,
+)
 from telaios.modules.repositories import repositories_router
 from telaios.modules.settings import llm_router, settings_router
 from telaios.modules.skills import skills_router
@@ -77,7 +84,7 @@ logger = logging.getLogger(__name__)
 _MODULES: dict[str, list[APIRouter]] = {
     "users": [auth_router, users_router],
     "workspaces": [project_workspaces_router, workspace_router],
-    "projects": [projects_router, members_router, agents_router],
+    "projects": [projects_router, members_router, agents_router, conversation_router, project_skills_router, project_mcps_router],
     "repositories": [repositories_router],
     "environments": [environments_router],
     "settings": [settings_router, llm_router],
