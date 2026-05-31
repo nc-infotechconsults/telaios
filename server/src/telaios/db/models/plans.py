@@ -9,7 +9,9 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
@@ -49,8 +51,17 @@ class Message(Base, SoftDeleteAuditMixin):
     id: Mapped[uuid.UUID] = uuid_pk()
     project_id: Mapped[uuid.UUID] = uuid_fk("projects.id")
     plan_id: Mapped[uuid.UUID | None] = uuid_fk("plans.id", nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     role: Mapped[PlanMessageRole] = mapped_column(String, nullable=False)
+    sender_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="user", server_default="user"
+    )
+    specialist: Mapped[str | None] = mapped_column(String(50), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
     project: Mapped[Project] = relationship("Project", back_populates="messages")

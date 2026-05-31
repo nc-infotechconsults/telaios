@@ -1,5 +1,4 @@
 """Message Pydantic schemas."""
-
 from __future__ import annotations
 
 import uuid
@@ -14,6 +13,9 @@ class MessageCreate(BaseModel):
     role: PlanMessageRole
     content: str
     plan_id: uuid.UUID | None = None
+    sender_type: str = "user"
+    specialist: str | None = None
+    user_id: uuid.UUID | None = None
 
 
 class MessageRead(BaseModel):
@@ -22,7 +24,10 @@ class MessageRead(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     plan_id: uuid.UUID | None
+    user_id: uuid.UUID | None
     role: PlanMessageRole
+    sender_type: str
+    specialist: str | None
     content: str
     created_at: datetime
 
