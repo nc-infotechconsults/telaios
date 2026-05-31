@@ -205,6 +205,20 @@ class QdrantVectorStore:
 
     # ── Delete ────────────────────────────────────────────────────────────────
 
+    async def count_by_project(self, collection: str, project_id: str) -> int:
+        """Return the number of vector points for *project_id* in *collection*."""
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        existing = {c.name for c in (await self._client.get_collections()).collections}
+        if collection not in existing:
+            return 0
+        result = await self._client.count(
+            collection_name=collection,
+            count_filter=Filter(must=[FieldCondition(key="project_id", match=MatchValue(value=project_id))]),
+            exact=False,
+        )
+        return result.count
+
     async def delete_by_project(self, collection: str, project_id: str) -> None:
         """Delete all points belonging to *project_id*. No-op if collection doesn't exist."""
         from qdrant_client.models import FieldCondition, Filter, MatchValue

@@ -81,10 +81,33 @@ class ConversationAgent:
         llm = build_llm(config)
 
         prefix = _SPECIALIST_SYSTEM_PREFIXES.get(specialist, _SPECIALIST_SYSTEM_PREFIXES["qa"])
+
+        # For knowledge-intensive specialists, retrieve relevant context first
+        kb_context = ""
+        if specialist in ("qa", "explorer", "reverse", "coder"):
+            try:
+                from telaios.core.knowledge.factory import KnowledgePipelineFactory
+                pipeline = await KnowledgePipelineFactory.get()
+                result = await pipeline.query(
+                    project_id=str(project_id),
+                    text=user_message,
+                    source="all",
+                    top_k=5,
+                )
+                if result.chunks:
+                    snippets = "\n\n".join(
+                        f"[{c.metadata.get('source', 'doc')}]\n{c.content[:800]}"
+                        for c in result.chunks[:5]
+                    )
+                    kb_context = f"\n\n<knowledge_base_context>\n{snippets}\n</knowledge_base_context>"
+            except Exception:
+                pass
+
         system_content = (
             f"{prefix}\n\n"
             f"You are operating within project {project_id}. "
             "Answer clearly and concisely."
+            f"{kb_context}"
         )
 
         messages: list[Message] = [

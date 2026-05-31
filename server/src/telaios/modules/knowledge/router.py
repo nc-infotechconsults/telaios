@@ -69,10 +69,20 @@ async def get_knowledge_status(
             Repository.project_id == project_id,
         )
     )).scalar_one()
+
+    vector_count = 0
+    try:
+        pipeline = await _get_pipeline()
+        doc_vecs = await pipeline._vs.count_by_project("documents", str(project_id))
+        repo_vecs = await pipeline._vs.count_by_project("repositories", str(project_id))
+        vector_count = doc_vecs + repo_vecs
+    except Exception:
+        pass
+
     return KnowledgeStatusResponse(
         document_count=doc_count,
         repo_count=repo_count,
-        vector_count=0,
+        vector_count=vector_count,
         last_indexed_at=None,
     )
 
