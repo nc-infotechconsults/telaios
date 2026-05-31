@@ -5,12 +5,17 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.auth.dependencies import CurrentPrincipal
+from telaios.auth.project_access import require_project_access
 from telaios.core.knowledge.factory import KnowledgePipelineFactory
 from telaios.core.knowledge.pipeline import KnowledgeQueryResult
 from telaios.core.knowledge.retrieval import score_to_tier
+from telaios.db.session import get_session
 from telaios.modules.knowledge.schemas import (
     CitationRead,
     IngestDocumentsRequest,
@@ -21,6 +26,14 @@ from telaios.modules.knowledge.schemas import (
     KnowledgeQueryResponse,
 )
 
+
+class KnowledgeStatusResponse(BaseModel):
+    document_count: int
+    repo_count: int
+    vector_count: int
+    last_indexed_at: str | None
+
+
 knowledge_router = APIRouter(
     prefix="/projects/{project_id}/knowledge",
     tags=["knowledge"],
@@ -29,6 +42,39 @@ knowledge_router = APIRouter(
 
 async def _get_pipeline():
     return await KnowledgePipelineFactory.get()
+
+
+@knowledge_router.get(
+    "/status",
+    response_model=KnowledgeStatusResponse,
+    dependencies=[Depends(require_project_access("viewer"))],
+)
+async def get_knowledge_status(
+    project_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> KnowledgeStatusResponse:
+    """Return knowledge base statistics for a project."""
+    from sqlalchemy import func
+    from telaios.db.models.documents import Document
+    from telaios.db.models.repositories import Repository
+
+    doc_count = (await session.execute(
+        select(func.count()).select_from(Document).where(
+            Document.project_id == project_id,
+            Document.deleted_at.is_(None),
+        )
+    )).scalar_one()
+    repo_count = (await session.execute(
+        select(func.count()).select_from(Repository).where(
+            Repository.project_id == project_id,
+        )
+    )).scalar_one()
+    return KnowledgeStatusResponse(
+        document_count=doc_count,
+        repo_count=repo_count,
+        vector_count=0,
+        last_indexed_at=None,
+    )
 
 
 @knowledge_router.post("/query", response_model=KnowledgeQueryResponse)
