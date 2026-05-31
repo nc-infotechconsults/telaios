@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getRepositories, createRepository, deleteRepository } from "../../lib/api";
+import { getRepositories, createRepository, deleteRepository, ingestRepository } from "../../lib/api";
 import type { Repository, RepositoryProviderType } from "../../types";
 
 const PROVIDER_ICONS: Record<RepositoryProviderType, string> = {
@@ -23,6 +23,7 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ provider: "git" as RepositoryProviderType, url: "", branch: "main" });
   const [creating, setCreating] = useState(false);
+  const [indexingIds, setIndexingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getRepositories(projectId)
@@ -52,6 +53,14 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
   const handleDelete = async (id: string) => {
     await deleteRepository(projectId, id);
     setRepos((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleIndex = async (repo: Repository) => {
+    setIndexingIds((prev) => new Set([...prev, repo.id]));
+    try {
+      await ingestRepository(projectId, repo.remote_url ?? "", repo.branch ?? "main");
+    } catch { /* ignore */ }
+    setIndexingIds((prev) => { const s = new Set(prev); s.delete(repo.id); return s; });
   };
 
   const stats = [
@@ -160,7 +169,20 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
                       </div>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
+                    <button
+                      onClick={() => handleIndex(repo)}
+                      disabled={indexingIds.has(repo.id)}
+                      title="Trigger knowledge ingest for this repository"
+                      style={{
+                        padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: indexingIds.has(repo.id) ? "default" : "pointer",
+                        background: "#5e5ce620", border: "1px solid #5e5ce640", color: "#5e5ce6",
+                        opacity: indexingIds.has(repo.id) ? 0.6 : 1,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {indexingIds.has(repo.id) ? "Indexing…" : "Index"}
+                    </button>
                     <ActionButton label="Ask about this repo" color="#0a84ff" icon="?" />
                     <ActionButton label="Re-sync" color="#30d158" icon="↺" />
                     <ActionButton

@@ -1360,3 +1360,27 @@ export async function getKnowledgeStatus(projectId: string): Promise<KnowledgeSt
   const res = await http.get<KnowledgeStatus>(`/projects/${projectId}/knowledge/status`);
   return res.data;
 }
+
+// ── Knowledge Ingest ──────────────────────────────────────────────────────────
+
+export async function ingestRepository(
+  projectId: string,
+  repoUrl: string,
+  branch = "main"
+): Promise<void> {
+  await http.post(`/projects/${projectId}/knowledge/repositories/ingest`, {
+    source_type: "git",
+    repo_url: repoUrl,
+    branch,
+  });
+}
+
+export async function ingestDocumentUrl(
+  projectId: string,
+  url: string
+): Promise<void> {
+  await http.post(`/projects/${projectId}/knowledge/documents/ingest`, {
+    source_type: "url",
+    url,
+  });
+}

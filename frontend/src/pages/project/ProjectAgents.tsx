@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listProjectAgents, listProjectSkills, listProjectMcps, deleteProjectSkill, deleteProjectMcp } from "../../lib/api";
+import { listProjectAgents, listProjectSkills, listProjectMcps, deleteProjectSkill, deleteProjectMcp, updateProjectAgent } from "../../lib/api";
 import type { ProjectAgent, ProjectSkill, ProjectMcp } from "../../types";
 
 interface BuiltinAgent {
@@ -82,6 +82,11 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
   const [projectMcps, setProjectMcps] = useState<ProjectMcp[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
 
+  // Agent edit modal state
+  const [editingAgent, setEditingAgent] = useState<ProjectAgent | null>(null);
+  const [editForm, setEditForm] = useState({ system_prompt: "", system_prompt_mode: "append", llm_provider: "", llm_model: "", llm_api_key: "", llm_temperature: "", llm_max_tokens: "" });
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     listProjectAgents(projectId)
       .then(setProjectAgents)
@@ -104,6 +109,42 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
     setRunningId(agentId);
     await new Promise((r) => setTimeout(r, 2000)); // Simulated run
     setRunningId(null);
+  };
+
+  const openEdit = (agent: ProjectAgent) => {
+    setEditingAgent(agent);
+    setEditForm({
+      system_prompt: agent.system_prompt ?? "",
+      system_prompt_mode: agent.system_prompt_mode ?? "append",
+      llm_provider: agent.llm_provider ?? "",
+      llm_model: agent.llm_model ?? "",
+      // llm_api_key is write-only; never returned by the API
+      llm_api_key: "",
+      llm_temperature: agent.llm_temperature != null ? String(agent.llm_temperature) : "",
+      llm_max_tokens: agent.llm_max_tokens != null ? String(agent.llm_max_tokens) : "",
+    });
+  };
+
+  const handleSave = async () => {
+    if (!editingAgent) return;
+    setSaving(true);
+    try {
+      // llm_api_key is accepted by PATCH but not part of the response type;
+      // use a cast to pass it through without TypeScript errors.
+      const patchBody = {
+        system_prompt: editForm.system_prompt || undefined,
+        system_prompt_mode: editForm.system_prompt_mode as "append" | "override",
+        llm_provider: editForm.llm_provider || undefined,
+        llm_model: editForm.llm_model || undefined,
+        llm_temperature: editForm.llm_temperature ? parseFloat(editForm.llm_temperature) : undefined,
+        llm_max_tokens: editForm.llm_max_tokens ? parseInt(editForm.llm_max_tokens) : undefined,
+        ...(editForm.llm_api_key ? { llm_api_key: editForm.llm_api_key } : {}),
+      } as Parameters<typeof updateProjectAgent>[2];
+      const updated = await updateProjectAgent(projectId, editingAgent.id, patchBody);
+      setProjectAgents((prev) => prev.map((a) => a.id === updated.id ? updated : a));
+      setEditingAgent(null);
+    } catch { /* ignore */ }
+    setSaving(false);
   };
 
   return (
@@ -332,12 +373,100 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                   <div style={{ fontSize: 11, color: "var(--label-tertiary)" }}>{agent.role}</div>
                 </div>
                 <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 9999, background: "var(--fill-tertiary)", color: "var(--label-tertiary)" }}>custom</span>
+                <button
+                  onClick={() => openEdit(agent)}
+                  style={{
+                    padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
+                    background: "#0a84ff20", border: "1px solid #0a84ff40", color: "#0a84ff",
+                    fontWeight: 500,
+                  }}
+                >
+                  Edit
+                </button>
               </div>
             ))}
           </div>
         </div>
       )}
       </>
+      )}
+
+      {/* Agent edit modal */}
+      {editingAgent && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "var(--bg-secondary, #1c1c1e)", borderRadius: 16, padding: 24, width: 520, maxWidth: "90vw", border: "0.5px solid var(--hairline)", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--label-primary)" }}>Edit Agent: {editingAgent.name}</div>
+
+            <div>
+              <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>System Prompt</label>
+              <textarea
+                value={editForm.system_prompt}
+                onChange={(e) => setEditForm((f) => ({ ...f, system_prompt: e.target.value }))}
+                rows={4}
+                placeholder="Custom system prompt (leave empty to use default)"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>Prompt Mode</label>
+                <select value={editForm.system_prompt_mode} onChange={(e) => setEditForm((f) => ({ ...f, system_prompt_mode: e.target.value }))}
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13 }}>
+                  <option value="append">Append to default</option>
+                  <option value="override">Override default</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>Provider</label>
+                <input value={editForm.llm_provider} onChange={(e) => setEditForm((f) => ({ ...f, llm_provider: e.target.value }))}
+                  placeholder="e.g. anthropic, openai"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13, boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 2 }}>
+                <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>Model</label>
+                <input value={editForm.llm_model} onChange={(e) => setEditForm((f) => ({ ...f, llm_model: e.target.value }))}
+                  placeholder="e.g. claude-sonnet-4-6"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13, boxSizing: "border-box" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>Temperature</label>
+                <input type="number" min="0" max="2" step="0.1" value={editForm.llm_temperature}
+                  onChange={(e) => setEditForm((f) => ({ ...f, llm_temperature: e.target.value }))}
+                  placeholder="0.7"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13, boxSizing: "border-box" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>Max Tokens</label>
+                <input type="number" value={editForm.llm_max_tokens}
+                  onChange={(e) => setEditForm((f) => ({ ...f, llm_max_tokens: e.target.value }))}
+                  placeholder="4096"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13, boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, color: "var(--label-secondary)", display: "block", marginBottom: 4 }}>API Key (override)</label>
+              <input type="password" value={editForm.llm_api_key} onChange={(e) => setEditForm((f) => ({ ...f, llm_api_key: e.target.value }))}
+                placeholder="Leave empty to use project default"
+                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "var(--fill-tertiary)", color: "var(--label-primary)", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+              <button onClick={() => setEditingAgent(null)}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "none", color: "var(--label-secondary)", cursor: "pointer", fontSize: 13 }}>
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0a84ff", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
