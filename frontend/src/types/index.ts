@@ -135,12 +135,22 @@ export interface Message {
 
 export type DesignSessionStatus = "active" | "archived";
 
+export type DesignLayerType =
+  | "er_diagram"
+  | "ui_interface"
+  | "system_architecture"
+  | "data_flow"
+  | "api_spec"
+  | "sequence_diagram"
+  | "general";
+
 export interface DesignSession {
   id: string;
   project_id: string;
   title?: string | null;
   designer_agent_id?: string | null;
   status: DesignSessionStatus;
+  layer_type: DesignLayerType;
   created_at: string;
   updated_at: string;
 }
@@ -911,4 +921,63 @@ export interface PatchSettingsPayload {
   default_theme?: string;
   theme_preset?: ThemePreset | null;
   custom_theme?: CustomTheme | null;
+}
+
+// ── Conversation ──────────────────────────────────────────────────────────────
+
+export interface ConversationMessage {
+  id: string;
+  project_id: string;
+  user_id: string | null;
+  sender_type: "user" | "agent";
+  specialist: string | null;
+  content: string;
+  created_at: string;
+}
+
+export interface ConversationHistoryResponse {
+  messages: ConversationMessage[];
+  total: number;
+}
+
+// ── Project Skills ────────────────────────────────────────────────────────────
+
+export interface ProjectSkill {
+  id: string;
+  project_id: string;
+  cloned_from_library_skill_id: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Project MCPs ──────────────────────────────────────────────────────────────
+
+export interface ProjectMcp {
+  id: string;
+  project_id: string;
+  cloned_from_library_mcp_id: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  transport: "stdio" | "streamable-http";
+  command: string | null;
+  args: string[];
+  env: Record<string, string>;
+  url: string | null;
+  headers: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Knowledge Status ──────────────────────────────────────────────────────────
+
+export interface KnowledgeStatus {
+  document_count: number;
+  repo_count: number;
+  vector_count: number;
+  last_indexed_at: string | null;
 }

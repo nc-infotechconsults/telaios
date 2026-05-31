@@ -50,6 +50,11 @@ import type {
   DocumentAnalytics,
   AppSettings,
   PatchSettingsPayload,
+  ConversationMessage,
+  ConversationHistoryResponse,
+  ProjectSkill,
+  ProjectMcp,
+  KnowledgeStatus,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -1233,3 +1238,121 @@ export const getProjectDocAnalytics = (
     : http
         .get<DocumentAnalytics>(`/analytics/projects/${projectId}/docs`, { params: { period } })
         .then((r) => r.data);
+
+// ── Conversation ─────────────────────────────────────────────────────────────
+
+export async function getConversationHistory(
+  projectId: string,
+  params: { offset?: number; limit?: number } = {}
+): Promise<ConversationHistoryResponse> {
+  const q = new URLSearchParams();
+  if (params.offset != null) q.set("offset", String(params.offset));
+  if (params.limit != null) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  const res = await http.get<ConversationHistoryResponse>(`/projects/${projectId}/conversation/messages${qs ? `?${qs}` : ""}`);
+  return res.data;
+}
+
+export async function sendConversationMessage(
+  projectId: string,
+  content: string,
+  specialist?: string
+): Promise<ConversationMessage> {
+  const res = await http.post<ConversationMessage>(`/projects/${projectId}/conversation/message`, {
+    content,
+    specialist: specialist ?? null,
+  });
+  return res.data;
+}
+
+// ── Project Skills ────────────────────────────────────────────────────────────
+
+export async function listProjectSkills(projectId: string): Promise<ProjectSkill[]> {
+  const res = await http.get<ProjectSkill[]>(`/projects/${projectId}/skills`);
+  return res.data;
+}
+
+export async function createProjectSkill(
+  projectId: string,
+  body: { name: string; slug: string; description?: string; content: string }
+): Promise<ProjectSkill> {
+  const res = await http.post<ProjectSkill>(`/projects/${projectId}/skills`, body);
+  return res.data;
+}
+
+export async function cloneSkillFromLibrary(
+  projectId: string,
+  librarySkillId: string
+): Promise<ProjectSkill> {
+  const res = await http.post<ProjectSkill>(`/projects/${projectId}/skills/clone`, {
+    library_skill_id: librarySkillId,
+  });
+  return res.data;
+}
+
+export async function updateProjectSkill(
+  projectId: string,
+  skillId: string,
+  body: Partial<{ name: string; slug: string; description: string; content: string }>
+): Promise<ProjectSkill> {
+  const res = await http.patch<ProjectSkill>(`/projects/${projectId}/skills/${skillId}`, body);
+  return res.data;
+}
+
+export async function deleteProjectSkill(projectId: string, skillId: string): Promise<void> {
+  await http.delete(`/projects/${projectId}/skills/${skillId}`);
+}
+
+// ── Project MCPs ──────────────────────────────────────────────────────────────
+
+export async function listProjectMcps(projectId: string): Promise<ProjectMcp[]> {
+  const res = await http.get<ProjectMcp[]>(`/projects/${projectId}/mcps`);
+  return res.data;
+}
+
+export async function createProjectMcp(
+  projectId: string,
+  body: {
+    name: string;
+    slug: string;
+    description?: string;
+    transport: string;
+    command?: string;
+    args?: string[];
+    env?: Record<string, string>;
+    url?: string;
+  }
+): Promise<ProjectMcp> {
+  const res = await http.post<ProjectMcp>(`/projects/${projectId}/mcps`, body);
+  return res.data;
+}
+
+export async function cloneMcpFromLibrary(
+  projectId: string,
+  libraryMcpId: string
+): Promise<ProjectMcp> {
+  const res = await http.post<ProjectMcp>(`/projects/${projectId}/mcps/clone`, {
+    library_mcp_id: libraryMcpId,
+  });
+  return res.data;
+}
+
+export async function updateProjectMcp(
+  projectId: string,
+  mcpId: string,
+  body: Partial<ProjectMcp>
+): Promise<ProjectMcp> {
+  const res = await http.patch<ProjectMcp>(`/projects/${projectId}/mcps/${mcpId}`, body);
+  return res.data;
+}
+
+export async function deleteProjectMcp(projectId: string, mcpId: string): Promise<void> {
+  await http.delete(`/projects/${projectId}/mcps/${mcpId}`);
+}
+
+// ── Knowledge Status ──────────────────────────────────────────────────────────
+
+export async function getKnowledgeStatus(projectId: string): Promise<KnowledgeStatus> {
+  const res = await http.get<KnowledgeStatus>(`/projects/${projectId}/knowledge/status`);
+  return res.data;
+}
