@@ -319,6 +319,31 @@ class DesignSessionStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class MessageSenderType(StrEnum):
+    USER = "user"
+    AGENT = "agent"
+
+
+class ConversationSpecialist(StrEnum):
+    QA = "qa"
+    EXPLORER = "explorer"
+    REVERSE = "reverse"
+    PLANNER = "planner"
+    CODER = "coder"
+    DESIGNER = "designer"
+    REVIEWER = "reviewer"
+
+
+class DesignLayerType(StrEnum):
+    ER_DIAGRAM = "er_diagram"
+    UI_INTERFACE = "ui_interface"
+    SYSTEM_ARCHITECTURE = "system_architecture"
+    DATA_FLOW = "data_flow"
+    API_SPEC = "api_spec"
+    SEQUENCE_DIAGRAM = "sequence_diagram"
+    GENERAL = "general"
+
+
 class DesignMessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
