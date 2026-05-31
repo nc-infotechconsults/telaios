@@ -31,7 +31,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import (
     DocumentActivityAction,
     DocumentCommentAnchorType,
@@ -62,7 +62,7 @@ document_document_tags = Table(
 )
 
 
-class DocumentFolder(Base, TimestampMixin, SoftDeleteMixin):
+class DocumentFolder(Base, SoftDeleteAuditMixin):
     """Folder grouping documents (``document_folders`` table)."""
 
     __tablename__ = "document_folders"
@@ -75,16 +75,16 @@ class DocumentFolder(Base, TimestampMixin, SoftDeleteMixin):
 
     name: Mapped[str] = mapped_column(String, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
-    created_by: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
+    creator_id: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
 
     project: Mapped[Project] = relationship("Project", back_populates="document_folders")
     parent_folder: Mapped[DocumentFolder | None] = relationship(
         "DocumentFolder", remote_side="DocumentFolder.id"
     )
-    creator: Mapped[User | None] = relationship("User")
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[creator_id])
 
 
-class Document(Base, TimestampMixin, SoftDeleteMixin):
+class Document(Base, SoftDeleteAuditMixin):
     """A stored document (``documents`` table)."""
 
     __tablename__ = "documents"
@@ -124,7 +124,7 @@ class Document(Base, TimestampMixin, SoftDeleteMixin):
     current_version: Mapped[DocumentVersion | None] = relationship(
         "DocumentVersion", foreign_keys=[current_version_id], post_update=True
     )
-    uploader: Mapped[User | None] = relationship("User")
+    uploader: Mapped[User | None] = relationship("User", foreign_keys=[uploaded_by])
     versions: Mapped[list[DocumentVersion]] = relationship(
         "DocumentVersion",
         back_populates="document",
@@ -137,7 +137,7 @@ class Document(Base, TimestampMixin, SoftDeleteMixin):
     )
 
 
-class DocumentVersion(Base):
+class DocumentVersion(Base, SoftDeleteAuditMixin):
     """Versioned copy of a document (``document_versions`` table)."""
 
     __tablename__ = "document_versions"
@@ -150,19 +150,15 @@ class DocumentVersion(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     checksum_sha256: Mapped[str] = mapped_column(String, nullable=False)
     change_description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    creator_id: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
 
     document: Mapped[Document] = relationship(
         "Document", back_populates="versions", foreign_keys=[document_id]
     )
-    creator: Mapped[User | None] = relationship("User")
+    creator: Mapped[User | None] = relationship("User", foreign_keys=[creator_id])
 
 
-class DocumentTemplate(Base, TimestampMixin):
+class DocumentTemplate(Base, SoftDeleteAuditMixin):
     """Reusable document template (``document_templates`` table)."""
 
     __tablename__ = "document_templates"
@@ -177,10 +173,10 @@ class DocumentTemplate(Base, TimestampMixin):
         Boolean, nullable=False, default=True, server_default="true"
     )
     project_id: Mapped[uuid.UUID | None] = uuid_fk("projects.id", nullable=True, ondelete="CASCADE")
-    created_by: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
+    creator_id: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
 
 
-class DocumentChunk(Base):
+class DocumentChunk(Base, SoftDeleteAuditMixin):
     """RAG chunk of a document (``document_chunks`` table).
 
     Embeddings are stored in Qdrant, not PostgreSQL.  The ``qdrant_point_id``
@@ -201,14 +197,10 @@ class DocumentChunk(Base):
     )
     chunk_metadata: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-
     document: Mapped[Document] = relationship("Document")
 
 
-class DocumentActivity(Base):
+class DocumentActivity(Base, SoftDeleteAuditMixin):
     """Audit-log entry for a document (``document_activities`` table)."""
 
     __tablename__ = "document_activities"
@@ -221,12 +213,9 @@ class DocumentActivity(Base):
     activity_metadata: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata", JSONB, nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
 
 
-class DocumentComment(Base, TimestampMixin):
+class DocumentComment(Base, SoftDeleteAuditMixin):
     """Inline comment on a document (``document_comments`` table)."""
 
     __tablename__ = "document_comments"
@@ -250,7 +239,7 @@ class DocumentComment(Base, TimestampMixin):
     )
 
 
-class DocumentTag(Base):
+class DocumentTag(Base, SoftDeleteAuditMixin):
     """Tag scoped to a project (``document_tags`` table)."""
 
     __tablename__ = "document_tags"
@@ -261,9 +250,6 @@ class DocumentTag(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     color: Mapped[str] = mapped_column(
         String, nullable=False, default="#3B82F6", server_default="#3B82F6"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
 

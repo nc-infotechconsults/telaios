@@ -12,10 +12,13 @@ import logging
 from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from telaios.auth.dependencies import set_user_loader
+from telaios.auth.dependencies import SERVICE_PRINCIPAL_ID, set_user_loader
+from telaios.auth.internal_api_key import is_internal_api_key
+from telaios.auth.jwt import verify_token
+from telaios.db.base import set_audit_user
 from telaios.config.logging import configure_logging
 from telaios.config.settings import get_settings
 from telaios.db.session import dispose_engine
@@ -113,6 +116,26 @@ _MODULES: dict[str, list[APIRouter]] = {
 }
 
 
+def _extract_audit_user_id(request: Request) -> str | None:
+    """Resolve the caller identity from the request headers for audit tracking."""
+    internal_key = request.headers.get("x-internal-api-key", "")
+    if internal_key and is_internal_api_key(internal_key):
+        return SERVICE_PRINCIPAL_ID
+
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return None
+    token = auth[7:].strip()
+
+    if is_internal_api_key(token):
+        return SERVICE_PRINCIPAL_ID
+
+    try:
+        return verify_token(token).sub
+    except Exception:
+        return None
+
+
 @asynccontextmanager
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
@@ -179,6 +202,13 @@ def create_app(modules: Iterable[str] | None = None) -> FastAPI:
     )
 
     install_exception_handlers(app)
+
+    # Audit middleware — populates the per-request ContextVar so SQLAlchemy
+    # event listeners can fill created_by / updated_by / deleted_by automatically.
+    @app.middleware("http")
+    async def _audit_middleware(request: Request, call_next):  # type: ignore[misc]
+        set_audit_user(_extract_audit_user_id(request))
+        return await call_next(request)
 
     # Mount routers for each selected module in registry order ---------------
     for name in _MODULES:

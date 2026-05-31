@@ -1,21 +1,17 @@
 """Repository model.
 
 Ported from ``data-api/src/entities/Repository.entity.ts``.
-
-Note: legacy schema lacks an explicit ``created_at`` — only ``updated_at`` /
-``deleted_at`` are emitted by TypeORM here.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import RepositoryAuthType, RepositoryProviderType, RepositoryStatus
 
 if TYPE_CHECKING:
@@ -23,7 +19,7 @@ if TYPE_CHECKING:
     from telaios.db.models.tasks import TaskRepository
 
 
-class Repository(Base, SoftDeleteMixin):
+class Repository(Base, SoftDeleteAuditMixin):
     """Git/S3 repository attached to a project (``repositories`` table)."""
 
     __tablename__ = "repositories"
@@ -52,13 +48,6 @@ class Repository(Base, SoftDeleteMixin):
         String, nullable=False, default="unconfigured", server_default="unconfigured"
     )
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
 
     project: Mapped[Project] = relationship("Project", back_populates="repositories")
     task_repositories: Mapped[list[TaskRepository]] = relationship(

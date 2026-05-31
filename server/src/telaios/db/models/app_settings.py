@@ -6,16 +6,14 @@ holding UI customisation settings.
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from telaios.db.base import Base
+from telaios.db.base import Base, SoftDeleteAuditMixin
 
 
-class AppSettings(Base):
+class AppSettings(Base, SoftDeleteAuditMixin):
     """Application-wide UI settings (``settings`` table, single row)."""
 
     __tablename__ = "settings"
@@ -38,10 +36,3 @@ class AppSettings(Base):
     # ── Extended theme customisation ─────────────────────────────────────────
     theme_preset: Mapped[str | None] = mapped_column(String(32), nullable=True)
     custom_theme: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )

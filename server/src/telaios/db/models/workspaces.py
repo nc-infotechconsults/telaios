@@ -12,7 +12,7 @@ from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import WorkspaceStatus
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from telaios.db.models.users import User
 
 
-class Workspace(Base, TimestampMixin, SoftDeleteMixin):
+class Workspace(Base, SoftDeleteAuditMixin):
     """Project workspace (``workspaces`` table)."""
 
     __tablename__ = "workspaces"
@@ -39,7 +39,7 @@ class Workspace(Base, TimestampMixin, SoftDeleteMixin):
     config: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
-    created_by: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
+    creator_id: Mapped[uuid.UUID | None] = uuid_fk("users.id", nullable=True, ondelete="SET NULL")
 
     project: Mapped[Project] = relationship("Project", back_populates="workspaces")
     creator: Mapped[User | None] = relationship("User")

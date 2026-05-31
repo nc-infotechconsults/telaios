@@ -13,7 +13,7 @@ from sqlalchemy import DateTime, Float, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import AgentRole, ProjectRole, ProjectStatus
 
 if TYPE_CHECKING:
@@ -26,11 +26,8 @@ if TYPE_CHECKING:
     from telaios.db.models.workspaces import Workspace
 
 
-class Project(Base, SoftDeleteMixin):
-    """A telaios project (``projects`` table).
-
-    Note: legacy schema has only ``created_at`` (no ``updated_at``).
-    """
+class Project(Base, SoftDeleteAuditMixin):
+    """A telaios project (``projects`` table)."""
 
     __tablename__ = "projects"
 
@@ -39,9 +36,6 @@ class Project(Base, SoftDeleteMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(
         String, nullable=False, default="planning", server_default="planning"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     members: Mapped[list[ProjectMember]] = relationship(
@@ -95,7 +89,7 @@ class ProjectMember(Base):
     project: Mapped[Project] = relationship("Project", back_populates="members")
 
 
-class ProjectAgent(Base, TimestampMixin):
+class ProjectAgent(Base, SoftDeleteAuditMixin):
     """Project-scoped agent (``project_agents`` table).
 
     A standalone clone of a :class:`LibraryAgent` (no live link).

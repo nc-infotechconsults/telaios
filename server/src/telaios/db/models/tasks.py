@@ -9,12 +9,12 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import ArtifactType, TaskStatus, TaskType
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from telaios.db.models.repositories import Repository
 
 
-class Task(Base, TimestampMixin, SoftDeleteMixin):
+class Task(Base, SoftDeleteAuditMixin):
     """Unit of work within a Plan (``tasks`` table)."""
 
     __tablename__ = "tasks"
@@ -92,7 +92,7 @@ class TaskRepository(Base):
     repository: Mapped[Repository] = relationship("Repository", back_populates="task_repositories")
 
 
-class TaskArtifact(Base, SoftDeleteMixin):
+class TaskArtifact(Base, SoftDeleteAuditMixin):
     """Output artifact attached to a task (``task_artifacts`` table)."""
 
     __tablename__ = "task_artifacts"
@@ -110,8 +110,5 @@ class TaskArtifact(Base, SoftDeleteMixin):
         "metadata", JSONB, nullable=True
     )
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
 
     task: Mapped[Task] = relationship("Task", back_populates="artifacts")

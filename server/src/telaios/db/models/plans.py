@@ -9,10 +9,10 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import PlanMessageRole, PlanStatus
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from telaios.db.models.tasks import Task
 
 
-class Plan(Base, SoftDeleteMixin):
+class Plan(Base, SoftDeleteAuditMixin):
     """Execution plan grouping tasks (``plans`` table)."""
 
     __tablename__ = "plans"
@@ -35,17 +35,13 @@ class Plan(Base, SoftDeleteMixin):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-
     project: Mapped[Project] = relationship("Project", back_populates="plans")
     tasks: Mapped[list[Task]] = relationship(
         "Task", back_populates="plan", cascade="all, delete-orphan"
     )
 
 
-class Message(Base, SoftDeleteMixin):
+class Message(Base, SoftDeleteAuditMixin):
     """Chat message belonging to a project (``messages`` table)."""
 
     __tablename__ = "messages"
@@ -56,10 +52,6 @@ class Message(Base, SoftDeleteMixin):
 
     role: Mapped[PlanMessageRole] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
 
     project: Mapped[Project] = relationship("Project", back_populates="messages")
     plan: Mapped[Plan | None] = relationship("Plan")

@@ -13,11 +13,11 @@ from sqlalchemy import UUID, Boolean, Float, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import AgentType, McpTransport, SystemPromptMode
 
 
-class LibraryAgent(Base, TimestampMixin, SoftDeleteMixin):
+class LibraryAgent(Base, SoftDeleteAuditMixin):
     """Reusable agent definition (``library_agents`` table)."""
 
     __tablename__ = "library_agents"
@@ -71,7 +71,7 @@ class LibraryAgent(Base, TimestampMixin, SoftDeleteMixin):
     )
 
 
-class LibraryMCP(Base, TimestampMixin, SoftDeleteMixin):
+class LibraryMCP(Base, SoftDeleteAuditMixin):
     """Reusable MCP server definition (``library_mcps`` table)."""
 
     __tablename__ = "library_mcps"
@@ -104,7 +104,7 @@ class LibraryMCP(Base, TimestampMixin, SoftDeleteMixin):
     )
 
 
-class LibrarySkill(Base, TimestampMixin, SoftDeleteMixin):
+class LibrarySkill(Base, SoftDeleteAuditMixin):
     """Reusable skill definition (``library_skills`` table)."""
 
     __tablename__ = "library_skills"
@@ -131,7 +131,7 @@ class LibrarySkill(Base, TimestampMixin, SoftDeleteMixin):
     )
 
 
-class LibrarySkillFile(Base, TimestampMixin, SoftDeleteMixin):
+class LibrarySkillFile(Base, SoftDeleteAuditMixin):
     """File attached to a library skill (``library_skill_files`` table)."""
 
     __tablename__ = "library_skill_files"

@@ -6,22 +6,21 @@ Project-scoped conversational design sessions with immutable artifact revisions.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy import UUID, DateTime, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import UUID, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_fk, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
 from telaios.domain.enums import DesignMessageRole, DesignSessionStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
 
 
-class DesignSession(Base, TimestampMixin, SoftDeleteMixin):
+class DesignSession(Base, SoftDeleteAuditMixin):
     """Conversational UI-design session (``design_sessions`` table)."""
 
     __tablename__ = "design_sessions"
@@ -51,7 +50,7 @@ class DesignSession(Base, TimestampMixin, SoftDeleteMixin):
     )
 
 
-class DesignMessage(Base, SoftDeleteMixin):
+class DesignMessage(Base, SoftDeleteAuditMixin):
     """Message inside a design session (``design_messages`` table)."""
 
     __tablename__ = "design_messages"
@@ -60,14 +59,11 @@ class DesignMessage(Base, SoftDeleteMixin):
     session_id: Mapped[uuid.UUID] = uuid_fk("design_sessions.id")
     role: Mapped[DesignMessageRole] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
 
     session: Mapped[DesignSession] = relationship("DesignSession", back_populates="messages")
 
 
-class DesignArtifact(Base, SoftDeleteMixin):
+class DesignArtifact(Base, SoftDeleteAuditMixin):
     """Generated design artifact revision (``design_artifacts`` table)."""
 
     __tablename__ = "design_artifacts"
@@ -86,9 +82,6 @@ class DesignArtifact(Base, SoftDeleteMixin):
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
     artifact_metadata: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata", JSONB, nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     session: Mapped[DesignSession] = relationship("DesignSession", back_populates="artifacts")

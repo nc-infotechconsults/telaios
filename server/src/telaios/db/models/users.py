@@ -11,14 +11,14 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telaios.db.base import Base, SoftDeleteMixin, TimestampMixin, uuid_pk
+from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_pk
 from telaios.domain.enums import SystemRole
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import ProjectMember
 
 
-class User(Base, TimestampMixin, SoftDeleteMixin):
+class User(Base, SoftDeleteAuditMixin):
     """Application user (``users`` table)."""
 
     __tablename__ = "users"
