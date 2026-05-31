@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { listProjectAgents } from "../../lib/api";
-import type { ProjectAgent } from "../../types";
+import { listProjectAgents, listProjectSkills, listProjectMcps, deleteProjectSkill, deleteProjectMcp } from "../../lib/api";
+import type { ProjectAgent, ProjectSkill, ProjectMcp } from "../../types";
 
 interface BuiltinAgent {
   id: string;
@@ -76,12 +76,29 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
   const [projectAgents, setProjectAgents] = useState<ProjectAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [resourceTab, setResourceTab] = useState<"agents" | "resources">("agents");
+  const [resourceSubTab, setResourceSubTab] = useState<"skills" | "mcps">("skills");
+  const [projectSkills, setProjectSkills] = useState<ProjectSkill[]>([]);
+  const [projectMcps, setProjectMcps] = useState<ProjectMcp[]>([]);
+  const [resourcesLoading, setResourcesLoading] = useState(false);
 
   useEffect(() => {
     listProjectAgents(projectId)
       .then(setProjectAgents)
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  useEffect(() => {
+    if (resourceTab !== "resources") return;
+    setResourcesLoading(true);
+    Promise.all([
+      listProjectSkills(projectId),
+      listProjectMcps(projectId),
+    ]).then(([skills, mcps]) => {
+      setProjectSkills(skills);
+      setProjectMcps(mcps);
+    }).catch(() => {}).finally(() => setResourcesLoading(false));
+  }, [projectId, resourceTab]);
 
   const handleRun = async (agentId: string) => {
     setRunningId(agentId);
@@ -98,6 +115,76 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
         </p>
       </div>
 
+      {/* Top-level tab switcher */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20 }}>
+        {(["agents", "resources"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setResourceTab(tab)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 8,
+              border: "none",
+              background: resourceTab === tab ? "var(--glass-strong)" : "none",
+              color: resourceTab === tab ? "var(--label-primary)" : "var(--label-tertiary)",
+              fontWeight: resourceTab === tab ? 500 : 400,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            {tab === "agents" ? "Agents" : "Project Resources"}
+          </button>
+        ))}
+      </div>
+
+      {resourceTab === "resources" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", gap: 4 }}>
+            {(["skills", "mcps"] as const).map((sub) => (
+              <button
+                key={sub}
+                onClick={() => setResourceSubTab(sub)}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 6,
+                  border: `1px solid ${resourceSubTab === sub ? "#0a84ff" : "var(--hairline)"}`,
+                  background: resourceSubTab === sub ? "#0a84ff20" : "none",
+                  color: resourceSubTab === sub ? "#0a84ff" : "var(--label-secondary)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {sub === "skills" ? "Skills" : "MCP Servers"}
+              </button>
+            ))}
+          </div>
+
+          {resourcesLoading ? (
+            <div style={{ color: "var(--label-tertiary)", textAlign: "center", padding: 32 }}>Loading…</div>
+          ) : resourceSubTab === "skills" ? (
+            <ResourceList
+              items={projectSkills}
+              type="skill"
+              onDelete={async (id) => {
+                await deleteProjectSkill(projectId, id);
+                setProjectSkills((prev) => prev.filter((s) => s.id !== id));
+              }}
+            />
+          ) : (
+            <ResourceList
+              items={projectMcps}
+              type="mcp"
+              onDelete={async (id) => {
+                await deleteProjectMcp(projectId, id);
+                setProjectMcps((prev) => prev.filter((m) => m.id !== id));
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {resourceTab === "agents" && (
+      <>
       {/* Built-in agents */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--label-tertiary)", marginBottom: 10 }}>
@@ -250,6 +337,69 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
           </div>
         </div>
       )}
+      </>
+      )}
+    </div>
+  );
+}
+
+function ResourceList({
+  items,
+  type,
+  onDelete,
+}: {
+  items: Array<{ id: string; name: string; slug: string; description: string | null }>;
+  type: "skill" | "mcp";
+  onDelete: (id: string) => Promise<void>;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {items.length === 0 && (
+        <div style={{ color: "var(--label-tertiary)", fontSize: 13, padding: "16px 0" }}>
+          No project {type === "skill" ? "skills" : "MCP servers"} yet.
+        </div>
+      )}
+      {items.map((item) => (
+        <div
+          key={item.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: "var(--fill-tertiary)",
+            border: "0.5px solid var(--hairline)",
+          }}
+        >
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: type === "skill" ? "#5e5ce620" : "#30d15820",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 15, flexShrink: 0,
+          }}>
+            {type === "skill" ? "⚡" : "🔌"}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--label-primary)" }}>
+              {item.name}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--label-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {item.description ?? item.slug}
+            </div>
+          </div>
+          <button
+            onClick={() => onDelete(item.id)}
+            style={{
+              padding: "4px 10px", borderRadius: 6,
+              background: "#ff375f15", border: "1px solid #ff375f30",
+              color: "#ff375f", fontSize: 12, cursor: "pointer",
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
