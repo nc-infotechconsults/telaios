@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getRepositories, listDocuments } from "../../lib/api";
-import type { Repository, Document } from "../../types";
+import { getRepositories, listDocuments, getKnowledgeStatus } from "../../lib/api";
+import type { Repository, Document, KnowledgeStatus } from "../../types";
 import type { ProjectView } from "../../components/ProjectLayout";
 
 interface StatCard {
@@ -42,6 +42,7 @@ export default function ProjectDashboard({
   const [repos, setRepos] = useState<Repository[]>([]);
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [kbStatus, setKbStatus] = useState<KnowledgeStatus | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -50,6 +51,12 @@ export default function ProjectDashboard({
     ])
       .then(([r, d]) => { setRepos(r); setDocs(d); })
       .finally(() => setLoading(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    getKnowledgeStatus(projectId)
+      .then(setKbStatus)
+      .catch(() => {});
   }, [projectId]);
 
   const stats: StatCard[] = [
@@ -256,6 +263,47 @@ export default function ProjectDashboard({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Knowledge Base status card */}
+      <div
+        style={{
+          background: "var(--glass)",
+          backdropFilter: "blur(20px)",
+          border: "0.5px solid var(--glass-edge)",
+          borderRadius: 18,
+          padding: "16px 18px",
+          boxShadow: "var(--shadow-glass-panel)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, color: "var(--label-primary)" }}>
+          Knowledge Base
+        </h2>
+        <div style={{ display: "flex", gap: 28 }}>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "#0a84ff", lineHeight: 1 }}>
+              {kbStatus?.document_count ?? <span style={{ opacity: 0.4 }}>—</span>}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginTop: 4 }}>Documents</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "#30d158", lineHeight: 1 }}>
+              {kbStatus?.repo_count ?? <span style={{ opacity: 0.4 }}>—</span>}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginTop: 4 }}>Repositories</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "#bf5af2", lineHeight: 1 }}>
+              {kbStatus?.vector_count ?? <span style={{ opacity: 0.4 }}>—</span>}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginTop: 4 }}>Indexed chunks</div>
+          </div>
+        </div>
+        {kbStatus?.last_indexed_at && (
+          <div style={{ fontSize: 11, color: "var(--label-quaternary)", marginTop: 10 }}>
+            Last indexed: {new Date(kbStatus.last_indexed_at).toLocaleDateString()}
+          </div>
+        )}
       </div>
 
       {/* Activity feed */}
