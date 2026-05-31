@@ -8,6 +8,7 @@ import type {
   TaskArtifact,
   Message,
   DesignSession,
+  DesignLayerType,
   DesignMessage,
   DesignArtifact,
   AgentProfile,
@@ -294,7 +295,7 @@ export const getMessages = (projectId: string): Promise<Message[]> =>
 export const listDesignSessions = (projectId: string): Promise<DesignSession[]> =>
   DEMO ? delay([]) : http.get<DesignSession[]>(`/projects/${projectId}/design/sessions`).then((r) => r.data);
 
-export const createDesignSession = (projectId: string, title?: string, designer_agent_id?: string): Promise<DesignSession> =>
+export const createDesignSession = (projectId: string, title?: string, designer_agent_id?: string, layer_type?: DesignLayerType): Promise<DesignSession> =>
   DEMO
     ? delay<DesignSession>({
         id: `design-${Date.now()}`,
@@ -302,10 +303,11 @@ export const createDesignSession = (projectId: string, title?: string, designer_
         title: title ?? null,
         designer_agent_id: designer_agent_id ?? null,
         status: "active",
+        layer_type: layer_type ?? "general",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-    : http.post<DesignSession>(`/projects/${projectId}/design/sessions`, { title, designer_agent_id }).then((r) => r.data);
+    : http.post<DesignSession>(`/projects/${projectId}/design/sessions`, { title, designer_agent_id, layer_type }).then((r) => r.data);
 
 export const getDesignSession = (sessionId: string): Promise<DesignSession> =>
   DEMO
@@ -314,6 +316,7 @@ export const getDesignSession = (sessionId: string): Promise<DesignSession> =>
         project_id: "demo",
         title: "Design Session",
         status: "active",
+        layer_type: "general",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -327,6 +330,7 @@ export const patchDesignSession = (sessionId: string, designer_agent_id?: string
         title: "Design Session",
         designer_agent_id: designer_agent_id ?? null,
         status: "active",
+        layer_type: "general",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

@@ -1,6 +1,23 @@
 import { useState, useRef, useEffect } from "react";
 import { listDesignSessions, createDesignSession } from "../../lib/api";
-import type { DesignSession } from "../../types";
+import type { DesignSession, DesignLayerType } from "../../types";
+
+/* ─── Design layer config ─────────────────────────────────────────────────── */
+const DESIGN_LAYERS: Array<{
+  type: DesignLayerType;
+  label: string;
+  icon: string;
+  color: string;
+  description: string;
+}> = [
+  { type: "er_diagram",          label: "ER Diagram",          icon: "⬡", color: "#0a84ff", description: "Entity-relationship model" },
+  { type: "ui_interface",        label: "UI Interface",        icon: "⬜", color: "#ff9f0a", description: "Wireframes and component layouts" },
+  { type: "system_architecture", label: "System Architecture", icon: "◈", color: "#5e5ce6", description: "Architecture overview diagrams" },
+  { type: "data_flow",           label: "Data Flow",           icon: "↝", color: "#30d158", description: "Data movement and pipeline diagrams" },
+  { type: "api_spec",            label: "API Spec",            icon: "{}", color: "#bf5af2", description: "OpenAPI 3.1 YAML fragments" },
+  { type: "sequence_diagram",    label: "Sequence Diagram",    icon: "⇅", color: "#64d2ff", description: "Interaction sequence diagrams" },
+  { type: "general",             label: "General",             icon: "✦", color: "#98989d", description: "Open-ended design conversation" },
+];
 
 /* ─── Schematic SVG previews ─────────────────────────────────────────────── */
 function DesignSchematic({ screen, accent }: { screen: string; accent: string }) {
@@ -163,6 +180,7 @@ interface LocalDesign {
   iterations: number;
   versions: Array<{ id: string; label: string; summary: string }>;
   chat: Array<{ role: "user" | "designer"; text: string }>;
+  layer_type?: DesignLayerType;
 }
 
 const SEEDED_DESIGNS: LocalDesign[] = [
@@ -541,6 +559,8 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
   const [generating, setGenerating] = useState(false);
   const [generatePrompt, setGeneratePrompt] = useState("");
   const [showGenerate, setShowGenerate] = useState(false);
+  const [showLayerPicker, setShowLayerPicker] = useState(false);
+  const [selectedLayerType, setSelectedLayerType] = useState<DesignLayerType>("general");
 
   useEffect(() => {
     listDesignSessions(projectId)
@@ -555,13 +575,14 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
       id: s.id,
       title: s.title ?? "Untitled Design",
       screen: "dashboard",
-      accent: "#0a84ff",
+      accent: DESIGN_LAYERS.find((l) => l.type === s.layer_type)?.color ?? "#0a84ff",
       status: "draft",
       author: "TEOS Designer",
       time: new Date(s.updated_at).toLocaleDateString(),
       iterations: 1,
       versions: [{ id: "v1", label: "v1", summary: "Initial design" }],
       chat: [],
+      layer_type: s.layer_type,
     })),
   ];
 
@@ -577,17 +598,23 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
     return <FocusView design={focused} onClose={() => setFocused(null)} />;
   }
 
-  const handleGenerate = async () => {
+  const handleCreateSession = async (layerType: DesignLayerType) => {
     if (!generatePrompt.trim()) return;
     setGenerating(true);
     setShowGenerate(false);
     try {
-      const s = await createDesignSession(projectId, generatePrompt);
+      const s = await createDesignSession(projectId, generatePrompt, undefined, layerType);
       setApiSessions((prev) => [s, ...prev]);
     } finally {
       setGenerating(false);
       setGeneratePrompt("");
+      setSelectedLayerType("general");
     }
+  };
+
+  const openLayerPicker = () => {
+    setSelectedLayerType("general");
+    setShowLayerPicker(true);
   };
 
   return (
@@ -601,7 +628,7 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
           </p>
         </div>
         <button
-          onClick={() => setShowGenerate(true)}
+          onClick={openLayerPicker}
           style={{ padding: "8px 16px", borderRadius: 10, background: "linear-gradient(135deg, #ff9f0a, #bf5af2)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
         >
           ✦ Generate design
@@ -678,7 +705,7 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
           <p style={{ fontSize: 14, margin: "0 0 4px", color: "var(--label-secondary)" }}>No designs yet</p>
           <p style={{ fontSize: 12, margin: "0 0 16px" }}>Generate a design with the TEOS Designer</p>
           <button
-            onClick={() => setShowGenerate(true)}
+            onClick={openLayerPicker}
             style={{ padding: "8px 20px", borderRadius: 10, background: "linear-gradient(135deg, #ff9f0a, #bf5af2)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
           >
             Start designing
@@ -703,12 +730,76 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--label-primary)", marginBottom: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 9999, background: STATUS_COLOR[d.status], color: STATUS_TEXT[d.status], fontWeight: 500 }}>{d.status}</span>
+                  {d.layer_type && (() => {
+                    const layerConfig = DESIGN_LAYERS.find((l) => l.type === d.layer_type) ?? DESIGN_LAYERS[6];
+                    return (
+                      <span style={{ fontSize: 10, color: layerConfig.color, border: `1px solid ${layerConfig.color}40`, borderRadius: 4, padding: "1px 5px" }}>
+                        {layerConfig.icon} {layerConfig.label}
+                      </span>
+                    );
+                  })()}
                   <span style={{ fontSize: 10, color: "var(--label-quaternary)" }}>{d.versions.length} ver.</span>
                   <span style={{ fontSize: 10, color: "var(--label-quaternary)", marginLeft: "auto" }}>{d.time}</span>
                 </div>
               </div>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Layer picker modal */}
+      {showLayerPicker && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+        }}>
+          <div style={{
+            background: "var(--bg-secondary, #1c1c1e)",
+            borderRadius: 16, padding: 24, width: 480, maxWidth: "90vw",
+            border: "0.5px solid var(--hairline)",
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--label-primary)", marginBottom: 16 }}>
+              Choose Design Layer
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+              {DESIGN_LAYERS.map((layer) => (
+                <button
+                  key={layer.type}
+                  onClick={() => setSelectedLayerType(layer.type)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    borderRadius: 10,
+                    border: `1px solid ${selectedLayerType === layer.type ? layer.color : "var(--hairline)"}`,
+                    background: selectedLayerType === layer.type ? `${layer.color}15` : "none",
+                    cursor: "pointer", textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: 18, color: layer.color }}>{layer.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--label-primary)" }}>{layer.label}</div>
+                    <div style={{ fontSize: 11, color: "var(--label-tertiary)" }}>{layer.description}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                onClick={() => setShowLayerPicker(false)}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "0.5px solid var(--hairline)", background: "none", color: "var(--label-secondary)", cursor: "pointer", fontSize: 13 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLayerPicker(false);
+                  setShowGenerate(true);
+                }}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0a84ff", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -735,10 +826,28 @@ export default function ProjectDesigns({ projectId }: { projectId: string }) {
                 rows={4}
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 12, background: "var(--fill-tertiary)", border: "0.5px solid var(--hairline)", color: "var(--label-primary)", fontSize: 13, fontFamily: "inherit", resize: "none", boxSizing: "border-box", lineHeight: 1.55 }}
               />
+              {/* Selected layer badge */}
+              {(() => {
+                const lc = DESIGN_LAYERS.find((l) => l.type === selectedLayerType) ?? DESIGN_LAYERS[6];
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                    <span style={{ fontSize: 11, color: "var(--label-tertiary)" }}>Layer:</span>
+                    <span style={{ fontSize: 11, color: lc.color, border: `1px solid ${lc.color}40`, borderRadius: 4, padding: "1px 6px" }}>
+                      {lc.icon} {lc.label}
+                    </span>
+                    <button
+                      onClick={() => { setShowGenerate(false); setShowLayerPicker(true); }}
+                      style={{ fontSize: 11, color: "var(--label-tertiary)", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                    >
+                      Change
+                    </button>
+                  </div>
+                );
+              })()}
               <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
                 <button onClick={() => setShowGenerate(false)} style={{ padding: "8px 16px", borderRadius: 10, background: "var(--fill-tertiary)", border: "0.5px solid var(--hairline)", fontSize: 13, cursor: "pointer", color: "var(--label-secondary)" }}>Cancel</button>
                 <button
-                  onClick={handleGenerate}
+                  onClick={() => handleCreateSession(selectedLayerType)}
                   disabled={!generatePrompt.trim() || generating}
                   style={{ padding: "8px 18px", borderRadius: 10, background: "linear-gradient(135deg, #ff9f0a, #bf5af2)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: generatePrompt.trim() ? "pointer" : "default", opacity: generatePrompt.trim() ? 1 : 0.5 }}
                 >
