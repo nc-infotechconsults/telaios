@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from telaios.db.models.documents import Document, DocumentFolder
     from telaios.db.models.environments import Environment
     from telaios.db.models.plans import Message, Plan
+    from telaios.db.models.project_resources import ProjectMCP, ProjectSkill
     from telaios.db.models.repositories import Repository
     from telaios.db.models.users import User
     from telaios.db.models.workspaces import Workspace
@@ -67,6 +68,12 @@ class Project(Base, SoftDeleteAuditMixin):
     )
     document_folders: Mapped[list[DocumentFolder]] = relationship(
         "DocumentFolder", back_populates="project", cascade="all, delete-orphan"
+    )
+    skills: Mapped[list[ProjectSkill]] = relationship(
+        "ProjectSkill", back_populates="project", cascade="all, delete-orphan"
+    )
+    mcps: Mapped[list[ProjectMCP]] = relationship(
+        "ProjectMCP", back_populates="project", cascade="all, delete-orphan"
     )
 
 

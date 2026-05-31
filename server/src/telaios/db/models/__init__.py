@@ -25,6 +25,7 @@ from telaios.db.models.library import (
     LibrarySkillFile,
 )
 from telaios.db.models.plans import Message, Plan
+from telaios.db.models.project_resources import ProjectMCP, ProjectSkill
 from telaios.db.models.projects import Project, ProjectAgent, ProjectMember
 from telaios.db.models.repositories import Repository
 from telaios.db.models.tasks import (
@@ -60,7 +61,9 @@ __all__ = [
     "Plan",
     "Project",
     "ProjectAgent",
+    "ProjectMCP",
     "ProjectMember",
+    "ProjectSkill",
     "Repository",
     "Task",
     "TaskArtifact",
