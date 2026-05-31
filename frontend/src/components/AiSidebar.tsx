@@ -426,6 +426,37 @@ export default function AiSidebar({ projectId, projectName, visible }: AiSidebar
         <div ref={endRef} />
       </div>
 
+      {/* Suggestion chips */}
+      {messages.length <= 1 && (
+        <div style={{ padding: "6px 12px 0", flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+          {[
+            "How does our auth flow work?",
+            "Reverse-engineer the payments service",
+            "Plan: add SSO via Okta",
+          ].map((s) => (
+            <button
+              key={s}
+              onClick={() => { setInput(s); }}
+              style={{
+                padding: "5px 10px",
+                borderRadius: 8,
+                background: "var(--fill-quaternary)",
+                border: "0.5px solid var(--hairline)",
+                fontSize: 12,
+                color: "var(--label-secondary)",
+                cursor: "pointer",
+                textAlign: "left",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input area */}
       <div
         style={{
