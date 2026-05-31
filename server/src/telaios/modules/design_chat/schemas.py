@@ -8,12 +8,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from telaios.domain.enums import DesignMessageRole, DesignSessionStatus
+from telaios.domain.enums import DesignLayerType, DesignMessageRole, DesignSessionStatus
 
 
 class DesignSessionCreate(BaseModel):
     title: str | None = None
     designer_agent_id: uuid.UUID | None = None
+    layer_type: DesignLayerType = DesignLayerType.GENERAL
 
 
 class DesignSessionRead(BaseModel):
@@ -23,6 +24,7 @@ class DesignSessionRead(BaseModel):
     project_id: uuid.UUID
     designer_agent_id: uuid.UUID | None
     title: str | None
+    layer_type: DesignLayerType
     status: DesignSessionStatus
     created_at: datetime
     updated_at: datetime

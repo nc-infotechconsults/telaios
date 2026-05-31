@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from telaios.db.base import Base, SoftDeleteAuditMixin, uuid_fk, uuid_pk
-from telaios.domain.enums import DesignMessageRole, DesignSessionStatus
+from telaios.domain.enums import DesignLayerType, DesignMessageRole, DesignSessionStatus
 
 if TYPE_CHECKING:
     from telaios.db.models.projects import Project
@@ -34,6 +34,12 @@ class DesignSession(Base, SoftDeleteAuditMixin):
     )
 
     title: Mapped[str | None] = mapped_column(String, nullable=True)
+    layer_type: Mapped[DesignLayerType] = mapped_column(
+        String(50),
+        nullable=False,
+        default=DesignLayerType.GENERAL,
+        server_default="general",
+    )
     status: Mapped[DesignSessionStatus] = mapped_column(
         String,
         nullable=False,
