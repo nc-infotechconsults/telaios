@@ -298,10 +298,10 @@ export default function AgentProfiles() {
             <>
               <ModalHeader className="flex flex-col gap-1">
                 {modalMode === "view" ? (
-                  <span>Agent Profile Details</span>
+                  <h2>Agent Profile Details</h2>
                 ) : (
                   <>
-                    <span>{isNew ? "New Agent Profile" : "Edit Agent Profile"}</span>
+                    <h2>{isNew ? "New Agent Profile" : "Edit Agent Profile"}</h2>
                     <span className="text-sm text-default-400 font-normal">
                       {isNew ? "Configure the LLM, tools, and skills for this agent" : `Editing: ${selectedProfile?.name}`}
                     </span>

@@ -20,9 +20,15 @@ export default async function globalTeardown() {
     if (!fs.existsSync(CI_DATA_FILE)) return;
 
     const ciData: CIData = JSON.parse(fs.readFileSync(CI_DATA_FILE, "utf-8"));
+
+    // Log in as the e2e test user to get a valid JWT
+    const { data: loginData } = await axios.post<{ token: string }>(`${SERVER_URL}/auth/login`, {
+      email: "e2e-test@example.com",
+      password: "E2eTest1234!",
+    });
     const api = axios.create({
       baseURL: SERVER_URL,
-      headers: { Authorization: `Bearer ${INTERNAL_KEY}` },
+      headers: { Authorization: `Bearer ${loginData.token}` },
     });
 
     // Deleting projects cascades to their plans, tasks, and repos

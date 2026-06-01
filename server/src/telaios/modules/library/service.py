@@ -86,15 +86,9 @@ class LibraryAgentService:
         if existing is not None:
             raise ConflictError(f"Slug '{dto.slug}' is already taken")
 
-        data: dict[str, Any] = dto.model_dump(exclude_none=True)
+        data: dict[str, Any] = dto.model_dump(mode="json", exclude_none=True)
         if data.get("llm_api_key"):
             data["llm_api_key"] = encrypt(data["llm_api_key"])
-        # Convert sub_agents / mcp_servers / skills from Pydantic models to plain dicts
-        for field in ("sub_agents", "mcp_servers", "skills"):
-            if data.get(field):
-                data[field] = [
-                    v.model_dump() if hasattr(v, "model_dump") else v for v in data[field]
-                ]
         data["agent_type"] = "custom"
         data["published_by"] = published_by
 
@@ -107,11 +101,9 @@ class LibraryAgentService:
             raise NotFoundError("Library agent not found")
         if obj.is_base:
             raise ForbiddenError("Base agents cannot be edited directly; clone them instead")
-        for field, val in dto.model_dump(exclude_unset=True).items():
+        for field, val in dto.model_dump(mode="json", exclude_unset=True).items():
             if field == "llm_api_key" and val:
                 val = encrypt(val)
-            elif field in ("sub_agents", "mcp_servers", "skills") and val:
-                val = [v.model_dump() if hasattr(v, "model_dump") else v for v in val]
             setattr(obj, field, val)
         obj = await self._repo.save(obj)
         return LibraryAgentRead.from_orm_sanitized(obj)

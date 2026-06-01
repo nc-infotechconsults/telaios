@@ -494,6 +494,5 @@ export function applyAppSettingsToDocument(settings: AppSettings): void {
   const themeColorMeta = ensureThemeColorMeta();
   themeColorMeta.content = brandColor;
 
-  // Theme overrides disabled until Apple HIG interface is fully complete
-  // applyThemeOverrides(settings.theme_preset ?? null, settings.custom_theme ?? null);
+  applyThemeOverrides(settings.theme_preset ?? null, settings.custom_theme ?? null);
 }

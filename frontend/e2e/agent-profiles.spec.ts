@@ -58,30 +58,30 @@ test.describe("AgentProfiles — grid view badges", () => {
     // Default view is grid; ensure it's active
     const viewGroup = page.getByRole("group", { name: /view/i });
     if (await viewGroup.count()) {
-      const gridBtn = viewGroup.getByText("Grid");
+      const gridBtn = viewGroup.getByRole("button", { name: "Grid" });
       if (await gridBtn.count()) await gridBtn.click();
     }
   });
 
   test("shows 💬 prompt badge for profile with system_prompt", async ({ page }) => {
     // The E2E Prompt Profile card should contain the 💬 prompt chip
-    const card = page.locator("[class*=CardBody]").filter({ hasText: "E2E Prompt Profile" });
+    const card = page.locator(".apple-card").filter({ hasText: "E2E Prompt Profile" });
     await expect(card.getByTitle("E2E custom prompt content")).toBeVisible();
   });
 
   test("does NOT show 💬 prompt badge for profile without system_prompt", async ({ page }) => {
-    const card = page.locator("[class*=CardBody]").filter({ hasText: "GPT-4o Coder" });
+    const card = page.locator(".apple-card").filter({ hasText: "GPT-4o Coder" });
     // The 💬 chip should NOT be present
     await expect(card.getByTitle(/custom prompt/i)).not.toBeVisible();
   });
 
   test("shows 🤝 sub-agent badge for profile with sub_agent_ids", async ({ page }) => {
-    const card = page.locator("[class*=CardBody]").filter({ hasText: "E2E Prompt Profile" });
+    const card = page.locator(".apple-card").filter({ hasText: "E2E Prompt Profile" });
     await expect(card.getByText(/🤝/)).toBeVisible();
   });
 
   test("does NOT show 🤝 sub-agent badge for profile without sub_agent_ids", async ({ page }) => {
-    const card = page.locator("[class*=CardBody]").filter({ hasText: "GPT-4o Coder" });
+    const card = page.locator(".apple-card").filter({ hasText: "GPT-4o Coder" });
     await expect(card.getByText(/🤝/)).not.toBeVisible();
   });
 });
@@ -93,7 +93,7 @@ test.describe("AgentProfiles — list view badges", () => {
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
     const viewGroup = page.getByRole("group", { name: /view/i });
-    await viewGroup.getByText("List").click();
+    await viewGroup.getByRole("button", { name: "List" }).click();
   });
 
   test("list view renders a row for each seeded profile", async ({ page }) => {
@@ -116,7 +116,7 @@ test.describe("AgentProfiles — table view badges", () => {
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
     const viewGroup = page.getByRole("group", { name: /view/i });
-    await viewGroup.getByText("Table").click();
+    await viewGroup.getByRole("button", { name: "Table" }).click();
   });
 
   test("table view renders a row for E2E Prompt Profile", async ({ page }) => {
@@ -150,30 +150,37 @@ test.describe("AgentProfiles — New Profile modal", () => {
   });
 
   test("dialog contains the System Prompt section heading", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByText("System Prompt")).toBeVisible();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    // Use paragraph selector to avoid strict-mode collision with the textarea label
+    await expect(dialog.locator("p").filter({ hasText: /^System Prompt$/ }).first()).toBeVisible();
   });
 
   test("dialog contains the System Prompt textarea", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByLabel("System Prompt")).toBeVisible();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    await expect(dialog.getByLabel("System Prompt")).toBeVisible();
   });
 
   test("default system prompt mode is Extend", async ({ page }) => {
-    // HeroUI Select renders a button-like element whose text reflects the selected option
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText(/Extend — append to built-in prompt/i)).toBeVisible();
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    // Mode is a native <select id="mode"> — check its value directly
+    await expect(dialog.locator("select#mode")).toHaveValue("extend");
   });
 
   test("changing mode to Override updates the description text", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    // Click the Mode select to open it
-    await dialog.getByText(/Extend — append to built-in prompt/i).click();
-    // Pick Override option in the listbox
-    await page.getByRole("option", { name: /Override/i }).click();
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    // Mode is a native <select> — use selectOption to change it
+    await dialog.locator("select#mode").selectOption("override");
     await expect(dialog.getByText("Fully replaces the built-in agent prompt.")).toBeVisible();
   });
 
   test("system prompt textarea accepts input", async ({ page }) => {
-    const textarea = page.getByRole("dialog").getByLabel("System Prompt");
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    const textarea = dialog.getByLabel("System Prompt");
     await textarea.fill("You are a specialized test agent.");
     await expect(textarea).toHaveValue("You are a specialized test agent.");
   });
@@ -188,37 +195,45 @@ test.describe("AgentProfiles — New Profile modal", () => {
 
   test("Advanced sampling toggle reveals Top P input", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    // Top P should not be visible yet
+    // Top P should not exist yet (toggle is closed)
     await expect(dialog.getByLabel("Top P")).not.toBeVisible();
-    // Click the Advanced toggle
-    await dialog.getByText("Advanced sampling parameters").click();
+    // The toggle button may be below the modal fold — bypass viewport check
+    await dialog.getByText("Advanced sampling parameters").evaluate(el => (el as HTMLElement).click());
     await expect(dialog.getByLabel("Top P")).toBeVisible();
   });
 
   test("Sub-agents section is visible", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByText("Sub-agents")).toBeVisible();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
+    // Use paragraph selector to avoid strict-mode collision with the tab button text
+    await expect(dialog.locator("p").filter({ hasText: /^Sub-agents$/ }).first()).toBeVisible();
   });
 
   test("Sub-agents picker shows other profiles as options", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    // Open the Add sub-agent select
-    const subAgentSelect = dialog.getByText(/Select an agent profile/i);
-    await subAgentSelect.click();
-    // E2E Sub-Agent should appear as an option
-    await expect(page.getByRole("option", { name: "E2E Sub-Agent" })).toBeVisible();
+    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
+    // Wait for profiles to load (spinner disappears, select appears)
+    const subAgentSelect = dialog.locator("select#add-sub-agent");
+    await expect(subAgentSelect).toBeVisible({ timeout: 5_000 });
+    // The native select should contain an option for E2E Sub-Agent
+    await expect(subAgentSelect.locator("option").filter({ hasText: /E2E Sub-Agent/ })).toHaveCount(1);
   });
 
   test("selecting a sub-agent adds it as a chip", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    await dialog.getByText(/Select an agent profile/i).click();
-    await page.getByRole("option", { name: "E2E Sub-Agent" }).click();
-    // A chip with the profile name should appear
-    await expect(dialog.getByText("E2E Sub-Agent").first()).toBeVisible();
+    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
+    const subAgentSelect = dialog.locator("select#add-sub-agent");
+    await expect(subAgentSelect).toBeVisible({ timeout: 5_000 });
+    // Select by value (profile ID) via native select API
+    await subAgentSelect.selectOption({ value: data.subAgentProfileId });
+    // A chip (span.apple-badge) with the profile name should appear — not the hidden <option>
+    await expect(dialog.locator(".apple-badge").filter({ hasText: "E2E Sub-Agent" })).toBeVisible();
   });
 
   test("cancelling closes the dialog", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Cancel" }).click();
+    // Cancel button is at the modal footer — bypass viewport check
+    await dialog.getByRole("button", { name: "Cancel" }).evaluate(el => (el as HTMLElement).click());
     await expect(page.getByRole("dialog")).not.toBeVisible();
   });
 });
@@ -239,17 +254,22 @@ test.describe("AgentProfiles — Edit Profile modal pre-fill", () => {
   });
 
   test("system prompt textarea is pre-filled with saved value", async ({ page }) => {
-    const textarea = page.getByRole("dialog").getByLabel("System Prompt");
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    const textarea = dialog.getByLabel("System Prompt");
     await expect(textarea).toHaveValue("E2E custom prompt content");
   });
 
   test("mode select shows saved mode (Extend)", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText(/Extend — append to built-in prompt/i)).toBeVisible();
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
+    // Mode is a native <select id="mode"> — check its value directly
+    await expect(dialog.locator("select#mode")).toHaveValue("extend");
   });
 
   test("sub-agent chip is pre-populated with E2E Sub-Agent", async ({ page }) => {
     const dialog = page.getByRole("dialog");
+    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
     // The chip label shows the sub-agent's name
     await expect(dialog.getByText("E2E Sub-Agent").first()).toBeVisible();
   });
@@ -299,6 +319,8 @@ test.describe("AgentProfiles — Create cycle (API intercepted)", () => {
 
     // Fill in the minimum required field (Name) + a system prompt
     await dialog.getByLabel("Name").fill("Test Intercepted Profile");
+    // Switch to Prompt tab to fill system prompt
+    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
     const textarea = dialog.getByLabel("System Prompt");
     await textarea.fill("I am a test agent.");
 

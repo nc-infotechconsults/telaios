@@ -20,7 +20,7 @@ const BUILTIN_AGENTS: BuiltinAgent[] = [
     role: "qa",
     description: "Answers questions about your codebase, architecture, and documentation using project knowledge.",
     icon: "?",
-    color: "#0a84ff",
+    color: "var(--color-blue)",
     knowledgeSources: ["repositories", "documents"],
     status: "idle",
   },
@@ -30,7 +30,7 @@ const BUILTIN_AGENTS: BuiltinAgent[] = [
     role: "reverse",
     description: "Traces code flows, generates sequence diagrams, and maps component relationships.",
     icon: "◈",
-    color: "#bf5af2",
+    color: "var(--color-purple)",
     knowledgeSources: ["repositories"],
     status: "idle",
   },
@@ -40,7 +40,7 @@ const BUILTIN_AGENTS: BuiltinAgent[] = [
     role: "planner",
     description: "Plans features, creates implementation roadmaps, and identifies dependencies.",
     icon: "⎇",
-    color: "#30d158",
+    color: "var(--color-green)",
     knowledgeSources: ["repositories", "documents"],
     status: "idle",
   },
@@ -50,7 +50,7 @@ const BUILTIN_AGENTS: BuiltinAgent[] = [
     role: "designer",
     description: "Generates UI mockups, suggests design improvements, and creates component specs.",
     icon: "✦",
-    color: "#ff9f0a",
+    color: "var(--color-orange)",
     knowledgeSources: ["designs"],
     status: "idle",
   },
@@ -60,7 +60,7 @@ const BUILTIN_AGENTS: BuiltinAgent[] = [
     role: "knowledge",
     description: "Keeps documentation in sync with code changes and detects documentation drift.",
     icon: "↻",
-    color: "#5e5ce6",
+    color: "var(--color-indigo)",
     knowledgeSources: ["repositories", "documents"],
     status: "idle",
   },
@@ -188,9 +188,9 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                 style={{
                   padding: "4px 12px",
                   borderRadius: 6,
-                  border: `1px solid ${resourceSubTab === sub ? "#0a84ff" : "var(--hairline)"}`,
-                  background: resourceSubTab === sub ? "#0a84ff20" : "none",
-                  color: resourceSubTab === sub ? "#0a84ff" : "var(--label-secondary)",
+                  border: `1px solid ${resourceSubTab === sub ? "var(--color-blue)" : "var(--hairline)"}`,
+                  background: resourceSubTab === sub ? "color-mix(in srgb, var(--color-blue) 12%, transparent)" : "none",
+                  color: resourceSubTab === sub ? "var(--color-blue)" : "var(--label-secondary)",
                   fontSize: 12,
                   cursor: "pointer",
                 }}
@@ -257,8 +257,8 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                       width: 36,
                       height: 36,
                       borderRadius: 10,
-                      background: `${agent.color}18`,
-                      border: `0.5px solid ${agent.color}30`,
+                      background: `color-mix(in srgb, ${agent.color} 9%, transparent)`,
+                      border: `0.5px solid color-mix(in srgb, ${agent.color} 18%, transparent)`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -279,7 +279,7 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                       width: 8,
                       height: 8,
                       borderRadius: "50%",
-                      background: isRunning ? "#30d158" : "var(--label-quaternary)",
+                      background: isRunning ? "var(--color-green)" : "var(--label-quaternary)",
                       animation: isRunning ? "teosOrbPulse 1s ease-in-out infinite" : undefined,
                       flexShrink: 0,
                       marginTop: 4,
@@ -321,8 +321,8 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                       padding: "7px 0",
                       borderRadius: 10,
                       background: isRunning
-                        ? `${agent.color}20`
-                        : `linear-gradient(135deg, ${agent.color}, ${agent.color}bb)`,
+                        ? `color-mix(in srgb, ${agent.color} 12%, transparent)`
+                        : `linear-gradient(135deg, ${agent.color}, color-mix(in srgb, ${agent.color} 73%, transparent))`,
                       border: "none",
                       color: isRunning ? agent.color : "#fff",
                       fontSize: 12,
@@ -377,7 +377,7 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                   onClick={() => openEdit(agent)}
                   style={{
                     padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
-                    background: "#0a84ff20", border: "1px solid #0a84ff40", color: "#0a84ff",
+                    background: "color-mix(in srgb, var(--color-blue) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--color-blue) 25%, transparent)", color: "var(--color-blue)",
                     fontWeight: 500,
                   }}
                 >
@@ -461,7 +461,7 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                 Cancel
               </button>
               <button onClick={handleSave} disabled={saving}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0a84ff", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--color-blue)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: saving ? 0.6 : 1 }}>
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>
@@ -503,7 +503,7 @@ function ResourceList({
         >
           <div style={{
             width: 32, height: 32, borderRadius: 8,
-            background: type === "skill" ? "#5e5ce620" : "#30d15820",
+            background: type === "skill" ? "color-mix(in srgb, var(--color-indigo) 12%, transparent)" : "color-mix(in srgb, var(--color-green) 12%, transparent)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 15, flexShrink: 0,
           }}>
@@ -521,8 +521,8 @@ function ResourceList({
             onClick={() => onDelete(item.id)}
             style={{
               padding: "4px 10px", borderRadius: 6,
-              background: "#ff375f15", border: "1px solid #ff375f30",
-              color: "#ff375f", fontSize: 12, cursor: "pointer",
+              background: "color-mix(in srgb, var(--color-red) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--color-red) 18%, transparent)",
+              color: "var(--color-red)", fontSize: 12, cursor: "pointer",
             }}
           >
             Delete

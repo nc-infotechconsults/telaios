@@ -297,6 +297,7 @@ class AgentType(StrEnum):
 class SystemPromptMode(StrEnum):
     APPEND = "append"
     OVERRIDE = "override"
+    EXTEND = "extend"
 
 
 class McpTransport(StrEnum):

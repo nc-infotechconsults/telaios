@@ -44,8 +44,8 @@ class InlineSkill(BaseModel):
 
 class SubAgentEntry(BaseModel):
     agent_id: uuid.UUID
-    tool_name: str = Field(min_length=1)
-    tool_description: str = Field(min_length=1)
+    tool_name: str = Field(default="")
+    tool_description: str = Field(default="")
 
 
 # ── LibraryAgent ──────────────────────────────────────────────────────────────

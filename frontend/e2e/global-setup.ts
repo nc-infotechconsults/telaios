@@ -115,6 +115,26 @@ export default async function globalSetup(config: FullConfig) {
     headers: { Authorization: `Bearer ${token}` },
   });
 
+  // ── 1b. Clean up any leftover E2E data from previous runs ──────────────────
+  const E2E_PROFILE_NAMES = ["GPT-4o Coder", "E2E Prompt Profile", "E2E Sub-Agent"];
+  const E2E_PROJECT_NAMES = ["E2E Executing Project", "E2E Planning Project", "E2E Completed Project"];
+
+  // agent-profiles returns a plain array
+  try {
+    const { data: existingProfiles } = await api.get<{ id: string; name: string }[]>("/agent-profiles");
+    for (const p of existingProfiles.filter(p => E2E_PROFILE_NAMES.includes(p.name))) {
+      await api.delete(`/agent-profiles/${p.id}`).catch(() => {});
+    }
+  } catch { /* ignore */ }
+
+  // projects returns { items: [...] }
+  try {
+    const { data: existingProjects } = await api.get<{ items: { id: string; name: string }[] }>("/projects?limit=200");
+    for (const p of (existingProjects.items ?? []).filter(p => E2E_PROJECT_NAMES.includes(p.name))) {
+      await api.delete(`/projects/${p.id}`).catch(() => {});
+    }
+  } catch { /* ignore */ }
+
   // ── 2. Agent profile ────────────────────────────────────────────────────────
   const { data: agentProfile } = await api.post<{ id: string }>("/agent-profiles", {
     name: "GPT-4o Coder",

@@ -27,9 +27,9 @@ const MOCK_ACTIVITY = [
 ];
 
 const MOCK_TEOS_TASKS = [
-  { id: "t1", label: "Analyzing new PR #142 for code quality", progress: 65, color: "#0a84ff" },
-  { id: "t2", label: "Indexing repository changes (247 commits)", progress: 88, color: "#30d158" },
-  { id: "t3", label: "Generating API documentation", progress: 30, color: "#bf5af2" },
+  { id: "t1", label: "Analyzing new PR #142 for code quality", progress: 65, color: "var(--color-blue)" },
+  { id: "t2", label: "Indexing repository changes (247 commits)", progress: 88, color: "var(--color-green)" },
+  { id: "t3", label: "Generating API documentation", progress: 30, color: "var(--color-purple)" },
 ];
 
 export default function ProjectDashboard({
@@ -60,10 +60,10 @@ export default function ProjectDashboard({
   }, [projectId]);
 
   const stats: StatCard[] = [
-    { label: "Repos connected",    value: repos.length,  icon: "⎔", color: "#0a84ff",  delta: "+1 this week" },
-    { label: "Documents indexed",  value: docs.length,   icon: "⎕", color: "#30d158",  delta: "+12 today" },
-    { label: "Symbols extracted",  value: loading ? "…" : `${repos.length * 1200 + 350}`, icon: "⌖", color: "#bf5af2", delta: "live" },
-    { label: "Questions answered", value: 47,            icon: "?", color: "#ff9f0a",  delta: "+8 today" },
+    { label: "Repos connected",    value: repos.length,  icon: "⎔", color: "var(--color-blue)",   delta: "+1 this week" },
+    { label: "Documents indexed",  value: docs.length,   icon: "⎕", color: "var(--color-green)",  delta: "+12 today" },
+    { label: "Symbols extracted",  value: loading ? "…" : `${repos.length * 1200 + 350}`, icon: "⌖", color: "var(--color-purple)", delta: "live" },
+    { label: "Questions answered", value: 47,            icon: "?", color: "var(--color-orange)", delta: "+8 today" },
   ];
 
   return (
@@ -95,7 +95,7 @@ export default function ProjectDashboard({
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
               <span style={{ fontSize: 20 }} aria-hidden="true">{s.icon}</span>
               {s.delta && (
-                <span style={{ fontSize: 10, color: "#30d158", background: "rgba(48,209,88,0.12)", padding: "2px 6px", borderRadius: 9999 }}>
+                <span style={{ fontSize: 10, color: "var(--color-green)", background: "rgba(48,209,88,0.12)", padding: "2px 6px", borderRadius: 9999 }}>
                   {s.delta}
                 </span>
               )}
@@ -125,7 +125,7 @@ export default function ProjectDashboard({
               width: 22,
               height: 22,
               borderRadius: "50%",
-              background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+              background: "linear-gradient(135deg, var(--color-blue), var(--color-purple))",
               animation: "teosOrbPulse 2s ease-in-out infinite",
             }}
             aria-hidden="true"
@@ -177,7 +177,7 @@ export default function ProjectDashboard({
             </h2>
             <button
               onClick={() => onNavigate("repositories")}
-              style={{ background: "none", border: "none", fontSize: 12, color: "#0a84ff", cursor: "pointer" }}
+              style={{ background: "none", border: "none", fontSize: 12, color: "var(--color-blue)", cursor: "pointer" }}
             >
               View all
             </button>
@@ -232,7 +232,7 @@ export default function ProjectDashboard({
                 width: 14,
                 height: 14,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+                background: "linear-gradient(135deg, var(--color-blue), var(--color-purple))",
                 animation: "teosOrbPulse 2s ease-in-out infinite",
               }}
               aria-hidden="true"
@@ -281,19 +281,19 @@ export default function ProjectDashboard({
         </h2>
         <div style={{ display: "flex", gap: 28 }}>
           <div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#0a84ff", lineHeight: 1 }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "var(--color-blue)", lineHeight: 1 }}>
               {kbStatus?.document_count ?? <span style={{ opacity: 0.4 }}>—</span>}
             </div>
             <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginTop: 4 }}>Documents</div>
           </div>
           <div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#30d158", lineHeight: 1 }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "var(--color-green)", lineHeight: 1 }}>
               {kbStatus?.repo_count ?? <span style={{ opacity: 0.4 }}>—</span>}
             </div>
             <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginTop: 4 }}>Repositories</div>
           </div>
           <div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: "#bf5af2", lineHeight: 1 }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "var(--color-purple)", lineHeight: 1 }}>
               {kbStatus?.vector_count ?? <span style={{ opacity: 0.4 }}>—</span>}
             </div>
             <div style={{ fontSize: 11, color: "var(--label-tertiary)", marginTop: 4 }}>Indexed chunks</div>
@@ -346,9 +346,9 @@ export default function ProjectDashboard({
 
 function StatusDot({ status }: { status: string }) {
   const colorMap: Record<string, string> = {
-    ready: "#30d158",
-    cloning: "#ff9f0a",
-    error: "#ff375f",
+    ready: "var(--color-green)",
+    cloning: "var(--color-orange)",
+    error: "var(--color-red)",
     unconfigured: "var(--label-quaternary)",
   };
   return (

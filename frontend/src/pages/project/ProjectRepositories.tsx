@@ -11,9 +11,9 @@ const PROVIDER_ICONS: Record<RepositoryProviderType, string> = {
 };
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  ready: { label: "Synced", color: "#30d158" },
-  cloning: { label: "Indexing…", color: "#ff9f0a" },
-  error: { label: "Failed", color: "#ff375f" },
+  ready: { label: "Synced", color: "var(--color-green)" },
+  cloning: { label: "Indexing…", color: "var(--color-orange)" },
+  error: { label: "Failed", color: "var(--color-red)" },
   unconfigured: { label: "Not configured", color: "var(--label-quaternary)" },
 };
 
@@ -64,10 +64,10 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
   };
 
   const stats = [
-    { label: "Connected", value: repos.length, color: "#0a84ff" },
-    { label: "Synced",    value: repos.filter(r => r.status === "ready").length, color: "#30d158" },
-    { label: "Indexing",  value: repos.filter(r => r.status === "cloning").length, color: "#ff9f0a" },
-    { label: "Failed",    value: repos.filter(r => r.status === "error").length, color: "#ff375f" },
+    { label: "Connected", value: repos.length, color: "var(--color-blue)" },
+    { label: "Synced",    value: repos.filter(r => r.status === "ready").length, color: "var(--color-green)" },
+    { label: "Indexing",  value: repos.filter(r => r.status === "cloning").length, color: "var(--color-orange)" },
+    { label: "Failed",    value: repos.filter(r => r.status === "error").length, color: "var(--color-red)" },
   ];
 
   return (
@@ -85,7 +85,7 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
           style={{
             padding: "8px 16px",
             borderRadius: 10,
-            background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+            background: "linear-gradient(135deg, var(--color-blue), var(--color-indigo))",
             border: "none",
             color: "#fff",
             fontSize: 13,
@@ -122,7 +122,7 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
           <div style={{ fontSize: 40, marginBottom: 12 }}>⎔</div>
           <p style={{ fontSize: 14, margin: 0 }}>No repositories connected yet</p>
           <p style={{ fontSize: 12, margin: "8px 0 0" }}>Connect a repository to enable code knowledge extraction</p>
-          <button onClick={() => setShowModal(true)} style={{ marginTop: 16, padding: "8px 20px", borderRadius: 10, background: "#0a84ff", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={() => setShowModal(true)} style={{ marginTop: 16, padding: "8px 20px", borderRadius: 10, background: "var(--color-blue)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             Connect your first repo
           </button>
         </div>
@@ -164,7 +164,7 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
                     {repo.status === "cloning" && (
                       <div style={{ marginTop: 10 }}>
                         <div style={{ height: 3, borderRadius: 9999, background: "var(--fill-tertiary)", overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: "60%", background: "#ff9f0a", borderRadius: 9999, animation: "pulse 2s ease-in-out infinite" }} />
+                          <div style={{ height: "100%", width: "60%", background: "var(--color-orange)", borderRadius: 9999, animation: "pulse 2s ease-in-out infinite" }} />
                         </div>
                       </div>
                     )}
@@ -176,18 +176,18 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
                       title="Trigger knowledge ingest for this repository"
                       style={{
                         padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: indexingIds.has(repo.id) ? "default" : "pointer",
-                        background: "#5e5ce620", border: "1px solid #5e5ce640", color: "#5e5ce6",
+                        background: "color-mix(in srgb, var(--color-indigo) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--color-indigo) 25%, transparent)", color: "var(--color-indigo)",
                         opacity: indexingIds.has(repo.id) ? 0.6 : 1,
                         fontWeight: 500,
                       }}
                     >
                       {indexingIds.has(repo.id) ? "Indexing…" : "Index"}
                     </button>
-                    <ActionButton label="Ask about this repo" color="#0a84ff" icon="?" />
-                    <ActionButton label="Re-sync" color="#30d158" icon="↺" />
+                    <ActionButton label="Ask about this repo" color="var(--color-blue)" icon="?" />
+                    <ActionButton label="Re-sync" color="var(--color-green)" icon="↺" />
                     <ActionButton
                       label="Delete"
-                      color="#ff375f"
+                      color="var(--color-red)"
                       icon="✕"
                       onClick={() => handleDelete(repo.id)}
                     />
@@ -224,9 +224,9 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
                         padding: "6px 12px",
                         borderRadius: 8,
                         border: "0.5px solid",
-                        borderColor: form.provider === p ? "#0a84ff" : "var(--hairline)",
-                        background: form.provider === p ? "rgba(10,132,255,0.12)" : "var(--fill-quaternary)",
-                        color: form.provider === p ? "#0a84ff" : "var(--label-secondary)",
+                        borderColor: form.provider === p ? "var(--color-blue)" : "var(--hairline)",
+                        background: form.provider === p ? "color-mix(in srgb, var(--color-blue) 12%, transparent)" : "var(--fill-quaternary)",
+                        color: form.provider === p ? "var(--color-blue)" : "var(--label-secondary)",
                         cursor: "pointer",
                         fontSize: 12,
                         fontWeight: form.provider === p ? 600 : 400,
@@ -276,7 +276,7 @@ export default function ProjectRepositories({ projectId }: { projectId: string }
                 style={{
                   padding: "8px 20px",
                   borderRadius: 10,
-                  background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+                  background: "linear-gradient(135deg, var(--color-blue), var(--color-indigo))",
                   border: "none",
                   color: "#fff",
                   fontSize: 13,
@@ -314,8 +314,8 @@ function ActionButton({ label, color, icon, onClick }: { label: string; color: s
         width: 30,
         height: 30,
         borderRadius: 8,
-        background: color + "14",
-        border: "0.5px solid " + color + "30",
+        background: `color-mix(in srgb, ${color} 8%, transparent)`,
+        border: `0.5px solid color-mix(in srgb, ${color} 18%, transparent)`,
         color,
         cursor: "pointer",
         display: "flex",

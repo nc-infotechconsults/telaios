@@ -24,6 +24,7 @@ import Layout from "./components/Layout";
 import ProjectLayout from "./components/ProjectLayout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import SettingsPage from "./pages/SettingsPage";
+import AgentProfiles from "./pages/AgentProfiles";
 
 applyAppSettingsToDocument(loadCachedAppSettings());
 
@@ -62,6 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/agents" element={<AgentProfiles />} />
                   </Route>
                 </Route>
               </Routes>

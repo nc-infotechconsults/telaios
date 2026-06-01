@@ -74,7 +74,8 @@ test.describe("TaskDetailModal — basic open/close", () => {
     const modal = page.getByRole("dialog");
     await expect(modal).toBeVisible();
     await expect(modal.getByText("Agent")).toBeVisible();
-    await expect(modal.getByText("langgraph")).toBeVisible();
+    // Backend always returns agent_type="custom" for user-created profiles
+    await expect(modal.getByText("custom")).toBeVisible();
     await expect(modal.getByText("GPT-4o Coder")).toBeVisible();
   });
 

@@ -1,4 +1,4 @@
-import type { ReactNode, MouseEvent } from "react";
+import type { ReactNode } from "react";
 
 type ChipColor = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
 type ChipVariant = "solid" | "flat" | "bordered" | "dot";
@@ -13,6 +13,7 @@ interface Props {
   startContent?: ReactNode;
   onClose?: () => void;
   onClick?: () => void;
+  title?: string;
 }
 
 const colorSolid: Record<ChipColor, string> = {
@@ -25,7 +26,7 @@ const colorSolid: Record<ChipColor, string> = {
 };
 
 const colorFlat: Record<ChipColor, string> = {
-  default:   "bg-default-100 text-default-600",
+  default:   "bg-[var(--fill-tertiary)] text-[var(--label-secondary)]",
   primary:   "bg-primary/15 text-primary",
   secondary: "bg-secondary/15 text-secondary",
   success:   "bg-success/15 text-success",
@@ -48,7 +49,7 @@ const sizeMap: Record<string, string> = {
   lg: "text-[13px] h-7 px-3",
 };
 
-export function Chip({ color = "default", size = "sm", variant = "flat", className = "", style, children, startContent, onClose, onClick }: Props) {
+export function Chip({ color = "default", size = "sm", variant = "flat", className = "", style, children, startContent, onClose, onClick, title }: Props) {
   const colorClass = variant === "solid" ? colorSolid[color] : variant === "bordered" ? colorBordered[color] : colorFlat[color];
 
   const Wrapper = onClick ? "button" : "span";
@@ -58,6 +59,7 @@ export function Chip({ color = "default", size = "sm", variant = "flat", classNa
       className={`apple-badge inline-flex items-center gap-1 ${colorClass} ${sizeMap[size] ?? sizeMap.sm} ${onClick ? "cursor-pointer" : ""} ${className}`}
       style={style}
       onClick={onClick}
+      title={title}
     >
       {startContent}
       {children}

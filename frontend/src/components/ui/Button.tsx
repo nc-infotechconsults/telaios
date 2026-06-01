@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 type ButtonVariant = "solid" | "light" | "flat" | "ghost" | "bordered";
 type ButtonColor = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
@@ -27,9 +27,9 @@ interface Props {
 }
 
 const colorMap: Record<ButtonColor, { bg: string; text: string; hover: string }> = {
-  default:  { bg: "bg-default-100", text: "text-foreground", hover: "hover:bg-default-200" },
+  default:  { bg: "bg-[var(--fill-tertiary)]", text: "text-[var(--label-primary)]", hover: "hover:bg-[var(--fill-secondary)]" },
   primary:  { bg: "bg-primary", text: "text-primary-foreground", hover: "hover:opacity-90" },
-  secondary:{ bg: "bg-default-100", text: "text-foreground", hover: "hover:bg-default-200" },
+  secondary:{ bg: "bg-[var(--fill-tertiary)]", text: "text-[var(--label-primary)]", hover: "hover:bg-[var(--fill-secondary)]" },
   success:  { bg: "bg-success", text: "text-white", hover: "hover:opacity-90" },
   warning:  { bg: "bg-warning", text: "text-white", hover: "hover:opacity-90" },
   danger:   { bg: "bg-danger", text: "text-white", hover: "hover:opacity-90" },
@@ -64,7 +64,7 @@ export function Button({
   const c = colorMap[color] ?? colorMap.default;
   const sz = isIconOnly ? (size === "sm" ? "h-9 w-9 px-0" : size === "lg" ? "h-[50px] w-[50px] px-0" : "h-[44px] w-[44px] px-0") : (sizeMap[size] ?? sizeMap.md);
 
-  const base = "inline-flex items-center justify-center font-semibold rounded-[14px] transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100";
+  const base = "inline-flex items-center justify-center gap-2 font-semibold rounded-[14px] transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100";
 
   const variantClass = (() => {
     if (variant === "flat" || variant === "light") return `bg-transparent ${c.text}`;

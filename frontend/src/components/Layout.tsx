@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { getSettings } from "../lib/api";
@@ -9,7 +9,7 @@ import {
   subscribeToAppSettingsUpdates,
 } from "../lib/appSettings";
 import type { AppSettings } from "../types";
-import { TelaiOSLogo } from "./common/TelaiOSLogo.tsx";
+import MeshBackground from "./MeshBackground";
 
 const IS_DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 const COLLAPSED_KEY = "sidebar_collapsed";
@@ -18,7 +18,7 @@ const COLLAPSED_KEY = "sidebar_collapsed";
 
 function BriefcaseIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="2" y="7" width="20" height="14" rx="2" />
       <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
     </svg>
@@ -26,7 +26,7 @@ function BriefcaseIcon() {
 }
 function BotIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="11" width="18" height="10" rx="2" />
       <circle cx="12" cy="5" r="2" />
       <path d="M12 7v4" />
@@ -37,7 +37,7 @@ function BotIcon() {
 }
 function UsersIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -47,180 +47,106 @@ function UsersIcon() {
 }
 function SettingsIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
-function SunIcon() {
+function AnalyticsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="5" />
-      <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-      <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-    </svg>
-  );
-}
-function MoonIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
-function LogoutIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
-function MenuIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-  );
-}
-function CloseIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-function ChevronLeftIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-function ChevronRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="9 18 15 12 9 6" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
+interface NavItem {
+  to: string;
+  end: boolean;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: "/", end: true, label: "Projects", icon: <BriefcaseIcon /> },
   { to: "/library", end: false, label: "Library", icon: <BotIcon /> },
-  {
-    to: "/analytics",
-    end: false,
-    label: "Analytics",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
-      </svg>
-    ),
-  },
+  { to: "/analytics", end: false, label: "Analytics", icon: <AnalyticsIcon /> },
 ];
 
-// ─── Collapsed tooltip ────────────────────────────────────────────────────────
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  { to: "/users", end: false, label: "Users", icon: <UsersIcon /> },
+  { to: "/settings", end: false, label: "Settings", icon: <SettingsIcon /> },
+];
 
-function CollapsedTooltip({ label }: { label: string }) {
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+// ─── NavButton ────────────────────────────────────────────────────────────────
 
+function NavButton({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <span
-      className="absolute inset-0"
-      onMouseEnter={(e) => {
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        setPos({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+    <button
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: "7px 10px",
+        borderRadius: 10,
+        border: "none",
+        borderLeft: active ? "2.5px solid #0a84ff" : "2.5px solid transparent",
+        background: active ? "var(--glass-strong)" : "none",
+        cursor: "pointer",
+        color: active ? "var(--label-primary)" : "var(--label-secondary)",
+        fontSize: 13.5,
+        fontWeight: active ? 500 : 400,
+        textAlign: "left",
+        marginBottom: 1,
+        transition: "background 120ms, color 120ms",
       }}
-      onMouseLeave={() => setPos(null)}
+      onMouseEnter={(e) => {
+        if (!active) (e.currentTarget as HTMLElement).style.background = "var(--hover-glass)";
+      }}
+      onMouseLeave={(e) => {
+        if (!active) (e.currentTarget as HTMLElement).style.background = "none";
+      }}
     >
-      {pos && (
-        <span
-          style={{ position: "fixed", top: pos.top, left: pos.left, transform: "translateY(-50%)", zIndex: 9999 }}
-          className="px-2 py-1 rounded-md text-xs font-medium bg-foreground text-background whitespace-nowrap shadow-md pointer-events-none"
-        >
-          {label}
-        </span>
-      )}
-    </span>
+      <span style={{ width: 16, height: 16, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        {item.icon}
+      </span>
+      <span style={{ flex: 1 }}>{item.label}</span>
+    </button>
   );
 }
 
-// ─── Sidebar nav link ─────────────────────────────────────────────────────────
+// ─── Section header ───────────────────────────────────────────────────────────
 
-function SideNavLink({
-  to, end, label, icon, collapsed, onClick,
-}: {
-  to: string; end: boolean; label: string; icon: React.ReactNode; collapsed: boolean; onClick?: () => void;
-}) {
+function SectionHeader({ label }: { label: string }) {
   return (
-    <NavLink
-      to={to}
-      end={end}
-      onClick={onClick}
-      style={({ isActive }) => ({
-        display: "flex",
-        alignItems: "center",
-        gap: collapsed ? 0 : "10px",
-        position: "relative",
-        cursor: "pointer",
-        userSelect: "none",
-        height: "30px",
-        margin: "1px 0",
-        padding: collapsed ? "0" : "0 8px",
-        justifyContent: collapsed ? "center" : "flex-start",
-        borderRadius: "6px",
-        fontSize: "13px",
-        fontWeight: isActive ? 600 : 500,
-        letterSpacing: "-0.01em",
-        color: isActive ? "var(--label-primary)" : "var(--label-secondary)",
-        background: isActive ? "var(--fill-secondary)" : "transparent",
-        transition: "background 120ms ease, color 120ms ease",
-      })}
-      onMouseEnter={(e) => {
-        if (!e.currentTarget.style.background.includes("--fill-secondary")) {
-          const isCurrentlyActive = e.currentTarget.getAttribute("aria-current") === "page";
-          if (!isCurrentlyActive) {
-            e.currentTarget.style.background = "var(--fill-quaternary)";
-          }
-        }
-      }}
-      onMouseLeave={(e) => {
-        const isCurrentlyActive = e.currentTarget.getAttribute("aria-current") === "page";
-        if (!isCurrentlyActive) {
-          e.currentTarget.style.background = "transparent";
-        }
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        color: "var(--label-tertiary)",
+        padding: "10px 12px 4px",
       }}
     >
-      {({ isActive }) => (
-        <>
-          <span
-            className="shrink-0 inline-flex items-center justify-center"
-            style={{
-              width: 18,
-              height: 18,
-              color: isActive ? "var(--color-blue)" : "var(--label-secondary)",
-            }}
-          >
-            {icon}
-          </span>
-          {!collapsed && <span style={{ lineHeight: 1 }}>{label}</span>}
-          {!collapsed && isActive && <span className="sr-only">(current page)</span>}
-          {collapsed && <CollapsedTooltip label={label} />}
-        </>
-      )}
-    </NavLink>
+      {label}
+    </div>
   );
 }
 
@@ -229,7 +155,7 @@ function SideNavLink({
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, toggle, syncThemeWithDefault } = useTheme();
+  const { theme, toggle } = useTheme();
   const { user, logout } = useAuth();
   const [appSettings, setAppSettings] = useState<AppSettings>(loadCachedAppSettings);
 
@@ -253,14 +179,15 @@ export default function Layout() {
     getSettings()
       .then((settings) => {
         persistAndApplyAppSettings(settings);
-        syncThemeWithDefault(settings.default_theme === "light" ? "light" : "dark");
+        // syncThemeWithDefault removed — not needed here since we use toggle
       })
       .catch(() => {
         // Best-effort refresh: keep cached settings if request fails.
       });
-  }, [syncThemeWithDefault, user]);
+  }, [user]);
 
-  const brandName = appSettings.brand_name.trim() || "TelaiOS";
+  void appSettings; // used for future brand customisation
+  void collapsed;   // kept for future collapse support
 
   const handleLogout = useCallback(() => {
     logout();
@@ -274,6 +201,8 @@ export default function Layout() {
       return next;
     });
   }, []);
+
+  void toggleCollapsed; // available for future collapse button
 
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
@@ -292,348 +221,297 @@ export default function Layout() {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
-  const isFullHeight =
-    location.pathname.includes("/projects/") ||
-    location.pathname.includes("/execute");
+  // Helper: is this nav item's path active?
+  function isActive(item: NavItem): boolean {
+    if (item.end) {
+      return location.pathname === item.to;
+    }
+    return location.pathname.startsWith(item.to);
+  }
 
-  const sidebarWidth = collapsed ? "w-12" : "w-[220px]";
+  // ── Sidebar inner content ──
+  const SidebarInner = () => (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 
-  // ── Sidebar content (shared between drawer and desktop) ──
-  const SidebarContent = ({ onClose }: { onClose?: () => void }) => {
-    // Mobile drawer is always fully expanded regardless of desktop collapse state
-    const isExpanded = !!onClose;
-    const effectiveCollapsed = isExpanded ? false : collapsed;
-
-    return (
-    <div className="flex flex-col h-full">
-      {/* Mobile close button */}
-      {onClose && (
-        <div className="flex items-center justify-end h-10 px-2 shrink-0 md:hidden">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close menu"
-            className="inline-flex items-center justify-center w-8 h-8 rounded-[8px] transition-colors"
-            style={{ color: "var(--label-secondary)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--fill-tertiary)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      {/* Brand */}
+      <div
+        style={{
+          padding: "16px 16px 12px",
+          borderBottom: "0.5px solid var(--hairline)",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 8,
+              background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#fff",
+              flexShrink: 0,
+            }}
+            aria-hidden="true"
           >
-            <CloseIcon />
-          </button>
+            T
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--label-primary)", lineHeight: 1.2 }}>TelaiOS</div>
+            <div style={{ fontSize: 10, color: "var(--label-tertiary)" }}>v2.4</div>
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Section header (Finder-style) */}
-      {!effectiveCollapsed && (
-        <div
-          className="px-3 pt-3 pb-1 shrink-0"
-          style={{
-            fontSize: "11px",
-            fontWeight: 600,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-            color: "var(--label-tertiary)",
-          }}
-        >
-          Workspace
-        </div>
-      )}
-
-      {/* Navigation */}
+      {/* Nav */}
       <nav
         aria-label="Main navigation"
-        className="flex-1 overflow-y-auto overflow-x-hidden"
-        style={{ padding: effectiveCollapsed ? "8px 6px" : "2px 8px 8px" }}
+        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "4px 8px" }}
       >
+        <SectionHeader label="Workspace" />
         {NAV_ITEMS.map((item) => (
-          <SideNavLink
+          <NavButton
             key={item.to}
-            {...item}
-            collapsed={effectiveCollapsed}
-            onClick={onClose}
+            item={item}
+            active={isActive(item)}
+            onClick={() => navigate(item.to)}
           />
         ))}
 
         {user?.system_role === "admin" && (
           <>
-            {!effectiveCollapsed && (
-              <div
-                className="pt-4 pb-1 px-1"
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  color: "var(--label-tertiary)",
-                }}
-              >
-                Administration
-              </div>
-            )}
-            <SideNavLink
-              to="/users"
-              end={false}
-              label="Users"
-              icon={<UsersIcon />}
-              collapsed={effectiveCollapsed}
-              onClick={onClose}
-            />
-            <SideNavLink
-              to="/settings"
-              end={false}
-              label="Settings"
-              icon={<SettingsIcon />}
-              collapsed={effectiveCollapsed}
-              onClick={onClose}
-            />
+            <SectionHeader label="Administration" />
+            {ADMIN_NAV_ITEMS.map((item) => (
+              <NavButton
+                key={item.to}
+                item={item}
+                active={isActive(item)}
+                onClick={() => navigate(item.to)}
+              />
+            ))}
           </>
         )}
       </nav>
 
-      {/* Collapse toggle */}
+      {/* User strip */}
       <div
-        className="shrink-0 hidden md:block"
         style={{
-          borderTop: "0.5px solid var(--separator)",
-          padding: "6px 8px",
+          borderTop: "0.5px solid var(--hairline)",
+          padding: "8px 10px",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
         }}
       >
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="flex items-center gap-2 w-full rounded-[6px] transition-colors"
-          style={{
-            height: "28px",
-            padding: collapsed ? "0" : "0 8px",
-            justifyContent: collapsed ? "center" : "flex-start",
-            fontSize: "12px",
-            fontWeight: 500,
-            color: "var(--label-tertiary)",
-            background: "transparent",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--fill-quaternary)";
-            e.currentTarget.style.color = "var(--label-secondary)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "var(--label-tertiary)";
-          }}
-        >
-          {collapsed ? <ChevronRightIcon /> : <><ChevronLeftIcon /><span>Collapse</span></>}
-        </button>
-      </div>
-    </div>
-    );
-  };
-
-  return (
-    <div className="h-screen flex flex-col overflow-hidden text-foreground">
-      {/* Demo banner */}
-      {IS_DEMO && (
         <div
-          className="shrink-0 flex items-center justify-center gap-2 px-4 py-1.5 text-[11px] font-medium"
-          role="banner"
+          aria-hidden="true"
           style={{
-            background: "rgba(255, 149, 0, 0.12)",
-            color: "var(--color-orange)",
-            borderBottom: "0.5px solid var(--separator)",
-            backdropFilter: "var(--glass-blur)",
-            WebkitBackdropFilter: "var(--glass-blur)",
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#fff",
+            flexShrink: 0,
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span>
-            Demo mode — all data is mocked. Run{" "}
-            <code className="font-mono px-1 rounded" style={{ background: "rgba(255,149,0,0.10)" }}>npm run dev</code> to connect to the backend.
-          </span>
+          {user?.display_name?.charAt(0)?.toUpperCase() ?? "U"}
         </div>
-      )}
-
-      {/* ── Top toolbar (macOS unified style) ── */}
-      <header
-        className="h-[44px] shrink-0 flex items-center gap-2 px-3 sm:px-4 apple-nav-glass z-30 select-none"
-      >
-        {/* Mobile hamburger */}
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open menu"
-          aria-expanded={drawerOpen}
-          className="md:hidden inline-flex items-center justify-center w-8 h-8 rounded-[8px] transition-colors"
-          style={{ color: "var(--label-secondary)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--fill-tertiary)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-        >
-          <MenuIcon />
-        </button>
-
-        {/* Brand */}
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center" style={{ color: "var(--color-blue)" }}>
-            {appSettings.logo_url ? (
-              <img
-                src={appSettings.logo_url}
-                alt={`${brandName} logo`}
-                className="h-[20px] w-auto max-w-[140px] object-contain"
-              />
-            ) : (
-              <TelaiOSLogo size={20} />
-            )}
-          </span>
-          <span
-            className="leading-none tracking-tight truncate"
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
             style={{
-              fontSize: "14px",
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
+              fontSize: 12,
+              fontWeight: 500,
               color: "var(--label-primary)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
-            {brandName}
-          </span>
+            {user?.display_name || user?.email || "User"}
+          </div>
         </div>
-
-        <div className="flex-1" />
-
-        {/* Right cluster */}
-        <div className="flex items-center gap-1">
+        <div style={{ display: "flex", gap: 2 }}>
           <button
-            type="button"
             onClick={toggle}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-[8px] transition-colors"
-            style={{ color: "var(--label-secondary)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--fill-tertiary)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-          >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-          </button>
-
-          {user && (
-            <div
-              className="flex items-center gap-2 pl-2 ml-1"
-              style={{ borderLeft: "0.5px solid var(--separator)" }}
-            >
-              <div className="hidden sm:flex flex-col items-end leading-tight">
-                <span
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "var(--label-primary)",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  {user.display_name}
-                </span>
-                <span
-                  className="capitalize"
-                  style={{
-                    fontSize: "11px",
-                    color: "var(--label-tertiary)",
-                  }}
-                >
-                  {user.system_role}
-                </span>
-              </div>
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                aria-hidden="true"
-                style={{
-                  background: "linear-gradient(135deg, var(--color-blue), var(--color-indigo))",
-                  color: "white",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  boxShadow: "var(--shadow-xs)",
-                }}
-              >
-                {user.display_name.charAt(0).toUpperCase()}
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                aria-label="Sign out"
-                title="Sign out"
-                className="inline-flex items-center justify-center w-7 h-7 rounded-[8px] transition-colors"
-                style={{ color: "var(--label-tertiary)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--fill-tertiary)";
-                  e.currentTarget.style.color = "var(--label-secondary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "var(--label-tertiary)";
-                }}
-              >
-                <LogoutIcon />
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* ── Body: sidebar + main ── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* Mobile overlay */}
-        {drawerOpen && (
-          <div
-            className="fixed top-[44px] inset-x-0 bottom-0 z-40 md:hidden"
             style={{
-              background: "rgba(0, 0, 0, 0.30)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--label-secondary)",
+              fontSize: 14,
+              padding: 4,
+              borderRadius: 6,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            aria-hidden="true"
-            onClick={() => setDrawerOpen(false)}
-          />
-        )}
-
-        {/* Mobile drawer */}
-        <aside
-          id="sidebar-drawer"
-          aria-label="Application sidebar"
-          className={`
-            fixed top-[44px] left-0 h-[calc(100%-44px)] z-50 w-64 apple-sidebar-glass
-            transform transition-transform duration-300 ease-out
-            ${drawerOpen ? "translate-x-0" : "-translate-x-full"}
-            md:hidden
-          `}
-        >
-          <SidebarContent onClose={() => setDrawerOpen(false)} />
-        </aside>
-
-        {/* Desktop sidebar */}
-        <aside
-          aria-label="Application sidebar"
-          className={`
-            hidden md:flex flex-col shrink-0 apple-sidebar-glass
-            transition-[width] duration-200 ease-in-out overflow-hidden
-            ${sidebarWidth}
-          `}
-        >
-          <SidebarContent />
-        </aside>
-
-        {/* Main content */}
-        <main
-          className={
-            isFullHeight
-              ? "flex-1 overflow-hidden min-w-0"
-              : "flex-1 overflow-y-auto min-w-0"
-          }
-        >
-          {isFullHeight ? (
-            <Outlet />
-          ) : (
-            <div className="w-full px-5 sm:px-7 lg:px-10 py-6 sm:py-8 mx-auto" style={{ maxWidth: "var(--width-max)" }}>
-              <Outlet />
-            </div>
-          )}
-        </main>
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--hover-glass)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          >
+            {theme === "dark" ? "☀" : "☽"}
+          </button>
+          <button
+            onClick={handleLogout}
+            aria-label="Log out"
+            title="Log out"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--label-tertiary)",
+              padding: 4,
+              borderRadius: 6,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--hover-glass)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      <MeshBackground />
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "grid",
+          gridTemplateColumns: "220px 1fr",
+          gridTemplateRows: "auto 1fr",
+          width: "100vw",
+          height: "100vh",
+          padding: 10,
+          gap: 10,
+          boxSizing: "border-box",
+          overflow: "hidden",
+        }}
+      >
+        {/* ── Sidebar ── */}
+        <nav
+          className="glass-panel"
+          aria-label="Application sidebar"
+          style={{
+            gridRow: "1 / span 2",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <SidebarInner />
+        </nav>
+
+        {/* ── Main content ── */}
+        <main
+          className="glass-panel"
+          style={{
+            gridColumn: 2,
+            gridRow: "1 / span 2",
+            overflow: "auto",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {/* Demo banner */}
+          {IS_DEMO && (
+            <div
+              role="banner"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "6px 16px",
+                fontSize: 11,
+                fontWeight: 500,
+                background: "rgba(255, 149, 0, 0.12)",
+                color: "var(--color-orange)",
+                borderBottom: "0.5px solid var(--separator)",
+                borderRadius: "var(--radius-glass) var(--radius-glass) 0 0",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span>
+                Demo mode — all data is mocked. Run{" "}
+                <code style={{ fontFamily: "monospace", padding: "0 4px", borderRadius: 4, background: "rgba(255,149,0,0.10)" }}>npm run dev</code> to connect to the backend.
+              </span>
+            </div>
+          )}
+
+          <div
+            style={{
+              padding: "20px 24px",
+              maxWidth: "var(--width-max)",
+              margin: "0 auto",
+            }}
+          >
+            <Outlet />
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile drawer overlay */}
+      {drawerOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            background: "rgba(0,0,0,0.30)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+          }}
+          aria-hidden="true"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        aria-label="Application sidebar"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          height: "100%",
+          width: 260,
+          zIndex: 50,
+          transform: drawerOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 300ms ease-out",
+          background: "var(--glass-thin)",
+          backdropFilter: "blur(40px) saturate(180%)",
+          WebkitBackdropFilter: "blur(40px) saturate(180%)",
+          borderRight: "0.5px solid var(--separator)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <SidebarInner />
+      </aside>
+    </>
   );
 }

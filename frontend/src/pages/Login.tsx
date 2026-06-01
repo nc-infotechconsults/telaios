@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { TelaiOSLogo } from "../components/common/TelaiOSLogo.tsx";
-
+import MeshBackground from "../components/MeshBackground";
 
 export default function Login() {
   const { login } = useAuth();
@@ -27,24 +27,34 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm">
-        {/* Brand */}
-        <div className="flex items-center gap-3 justify-center mb-8">
-          <span className="text-primary">
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, position: "relative" }}>
+      <MeshBackground />
+      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 380 }}>
+        <div
+          style={{
+            background: "var(--glass-strong)",
+            backdropFilter: "blur(28px) saturate(180%)",
+            WebkitBackdropFilter: "blur(28px) saturate(180%)",
+            border: "0.5px solid var(--glass-edge)",
+            borderRadius: 22,
+            boxShadow: "var(--shadow-glass-lg)",
+            padding: "36px 32px",
+            width: "100%",
+            maxWidth: 380,
+            position: "relative",
+          }}
+        >
+          {/* Brand header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginBottom: 28 }}>
             <TelaiOSLogo size={36} />
-          </span>
-          <span className="font-bold text-2xl leading-snug tracking-tight text-foreground">
-            TelaiOS
-          </span>
-        </div>
+            <span style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-0.02em", color: "var(--label-primary)" }}>
+              TelaiOS
+            </span>
+          </div>
 
-        <div className="apple-card p-8">
-          <h1 className="text-lg font-semibold text-foreground mb-6">Sign In</h1>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-[13px] font-semibold text-default-500">
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="email" style={{ fontSize: 13, fontWeight: 600, color: "var(--label-secondary)" }}>
                 Email Address
               </label>
               <input
@@ -54,13 +64,14 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="apple-input w-full px-3 py-2.5 text-foreground placeholder-default-400"
+                className="apple-input"
+                style={{ width: "100%", padding: "10px 12px", fontSize: 14 }}
                 placeholder="you@example.com"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="block text-[13px] font-semibold text-default-500">
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label htmlFor="password" style={{ fontSize: 13, fontWeight: 600, color: "var(--label-secondary)" }}>
                 Password
               </label>
               <input
@@ -70,13 +81,14 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="apple-input w-full px-3 py-2.5 text-foreground placeholder-default-400"
+                className="apple-input"
+                style={{ width: "100%", padding: "10px 12px", fontSize: 14 }}
                 placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <p role="alert" className="text-sm text-danger">
+              <p role="alert" style={{ color: "var(--color-red)", fontSize: 13, marginTop: 8 }}>
                 {error}
               </p>
             )}
@@ -84,9 +96,22 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="apple-btn w-full h-[50px] bg-primary text-primary-foreground font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                width: "100%",
+                height: 44,
+                borderRadius: 12,
+                background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 600,
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.6 : 1,
+                transition: "opacity 150ms",
+                letterSpacing: "-0.01em",
+              }}
             >
-              {loading ? "Signing In…" : "Sign In"}
+              {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
         </div>

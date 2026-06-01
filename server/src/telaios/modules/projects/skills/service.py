@@ -67,7 +67,13 @@ class ProjectSkillService:
     async def clone_from_library(
         self, project_id: uuid.UUID, library_skill_id: uuid.UUID
     ) -> ProjectSkillRead:
-        lib_skill = await self._session.get(LibrarySkill, library_skill_id)
+        result = await self._session.execute(
+            select(LibrarySkill).where(
+                LibrarySkill.id == library_skill_id,
+                LibrarySkill.deleted_at.is_(None),
+            )
+        )
+        lib_skill = result.scalar_one_or_none()
         if lib_skill is None:
             raise NotFoundError("Library skill not found")
         skill = ProjectSkill(

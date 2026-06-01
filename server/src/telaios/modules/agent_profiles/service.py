@@ -97,7 +97,7 @@ class AgentProfileService:
             llm_temperature=dto.llm_temperature,
             llm_max_tokens=dto.llm_max_tokens,
             system_prompt=dto.system_prompt,
-            system_prompt_mode=("append" if dto.system_prompt_mode == "extend" else "override"),
+            system_prompt_mode=("append" if dto.system_prompt_mode in ("extend", "append") else "override"),
             sub_agents=[
                 SubAgentEntry(agent_id=str(aid), tool_name="", tool_description="")
                 for aid in (dto.sub_agent_ids or [])
@@ -118,7 +118,7 @@ class AgentProfileService:
         updates = dto.model_dump(exclude_unset=True, exclude_none=True)
         for field, val in updates.items():
             if field == "system_prompt_mode":
-                setattr(patch_dto, field, "append" if val == "extend" else "override")
+                setattr(patch_dto, field, "append" if val in ("extend", "append") else "override")
             elif field == "sub_agent_ids":
                 setattr(
                     patch_dto,
