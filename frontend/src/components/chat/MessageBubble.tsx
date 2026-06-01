@@ -63,9 +63,20 @@ interface Props {
   isStreaming?: boolean;
 }
 
+function extractDisplayContent(content: string): string {
+  if (content.trimStart().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(content);
+      if (typeof parsed.message === "string") return parsed.message;
+    } catch { /* not JSON */ }
+  }
+  return content;
+}
+
 export default function MessageBubble({ message, isStreaming }: Props) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
+  const displayContent = isUser ? message.content : extractDisplayContent(message.content);
 
   if (isSystem) {
     return (
@@ -91,10 +102,10 @@ export default function MessageBubble({ message, isStreaming }: Props) {
           }`}
         >
           {isUser || isStreaming ? (
-            <span className="whitespace-pre-wrap">{message.content}</span>
+            <span className="whitespace-pre-wrap">{displayContent}</span>
           ) : (
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
-              {message.content}
+              {displayContent}
             </ReactMarkdown>
           )}
         </div>

@@ -15,7 +15,7 @@ import type { HelmRelease } from "../../types";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   environmentId: string;
   onInstall: (release: HelmRelease) => void;
 }
@@ -108,7 +108,7 @@ export default function HelmInstallModal({
       toast.success("Chart installed", release.name);
       onInstall(release);
       resetForm();
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to install Helm chart");
     } finally {

@@ -143,7 +143,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
       <div className="flex gap-3">
         <Select
           label="Role"
-          selectedKeys={new Set([role])}
+          selectedKeys={Array.from(new Set([role]))}
           onSelectionChange={(keys) => setRole(Array.from(keys)[0] as AgentRole)}
           isDisabled={saving}
           className="flex-1"
@@ -155,7 +155,7 @@ export default function LibraryAgentForm({ initialData, onSaved, onCancel }: Pro
 
         <Select
           label="Prompt mode"
-          selectedKeys={new Set([systemPromptMode])}
+          selectedKeys={Array.from(new Set([systemPromptMode]))}
           onSelectionChange={(keys) =>
             setSystemPromptMode(Array.from(keys)[0] as "append" | "override")
           }

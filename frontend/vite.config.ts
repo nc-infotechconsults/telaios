@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // When running inside Docker the proxy needs Docker network service names.
 // Outside Docker this env var is unset, so we fall back to localhost.
-const SERVER_URL = process.env.INTERNAL_SERVER_URL ?? process.env.VITE_API_URL ?? "http://localhost:8000";
+const SERVER_URL = process.env.INTERNAL_SERVER_URL ?? process.env.VITE_API_URL ?? "http://localhost:8001";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

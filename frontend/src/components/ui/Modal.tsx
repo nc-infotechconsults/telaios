@@ -21,7 +21,7 @@ const sizeWidth: Record<string, string> = {
   "2xl": "max-w-2xl", "3xl": "max-w-3xl", "4xl": "max-w-4xl", "5xl": "max-w-5xl", full: "max-w-full",
 };
 
-export function Modal({ isOpen, onOpenChange, onClose, size = "md", children, scrollBehavior = "normal", isDismissable, hideCloseButton, classNames, ...rest }: ModalProps) {
+export function Modal({ isOpen, onOpenChange, size = "md", children, scrollBehavior = "normal", classNames: _classNames }: ModalProps) {
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };

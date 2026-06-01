@@ -8,7 +8,7 @@ class BaseAgent(BaseChatModel):
     def _init_model(self):
         chat_model_values = {
             "model_provider": self._llm_config.provider,
-            "model": self._llm_config.model_name,
+            "model": self._llm_config.model,
             "temperature": self._llm_config.temperature,
             "timeout": self._llm_config.timeout,
             "max_tokens": self._llm_config.max_tokens,

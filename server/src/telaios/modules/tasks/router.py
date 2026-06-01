@@ -1,6 +1,7 @@
 """Tasks router.
 
 Routes:
+  GET    /projects/{project_id}/tasks        — list recent tasks for a project, viewer+
   GET    /plans/{plan_id}/tasks              — list, viewer+
   POST   /plans/{plan_id}/tasks              — create, editor+
 
@@ -17,12 +18,13 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telaios.auth.dependencies import CurrentPrincipal, Principal
-from telaios.auth.project_access import check_project_membership
+from telaios.auth.project_access import check_project_membership, require_project_access
 from telaios.db.session import get_session
+from telaios.domain.enums import TaskStatus
 from telaios.modules.plans.service import PlanService
 from telaios.modules.tasks.artifacts.schemas import ArtifactRead, BulkArtifactCreate
 from telaios.modules.tasks.artifacts.service import ArtifactService
@@ -191,4 +193,29 @@ async def bulk_create_artifacts(
     return await ArtifactService(session).create_bulk(task_id, body.artifacts)
 
 
-__all__ = ["plan_tasks_router", "task_router"]
+# ─── Project-scoped tasks router ─────────────────────────────────────────────
+
+project_tasks_router = APIRouter(
+    prefix="/projects/{project_id}/tasks",
+    tags=["tasks"],
+)
+
+
+@project_tasks_router.get(
+    "",
+    response_model=list[TaskRead],
+    dependencies=[Depends(require_project_access("viewer"))],
+)
+async def list_project_tasks(
+    project_id: uuid.UUID,
+    limit: int = Query(default=20, ge=1, le=100),
+    status: str | None = Query(default=None, description="Filter by status (comma-separated)"),
+    session: AsyncSession = Depends(get_session),
+) -> list[TaskRead]:
+    statuses: list[TaskStatus] | None = None
+    if status:
+        statuses = [TaskStatus(s.strip()) for s in status.split(",") if s.strip()]
+    return await TaskService(session).list_by_project(project_id, limit, statuses)
+
+
+__all__ = ["plan_tasks_router", "project_tasks_router", "task_router"]

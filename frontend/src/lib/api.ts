@@ -265,6 +265,16 @@ export const deletePlan = (planId: string): Promise<void> =>
 export const getTasks = (planId: string): Promise<Task[]> =>
   DEMO ? delay(demo.TASKS[planId] ?? []) : http.get<Task[]>(`/plans/${planId}/tasks`).then((r) => r.data);
 
+export const listProjectTasks = (
+  projectId: string,
+  opts?: { limit?: number; status?: string },
+): Promise<Task[]> =>
+  DEMO
+    ? delay([])
+    : http
+        .get<Task[]>(`/projects/${projectId}/tasks`, { params: opts })
+        .then((r) => r.data);
+
 export const retryTask = (taskId: string): Promise<Task> =>
   DEMO ? delay({} as Task) : http.post<Task>(`/tasks/${taskId}/retry`).then((r) => r.data);
 

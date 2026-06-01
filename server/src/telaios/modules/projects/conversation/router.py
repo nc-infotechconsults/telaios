@@ -106,6 +106,13 @@ async def send_message(
     except (ValueError, AttributeError):
         caller_uuid = None
 
+    # Get conversation history before saving the new user message so it isn't duplicated
+    history_msgs, _ = await svc.get_history(project_id, limit=20)
+    history = [
+        {"sender_type": m.sender_type, "content": m.content}
+        for m in history_msgs
+    ]
+
     # Persist user message
     user_msg = await svc.save_user_message(
         project_id=project_id,
@@ -119,13 +126,6 @@ async def send_message(
         "type": "message",
         "message": user_msg.model_dump(mode="json"),
     })
-
-    # Get conversation history for context
-    history_msgs, _ = await svc.get_history(project_id, limit=20)
-    history = [
-        {"sender_type": m.sender_type, "content": m.content}
-        for m in history_msgs
-    ]
 
     # Detect specialist
     specialist = body.specialist or ConversationAgent.detect_specialist(body.content)

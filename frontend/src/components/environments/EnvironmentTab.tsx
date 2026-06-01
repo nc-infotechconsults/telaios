@@ -90,7 +90,7 @@ export default function EnvironmentTab({ projectId }: Props) {
       await deleteEnvironment(envToDelete.id);
       setEnvironments((prev) => prev.filter((e) => e.id !== envToDelete.id));
       toast.success("Environment deleted", envToDelete.name);
-      onDeleteOpenChange();
+      onDeleteOpenChange(false);
       setEnvToDelete(null);
     } catch {
       toast.error("Failed to delete environment");

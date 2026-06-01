@@ -15,7 +15,7 @@ import type { HelmRelease } from "../../types";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   environmentId: string;
   release: HelmRelease | null;
   onUpgrade: (release: HelmRelease) => void;
@@ -89,7 +89,7 @@ export default function HelmUpgradeModal({
       toast.success("Helm release upgraded", updated.name);
       onUpgrade(updated);
       resetForm();
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to upgrade Helm release");
     } finally {

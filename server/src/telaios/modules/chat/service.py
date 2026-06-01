@@ -21,6 +21,7 @@ from telaios.modules.documents.chunks.service import ChunkService
 from telaios.modules.documents.service import DocumentService
 from telaios.modules.messages.schemas import MessageCreate, MessageRead
 from telaios.modules.messages.service import MessageService
+from telaios.modules.plans.parser import parse_planner_response
 from telaios.modules.plans.prompts import compose_planning_prompt
 from telaios.modules.plans.schemas import PlanPatch
 from telaios.modules.plans.service import PlanService
@@ -253,12 +254,16 @@ class ChatService:
         doc_names = [str(d.get("name", "document")) for d in context.get("documents", [])]
 
         try:
-            assistant_text = await self._invoke_llm(user_content, context)
+            raw_text = await self._invoke_llm(user_content, context)
         except Exception as exc:
             logger.warning("planner invocation failed, using fallback: %s", exc)
             plan_obj = await self._plan_svc.get_orm(plan_id)
             plan_title = plan_obj.title if plan_obj is not None else None
-            assistant_text = _fallback_plan_text(plan_title, user_content, repo_names, doc_names)
+            raw_text = _fallback_plan_text(plan_title, user_content, repo_names, doc_names)
+
+        # Extract human-readable message from JSON-formatted planner response
+        parsed_response = parse_planner_response(raw_text)
+        assistant_text = parsed_response["message"] if parsed_response else raw_text
 
         for token in assistant_text.split():
             sse_manager.broadcast(str(plan_id), {"type": "chat_token", "content": f"{token} "})

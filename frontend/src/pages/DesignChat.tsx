@@ -133,7 +133,7 @@ export default function DesignChat() {
         newTitle.trim() || undefined,
         selectedDesignerAgentId || undefined,
       );
-      onOpenChange();
+      onOpenChange(false);
       setNewTitle("");
       setSelectedDesignerAgentId("");
       navigate(`/projects/${projectId}/design/${created.id}`);
@@ -189,7 +189,7 @@ export default function DesignChat() {
                 size="sm"
                 aria-label="Designer agent"
                 className="ml-auto w-40"
-                selectedKeys={sessionDesignerAgentId ? new Set([sessionDesignerAgentId]) : new Set()}
+                selectedKeys={sessionDesignerAgentId ? Array.from(new Set([sessionDesignerAgentId])) : []}
                 onSelectionChange={async (keys) => {
                   const key = Array.from(keys)[0] as string | undefined;
                   if (!key || key === sessionDesignerAgentId || !designSessionId) return;
@@ -311,7 +311,7 @@ export default function DesignChat() {
                 <Select
                   label="Designer agent"
                   placeholder="Select a designer agent"
-                  selectedKeys={selectedDesignerAgentId ? new Set([selectedDesignerAgentId]) : new Set()}
+                  selectedKeys={selectedDesignerAgentId ? Array.from(new Set([selectedDesignerAgentId])) : []}
                   onSelectionChange={(keys) => {
                     const key = Array.from(keys)[0] as string | undefined;
                     setSelectedDesignerAgentId(key ?? "");

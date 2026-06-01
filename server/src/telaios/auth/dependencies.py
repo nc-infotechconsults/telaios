@@ -62,12 +62,15 @@ def set_user_loader(loader: UserLoader | None) -> None:
 
 def _extract_bearer(request: Request) -> str:
     auth = request.headers.get("authorization", "")
-    if not auth.lower().startswith("bearer "):
-        raise UnauthorizedError("Authentication required")
-    token = auth[7:].strip()
-    if not token:
-        raise UnauthorizedError("Authentication required")
-    return token
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        if token:
+            return token
+    # Fall back to ?token= query param (needed for browser EventSource / SSE).
+    token = request.query_params.get("token", "")
+    if token:
+        return token
+    raise UnauthorizedError("Authentication required")
 
 
 def _service_principal() -> Principal:

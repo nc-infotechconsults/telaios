@@ -1,332 +1,322 @@
 import { useEffect, useState } from "react";
-import { getRepositories, createRepository, deleteRepository, ingestRepository } from "../../lib/api";
-import type { Repository, RepositoryProviderType } from "../../types";
+import { Icon } from "../../components/Icon";
+import { getRepositories, createRepository } from "../../lib/api";
+import type { Repository } from "../../types";
 
-const PROVIDER_ICONS: Record<RepositoryProviderType, string> = {
-  github: "🐙",
-  gitlab: "🦊",
-  bitbucket: "🪣",
-  git: "⎔",
-  s3: "☁",
+const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
+
+// ─── Mock data (used in DEMO mode only) ───────────────────────────────────────
+
+const MOCK_REPOS = [
+  {
+    name: "acme/atlas-api",   provider: "GitHub", url: "github.com/acme/atlas-api",
+    branch: "main",       lang: "TypeScript", langColor: "#3178c6",
+    status: "synced",   files: 1284, symbols: 8420,  lastSync: "12 minutes ago", progress: 100,
+    desc: "REST + GraphQL gateway. Indexed at commit a3f9c12.",
+  },
+  {
+    name: "acme/atlas-web",   provider: "GitHub", url: "github.com/acme/atlas-web",
+    branch: "main",       lang: "TypeScript", langColor: "#3178c6",
+    status: "synced",   files: 3142, symbols: 12480, lastSync: "1 hour ago",     progress: 100,
+    desc: "Customer-facing web app. UI component library indexed.",
+  },
+  {
+    name: "acme/atlas-edge",  provider: "GitHub", url: "github.com/acme/atlas-edge",
+    branch: "main",       lang: "Rust",       langColor: "#dea584",
+    status: "indexing", files: 412,  symbols: 0,     lastSync: "just now",       progress: 64,
+    desc: "Low-latency edge workers. Pulling commits…",
+  },
+  {
+    name: "acme/atlas-infra", provider: "GitLab", url: "gitlab.com/acme/atlas-infra",
+    branch: "production", lang: "HCL",        langColor: "#5e5ce6",
+    status: "synced",   files: 318,  symbols: 1240,  lastSync: "yesterday",      progress: 100,
+    desc: "Terraform & helm charts. Auto-syncs on push.",
+  },
+  {
+    name: "acme/atlas-cli",   provider: "GitHub", url: "github.com/acme/atlas-cli",
+    branch: "main",       lang: "Go",         langColor: "#00add8",
+    status: "failed",   files: 0,    symbols: 0,     lastSync: "3 hours ago",    progress: 0,
+    desc: "Authentication expired. Reconnect to resume indexing.",
+  },
+];
+
+// ─── Helpers to map real Repository fields to UI shape ────────────────────────
+
+const PROVIDER_LANG: Record<string, { lang: string; langColor: string }> = {
+  github:    { lang: "TypeScript", langColor: "#3178c6" },
+  gitlab:    { lang: "TypeScript", langColor: "#3178c6" },
+  bitbucket: { lang: "TypeScript", langColor: "#3178c6" },
+  git:       { lang: "Unknown",    langColor: "#8b8b8b" },
+  s3:        { lang: "S3",         langColor: "#ff9900" },
 };
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  ready: { label: "Synced", color: "var(--color-green)" },
-  cloning: { label: "Indexing…", color: "var(--color-orange)" },
-  error: { label: "Failed", color: "var(--color-red)" },
-  unconfigured: { label: "Not configured", color: "var(--label-quaternary)" },
+function repoStatusToUi(status: Repository["status"]): string {
+  switch (status) {
+    case "ready":       return "synced";
+    case "cloning":     return "indexing";
+    case "error":       return "error";
+    case "unconfigured":
+    default:            return "pending";
+  }
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)  return "just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function repoToUi(r: Repository) {
+  const { lang, langColor } = PROVIDER_LANG[r.provider_type] ?? PROVIDER_LANG.git;
+  const uiStatus = repoStatusToUi(r.status);
+  return {
+    id:        r.id,
+    name:      r.name,
+    provider:  r.provider_type,
+    url:       r.remote_url ?? "",
+    branch:    r.branch ?? "main",
+    lang,
+    langColor,
+    status:    uiStatus,
+    files:     0,
+    symbols:   0,
+    lastSync:  formatRelativeTime(r.updated_at),
+    progress:  uiStatus === "indexing" ? 50 : uiStatus === "synced" ? 100 : 0,
+    desc:      r.error_message ?? "",
+  };
+}
+
+function statusAttr(s: string) {
+  return s === "synced" ? "done" : s === "indexing" ? "running" : "failed";
+}
+
+// ─── Connect modal ────────────────────────────────────────────────────────────
+
+const PROVIDER_TYPE_MAP: Record<string, Repository["provider_type"]> = {
+  GitHub: "github", GitLab: "gitlab", Bitbucket: "bitbucket", Other: "git",
 };
 
-export default function ProjectRepositories({ projectId }: { projectId: string }) {
-  const [repos, setRepos] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ provider: "git" as RepositoryProviderType, url: "", branch: "main" });
-  const [creating, setCreating] = useState(false);
-  const [indexingIds, setIndexingIds] = useState<Set<string>>(new Set());
+function ConnectRepoModal({
+  projectId,
+  onClose,
+  onSuccess,
+}: {
+  projectId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [provider, setProvider] = useState("GitHub");
+  const [url, setUrl] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    getRepositories(projectId)
-      .then(setRepos)
-      .finally(() => setLoading(false));
-  }, [projectId]);
-
-  const handleCreate = async () => {
-    if (!form.url.trim()) return;
-    setCreating(true);
+  async function handleConnect() {
+    if (DEMO) { onClose(); return; }
+    setSaving(true);
     try {
-      const repo = await createRepository(projectId, {
-        provider_type: form.provider,
-        remote_url: form.url.trim(),
-        branch: form.branch.trim() || "main",
-        name: form.url.split("/").pop()?.replace(".git", "") ?? "repo",
+      await createRepository(projectId, {
+        name: url,
+        provider_type: PROVIDER_TYPE_MAP[provider] ?? "git",
+        remote_url: url,
+        branch: branch || "main",
         auth_type: "none",
       });
-      setRepos((prev) => [...prev, repo]);
-      setShowModal(false);
-      setForm({ provider: "git", url: "", branch: "main" });
+      onSuccess();
+      onClose();
+    } catch {
+      // ignore — keep modal open so user can retry
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
-  };
-
-  const handleDelete = async (id: string) => {
-    await deleteRepository(projectId, id);
-    setRepos((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const handleIndex = async (repo: Repository) => {
-    setIndexingIds((prev) => new Set([...prev, repo.id]));
-    try {
-      await ingestRepository(projectId, repo.remote_url ?? "", repo.branch ?? "main");
-    } catch { /* ignore */ }
-    setIndexingIds((prev) => { const s = new Set(prev); s.delete(repo.id); return s; });
-  };
-
-  const stats = [
-    { label: "Connected", value: repos.length, color: "var(--color-blue)" },
-    { label: "Synced",    value: repos.filter(r => r.status === "ready").length, color: "var(--color-green)" },
-    { label: "Indexing",  value: repos.filter(r => r.status === "cloning").length, color: "var(--color-orange)" },
-    { label: "Failed",    value: repos.filter(r => r.status === "error").length, color: "var(--color-red)" },
-  ];
+  }
 
   return (
-    <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--label-primary)" }}>Repositories</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--label-secondary)" }}>
-            Connect and index git repositories for TEOS knowledge extraction
-          </p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 10,
-            background: "linear-gradient(135deg, var(--color-blue), var(--color-indigo))",
-            border: "none",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + Connect Repository
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            style={{ background: "var(--glass)", backdropFilter: "blur(20px)", border: "0.5px solid var(--glass-edge)", borderRadius: 14, padding: "12px 14px", boxShadow: "var(--shadow-glass-panel)" }}
-          >
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{loading ? "–" : s.value}</div>
-            <div style={{ fontSize: 12, color: "var(--label-secondary)", marginTop: 2 }}>{s.label}</div>
+    <div className="cmd-overlay" onClick={onClose}>
+      <div className="cmd-panel" onClick={(e) => e.stopPropagation()} style={{ width: 540, padding: 0 }}>
+        <div style={{ padding: "20px 22px 6px" }}>
+          <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em" }}>Connect a repository</div>
+          <div style={{ fontSize: 12.5, color: "var(--fg-3)", marginTop: 4 }}>
+            TEOS will clone, index symbols and start watching for commits.
           </div>
-        ))}
-      </div>
-
-      {/* Repo cards */}
-      {loading ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {[1,2].map(i => (
-            <div key={i} style={{ height: 100, borderRadius: 16, background: "var(--fill-quaternary)", animation: "pulse 2s ease-in-out infinite" }} aria-hidden="true" />
-          ))}
         </div>
-      ) : repos.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--label-tertiary)" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>⎔</div>
-          <p style={{ fontSize: 14, margin: 0 }}>No repositories connected yet</p>
-          <p style={{ fontSize: 12, margin: "8px 0 0" }}>Connect a repository to enable code knowledge extraction</p>
-          <button onClick={() => setShowModal(true)} style={{ marginTop: 16, padding: "8px 20px", borderRadius: 10, background: "var(--color-blue)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            Connect your first repo
+        <div style={{ padding: "12px 22px 0", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <div className="form-l">Provider</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {["GitHub", "GitLab", "Bitbucket", "Other"].map((p) => (
+                <button key={p} className="pill-btn" data-primary={provider === p ? "true" : undefined}
+                  onClick={() => setProvider(p)}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="form-l">Repository URL</div>
+            <input className="form-input" placeholder="github.com/acme/atlas-web"
+              value={url} onChange={(e) => setUrl(e.target.value)} />
+          </div>
+          <div>
+            <div className="form-l">Branch</div>
+            <input className="form-input" placeholder="main" value={branch}
+              onChange={(e) => setBranch(e.target.value)} />
+          </div>
+          <div style={{
+            padding: 12, borderRadius: 12, background: "var(--glass-weak)",
+            border: "0.5px solid var(--hairline)", fontSize: 12, color: "var(--fg-2)",
+            display: "flex", gap: 10, alignItems: "flex-start",
+          }}>
+            <Icon name="sparkle" size="sm" style={{ marginTop: 2, color: "var(--accent-1)" }} />
+            <div>TEOS extracts symbols, doc strings, dependency graphs and recent PR descriptions.
+              Nothing is shared outside your workspace.</div>
+          </div>
+        </div>
+        <div style={{
+          padding: 18, display: "flex", gap: 8, justifyContent: "flex-end",
+          borderTop: "0.5px solid var(--hairline)", marginTop: 16,
+        }}>
+          <button className="pill-btn" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="pill-btn" data-primary="true" onClick={handleConnect} disabled={saving}>
+            {saving ? "Connecting…" : "Connect & start indexing"}
           </button>
         </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }} role="list" aria-label="Repositories">
-          {repos.map((repo) => {
-            const statusInfo = STATUS_MAP[repo.status] ?? STATUS_MAP.unconfigured;
-            return (
-              <div
-                key={repo.id}
-                role="listitem"
-                style={{
-                  background: "var(--glass)",
-                  backdropFilter: "blur(20px)",
-                  border: "0.5px solid var(--glass-edge)",
-                  borderRadius: 16,
-                  padding: "16px 18px",
-                  boxShadow: "var(--shadow-glass-panel)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-                  <span style={{ fontSize: 24, flexShrink: 0 }} aria-hidden="true">{PROVIDER_ICONS[repo.provider_type]}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 15, fontWeight: 600, color: "var(--label-primary)" }}>{repo.name}</span>
-                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 9999, background: statusInfo.color + "18", color: statusInfo.color, fontWeight: 500 }}>
-                        {statusInfo.label}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--label-tertiary)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {repo.remote_url ?? repo.bucket_name ?? "—"}
-                    </div>
-                    <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
-                      {repo.branch && (
-                        <MetaChip icon="⎇" label={`Branch: ${repo.branch}`} />
-                      )}
-                      <MetaChip icon="⌖" label={`Provider: ${repo.provider_type}`} />
-                    </div>
-                    {repo.status === "cloning" && (
-                      <div style={{ marginTop: 10 }}>
-                        <div style={{ height: 3, borderRadius: 9999, background: "var(--fill-tertiary)", overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: "60%", background: "var(--color-orange)", borderRadius: 9999, animation: "pulse 2s ease-in-out infinite" }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
-                    <button
-                      onClick={() => handleIndex(repo)}
-                      disabled={indexingIds.has(repo.id)}
-                      title="Trigger knowledge ingest for this repository"
-                      style={{
-                        padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: indexingIds.has(repo.id) ? "default" : "pointer",
-                        background: "color-mix(in srgb, var(--color-indigo) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--color-indigo) 25%, transparent)", color: "var(--color-indigo)",
-                        opacity: indexingIds.has(repo.id) ? 0.6 : 1,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {indexingIds.has(repo.id) ? "Indexing…" : "Index"}
-                    </button>
-                    <ActionButton label="Ask about this repo" color="var(--color-blue)" icon="?" />
-                    <ActionButton label="Re-sync" color="var(--color-green)" icon="↺" />
-                    <ActionButton
-                      label="Delete"
-                      color="var(--color-red)"
-                      icon="✕"
-                      onClick={() => handleDelete(repo.id)}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Connect modal */}
-      {showModal && (
-        <div
-          onClick={() => setShowModal(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
-        >
-          <div
-            className="glass-panel-strong"
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "min(480px, 92vw)", padding: 24, boxShadow: "var(--shadow-glass-lg)" }}
-          >
-            <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "var(--label-primary)" }}>Connect Repository</h2>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--label-secondary)", marginBottom: 4, display: "block" }}>Provider</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["github", "gitlab", "bitbucket", "git"] as RepositoryProviderType[]).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setForm(f => ({ ...f, provider: p }))}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 8,
-                        border: "0.5px solid",
-                        borderColor: form.provider === p ? "var(--color-blue)" : "var(--hairline)",
-                        background: form.provider === p ? "color-mix(in srgb, var(--color-blue) 12%, transparent)" : "var(--fill-quaternary)",
-                        color: form.provider === p ? "var(--color-blue)" : "var(--label-secondary)",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontWeight: form.provider === p ? 600 : 400,
-                      }}
-                    >
-                      {PROVIDER_ICONS[p]} {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="repo-url" style={{ fontSize: 12, color: "var(--label-secondary)", marginBottom: 4, display: "block" }}>Repository URL</label>
-                <input
-                  id="repo-url"
-                  type="text"
-                  value={form.url}
-                  onChange={(e) => setForm(f => ({ ...f, url: e.target.value }))}
-                  placeholder="https://github.com/org/repo.git"
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: 10, background: "var(--fill-tertiary)", border: "0.5px solid var(--glass-edge)", color: "var(--label-primary)", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="repo-branch" style={{ fontSize: 12, color: "var(--label-secondary)", marginBottom: 4, display: "block" }}>Branch</label>
-                <input
-                  id="repo-branch"
-                  type="text"
-                  value={form.branch}
-                  onChange={(e) => setForm(f => ({ ...f, branch: e.target.value }))}
-                  placeholder="main"
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: 10, background: "var(--fill-tertiary)", border: "0.5px solid var(--glass-edge)", color: "var(--label-primary)", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{ padding: "8px 16px", borderRadius: 10, background: "var(--fill-tertiary)", border: "0.5px solid var(--hairline)", color: "var(--label-secondary)", fontSize: 13, cursor: "pointer" }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={creating || !form.url.trim()}
-                style={{
-                  padding: "8px 20px",
-                  borderRadius: 10,
-                  background: "linear-gradient(135deg, var(--color-blue), var(--color-indigo))",
-                  border: "none",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: creating || !form.url.trim() ? "default" : "pointer",
-                  opacity: creating || !form.url.trim() ? 0.5 : 1,
-                }}
-              >
-                {creating ? "Connecting…" : "Connect"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function MetaChip({ icon, label }: { icon: string; label: string }) {
-  return (
-    <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--label-tertiary)" }}>
-      <span aria-hidden="true">{icon}</span>
-      {label}
-    </span>
-  );
-}
+// ─── Main component ───────────────────────────────────────────────────────────
 
-function ActionButton({ label, color, icon, onClick }: { label: string; color: string; icon: string; onClick?: () => void }) {
+export default function ProjectRepositories({ projectId }: { projectId: string }) {
+  const [showConnect, setShowConnect] = useState(false);
+  const [repos, setRepos] = useState(DEMO ? MOCK_REPOS : [] as ReturnType<typeof repoToUi>[]);
+  const [loading, setLoading] = useState(!DEMO);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadRepos() {
+    if (DEMO) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getRepositories(projectId);
+      setRepos(data.map(repoToUi));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load repositories");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadRepos(); }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const syncedCount = repos.filter((r) => r.status === "synced").length;
+
   return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      style={{
-        width: 30,
-        height: 30,
-        borderRadius: 8,
-        background: `color-mix(in srgb, ${color} 8%, transparent)`,
-        border: `0.5px solid color-mix(in srgb, ${color} 18%, transparent)`,
-        color,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 13,
-        fontWeight: 600,
-        flexShrink: 0,
-      }}
-    >
-      {icon}
-    </button>
+    <div className="main-scroll">
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 6 }}>
+        <div style={{ flex: 1 }}>
+          <h1 className="h-page">Repositories</h1>
+          <p className="sub-page" style={{ margin: 0 }}>
+            Git sources TEOS indexes for knowledge. Connect a repo and TEOS extracts symbols, call graphs,
+            doc strings and patterns so agents can reason over them.
+          </p>
+        </div>
+        <button className="pill-btn" data-primary="true" onClick={() => setShowConnect(true)}>
+          <Icon name="plus" size="sm" /> Connect repository
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid-4" style={{ margin: "20px 0 14px" }}>
+        {[
+          { l: "Connected",     v: repos.length,  d: `${syncedCount} synced` },
+          { l: "Files indexed", v: "5,156",        d: "across 4 languages" },
+          { l: "Symbols",       v: "22.4k",        d: "functions, classes, types" },
+          { l: "Last sync",     v: "12m",          d: "atlas-api" },
+        ].map((s, i) => (
+          <div key={i} className="card stat">
+            <span className="stat-l">{s.l}</span>
+            <span className="stat-v">{s.v}</span>
+            <span className="stat-delta">{s.d}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Loading / error states */}
+      {loading && (
+        <div style={{ padding: "24px 0", color: "var(--fg-3)", fontSize: 13 }}>Loading…</div>
+      )}
+      {error && (
+        <div style={{ padding: "12px 0", color: "var(--error, #e05)", fontSize: 13 }}>{error}</div>
+      )}
+
+      {/* Repo cards */}
+      {!loading && (
+        <div className="stack">
+          {repos.map((r) => (
+            <div key={r.name} className="card repo-card">
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div className="repo-prov-ico">
+                  <Icon name="git" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-0.01em" }}>{r.name}</span>
+                    <span className="crumb-tag"><Icon name="branch" size="sm" /> {r.branch}</span>
+                    <span className="crumb-tag">
+                      <span className="lang-dot" style={{ background: r.langColor }} /> {r.lang}
+                    </span>
+                    <span className="task-status" data-s={statusAttr(r.status)}>{r.status}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 4 }}>
+                    <span className="mono">{r.url}</span> · {r.desc}
+                  </div>
+                  {r.status === "indexing" && (
+                    <div className="task-bar" style={{ marginTop: 10, maxWidth: 480 }}>
+                      <div style={{ width: r.progress + "%" }} />
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 18, marginTop: 12, fontSize: 11.5, color: "var(--fg-3)" }}>
+                    <span><b style={{ color: "var(--fg-2)" }}>{r.files.toLocaleString()}</b> files</span>
+                    <span><b style={{ color: "var(--fg-2)" }}>{r.symbols.toLocaleString()}</b> symbols</span>
+                    <span>Last sync <b style={{ color: "var(--fg-2)" }}>{r.lastSync}</b></span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                  <button className="pill-btn">
+                    <Icon name="sparkle" size="sm" /> Ask about this repo
+                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="pill-btn" onClick={() => void loadRepos()}><Icon name="refresh" size="sm" /> Re-sync</button>
+                    <button className="pill-btn"><Icon name="settings" size="sm" /></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button className="card empty-card" onClick={() => setShowConnect(true)}>
+            <Icon name="plus" />
+            <div>
+              <b>Connect another repository</b>
+              <div>GitHub, GitLab, Bitbucket — or paste any git URL</div>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {showConnect && (
+        <ConnectRepoModal
+          projectId={projectId}
+          onClose={() => setShowConnect(false)}
+          onSuccess={() => void loadRepos()}
+        />
+      )}
+    </div>
   );
 }

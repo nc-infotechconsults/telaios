@@ -14,7 +14,7 @@ import { toast } from "../../lib/toast";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   environmentId: string;
   podName: string;
   namespace: string;

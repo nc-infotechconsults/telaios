@@ -149,7 +149,7 @@ export default function LibraryMCPForm({ initialData, onSaved, onCancel }: Props
 
       <Select
         label="Transport"
-        selectedKeys={new Set([transport])}
+        selectedKeys={Array.from(new Set([transport]))}
         onSelectionChange={(keys) => {
           const t = Array.from(keys)[0] as Transport;
           setTransport(t);

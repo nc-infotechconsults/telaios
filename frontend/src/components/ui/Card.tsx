@@ -1,3 +1,4 @@
+import React from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
@@ -11,7 +12,7 @@ export function Card({ children, className = "", isPressable, onPress, onClick, 
     return (
       <button
         type="button"
-        onClick={onPress ?? onClick}
+        onClick={(onPress ?? onClick) as unknown as React.MouseEventHandler<HTMLButtonElement>}
         className={`apple-card w-full text-left ${className}`}
       >
         {children}

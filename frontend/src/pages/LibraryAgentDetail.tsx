@@ -331,7 +331,7 @@ export default function LibraryAgentDetail() {
                   <Select
                     label="Project"
                     placeholder="Select a project…"
-                    selectedKeys={selectedProjectId ? new Set([selectedProjectId]) : new Set()}
+                    selectedKeys={selectedProjectId ? Array.from(new Set([selectedProjectId])) : []}
                     onSelectionChange={(keys) => setSelectedProjectId(Array.from(keys)[0] as string)}
                   >
                     {projects.map((p) => (

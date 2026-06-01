@@ -17,7 +17,7 @@ import type { Environment, EnvironmentType } from "../../types";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   environment: Environment | null;
   onUpdate: (env: Environment) => void;
 }
@@ -97,7 +97,7 @@ export default function EnvironmentEditModal({
       const updated = await patchEnvironment(environment.id, data);
       toast.success("Environment updated", updated.name);
       onUpdate(updated);
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to update environment");
     } finally {

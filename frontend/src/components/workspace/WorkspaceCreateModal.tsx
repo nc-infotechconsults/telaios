@@ -15,7 +15,7 @@ import type { Workspace, Repository, WorkspaceConfig } from "../../types";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   projectId: string;
   repositories: Repository[];
   onCreate: (ws: Workspace) => void;
@@ -133,7 +133,7 @@ export default function WorkspaceCreateModal({
       toast.success("Workspace created", ws.name);
       onCreate(ws);
       resetForm();
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to create workspace");
     } finally {

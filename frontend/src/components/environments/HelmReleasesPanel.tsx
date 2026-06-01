@@ -80,7 +80,7 @@ export default function HelmReleasesPanel({ environmentId }: Props) {
         ),
       );
       toast.success("Helm release uninstalled", releaseToUninstall.name);
-      onUninstallOpenChange();
+      onUninstallOpenChange(false);
       setReleaseToUninstall(null);
     } catch {
       toast.error("Failed to uninstall Helm release");

@@ -10,9 +10,9 @@ interface Props {
   isLoading?: boolean;
   isDisabled?: boolean;
   isIconOnly?: boolean;
-  onPress?: () => void;
+  onPress?: (e?: any) => void;
   onClose?: () => void;
-  onClick?: () => void;
+  onClick?: (e?: any) => void;
   as?: "button" | "a";
   href?: string;
   target?: string;

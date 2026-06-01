@@ -41,6 +41,26 @@ class TaskRepository:
         )
         return list(result.scalars().all())
 
+    async def list_by_project(
+        self,
+        project_id: uuid.UUID,
+        limit: int = 20,
+        statuses: list[TaskStatus] | None = None,
+    ) -> list[Task]:
+        from telaios.db.models.plans import Plan
+
+        q = (
+            select(Task)
+            .join(Plan, Task.plan_id == Plan.id)
+            .where(Plan.project_id == project_id, Task.deleted_at.is_(None))
+        )
+        if statuses:
+            q = q.where(Task.status.in_(statuses))
+        result = await self._s.execute(
+            q.order_by(Task.updated_at.desc()).limit(limit).options(*self._load_opts())
+        )
+        return list(result.scalars().all())
+
     async def find(self, task_id: uuid.UUID) -> Task | None:
         result = await self._s.execute(
             select(Task)

@@ -72,6 +72,6 @@ export function Select({
   );
 }
 
-export function SelectItem({ value, children, textValue, ...rest }: { value?: string; children: ReactNode; textValue?: string; [key: string]: any }) {
+export function SelectItem({ value, children, textValue }: { value?: string; children: ReactNode; textValue?: string; [key: string]: any }) {
   return <option value={value}>{textValue ?? children}</option>;
 }

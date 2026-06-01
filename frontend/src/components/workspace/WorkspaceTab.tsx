@@ -112,7 +112,7 @@ export default function WorkspaceTab({ projectId, repositories }: Props) {
       await deleteWorkspace(wsToDelete.id);
       setWorkspaces((prev) => prev.filter((w) => w.id !== wsToDelete.id));
       toast.success("Workspace deleted", wsToDelete.name);
-      onDeleteOpenChange();
+      onDeleteOpenChange(false);
       setWsToDelete(null);
     } catch {
       toast.error("Failed to delete workspace");

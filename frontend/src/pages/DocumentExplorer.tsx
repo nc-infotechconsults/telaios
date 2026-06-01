@@ -519,7 +519,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
       )}
 
       {/* New Folder Modal */}
-      <Modal isOpen={isFolderModalOpen} onClose={closeFolderModal} size="sm">
+      <Modal isOpen={isFolderModalOpen} onClose={closeFolderModal} onOpenChange={(open) => { if (!open) closeFolderModal(); }} size="sm">
         <ModalContent>
           <ModalHeader>New Folder</ModalHeader>
           <ModalBody>

@@ -533,7 +533,7 @@ export default function McpServerEditor({ value, onChange }: Props) {
             <Select
               size="sm"
               label="Transport"
-              selectedKeys={new Set([entry.transport])}
+              selectedKeys={Array.from(new Set([entry.transport]))}
               onSelectionChange={(keys) => {
                 const t = Array.from(keys)[0] as McpServer["transport"];
                 if (t === "stdio") {

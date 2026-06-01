@@ -27,7 +27,7 @@ const ROLE_FILTERS: Array<AgentRole | "all"> = [
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   projectId: string;
   onAdded: (agent: ProjectAgent) => void;
 }
@@ -74,7 +74,7 @@ export default function LibraryBrowserModal({
       const created = await cloneProjectAgentFromLibrary(projectId, agent.id);
       toast.success("Agent added", agent.name);
       onAdded(created);
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to add agent");
     } finally {

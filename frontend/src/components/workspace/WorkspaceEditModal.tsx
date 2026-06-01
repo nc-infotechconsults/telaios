@@ -15,7 +15,7 @@ import type { Workspace, WorkspaceConfig } from "../../types";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   workspace: Workspace | null;
   onUpdate: (ws: Workspace) => void;
 }
@@ -113,7 +113,7 @@ export default function WorkspaceEditModal({
       } as Partial<Workspace>);
       toast.success("Workspace updated", updated.name);
       onUpdate(updated);
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to update workspace");
     } finally {

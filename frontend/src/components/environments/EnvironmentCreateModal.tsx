@@ -17,7 +17,7 @@ import type { Environment, EnvironmentType } from "../../types";
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   projectId: string;
   onCreate: (env: Environment) => void;
 }
@@ -94,7 +94,7 @@ export default function EnvironmentCreateModal({
       toast.success("Environment created", env.name);
       onCreate(env);
       resetForm();
-      onOpenChange();
+      onOpenChange(false);
     } catch {
       toast.error("Failed to create environment");
     } finally {

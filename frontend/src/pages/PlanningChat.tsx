@@ -243,18 +243,18 @@ export default function PlanningChat() {
   };
 
   const handleConfirmPlan = async () => {
-    onConfirmOpenChange();
+    onConfirmOpenChange(false);
     await handleSend("confirm");
   };
 
   const handleRequestChanges = () => {
-    onConfirmOpenChange();
+    onConfirmOpenChange(false);
     onChangesOpen();
   };
 
   const handleSubmitChanges = async () => {
     const feedback = changesNote.trim();
-    onChangesOpenChange();
+    onChangesOpenChange(false);
     const message = feedback
       ? `Please revise the plan. Here is my feedback:\n${feedback}`
       : "Please revise the plan based on our conversation.";

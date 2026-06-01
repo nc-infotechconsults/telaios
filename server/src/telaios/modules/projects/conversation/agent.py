@@ -74,7 +74,7 @@ class ConversationAgent:
         settings = get_settings()
         config = LLMConfig(
             provider=settings.LLM_PROVIDER,
-            model_name=settings.LLM_MODEL,
+            model=settings.LLM_MODEL,
             api_key=settings.LLM_API_KEY,
             base_url=settings.LLM_BASE_URL,
         )

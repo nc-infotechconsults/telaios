@@ -16,8 +16,8 @@ export function Tabs({
   "aria-label": ariaLabel,
   selectedKey,
   onSelectionChange,
-  variant,
-  size,
+  variant: _variant,
+  size: _size,
   className = "",
   classNames,
 }: TabsProps) {
@@ -56,6 +56,6 @@ export function Tabs({
   );
 }
 
-export function Tab({ children }: { children?: ReactNode; key?: string; title?: string }) {
+export function Tab({ children }: { children?: ReactNode; key?: string; title?: ReactNode }) {
   return <>{children}</>;
 }

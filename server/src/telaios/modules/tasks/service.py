@@ -21,6 +21,15 @@ class TaskService:
         tasks = await self._repo.list_by_plan(plan_id)
         return [TaskRead.from_orm_with_relations(t) for t in tasks]
 
+    async def list_by_project(
+        self,
+        project_id: uuid.UUID,
+        limit: int = 20,
+        statuses: list[TaskStatus] | None = None,
+    ) -> list[TaskRead]:
+        tasks = await self._repo.list_by_project(project_id, limit, statuses)
+        return [TaskRead.from_orm_with_relations(t) for t in tasks]
+
     async def get(self, task_id: uuid.UUID) -> TaskRead:
         task = await self._repo.find(task_id)
         if task is None:

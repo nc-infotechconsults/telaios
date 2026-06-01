@@ -9,7 +9,7 @@ import {
 
 interface Props {
   isOpen: boolean;
-  onOpenChange: () => void;
+  onOpenChange: (open: boolean) => void;
   title?: string;
   message: string;
   confirmLabel?: string;

@@ -179,7 +179,7 @@ export default function ProjectDetail() {
       const title = newPlanTitle.trim() || undefined;
       const plan = await createPlan(projectId, title);
       toast.success("Plan created", title ?? "New plan started");
-      onNewPlanOpenChange();
+      onNewPlanOpenChange(false);
       setNewPlanTitle("");
       navigate(`/projects/${projectId}/plans/${plan.id}`);
     } catch {
@@ -196,7 +196,7 @@ export default function ProjectDetail() {
       await deletePlan(planToDelete.id);
       setPlans((prev) => prev.filter((p) => p.id !== planToDelete.id));
       toast.success("Plan deleted", planToDelete.title ?? "Plan removed");
-      onDeleteOpenChange();
+      onDeleteOpenChange(false);
       setPlanToDelete(null);
     } catch {
       toast.error("Failed to delete plan");
@@ -214,7 +214,7 @@ export default function ProjectDetail() {
       await removeProjectAgent(projectId, agentToRemove.id);
       setAgents((prev) => prev.filter((a) => a.id !== agentToRemove.id));
       toast.success("Agent removed");
-      onRemoveAgentOpenChange();
+      onRemoveAgentOpenChange(false);
       setAgentToRemove(null);
     } catch {
       toast.error("Failed to remove agent");
@@ -235,7 +235,7 @@ export default function ProjectDetail() {
         prev.map((a) => (a.id === agentToEdit.id ? { ...a, ...updated } : a)),
       );
       toast.success("Agent updated");
-      onEditAgentOpenChange();
+      onEditAgentOpenChange(false);
       setAgentToEdit(null);
     } catch {
       toast.error("Failed to update agent");
@@ -256,7 +256,7 @@ export default function ProjectDetail() {
       });
       setMembers((prev) => [...prev, member]);
       toast.success("Member added");
-      onAddMemberOpenChange();
+      onAddMemberOpenChange(false);
       setAddMemberUserId("");
       setAddMemberRole("viewer");
     } catch {
@@ -273,7 +273,7 @@ export default function ProjectDetail() {
       await removeProjectMember(projectId, memberToRemove.user_id);
       setMembers((prev) => prev.filter((m) => m.user_id !== memberToRemove.user_id));
       toast.success("Member removed");
-      onRemoveMemberOpenChange();
+      onRemoveMemberOpenChange(false);
       setMemberToRemove(null);
     } catch {
       toast.error("Failed to remove member");
@@ -293,7 +293,7 @@ export default function ProjectDetail() {
         prev.map((m) => (m.user_id === memberToEditRole.user_id ? updated : m)),
       );
       toast.success("Member role updated");
-      onEditMemberRoleOpenChange();
+      onEditMemberRoleOpenChange(false);
       setMemberToEditRole(null);
     } catch {
       toast.error("Failed to update member role");
@@ -315,7 +315,7 @@ export default function ProjectDetail() {
       });
       setProject(updated);
       toast.success("Project updated");
-      onEditProjectOpenChange();
+      onEditProjectOpenChange(false);
     } catch {
       toast.error("Failed to update project");
     } finally {
@@ -813,7 +813,7 @@ export default function ProjectDetail() {
                 />
                 <Select
                   label="Role"
-                  selectedKeys={new Set([editAgentRole])}
+                  selectedKeys={Array.from(new Set([editAgentRole]))}
                   onSelectionChange={(keys) => setEditAgentRole(Array.from(keys)[0] as AgentRole)}
                 >
                   {ROLE_OPTIONS.map((r) => (
@@ -844,7 +844,7 @@ export default function ProjectDetail() {
                 <Select
                   label="User"
                   placeholder="Select a user…"
-                  selectedKeys={addMemberUserId ? new Set([addMemberUserId]) : new Set()}
+                  selectedKeys={addMemberUserId ? Array.from(new Set([addMemberUserId])) : []}
                   onSelectionChange={(keys) => setAddMemberUserId(Array.from(keys)[0] as string)}
                 >
                   {availableUsersForAdd.map((u) => (
@@ -855,7 +855,7 @@ export default function ProjectDetail() {
                 </Select>
                 <Select
                   label="Role"
-                  selectedKeys={new Set([addMemberRole])}
+                  selectedKeys={Array.from(new Set([addMemberRole]))}
                   onSelectionChange={(keys) => setAddMemberRole(Array.from(keys)[0] as ProjectRole)}
                 >
                   {MEMBER_ROLE_OPTIONS.map((r) => (
@@ -896,7 +896,7 @@ export default function ProjectDetail() {
                 </p>
                 <Select
                   label="Role"
-                  selectedKeys={new Set([editMemberRole])}
+                  selectedKeys={Array.from(new Set([editMemberRole]))}
                   onSelectionChange={(keys) => setEditMemberRole(Array.from(keys)[0] as ProjectRole)}
                 >
                   {MEMBER_ROLE_OPTIONS.map((r) => (
@@ -950,7 +950,7 @@ export default function ProjectDetail() {
                 />
                 <Select
                   label="Status"
-                  selectedKeys={new Set([editProjectStatus])}
+                  selectedKeys={Array.from(new Set([editProjectStatus]))}
                   onSelectionChange={(keys) => setEditProjectStatus(Array.from(keys)[0] as ProjectStatus)}
                 >
                   {PROJECT_STATUS_OPTIONS.map((s) => (

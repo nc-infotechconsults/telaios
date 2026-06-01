@@ -8,7 +8,7 @@ interface Props {
   className?: string;
 }
 
-export function Tooltip({ content, children, color }: Props) {
+export function Tooltip({ children }: Props) {
   // Simple wrapper — full tooltip would need more state management
   // For now, render children as-is
   return <>{children}</>;

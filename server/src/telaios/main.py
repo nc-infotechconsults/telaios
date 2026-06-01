@@ -66,7 +66,7 @@ from telaios.modules.projects import (
 from telaios.modules.repositories import repositories_router
 from telaios.modules.settings import llm_router, settings_router
 from telaios.modules.skills import skills_router
-from telaios.modules.tasks import plan_tasks_router, task_router
+from telaios.modules.tasks import plan_tasks_router, project_tasks_router, task_router
 from telaios.modules.users import UserService, auth_router, users_router
 from telaios.modules.workspaces import project_workspaces_router, workspace_router
 from telaios.utils.errors import install_exception_handlers
@@ -91,7 +91,7 @@ _MODULES: dict[str, list[APIRouter]] = {
     "library": [library_router],
     "agent_profiles": [agent_profiles_router],
     "plans": [project_plans_router, plan_router],
-    "tasks": [plan_tasks_router, task_router],
+    "tasks": [plan_tasks_router, project_tasks_router, task_router],
     "messages": [messages_router],
     "chat": [chat_router],
     "design_chat": [project_design_sessions_router, design_sessions_router],

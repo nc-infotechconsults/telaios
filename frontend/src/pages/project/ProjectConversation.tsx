@@ -1,6 +1,19 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { getConversationHistory, sendConversationMessage } from "../../lib/api";
 import type { ConversationMessage } from "../../types";
+
+const SESSION_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours between messages = new session
+
+interface Session {
+  id: string;
+  title: string;
+  time: string;
+  specs: SpecialistKey[];
+  startIndex: number;
+  endIndex: number;
+}
+
+const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
 type SpecialistKey = "qa" | "explorer" | "reverse" | "planner" | "coder" | "designer" | "reviewer";
 
@@ -38,21 +51,61 @@ export default function ProjectConversation({ projectId }: { projectId: string }
   const [activeSpecialist, setActiveSpecialist] = useState<SpecialistKey | null>(null);
   const [forcedSpecialist, setForcedSpecialist] = useState<SpecialistKey | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const streamBufferRef = useRef("");
 
+  // Group messages into sessions by time gap
+  const sessions = useMemo<Session[]>(() => {
+    if (messages.length === 0) return [];
+    const result: Session[] = [];
+    let sessionStart = 0;
+    for (let i = 1; i <= messages.length; i++) {
+      const isLast = i === messages.length;
+      const bigGap = !isLast && (
+        new Date(messages[i].created_at).getTime() - new Date(messages[i - 1].created_at).getTime() > SESSION_GAP_MS
+      );
+      if (bigGap || isLast) {
+        const slice = messages.slice(sessionStart, isLast ? i : i);
+        const firstMsg = slice.find((m) => m.sender_type === "user");
+        const specs = [...new Set(slice.filter((m) => m.specialist).map((m) => m.specialist as SpecialistKey))];
+        const ts = new Date(slice[0].created_at);
+        const now = Date.now();
+        const diffMs = now - ts.getTime();
+        const timeLabel = diffMs < 60_000 ? "just now"
+          : diffMs < 3_600_000 ? `${Math.round(diffMs / 60_000)}m ago`
+          : diffMs < 86_400_000 ? `${Math.round(diffMs / 3_600_000)}h ago`
+          : ts.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        result.push({
+          id: `session-${sessionStart}`,
+          title: firstMsg?.content.slice(0, 50) ?? "Conversation",
+          time: timeLabel,
+          specs,
+          startIndex: sessionStart,
+          endIndex: isLast ? i : i,
+        });
+        sessionStart = i;
+      }
+    }
+    return result;
+  }, [messages]);
+
   // Load history on mount
   useEffect(() => {
-    getConversationHistory(projectId, { limit: 100 })
+    if (DEMO) { setLoading(false); return; }
+    getConversationHistory(projectId, { limit: 200 })
       .then(({ messages: msgs }) => {
-        setMessages(msgs.map((m) => ({
+        const mapped = msgs.map((m) => ({
           id: m.id,
           sender_type: m.sender_type as "user" | "agent",
           specialist: m.specialist as SpecialistKey | null,
           content: m.content,
           created_at: m.created_at,
-        })));
+        }));
+        setMessages(mapped);
+        // Auto-select the most recent session (last one)
+        setActiveSessionId(null); // will be set to latest after sessions derive
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -60,6 +113,7 @@ export default function ProjectConversation({ projectId }: { projectId: string }
 
   // SSE connection
   useEffect(() => {
+    if (DEMO) return;
     const token = localStorage.getItem("swe_auth_token") ?? "";
     const url = `/api/projects/${projectId}/conversation/stream`;
     const es = new EventSource(url + (token ? `?token=${token}` : ""));
@@ -131,70 +185,161 @@ export default function ProjectConversation({ projectId }: { projectId: string }
     }
   };
 
+  // Visible messages: the active session slice, or all if "new"
+  const activeSession = activeSessionId === "new" ? null : (sessions.find((s) => s.id === activeSessionId) ?? sessions[sessions.length - 1] ?? null);
+  const visibleMessages = activeSession ? messages.slice(activeSession.startIndex, activeSession.endIndex) : [];
+
   const specialist = activeSpecialist ? SPECIALISTS[activeSpecialist] : null;
 
+  const isNewSession = activeSessionId === "new" || (sessions.length === 0 && !loading);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: 0 }}>
-      {/* Header */}
+    <div style={{ display: "flex", height: "100%", padding: 0 }}>
+      {/* Sessions panel */}
       <div style={{
-        padding: "12px 20px",
-        borderBottom: "0.5px solid var(--hairline)",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
+        width: 220,
         flexShrink: 0,
+        borderRight: "0.5px solid var(--hairline)",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        overflow: "hidden",
       }}>
-        <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--label-primary)" }}>
-          Project Conversation
-        </div>
-        {specialist && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "4px 10px",
-            borderRadius: 20,
-            background: `${specialist.color}20`,
-            border: `1px solid ${specialist.color}40`,
-            fontSize: 12,
-            color: specialist.color,
-          }}>
-            <span>{specialist.icon}</span>
-            <span>{specialist.name} is thinking…</span>
+        <div style={{ padding: "12px 14px 8px", borderBottom: "0.5px solid var(--hairline)", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--label-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+            Sessions
           </div>
-        )}
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-        {loading ? (
-          <div style={{ color: "var(--label-tertiary)", textAlign: "center", marginTop: 40 }}>
-            Loading conversation…
-          </div>
-        ) : messages.length === 0 && !streamingContent ? (
-          <div style={{ color: "var(--label-tertiary)", textAlign: "center", marginTop: 40 }}>
-            Start the conversation with your AI team.
-          </div>
-        ) : null}
-
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} />
-        ))}
-
-        {streamingContent && activeSpecialist && (
-          <MessageBubble
-            msg={{
-              id: "_streaming",
-              sender_type: "agent",
-              specialist: activeSpecialist,
-              content: streamingContent,
-              created_at: new Date().toISOString(),
-              streaming: true,
+          <button
+            onClick={() => setActiveSessionId("new")}
+            style={{
+              width: "100%",
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "0.5px solid var(--hairline)",
+              background: isNewSession ? "var(--fill-secondary)" : "none",
+              color: isNewSession ? "var(--label-primary)" : "var(--label-secondary)",
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
-          />
-        )}
-        <div ref={messagesEndRef} />
+          >
+            <span style={{ fontSize: 14 }}>+</span> New session
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+          {loading ? (
+            <div style={{ color: "var(--label-quaternary)", fontSize: 12, textAlign: "center", marginTop: 16 }}>Loading…</div>
+          ) : sessions.length === 0 ? (
+            <div style={{ color: "var(--label-quaternary)", fontSize: 12, textAlign: "center", marginTop: 16, padding: "0 8px" }}>No sessions yet</div>
+          ) : (
+            [...sessions].reverse().map((s) => {
+              const isActive = activeSession?.id === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveSessionId(s.id)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: isActive ? "var(--fill-secondary)" : "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    marginBottom: 2,
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "var(--label-primary)", lineHeight: 1.4, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.title}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10.5, color: "var(--label-quaternary)" }}>{s.time}</span>
+                    {s.specs.slice(0, 3).map((sp) => {
+                      const spec = SPECIALISTS[sp];
+                      return spec ? (
+                        <span key={sp} style={{ fontSize: 10, color: spec.color, background: `${spec.color}18`, padding: "1px 5px", borderRadius: 10 }}>
+                          {spec.name}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
+
+      {/* Main conversation area */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
+        {/* Header */}
+        <div style={{
+          padding: "12px 20px",
+          borderBottom: "0.5px solid var(--hairline)",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexShrink: 0,
+        }}>
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--label-primary)" }}>
+            {isNewSession ? "New session" : (activeSession?.title?.slice(0, 60) ?? "Conversation")}
+          </div>
+          {specialist && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              borderRadius: 20,
+              background: `${specialist.color}20`,
+              border: `1px solid ${specialist.color}40`,
+              fontSize: 12,
+              color: specialist.color,
+            }}>
+              <span>{specialist.icon}</span>
+              <span>{specialist.name} is thinking…</span>
+            </div>
+          )}
+        </div>
+
+        {/* Messages */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+          {loading ? (
+            <div style={{ color: "var(--label-tertiary)", textAlign: "center", marginTop: 40 }}>
+              Loading conversation…
+            </div>
+          ) : isNewSession ? (
+            <div style={{ color: "var(--label-tertiary)", textAlign: "center", marginTop: 40 }}>
+              Start the conversation with your AI team.
+            </div>
+          ) : visibleMessages.length === 0 ? (
+            <div style={{ color: "var(--label-tertiary)", textAlign: "center", marginTop: 40 }}>
+              No messages in this session.
+            </div>
+          ) : null}
+
+          {visibleMessages.map((msg) => (
+            <MessageBubble key={msg.id} msg={msg} />
+          ))}
+
+          {isNewSession && streamingContent && activeSpecialist && (
+            <MessageBubble
+              msg={{
+                id: "_streaming",
+                sender_type: "agent",
+                specialist: activeSpecialist,
+                content: streamingContent,
+                created_at: new Date().toISOString(),
+                streaming: true,
+              }}
+            />
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
       {/* Specialist chips */}
       <div style={{
@@ -279,6 +424,7 @@ export default function ProjectConversation({ projectId }: { projectId: string }
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }

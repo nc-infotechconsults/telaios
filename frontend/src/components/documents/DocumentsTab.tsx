@@ -114,7 +114,7 @@ export default function DocumentsTab({ projectId }: Props) {
       await deleteDocument(projectId, docToDelete.id);
       setDocuments((prev) => prev.filter((d) => d.id !== docToDelete.id));
       toast.success("Document deleted", docToDelete.name);
-      onDeleteOpenChange();
+      onDeleteOpenChange(false);
       setDocToDelete(null);
     } catch {
       toast.error("Failed to delete document");
