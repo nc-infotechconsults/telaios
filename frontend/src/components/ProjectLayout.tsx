@@ -525,7 +525,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
                     </button>
                   </div>
                   {/* Theme */}
-                  <div style={{ padding: "0 4px 4px", borderTop: "0.5px solid var(--hairline)", paddingTop: 4 }}>
+                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
                     <div style={{ padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
                       <Icon name="spark" size="sm" style={{ color: "var(--fg-3)" }} />
                       <span style={{ flex: 1, fontSize: 13 }}>Theme</span>
@@ -561,7 +561,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
                     </div>
                   </div>
                   {/* Logout */}
-                  <div style={{ padding: "0 4px 4px", borderTop: "0.5px solid var(--hairline)", paddingTop: 4 }}>
+                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
                     <button
                       className="sb-row"
                       style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8, color: "#ff375f" }}
