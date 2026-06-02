@@ -358,25 +358,29 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
             )}
           </div>
 
-          <div className="sb-section">Projects</div>
-          <div className="projects-list">
-            {sidebarProjects.map((p) => (
-              <button
-                key={p.id}
-                className="proj-row"
-                data-active={projectId === p.id}
-                onClick={() => { window.location.href = `/projects/${p.id}`; }}
-              >
-                <span className="proj-dot" style={{ background: p.color }} />
-                <span>{p.name}</span>
-              </button>
-            ))}
-            <button className="proj-row" style={{ color: "var(--fg-3)" }}
-              onClick={() => { window.location.href = "/"; }}>
-              <Icon name="plus" size="sm" className="sb-icon" />
-              <span>All projects</span>
-            </button>
-          </div>
+          {!wsView && (
+            <>
+              <div className="sb-section">Projects</div>
+              <div className="projects-list">
+                {sidebarProjects.map((p) => (
+                  <button
+                    key={p.id}
+                    className="proj-row"
+                    data-active={projectId === p.id}
+                    onClick={() => { window.location.href = `/projects/${p.id}`; }}
+                  >
+                    <span className="proj-dot" style={{ background: p.color }} />
+                    <span>{p.name}</span>
+                  </button>
+                ))}
+                <button className="proj-row" style={{ color: "var(--fg-3)" }}
+                  onClick={() => { window.location.href = "/"; }}>
+                  <Icon name="plus" size="sm" className="sb-icon" />
+                  <span>All projects</span>
+                </button>
+              </div>
+            </>
+          )}
 
           <div className="sb-spacer" />
 
