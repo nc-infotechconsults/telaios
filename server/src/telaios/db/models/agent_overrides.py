@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import Float, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import Float, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,15 +43,19 @@ class AgentOverride(Base):
     skills: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
-        UniqueConstraint(
+        # Partial unique index: at most one workspace-scope override per base profile
+        Index(
+            "uq_agent_override_workspace_scope",
             "base_profile_id",
-            name="uq_agent_override_workspace_scope",
+            unique=True,
             postgresql_where=text("project_id IS NULL"),
         ),
-        UniqueConstraint(
+        # Partial unique index: at most one project-scope override per (base, project) pair
+        Index(
+            "uq_agent_override_project_scope",
             "base_profile_id",
             "project_id",
-            name="uq_agent_override_project_scope",
+            unique=True,
             postgresql_where=text("project_id IS NOT NULL"),
         ),
     )
