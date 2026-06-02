@@ -21,7 +21,6 @@ import ProjectPlans from "../pages/project/ProjectPlans";
 import ProjectTeam from "../pages/project/ProjectTeam";
 import ProjectInbox from "../pages/project/ProjectInbox";
 import ProjectMembers from "../pages/project/ProjectMembers";
-import ProjectSettings from "../pages/project/ProjectSettings";
 
 // Workspace view components
 import WorkspaceProjects  from "../pages/workspace/WorkspaceProjects";
@@ -34,7 +33,7 @@ import WorkspaceSettings  from "../pages/workspace/WorkspaceSettings";
 export type ProjectView =
   | "dashboard" | "conversation" | "repositories" | "documents"
   | "designs" | "agents" | "library" | "plans" | "team"
-  | "inbox" | "members" | "settings";
+  | "inbox" | "members";
 
 export type WsView = "projects" | "library" | "analytics" | "agents" | "users" | "settings";
 
@@ -62,7 +61,7 @@ const WS_ADMIN_NAV = [
 const VIEW_LABELS: Record<ProjectView, string> = {
   dashboard: "Dashboard", conversation: "Conversation", repositories: "Repositories",
   documents: "Documents", designs: "Designs", agents: "Agents", library: "Library",
-  plans: "Plans", team: "Team", inbox: "Inbox", members: "Members", settings: "Settings",
+  plans: "Plans", team: "Team", inbox: "Inbox", members: "Members",
 };
 
 const SPECIALISTS: Record<string, { name: string; icon: string; color: string; tagline: string }> = {
@@ -242,9 +241,8 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   ] as const;
 
   const bottomNav = [
-    { id: "inbox",    label: "Inbox",    icon: "inbox",    badge: null },
-    { id: "members",  label: "Members",  icon: "users",    badge: null },
-    { id: "settings", label: "Settings", icon: "settings", badge: null },
+    { id: "inbox",   label: "Inbox",   icon: "inbox", badge: null },
+    { id: "members", label: "Members", icon: "users", badge: null },
   ] as const;
 
   const renderView = () => {
@@ -271,9 +269,8 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
       case "library":      return <ProjectLibrary projectId={projectId} />;
       case "plans":        return <ProjectPlans projectId={projectId} />;
       case "team":         return <ProjectTeam projectId={projectId} />;
-      case "inbox":        return <ProjectInbox projectId={projectId} />;
-      case "members":      return <ProjectMembers projectId={projectId} />;
-      case "settings":     return <ProjectSettings projectId={projectId} />;
+      case "inbox":   return <ProjectInbox projectId={projectId} />;
+      case "members": return <ProjectMembers projectId={projectId} />;
     }
   };
 
