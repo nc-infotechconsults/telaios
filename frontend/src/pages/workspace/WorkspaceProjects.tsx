@@ -48,10 +48,11 @@ function projectColor(idx: number) {
   return PROJECT_COLORS[idx % PROJECT_COLORS.length];
 }
 
-function ownerFromMembers(members: ProjectMember[]): string {
+function ownerFromMembers(members: ProjectMember[]): { name: string; initial: string } {
   const owner = members.find((m) => m.role === "owner");
-  if (!owner) return "—";
-  return owner.user.display_name || owner.user.email;
+  if (!owner) return { name: "—", initial: "?" };
+  const name = owner.user.display_name || owner.user.email;
+  return { name, initial: name.charAt(0).toUpperCase() };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -71,26 +72,56 @@ interface MenuState {
   y: number;
 }
 
-// ─── Stat Pill ────────────────────────────────────────────────────────────────
+// ─── Fa icon shorthand ────────────────────────────────────────────────────────
 
-function StatPill({ icon, value, label }: { icon: string; value: number | string; label: string }) {
+function Fa({ icon, style }: { icon: string; style?: React.CSSProperties }) {
+  return <i className={`fa-solid ${icon}`} style={style} />;
+}
+
+// ─── Stat cell ────────────────────────────────────────────────────────────────
+
+function StatCell({ icon, value, label }: { icon: string; value: number; label: string }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 4,
-      padding: "3px 8px", borderRadius: 8,
-      background: "var(--glass-weak)",
-      border: "0.5px solid var(--hairline)",
-    }}>
-      <span style={{ fontSize: 11 }}>{icon}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>{value}</span>
-      <span style={{ fontSize: 10.5, color: "var(--fg-3)" }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <Fa icon={icon} style={{ fontSize: 12, color: "var(--fg-3)", width: 14, textAlign: "center" }} />
+      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{value}</span>
+      <span style={{ fontSize: 11.5, color: "var(--fg-3)" }}>{label}</span>
     </div>
   );
 }
 
-// ─── Project Card ─────────────────────────────────────────────────────────────
+// ─── Table header ─────────────────────────────────────────────────────────────
 
-function ProjectCard({
+function TableHeader() {
+  const cell: React.CSSProperties = {
+    fontSize: 11, fontWeight: 600, color: "var(--fg-3)",
+    textTransform: "uppercase", letterSpacing: "0.05em",
+  };
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "2fr 1.2fr 100px 52px 52px 52px 60px 110px 110px 44px",
+      padding: "0 16px",
+      marginBottom: 4,
+      gap: 8,
+    }}>
+      <span style={cell}>Project</span>
+      <span style={cell}>Owner</span>
+      <span style={cell}>Status</span>
+      <span style={{ ...cell, textAlign: "center" }}>Repos</span>
+      <span style={{ ...cell, textAlign: "center" }}>Docs</span>
+      <span style={{ ...cell, textAlign: "center" }}>Members</span>
+      <span style={{ ...cell, textAlign: "center" }}>Msgs</span>
+      <span style={cell}>Activity</span>
+      <span style={cell}>Created</span>
+      <span style={cell}></span>
+    </div>
+  );
+}
+
+// ─── Project Row Card ─────────────────────────────────────────────────────────
+
+function ProjectRowCard({
   data,
   onMenuOpen,
   onClick,
@@ -104,110 +135,135 @@ function ProjectCard({
   const sc = STATUS_COLOR[p.status];
   const owner = ownerFromMembers(members);
   const lastActivity = p.updated_at || p.created_at;
-  const ownerInitial = owner !== "—" ? owner.charAt(0).toUpperCase() : "?";
 
   return (
     <div
-      className="card project-card"
+      className="card project-row"
       onClick={() => onClick(p.id)}
       style={{
-        padding: 0,
-        overflow: "hidden",
+        display: "grid",
+        gridTemplateColumns: "2fr 1.2fr 100px 52px 52px 52px 60px 110px 110px 44px",
+        padding: "12px 16px",
+        alignItems: "center",
+        gap: 8,
         cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        transition: "transform 0.15s, box-shadow 0.15s",
+        transition: "transform 0.12s, box-shadow 0.12s",
+        borderLeft: `3px solid ${color}`,
       }}
     >
-      {/* Colored accent bar */}
-      <div style={{ height: 3, background: color, flexShrink: 0 }} />
-
-      <div style={{ padding: "16px 16px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-
-        {/* Header: avatar, name, status, menu */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, background: color, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 700, color: "#fff", fontSize: 15,
-          }}>
-            {p.name.charAt(0).toUpperCase()}
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontWeight: 600, fontSize: 14,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              marginBottom: 4, color: "var(--fg)",
-            }}>
-              {p.name}
-            </div>
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "2px 8px", borderRadius: 20,
-              background: sc.bg, color: sc.fg,
-              fontSize: 10.5, fontWeight: 600,
-            }}>
-              <span style={{ width: 4, height: 4, borderRadius: "50%", background: sc.fg }} />
-              {STATUS_LABEL[p.status]}
-            </span>
-          </div>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); onMenuOpen(e, p.id); }}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "var(--fg-3)", padding: "2px 6px", borderRadius: 6,
-              fontSize: 16, lineHeight: 1, flexShrink: 0,
-            }}
-            title="More actions"
-          >
-            ⋯
-          </button>
-        </div>
-
-        {/* Owner */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{
-            width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-            background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 700, color: "#fff", fontSize: 9,
-          }}>
-            {ownerInitial}
-          </div>
-          <span style={{
-            fontSize: 12, color: "var(--fg-2)",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {owner}
-          </span>
-        </div>
-
-        {/* Stats */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          <StatPill icon="⎇" value={repos.length} label="repos" />
-          <StatPill icon="📄" value={documents.length} label="docs" />
-          <StatPill icon="👥" value={members.length} label="members" />
-          <StatPill icon="💬" value={messageCount} label="msgs" />
-        </div>
-
-        {/* Dates */}
+      {/* Project name + avatar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          paddingTop: 8, borderTop: "0.5px solid var(--hairline)",
-          marginTop: "auto",
+          width: 32, height: 32, borderRadius: 9, background: color, flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontWeight: 700, color: "#fff", fontSize: 13,
         }}>
-          <div style={{ fontSize: 11, color: "var(--fg-4)" }}>
-            <span style={{ color: "var(--fg-3)" }}>Activity</span>
-            {" "}{relativeTime(lastActivity)}
+          {p.name.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontWeight: 600, fontSize: 13.5,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            color: "var(--fg)",
+          }}>
+            {p.name}
           </div>
-          <div style={{ fontSize: 11, color: "var(--fg-4)" }}>
-            <span style={{ color: "var(--fg-3)" }}>Created</span>
-            {" "}{dateStr(p.created_at)}
-          </div>
+          {p.description && (
+            <div style={{
+              fontSize: 11.5, color: "var(--fg-3)",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              marginTop: 1,
+            }}>
+              {p.description}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Owner */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+        {owner.name !== "—" ? (
+          <>
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, color: "#fff", fontSize: 9,
+            }}>
+              {owner.initial}
+            </div>
+            <span style={{
+              fontSize: 12.5, color: "var(--fg-2)",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {owner.name}
+            </span>
+          </>
+        ) : (
+          <span style={{ fontSize: 12, color: "var(--fg-4)" }}>—</span>
+        )}
+      </div>
+
+      {/* Status */}
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: 5,
+        padding: "3px 9px", borderRadius: 20,
+        background: sc.bg, color: sc.fg,
+        fontSize: 11, fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.fg, flexShrink: 0 }} />
+        {STATUS_LABEL[p.status]}
+      </span>
+
+      {/* Repos */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <Fa icon="fa-code-branch" style={{ fontSize: 12, color: "var(--fg-3)" }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>{repos.length}</span>
+      </div>
+
+      {/* Docs */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <Fa icon="fa-file-lines" style={{ fontSize: 12, color: "var(--fg-3)" }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>{documents.length}</span>
+      </div>
+
+      {/* Members */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <Fa icon="fa-users" style={{ fontSize: 12, color: "var(--fg-3)" }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>{members.length}</span>
+      </div>
+
+      {/* Messages */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        <Fa icon="fa-comment-dots" style={{ fontSize: 12, color: "var(--fg-3)" }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>{messageCount}</span>
+      </div>
+
+      {/* Last activity */}
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <Fa icon="fa-clock" style={{ fontSize: 11, color: "var(--fg-3)" }} />
+        <span style={{ fontSize: 12, color: "var(--fg-2)" }}>{relativeTime(lastActivity)}</span>
+      </div>
+
+      {/* Created */}
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <Fa icon="fa-calendar" style={{ fontSize: 11, color: "var(--fg-3)" }} />
+        <span style={{ fontSize: 12, color: "var(--fg-2)" }}>{dateStr(p.created_at)}</span>
+      </div>
+
+      {/* Actions */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onMenuOpen(e, p.id); }}
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "var(--fg-3)", padding: "4px 8px", borderRadius: 6,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+        title="More actions"
+      >
+        <Fa icon="fa-ellipsis-vertical" style={{ fontSize: 15 }} />
+      </button>
     </div>
   );
 }
@@ -277,7 +333,7 @@ function OwnerSelector({
         ) : (
           <span style={{ color: "var(--fg-3)", fontSize: 13 }}>Select owner…</span>
         )}
-        <span style={{ color: "var(--fg-3)", fontSize: 10, marginLeft: "auto" }}>▾</span>
+        <Fa icon="fa-chevron-down" style={{ fontSize: 10, color: "var(--fg-3)", marginLeft: "auto" }} />
       </button>
 
       {open && (
@@ -338,7 +394,9 @@ function OwnerSelector({
                     </div>
                   )}
                 </div>
-                {u.id === value && <span style={{ fontSize: 11, color: "#30d158" }}>✓</span>}
+                {u.id === value && (
+                  <Fa icon="fa-check" style={{ fontSize: 11, color: "#30d158" }} />
+                )}
               </button>
             ))}
           </div>
@@ -400,9 +458,7 @@ function ProjectFormModal({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>
-              Project name *
-            </label>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Project name *</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -414,9 +470,7 @@ function ProjectFormModal({
           </div>
 
           <div>
-            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>
-              Description
-            </label>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Description</label>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
@@ -427,9 +481,7 @@ function ProjectFormModal({
           </div>
 
           <div>
-            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>
-              Owner
-            </label>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Owner</label>
             <OwnerSelector
               users={users}
               value={ownerId}
@@ -534,7 +586,7 @@ export default function WorkspaceProjects() {
     e.preventDefault();
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setMenu({ projectId, x: rect.right - 160, y: rect.bottom + 4 });
+    setMenu({ projectId, x: rect.right - 180, y: rect.bottom + 4 });
   }
 
   async function handleArchive(id: string) {
@@ -628,7 +680,7 @@ export default function WorkspaceProjects() {
       </p>
 
       {/* Filter bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <div className="card" style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 180 }}>
           <Icon name="search" size="sm" style={{ color: "var(--fg-3)" }} />
           <input
@@ -638,7 +690,9 @@ export default function WorkspaceProjects() {
             style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--fg)", fontSize: 13 }}
           />
           {search && (
-            <button onClick={() => setSearch("")} style={{ color: "var(--fg-3)", fontSize: 11, padding: "2px 6px", cursor: "pointer", background: "none", border: "none" }}>✕</button>
+            <button onClick={() => setSearch("")} style={{ color: "var(--fg-3)", fontSize: 11, padding: "2px 6px", cursor: "pointer", background: "none", border: "none" }}>
+              <Fa icon="fa-xmark" />
+            </button>
           )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -674,7 +728,7 @@ export default function WorkspaceProjects() {
               ? `No ${statusFilter} projects`
               : (
                 <div>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>🚀</div>
+                  <Fa icon="fa-rocket" style={{ fontSize: 36, marginBottom: 12, display: "block" }} />
                   <p style={{ fontWeight: 600, fontSize: 15, color: "var(--fg)", marginBottom: 4 }}>No projects yet</p>
                   <p style={{ fontSize: 13, marginBottom: 16 }}>Create your first project to get started.</p>
                   <button className="pill-btn" data-primary="true" onClick={() => setShowCreate(true)}>
@@ -686,28 +740,27 @@ export default function WorkspaceProjects() {
         </div>
       )}
 
-      {/* Card grid */}
+      {/* Card table */}
       {!loading && filteredCards.length > 0 && (
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-          gap: 16,
-        }}>
-          {filteredCards.map((c) => (
-            <div
-              key={c.project.id}
-              style={{
-                opacity: (deleting === c.project.id || archiving === c.project.id) ? 0.4 : 1,
-                transition: "opacity 0.15s",
-              }}
-            >
-              <ProjectCard
-                data={c}
-                onMenuOpen={openContextMenu}
-                onClick={(id) => { window.location.href = `/projects/${id}`; }}
-              />
-            </div>
-          ))}
+        <div>
+          <TableHeader />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {filteredCards.map((c) => (
+              <div
+                key={c.project.id}
+                style={{
+                  opacity: (deleting === c.project.id || archiving === c.project.id) ? 0.4 : 1,
+                  transition: "opacity 0.15s",
+                }}
+              >
+                <ProjectRowCard
+                  data={c}
+                  onMenuOpen={openContextMenu}
+                  onClick={(id) => { window.location.href = `/projects/${id}`; }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -718,29 +771,32 @@ export default function WorkspaceProjects() {
           className="card"
           style={{
             position: "fixed", top: menu.y, left: menu.x, zIndex: 2000,
-            minWidth: 160, padding: "4px 0", boxShadow: "var(--shadow-sm)",
+            minWidth: 180, padding: "4px 0", boxShadow: "var(--shadow-sm)",
           }}
         >
           {[
-            { label: "Open project", icon: "↗", danger: false, onClick: () => { window.location.href = `/projects/${menu.projectId}`; setMenu(null); } },
-            { label: "Edit", icon: "✎", danger: false, onClick: () => { setEditingId(menu.projectId); setMenu(null); } },
-            { label: "Archive", icon: "⬓", danger: false, onClick: () => void handleArchive(menu.projectId) },
-            { label: "Delete", icon: "✕", danger: true, onClick: () => void handleDelete(menu.projectId) },
-          ].map((item) => (
+            { label: "Open project", icon: "fa-arrow-up-right-from-square", danger: false, onClick: () => { window.location.href = `/projects/${menu.projectId}`; setMenu(null); } },
+            { label: "Edit", icon: "fa-pen", danger: false, onClick: () => { setEditingId(menu.projectId); setMenu(null); } },
+            { label: "Archive", icon: "fa-box-archive", danger: false, onClick: () => void handleArchive(menu.projectId) },
+            { label: "Delete", icon: "fa-trash", danger: true, onClick: () => void handleDelete(menu.projectId) },
+          ].map((item, i) => (
             <button
               key={item.label}
               onClick={item.onClick}
               style={{
                 display: "flex", alignItems: "center", gap: 10,
                 width: "100%", textAlign: "left",
-                padding: "8px 14px", background: "none", border: "none",
+                padding: "8px 16px",
+                background: "none", border: "none",
+                borderTop: i === 3 ? "0.5px solid var(--hairline)" : "none",
+                marginTop: i === 3 ? 4 : 0,
                 fontSize: 13, cursor: "pointer",
                 color: item.danger ? "#ff375f" : "var(--fg)",
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--hover)"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
             >
-              <span style={{ fontSize: 13, width: 16, flexShrink: 0, opacity: 0.6 }}>{item.icon}</span>
+              <Fa icon={item.icon} style={{ fontSize: 13, width: 16, opacity: 0.7, flexShrink: 0 }} />
               {item.label}
             </button>
           ))}
@@ -773,9 +829,9 @@ export default function WorkspaceProjects() {
       )}
 
       <style>{`
-        .project-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        .project-row:hover {
+          transform: translateX(2px);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.12);
         }
       `}</style>
     </div>
