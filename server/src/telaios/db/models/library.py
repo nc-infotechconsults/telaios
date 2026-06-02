@@ -39,11 +39,12 @@ class LibraryAgent(Base, SoftDeleteAuditMixin):
     llm_model: Mapped[str | None] = mapped_column(String, nullable=True)
     llm_temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
     llm_max_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    dispatch: Mapped[str | None] = mapped_column(String, nullable=True)
     llm_top_p: Mapped[float | None] = mapped_column(Float, nullable=True)
     llm_frequency_penalty: Mapped[float | None] = mapped_column(Float, nullable=True)
     llm_presence_penalty: Mapped[float | None] = mapped_column(Float, nullable=True)
     llm_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    dispatch: Mapped[str | None] = mapped_column(String, nullable=True)
 
     is_base: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"

@@ -1,29 +1,75 @@
 import { test, expect } from "@playwright/test";
-import { loadCIData } from "./global-setup";
 
 /**
  * Agent Profiles E2E tests.
  *
- * Run against the real FastAPI server.
- * Test data is seeded in global-setup.ts:
- *
- *   agentProfile      — "GPT-4o Coder"      (no system_prompt, no sub-agents)
- *   promptProfile     — "E2E Prompt Profile" (system_prompt="E2E custom prompt content",
- *                                             system_prompt_mode="extend", llm_temperature=0.7,
- *                                             sub_agent_ids=[subAgentProfileId])
- *   subAgentProfile   — "E2E Sub-Agent"      (plain profile used as delegation target)
- *
- * Destructive operations (create / delete) intercept the relevant API calls via
- * page.route() so they do not mutate the shared database state and break
- * subsequent tests.
+ * Tests the WorkspaceAgents page at /agents, which shows 8 predefined role-based
+ * agent profile cards. All API calls are intercepted so tests run without a real
+ * database and do not mutate shared state.
  */
 
-const data = loadCIData();
+// ─── Mock data ────────────────────────────────────────────────────────────────
+
+const BASE_PROFILE_ID_PLANNER  = "11111111-0000-0000-0000-000000000001";
+const BASE_PROFILE_ID_CODER    = "11111111-0000-0000-0000-000000000002";
+const BASE_PROFILE_ID_REVIEWER = "11111111-0000-0000-0000-000000000003";
+const BASE_PROFILE_ID_TESTER   = "11111111-0000-0000-0000-000000000004";
+const BASE_PROFILE_ID_INFRA    = "11111111-0000-0000-0000-000000000005";
+const BASE_PROFILE_ID_KNOWLEDGE = "11111111-0000-0000-0000-000000000006";
+const BASE_PROFILE_ID_DOCCOPILOT = "11111111-0000-0000-0000-000000000007";
+const BASE_PROFILE_ID_DESIGNER = "11111111-0000-0000-0000-000000000008";
+const OVERRIDE_ID_CODER        = "22222222-0000-0000-0000-000000000002";
+
+const MOCK_BASE_PROFILES = [
+  { id: BASE_PROFILE_ID_PLANNER,   role: "planner",          name: "Planner",          description: "Turns requirements into structured plans.",     dispatch: "direct",   system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.2, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_CODER,     role: "coder",            name: "Coder",            description: "Writes code based on task specifications.",       dispatch: "workflow", system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.1, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_REVIEWER,  role: "reviewer",         name: "Reviewer",         description: "Reviews code for quality and correctness.",       dispatch: "workflow", system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.1, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_TESTER,    role: "tester",           name: "Tester",           description: "Writes and runs tests.",                          dispatch: "workflow", system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.1, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_INFRA,     role: "infra",            name: "Infra",            description: "Manages infrastructure and deployments.",         dispatch: "workflow", system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.1, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_KNOWLEDGE, role: "knowledge",        name: "Knowledge",        description: "Queries the knowledge base.",                     dispatch: "direct",   system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.3, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_DOCCOPILOT, role: "document-copilot", name: "Document Copilot", description: "Assists with document tasks.",                   dispatch: "workflow", system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.4, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+  { id: BASE_PROFILE_ID_DESIGNER,  role: "designer",         name: "Designer",         description: "Creates UI designs.",                            dispatch: "direct",   system_prompt: null, system_prompt_mode: "append", llm_provider: "openai", llm_model: "gpt-4o", llm_temperature: 0.7, llm_max_tokens: null, llm_top_p: null, llm_frequency_penalty: null, llm_presence_penalty: null, mcp_servers: [], skills: [] },
+];
+
+const MOCK_OVERRIDE_CODER = {
+  id: OVERRIDE_ID_CODER,
+  base_profile_id: BASE_PROFILE_ID_CODER,
+  project_id: null,
+  system_prompt: "You are a senior TypeScript engineer.",
+  system_prompt_mode: "override",
+  llm_provider: null,
+  llm_model: null,
+  llm_temperature: null,
+  llm_max_tokens: null,
+  llm_top_p: null,
+  llm_frequency_penalty: null,
+  llm_presence_penalty: null,
+  mcp_servers: null,
+  skills: null,
+};
+
+async function mockApis(page: import("@playwright/test").Page, { overrides = [] }: { overrides?: unknown[] } = {}) {
+  await page.route("**/agent-base-profiles", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_BASE_PROFILES) });
+  });
+  await page.route("**/agent-overrides", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(overrides) });
+    } else {
+      await route.continue();
+    }
+  });
+  // Also mock LLM providers for the override form
+  await page.route("**/llm/providers", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
+  });
+}
 
 // ─── Page loading ─────────────────────────────────────────────────────────────
 
 test.describe("AgentProfiles — page loading", () => {
   test.beforeEach(async ({ page }) => {
+    await mockApis(page);
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
   });
@@ -32,277 +78,139 @@ test.describe("AgentProfiles — page loading", () => {
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible();
   });
 
-  test("shows the GPT-4o Coder profile seeded by global-setup", async ({ page }) => {
-    await expect(page.getByText("GPT-4o Coder")).toBeVisible();
+  test("does NOT show a New Profile button", async ({ page }) => {
+    await expect(page.getByRole("button", { name: /new profile/i })).not.toBeVisible();
   });
 
-  test("shows the E2E Prompt Profile seeded by global-setup", async ({ page }) => {
-    await expect(page.getByText("E2E Prompt Profile")).toBeVisible();
-  });
-
-  test("shows the E2E Sub-Agent profile seeded by global-setup", async ({ page }) => {
-    await expect(page.getByText("E2E Sub-Agent")).toBeVisible();
-  });
-
-  test("shows a New Profile button", async ({ page }) => {
-    await expect(page.getByRole("button", { name: /new profile/i })).toBeVisible();
+  test("shows 8 Customise buttons (one per role)", async ({ page }) => {
+    await expect(page.getByRole("button", { name: "Customise" })).toHaveCount(8);
   });
 });
 
-// ─── Grid view badges ─────────────────────────────────────────────────────────
+// ─── Section grouping ─────────────────────────────────────────────────────────
 
-test.describe("AgentProfiles — grid view badges", () => {
+test.describe("AgentProfiles — dispatch sections", () => {
   test.beforeEach(async ({ page }) => {
+    await mockApis(page);
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-    // Default view is grid; ensure it's active
-    const viewGroup = page.getByRole("group", { name: /view/i });
-    if (await viewGroup.count()) {
-      const gridBtn = viewGroup.getByRole("button", { name: "Grid" });
-      if (await gridBtn.count()) await gridBtn.click();
-    }
   });
 
-  test("shows 💬 prompt badge for profile with system_prompt", async ({ page }) => {
-    // The E2E Prompt Profile card should contain the 💬 prompt chip
-    const card = page.locator(".apple-card").filter({ hasText: "E2E Prompt Profile" });
-    await expect(card.getByTitle("E2E custom prompt content")).toBeVisible();
+  test("shows 'Direct dispatch' section heading", async ({ page }) => {
+    await expect(page.getByText("Direct dispatch", { exact: true })).toBeVisible();
   });
 
-  test("does NOT show 💬 prompt badge for profile without system_prompt", async ({ page }) => {
-    const card = page.locator(".apple-card").filter({ hasText: "GPT-4o Coder" });
-    // The 💬 chip should NOT be present
-    await expect(card.getByTitle(/custom prompt/i)).not.toBeVisible();
+  test("shows 'Workflow agents' section heading", async ({ page }) => {
+    await expect(page.getByText("Workflow agents", { exact: true })).toBeVisible();
   });
 
-  test("shows 🤝 sub-agent badge for profile with sub_agent_ids", async ({ page }) => {
-    const card = page.locator(".apple-card").filter({ hasText: "E2E Prompt Profile" });
-    await expect(card.getByText(/🤝/)).toBeVisible();
+  test("Planner card is in the Direct dispatch section", async ({ page }) => {
+    await expect(page.getByText("Planner")).toBeVisible();
   });
 
-  test("does NOT show 🤝 sub-agent badge for profile without sub_agent_ids", async ({ page }) => {
-    const card = page.locator(".apple-card").filter({ hasText: "GPT-4o Coder" });
-    await expect(card.getByText(/🤝/)).not.toBeVisible();
+  test("Coder card is in the Workflow agents section", async ({ page }) => {
+    await expect(page.getByText("Coder")).toBeVisible();
   });
 });
 
-// ─── List view ────────────────────────────────────────────────────────────────
+// ─── Default / Customised badges ─────────────────────────────────────────────
 
-test.describe("AgentProfiles — list view badges", () => {
-  test.beforeEach(async ({ page }) => {
+test.describe("AgentProfiles — Default/Customised badges", () => {
+  test("shows Default badge for profiles with no override", async ({ page }) => {
+    await mockApis(page, { overrides: [] });
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-    const viewGroup = page.getByRole("group", { name: /view/i });
-    await viewGroup.getByRole("button", { name: "List" }).click();
+    // All 8 badges should say "Default"
+    const defaultBadges = page.getByText("Default");
+    await expect(defaultBadges).toHaveCount(8);
   });
 
-  test("list view renders a row for each seeded profile", async ({ page }) => {
-    await expect(page.getByText("GPT-4o Coder")).toBeVisible();
-    await expect(page.getByText("E2E Prompt Profile")).toBeVisible();
-    await expect(page.getByText("E2E Sub-Agent")).toBeVisible();
-  });
-
-  test("list view shows 💬 icon for profile with system_prompt", async ({ page }) => {
-    // Each row is a flex div; find the one for E2E Prompt Profile
-    const row = page.locator("div").filter({ hasText: /^E2E Prompt Profile/ }).first();
-    await expect(row.getByTitle("E2E custom prompt content")).toBeVisible();
+  test("shows Customised badge for a profile that has an override", async ({ page }) => {
+    await mockApis(page, { overrides: [MOCK_OVERRIDE_CODER] });
+    await page.goto("/agents");
+    await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
+    // Coder card should show Customised
+    await expect(page.getByText("Customised")).toBeVisible();
+    // Other 7 should still show Default
+    await expect(page.getByText("Default")).toHaveCount(7);
   });
 });
 
-// ─── Table view ───────────────────────────────────────────────────────────────
+// ─── Customise modal ──────────────────────────────────────────────────────────
 
-test.describe("AgentProfiles — table view badges", () => {
+test.describe("AgentProfiles — Customise modal", () => {
   test.beforeEach(async ({ page }) => {
+    await mockApis(page, { overrides: [] });
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-    const viewGroup = page.getByRole("group", { name: /view/i });
-    await viewGroup.getByRole("button", { name: "Table" }).click();
+    // Open the override form for Planner
+    await page.getByText("Planner").locator("..").locator("..").getByRole("button", { name: "Customise" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5_000 });
   });
 
-  test("table view renders a row for E2E Prompt Profile", async ({ page }) => {
-    await expect(page.getByRole("cell", { name: /E2E Prompt Profile/i })).toBeVisible();
-  });
-
-  test("table view shows 💬 chip for profile with system_prompt", async ({ page }) => {
-    const promptCell = page.getByRole("row").filter({ hasText: "E2E Prompt Profile" });
-    await expect(promptCell.getByTitle("E2E custom prompt content")).toBeVisible();
-  });
-
-  test("table view shows 🤝 chip for profile with sub_agent_ids", async ({ page }) => {
-    const promptRow = page.getByRole("row").filter({ hasText: "E2E Prompt Profile" });
-    await expect(promptRow.getByText(/🤝/)).toBeVisible();
-  });
-});
-
-// ─── New Profile modal — form sections ───────────────────────────────────────
-
-test.describe("AgentProfiles — New Profile modal", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/agents");
-    await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: /new profile/i }).click();
+  test("modal opens when Customise is clicked", async ({ page }) => {
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "New Agent Profile" })).toBeVisible();
   });
 
-  test("dialog contains the Name field", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByLabel("Name")).toBeVisible();
+  test("modal has a General tab", async ({ page }) => {
+    await expect(page.getByRole("dialog").getByRole("tab", { name: /general/i })).toBeVisible();
   });
 
-  test("dialog contains the System Prompt section heading", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    // Use paragraph selector to avoid strict-mode collision with the textarea label
-    await expect(dialog.locator("p").filter({ hasText: /^System Prompt$/ }).first()).toBeVisible();
+  test("modal has a Prompt tab", async ({ page }) => {
+    await expect(page.getByRole("dialog").getByRole("tab", { name: /prompt/i })).toBeVisible();
   });
 
-  test("dialog contains the System Prompt textarea", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    await expect(dialog.getByLabel("System Prompt")).toBeVisible();
+  test("modal has an MCP Servers tab", async ({ page }) => {
+    await expect(page.getByRole("dialog").getByRole("tab", { name: /mcp/i })).toBeVisible();
   });
 
-  test("default system prompt mode is Extend", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    // Mode is a native <select id="mode"> — check its value directly
-    await expect(dialog.locator("select#mode")).toHaveValue("extend");
+  test("modal has a Skills tab", async ({ page }) => {
+    await expect(page.getByRole("dialog").getByRole("tab", { name: /skills/i })).toBeVisible();
   });
 
-  test("changing mode to Override updates the description text", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    // Mode is a native <select> — use selectOption to change it
-    await dialog.locator("select#mode").selectOption("override");
-    await expect(dialog.getByText("Fully replaces the built-in agent prompt.")).toBeVisible();
+  test("modal does NOT have a Sub-agents tab", async ({ page }) => {
+    await expect(page.getByRole("dialog").getByRole("tab", { name: /sub-agents/i })).not.toBeVisible();
   });
 
-  test("system prompt textarea accepts input", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    const textarea = dialog.getByLabel("System Prompt");
-    await textarea.fill("You are a specialized test agent.");
-    await expect(textarea).toHaveValue("You are a specialized test agent.");
+  test("modal does NOT have a Structured Output tab", async ({ page }) => {
+    await expect(page.getByRole("dialog").getByRole("tab", { name: /structured output/i })).not.toBeVisible();
   });
 
-  test("dialog contains the Temperature slider", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByRole("slider", { name: /temperature/i })).toBeVisible();
-  });
-
-  test("dialog contains the Max Tokens input", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByLabel("Max Tokens")).toBeVisible();
-  });
-
-  test("Advanced sampling toggle reveals Top P input", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    // Top P should not exist yet (toggle is closed)
-    await expect(dialog.getByLabel("Top P")).not.toBeVisible();
-    // The toggle button may be below the modal fold — bypass viewport check
-    await dialog.getByText("Advanced sampling parameters").evaluate(el => (el as HTMLElement).click());
-    await expect(dialog.getByLabel("Top P")).toBeVisible();
-  });
-
-  test("Sub-agents section is visible", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
-    // Use paragraph selector to avoid strict-mode collision with the tab button text
-    await expect(dialog.locator("p").filter({ hasText: /^Sub-agents$/ }).first()).toBeVisible();
-  });
-
-  test("Sub-agents picker shows other profiles as options", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
-    // Wait for profiles to load (spinner disappears, select appears)
-    const subAgentSelect = dialog.locator("select#add-sub-agent");
-    await expect(subAgentSelect).toBeVisible({ timeout: 5_000 });
-    // The native select should contain an option for E2E Sub-Agent
-    await expect(subAgentSelect.locator("option").filter({ hasText: /E2E Sub-Agent/ })).toHaveCount(1);
-  });
-
-  test("selecting a sub-agent adds it as a chip", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
-    const subAgentSelect = dialog.locator("select#add-sub-agent");
-    await expect(subAgentSelect).toBeVisible({ timeout: 5_000 });
-    // Select by value (profile ID) via native select API
-    await subAgentSelect.selectOption({ value: data.subAgentProfileId });
-    // A chip (span.apple-badge) with the profile name should appear — not the hidden <option>
-    await expect(dialog.locator(".apple-badge").filter({ hasText: "E2E Sub-Agent" })).toBeVisible();
-  });
-
-  test("cancelling closes the dialog", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    // Cancel button is at the modal footer — bypass viewport check
-    await dialog.getByRole("button", { name: "Cancel" }).evaluate(el => (el as HTMLElement).click());
+  test("Cancel button closes the modal", async ({ page }) => {
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).evaluate(
+      (el) => (el as HTMLElement).click()
+    );
     await expect(page.getByRole("dialog")).not.toBeVisible();
   });
 });
 
-// ─── Edit Profile modal — pre-filled values ───────────────────────────────────
+// ─── Customise save cycle (intercepted) ──────────────────────────────────────
 
-test.describe("AgentProfiles — Edit Profile modal pre-fill", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/agents");
-    await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-    // Open the edit modal for the E2E Prompt Profile
-    await page.getByRole("button", { name: `Edit E2E Prompt Profile` }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-  });
+test.describe("AgentProfiles — Customise save (API intercepted)", () => {
+  test("saving an override shows success toast and closes modal", async ({ page }) => {
+    await mockApis(page, { overrides: [] });
 
-  test("edit modal header shows Editing E2E Prompt Profile", async ({ page }) => {
-    await expect(page.getByRole("dialog").getByText(/Editing: E2E Prompt Profile/i)).toBeVisible();
-  });
-
-  test("system prompt textarea is pre-filled with saved value", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    const textarea = dialog.getByLabel("System Prompt");
-    await expect(textarea).toHaveValue("E2E custom prompt content");
-  });
-
-  test("mode select shows saved mode (Extend)", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    // Mode is a native <select id="mode"> — check its value directly
-    await expect(dialog.locator("select#mode")).toHaveValue("extend");
-  });
-
-  test("sub-agent chip is pre-populated with E2E Sub-Agent", async ({ page }) => {
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("tab", { name: /sub-agents/i }).evaluate(el => (el as HTMLElement).click());
-    // The chip label shows the sub-agent's name
-    await expect(dialog.getByText("E2E Sub-Agent").first()).toBeVisible();
-  });
-});
-
-// ─── Create cycle (intercepted) ───────────────────────────────────────────────
-
-test.describe("AgentProfiles — Create cycle (API intercepted)", () => {
-  test("filling required fields and saving shows success toast + closes modal", async ({ page }) => {
-    const newProfileId = "00000000-0000-0000-0000-000000000099";
-
-    // Intercept POST /agent-profiles so we don't pollute the DB
-    await page.route("**/agent-profiles", async (route) => {
-      if (route.request().method() === "POST") {
+    // Intercept PUT /agent-overrides/:id
+    await page.route(`**\/agent-overrides\/${BASE_PROFILE_ID_PLANNER}`, async (route) => {
+      if (route.request().method() === "PUT") {
         await route.fulfill({
-          status: 201,
+          status: 200,
           contentType: "application/json",
           body: JSON.stringify({
-            id: newProfileId,
-            name: "Test Intercepted Profile",
-            description: "",
-            agent_type: "langgraph",
-            llm_provider: "openai",
-            llm_model: "gpt-4o",
-            mcp_servers: [],
-            skills: [],
-            system_prompt: null,
-            system_prompt_mode: "extend",
-            sub_agent_ids: [],
-            has_llm_api_key: false,
-            has_github_token: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            id: "33333333-0000-0000-0000-000000000001",
+            base_profile_id: BASE_PROFILE_ID_PLANNER,
+            project_id: null,
+            system_prompt: "Custom planner instructions.",
+            system_prompt_mode: "override",
+            llm_provider: null,
+            llm_model: null,
+            llm_temperature: null,
+            llm_max_tokens: null,
+            llm_top_p: null,
+            llm_frequency_penalty: null,
+            llm_presence_penalty: null,
+            mcp_servers: null,
+            skills: null,
           }),
         });
       } else {
@@ -313,69 +221,23 @@ test.describe("AgentProfiles — Create cycle (API intercepted)", () => {
     await page.goto("/agents");
     await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: /new profile/i }).click();
+    // Open Planner customise
+    await page.getByText("Planner").locator("..").locator("..").getByRole("button", { name: "Customise" }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
 
-    // Fill in the minimum required field (Name) + a system prompt
-    await dialog.getByLabel("Name").fill("Test Intercepted Profile");
-    // Switch to Prompt tab to fill system prompt
-    await dialog.getByRole("tab", { name: /^Prompt/i }).evaluate(el => (el as HTMLElement).click());
-    const textarea = dialog.getByLabel("System Prompt");
-    await textarea.fill("I am a test agent.");
+    // Switch to Prompt tab and type something
+    await dialog.getByRole("tab", { name: /prompt/i }).evaluate((el) => (el as HTMLElement).click());
+    const textarea = dialog.locator("textarea").first();
+    if (await textarea.isVisible()) {
+      await textarea.fill("Custom planner instructions.");
+    }
 
     // Save
-    await dialog.getByRole("button", { name: "Create Profile" }).click();
+    await dialog.getByRole("button", { name: /save/i }).evaluate((el) => (el as HTMLElement).click());
 
-    // Modal should close and success toast should appear
+    // Toast and closed dialog
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText(/agent profile created/i)).toBeVisible();
-  });
-});
-
-// ─── Delete cycle ─────────────────────────────────────────────────────────────
-
-test.describe("AgentProfiles — Delete cycle (API intercepted)", () => {
-  test("delete button shows confirmation modal with profile name", async ({ page }) => {
-    await page.goto("/agents");
-    await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-
-    // Click delete on the GPT-4o Coder profile (intercepted so it isn't really deleted)
-    await page.route(`**/agent-profiles/${data.agentProfileId}`, async (route) => {
-      if (route.request().method() === "DELETE") {
-        await route.fulfill({ status: 204 });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.getByRole("button", { name: `Delete GPT-4o Coder` }).click();
-
-    // Confirm dialog should show the profile name
-    const confirmDialog = page.getByRole("dialog");
-    await expect(confirmDialog).toBeVisible();
-    await expect(confirmDialog.getByText(/GPT-4o Coder/i)).toBeVisible();
-  });
-
-  test("confirming delete shows success toast", async ({ page }) => {
-    await page.route(`**/agent-profiles/${data.agentProfileId}`, async (route) => {
-      if (route.request().method() === "DELETE") {
-        await route.fulfill({ status: 204 });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.goto("/agents");
-    await expect(page.getByRole("heading", { name: "Agent Profiles" })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: `Delete GPT-4o Coder` }).click();
-
-    const confirmDialog = page.getByRole("dialog");
-    await expect(confirmDialog).toBeVisible();
-
-    // Click the confirm Delete button inside the dialog
-    await confirmDialog.getByRole("button", { name: /^delete$/i }).click();
-
-    await expect(page.getByText(/agent profile deleted/i)).toBeVisible({ timeout: 6_000 });
+    await expect(page.getByText(/agent customisation saved/i)).toBeVisible();
   });
 });

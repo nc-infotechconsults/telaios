@@ -49,7 +49,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
     )
 
-    # Create partial unique indexes
+    # Partial unique indexes: one override per base_profile per scope
     op.create_index(
         "uq_agent_override_workspace_scope",
         "agent_overrides",
@@ -67,14 +67,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop partial indexes
     op.drop_index("uq_agent_override_project_scope", table_name="agent_overrides")
     op.drop_index("uq_agent_override_workspace_scope", table_name="agent_overrides")
-
-    # Drop agent_overrides table
     op.drop_table('agent_overrides')
-
-    # Drop columns from library_agents
     op.drop_column('library_agents', 'llm_presence_penalty')
     op.drop_column('library_agents', 'llm_frequency_penalty')
     op.drop_column('library_agents', 'llm_top_p')

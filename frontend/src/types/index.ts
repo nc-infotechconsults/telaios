@@ -433,6 +433,68 @@ export interface ProjectAgent {
   updated_at: string;
 }
 
+// ── Agent Base Profiles & Overrides ──────────────────────────────────────────
+
+/** Platform-managed base profile — one per AgentRole, global across all workspaces. */
+export interface AgentBaseProfile {
+  id: string;
+  role: AgentRole;
+  name: string;
+  description: string | null;
+  dispatch: "direct" | "workflow" | null;
+  system_prompt: string | null;
+  system_prompt_mode: "override" | "extend" | "append";
+  llm_provider: string | null;
+  llm_model: string | null;
+  llm_temperature: number | null;
+  llm_max_tokens: number | null;
+  llm_top_p: number | null;
+  llm_frequency_penalty: number | null;
+  llm_presence_penalty: number | null;
+  mcp_servers: McpServer[];
+  skills: InlineSkill[];
+}
+
+/** User-managed sparse override for a specific base profile. */
+export interface AgentOverride {
+  id: string;
+  base_profile_id: string;
+  project_id: string | null;
+  system_prompt: string | null;
+  system_prompt_mode: "override" | "extend" | null;
+  llm_provider: string | null;
+  llm_model: string | null;
+  llm_temperature: number | null;
+  llm_max_tokens: number | null;
+  llm_top_p: number | null;
+  llm_frequency_penalty: number | null;
+  llm_presence_penalty: number | null;
+  mcp_servers: McpServer[] | null;
+  skills: InlineSkill[] | null;
+}
+
+/** Request body for upsert — all fields optional (null clears the field). */
+export interface AgentOverrideUpsert {
+  system_prompt?: string | null;
+  system_prompt_mode?: "override" | "extend" | null;
+  llm_provider?: string | null;
+  llm_model?: string | null;
+  llm_temperature?: number | null;
+  llm_max_tokens?: number | null;
+  llm_top_p?: number | null;
+  llm_frequency_penalty?: number | null;
+  llm_presence_penalty?: number | null;
+  mcp_servers?: McpServer[] | null;
+  skills?: InlineSkill[] | null;
+}
+
+/** Fully merged profile consumed by TEOS — always complete. */
+export interface ResolvedAgentProfile extends AgentBaseProfile {
+  overridden_fields: string[];
+  override_scope: "base" | "workspace" | "project";
+  override_id: string | null;
+}
+
 // ── Workspaces ────────────────────────────────────────────────────────────────
 
 export type WorkspaceStatus = "idle" | "starting" | "running" | "sleeping" | "error";

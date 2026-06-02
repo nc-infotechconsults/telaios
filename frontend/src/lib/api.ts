@@ -56,6 +56,10 @@ import type {
   ProjectSkill,
   ProjectMcp,
   KnowledgeStatus,
+  AgentBaseProfile,
+  AgentOverride,
+  AgentOverrideUpsert,
+  ResolvedAgentProfile,
 } from "../types";
 import * as demo from "../demo/data";
 import { toast } from "./toast";
@@ -417,6 +421,85 @@ export const discoverMcpTools = (
     : http
         .post<{ tools: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown>; annotations?: import("../types").McpToolAnnotations }> }>("/agent-profiles/mcp-discover", serverConfig)
         .then((r) => r.data.tools ?? []);
+
+// ─── Agent Base Profiles & Overrides ─────────────────────────────────────────
+
+// Global (no workspace scope) — used by workspace admin view at /agents
+export const listAgentBaseProfiles = (): Promise<AgentBaseProfile[]> =>
+  DEMO
+    ? delay<AgentBaseProfile[]>([])
+    : http.get<AgentBaseProfile[]>("/agent-base-profiles").then((r) => r.data);
+
+export const listAgentOverrides = (): Promise<AgentOverride[]> =>
+  DEMO
+    ? delay<AgentOverride[]>([])
+    : http.get<AgentOverride[]>("/agent-overrides").then((r) => r.data);
+
+export const upsertAgentOverride = (
+  baseProfileId: string,
+  data: AgentOverrideUpsert
+): Promise<AgentOverride> =>
+  http.put<AgentOverride>(`/agent-overrides/${baseProfileId}`, data).then((r) => r.data);
+
+export const deleteAgentOverride = (baseProfileId: string): Promise<void> =>
+  http.delete(`/agent-overrides/${baseProfileId}`).then(() => undefined);
+
+// Workspace-scoped variants (kept for project-level pages)
+export const getAgentBaseProfiles = (workspaceId: string): Promise<AgentBaseProfile[]> =>
+  DEMO
+    ? delay<AgentBaseProfile[]>([])
+    : http.get<AgentBaseProfile[]>(`/workspaces/${workspaceId}/agent-base-profiles`).then((r) => r.data);
+
+export const getWorkspaceAgentOverrides = (workspaceId: string): Promise<AgentOverride[]> =>
+  DEMO
+    ? delay<AgentOverride[]>([])
+    : http.get<AgentOverride[]>(`/workspaces/${workspaceId}/agent-overrides`).then((r) => r.data);
+
+export const upsertWorkspaceAgentOverride = (
+  workspaceId: string,
+  baseProfileId: string,
+  data: AgentOverrideUpsert
+): Promise<AgentOverride> =>
+  http
+    .put<AgentOverride>(`/workspaces/${workspaceId}/agent-overrides/${baseProfileId}`, data)
+    .then((r) => r.data);
+
+export const deleteWorkspaceAgentOverride = (
+  workspaceId: string,
+  baseProfileId: string
+): Promise<void> =>
+  http
+    .delete(`/workspaces/${workspaceId}/agent-overrides/${baseProfileId}`)
+    .then(() => undefined);
+
+export const getProjectAgentOverrides = (projectId: string): Promise<AgentOverride[]> =>
+  DEMO
+    ? delay<AgentOverride[]>([])
+    : http.get<AgentOverride[]>(`/projects/${projectId}/agent-overrides`).then((r) => r.data);
+
+export const upsertProjectAgentOverride = (
+  projectId: string,
+  baseProfileId: string,
+  data: AgentOverrideUpsert
+): Promise<AgentOverride> =>
+  http
+    .put<AgentOverride>(`/projects/${projectId}/agent-overrides/${baseProfileId}`, data)
+    .then((r) => r.data);
+
+export const deleteProjectAgentOverride = (
+  projectId: string,
+  baseProfileId: string
+): Promise<void> =>
+  http
+    .delete(`/projects/${projectId}/agent-overrides/${baseProfileId}`)
+    .then(() => undefined);
+
+export const getResolvedAgentProfiles = (projectId: string): Promise<ResolvedAgentProfile[]> =>
+  DEMO
+    ? delay<ResolvedAgentProfile[]>([])
+    : http
+        .get<ResolvedAgentProfile[]>(`/projects/${projectId}/agent-profiles/resolved`)
+        .then((r) => r.data);
 
 // ─── Library Agents ───────────────────────────────────────────────────────────
 
