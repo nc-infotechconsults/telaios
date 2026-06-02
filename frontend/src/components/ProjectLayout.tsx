@@ -98,7 +98,7 @@ const COMMANDS = [
 export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const { user, logout } = useAuth();
-  const { theme, toggle: toggleTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const [project, setProject] = useState<Project | null>(null);
   const [sidebarProjects, setSidebarProjects] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -108,6 +108,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [density] = useState<"compact" | "regular" | "comfy">("regular");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   // TEOS sidebar state
   const [teosMessages, setTeosMessages] = useState<Array<{ role: string; text: string; specialist?: string }>>([]);
@@ -301,20 +302,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)", fontWeight: 500 }}>v2.4</span>
           </div>
 
-          {/* Workspace switcher */}
-          <div className="workspace-switch">
-            <div className="ws-avatar" style={{ background: projectColor }}>
-              {projectName.charAt(0).toUpperCase()}
-            </div>
-            <div className="ws-meta">
-              <b>{projectName}</b>
-              <span>Team · 24 members</span>
-            </div>
-            <div className="ws-arrows">
-              <Icon name="chevd" size="sm" />
-            </div>
-          </div>
-
           <div className="sb-section">{wsView ? "Navigation" : "Workspace"}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {wsView ? (
@@ -397,31 +384,73 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
               </button>
             ))}
 
-            {/* User row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px 4px" }}>
-              <div
-                style={{
-                  width: 26, height: 26, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, fontWeight: 600, color: "#fff", flexShrink: 0,
-                }}
-              >
-                {userInitials}
-              </div>
-              <span style={{ flex: 1, fontSize: 12, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user?.display_name || user?.email || "User"}
-              </span>
+            {/* Workspace switcher */}
+            <div style={{ position: "relative" }}>
               <button
-                onClick={toggleTheme}
-                title={theme === "dark" ? "Light mode" : "Dark mode"}
-                style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)", fontSize: 13 }}
+                className="workspace-switch"
+                style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+                onClick={() => setSwitcherOpen((v) => !v)}
               >
-                {theme === "dark" ? "☀" : "☽"}
+                <div className="ws-avatar" style={{ background: projectColor }}>
+                  {wsView ? "T" : projectName.charAt(0).toUpperCase()}
+                </div>
+                <div className="ws-meta">
+                  <b>{wsView ? "TelaiOS" : projectName}</b>
+                  <span>{wsView ? "Admin Console" : "Switch workspace"}</span>
+                </div>
+                <div className="ws-arrows">
+                  <Icon name="chevd" size="sm" style={{ transform: switcherOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
+                </div>
               </button>
-              <button onClick={logout} title="Log out" style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)" }}>
-                <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />
-              </button>
+
+              {switcherOpen && (
+                <>
+                  <div className="vis-backdrop" style={{ zIndex: 90 }} onClick={() => setSwitcherOpen(false)} />
+                  <div
+                    className="glass"
+                    style={{
+                      position: "absolute", bottom: "calc(100% + 6px)", top: "auto", left: 0, right: 0,
+                      borderRadius: 10, border: "0.5px solid var(--hairline)",
+                      boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
+                    }}
+                  >
+                    <button
+                      className="sb-row"
+                      style={{ width: "100%", borderRadius: 0, padding: "9px 12px", gap: 8 }}
+                      data-active={!!wsView}
+                      onClick={() => { setSwitcherOpen(false); window.location.href = "/"; }}
+                    >
+                      <div style={{
+                        width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+                        background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Icon name="settings" size="sm" style={{ color: "#fff", fontSize: 10 }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>Admin Console</div>
+                        <div style={{ fontSize: 11, color: "var(--fg-3)" }}>Workspace governance</div>
+                      </div>
+                    </button>
+                    {sidebarProjects.length > 0 && (
+                      <div style={{ borderTop: "0.5px solid var(--hairline)", padding: "4px 0" }}>
+                        {sidebarProjects.map((p) => (
+                          <button
+                            key={p.id}
+                            className="sb-row"
+                            style={{ width: "100%", borderRadius: 0, padding: "7px 12px", gap: 8 }}
+                            data-active={projectId === p.id && !wsView}
+                            onClick={() => { setSwitcherOpen(false); window.location.href = `/projects/${p.id}`; }}
+                          >
+                            <span className="proj-dot" style={{ background: p.color, width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
+                            <span style={{ fontSize: 12.5 }}>{p.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </aside>
