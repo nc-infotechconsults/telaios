@@ -278,13 +278,13 @@ export default function ProjectDashboard({
           {messages.map((m) => {
             const isUser = m.role === "user";
             const displayName = isUser ? "User" : "TEOS";
-            const initial = isUser ? initials("User") : "✶";
+            const initial = isUser ? initials("User") : null;
             const avatarClass = isUser ? "av-2" : "av-3";
             const tag = isUser ? "Question" : "Answer";
             const truncated = m.content.length > 120 ? m.content.slice(0, 120) + "…" : m.content;
             return (
               <div key={m.id} className="act-row">
-                <div className={"act-avatar " + avatarClass}>{initial}</div>
+                <div className={"act-avatar " + avatarClass}>{initial ?? <i className="fa-solid fa-robot" aria-hidden="true" />}</div>
                 <div className="act-body">
                   <span className="act-tag">{tag}</span>
                   <b>{displayName}</b> {truncated}

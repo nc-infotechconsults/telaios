@@ -311,9 +311,7 @@ export default function K8sPVCFileBrowserModal({
                           className="flex items-center justify-between gap-2 py-1.5 px-1 rounded hover:bg-default-50 group"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-default-400 text-xs flex-shrink-0 w-4">
-                              {entry.type === "directory" ? "📁" : "📄"}
-                            </span>
+                            <i className={`fa-solid ${entry.type === "directory" ? "fa-folder" : "fa-file"} text-default-400 text-xs flex-shrink-0`} aria-hidden="true" />
                             {entry.type === "directory" ? (
                               <button
                                 className="text-xs font-mono text-primary truncate"
@@ -345,7 +343,7 @@ export default function K8sPVCFileBrowserModal({
                                   isLoading={loadingFile && openingFilePath === entry.path}
                                   onPress={() => handleOpenFile(entry, "view")}
                                 >
-                                  👁
+                                  <i className="fa-solid fa-eye" aria-hidden="true" />
                                 </Button>
                                 {/* Edit */}
                                 <Button
@@ -357,7 +355,7 @@ export default function K8sPVCFileBrowserModal({
                                   isLoading={loadingFile && openingFilePath === entry.path}
                                   onPress={() => handleOpenFile(entry, "edit")}
                                 >
-                                  ✏️
+                                  <i className="fa-solid fa-pen" aria-hidden="true" />
                                 </Button>
                                 {/* Download */}
                                 <Button
@@ -388,7 +386,7 @@ export default function K8sPVCFileBrowserModal({
                     </div>
                   ) : fileData.encoding === "binary" ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3 text-default-500">
-                      <span className="text-3xl">🔒</span>
+                      <i className="fa-solid fa-lock" aria-hidden="true" style={{ fontSize: 28 }} />
                       <p className="text-sm">Binary file — download only</p>
                       <p className="text-xs text-default-400">
                         {formatSize(fileData.size)}

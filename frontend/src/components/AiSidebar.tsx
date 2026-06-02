@@ -12,13 +12,13 @@ interface Specialist {
 }
 
 const SPECIALISTS: Record<SpecialistKey, Specialist> = {
-  qa:       { name: "Q&A",        color: "#0a84ff", icon: "?",  tagline: "Ask anything about your project" },
-  explorer: { name: "Explorer",   color: "#64d2ff", icon: "⌖",  tagline: "Find code, files, and patterns" },
-  reverse:  { name: "Reverse",    color: "#bf5af2", icon: "◈",  tagline: "Trace and map code flows" },
-  planner:  { name: "Planner",    color: "#30d158", icon: "⎇",  tagline: "Plan features and roadmaps" },
-  coder:    { name: "Coder",      color: "#5e5ce6", icon: "</>", tagline: "Implement, refactor, and fix" },
-  designer: { name: "Designer",   color: "#ff9f0a", icon: "✦",  tagline: "Design UI and mock layouts" },
-  reviewer: { name: "Reviewer",   color: "#ff375f", icon: "⊘",  tagline: "Review PRs and audit code" },
+  qa:       { name: "Q&A",        color: "#0a84ff", icon: "fa-circle-question", tagline: "Ask anything about your project" },
+  explorer: { name: "Explorer",   color: "#64d2ff", icon: "fa-magnifying-glass", tagline: "Find code, files, and patterns" },
+  reverse:  { name: "Reverse",    color: "#bf5af2", icon: "fa-diagram-project",  tagline: "Trace and map code flows" },
+  planner:  { name: "Planner",    color: "#30d158", icon: "fa-sitemap",          tagline: "Plan features and roadmaps" },
+  coder:    { name: "Coder",      color: "#5e5ce6", icon: "fa-code",             tagline: "Implement, refactor, and fix" },
+  designer: { name: "Designer",   color: "#ff9f0a", icon: "fa-pen-ruler",        tagline: "Design UI and mock layouts" },
+  reviewer: { name: "Reviewer",   color: "#ff375f", icon: "fa-code-pull-request", tagline: "Review PRs and audit code" },
 };
 
 function detectSpecialist(text: string): SpecialistKey {
@@ -74,7 +74,7 @@ function HandoverDivider({ specialist, reason }: { specialist: Specialist; reaso
       <div style={{ flex: 1, height: "0.5px", background: "var(--hairline)" }} />
       <span style={{ fontSize: 11, color: specialist.color, display: "flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
         <span>→</span>
-        <span>{specialist.icon}</span>
+        <i className={`fa-solid ${specialist.icon}`} aria-hidden="true" />
         <b>{specialist.name}</b>
         {reason && <span>· {reason}</span>}
       </span>
@@ -248,7 +248,7 @@ export default function AiSidebar({ projectId, projectName, visible }: AiSidebar
               border: `0.5px solid ${specialist.color}40`,
             }}
           >
-            {specialist.icon} {specialist.name}
+            <i className={`fa-solid ${specialist.icon}`} aria-hidden="true" /> {specialist.name}
           </span>
           <button
             onClick={() => setShowSessionsDrawer(!showSessionsDrawer)}
@@ -265,7 +265,7 @@ export default function AiSidebar({ projectId, projectName, visible }: AiSidebar
             aria-label="Toggle sessions drawer"
             title="Sessions"
           >
-            ☰
+            <i className="fa-solid fa-bars" aria-hidden="true" />
           </button>
         </div>
         <p style={{ fontSize: 11, color: "var(--label-secondary)", margin: 0 }}>
@@ -395,7 +395,7 @@ export default function AiSidebar({ projectId, projectName, visible }: AiSidebar
               >
                 {!isUser && msg.specialist && msg.specialist !== "qa" && (
                   <div style={{ fontSize: 10, color: msgSpecialist.color, marginBottom: 4, fontWeight: 500 }}>
-                    {msgSpecialist.icon} {msgSpecialist.name}
+                    <i className={`fa-solid ${msgSpecialist.icon}`} aria-hidden="true" /> {msgSpecialist.name}
                   </div>
                 )}
                 <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>

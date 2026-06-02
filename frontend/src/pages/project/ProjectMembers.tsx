@@ -244,7 +244,7 @@ export default function ProjectMembers({ projectId }: { projectId: string }) {
           )}
 
           <div className="card glass adm-agent-card">
-            <div className="act-avatar av-3">✶</div>
+            <div className="act-avatar av-3"><i className="fa-solid fa-robot" aria-hidden="true" /></div>
             <div className="adm-agent-meta">
               <b>TEOS</b>
               <div>Always-on assistant · has access to everything humans in this project can see</div>

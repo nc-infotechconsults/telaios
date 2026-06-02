@@ -43,9 +43,9 @@ const EVENT_COLOR: Record<AgentEvent["type"], "warning" | "success" | "danger"> 
 };
 
 const EVENT_ICON: Record<AgentEvent["type"], string> = {
-  started: "⟳",
-  completed: "✓",
-  failed: "✗",
+  started: "fa-rotate",
+  completed: "fa-check",
+  failed: "fa-xmark",
 };
 
 function formatTime(ts: number): string {
@@ -148,8 +148,8 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
           <CardBody className="pt-2 space-y-1.5 max-h-64 overflow-y-auto">
             {agentEvents.map((ev) => (
               <div key={ev.id} className="flex items-start gap-2">
-                <span
-                  className={`text-xs mt-0.5 shrink-0 ${
+                <i
+                  className={`fa-solid ${EVENT_ICON[ev.type]} text-xs mt-0.5 shrink-0 ${
                     ev.type === "completed"
                       ? "text-success"
                       : ev.type === "failed"
@@ -157,9 +157,7 @@ export default function AgentActivityPanel({ pipelineState, agentEvents }: Props
                         : "text-warning"
                   }`}
                   aria-hidden="true"
-                >
-                  {EVENT_ICON[ev.type]}
-                </span>
+                />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">

@@ -198,7 +198,7 @@ export default function ProviderForm({ config, onChange, onTest, isTesting, test
           </Button>
           {testResult && (
             <span className={`text-sm ${testResult.ok ? "text-success" : "text-danger"}`}>
-              {testResult.ok ? "✓" : "✗"} {testResult.message}
+              <i className={`fa-solid ${testResult.ok ? "fa-check" : "fa-xmark"}`} aria-hidden="true" /> {testResult.message}
             </span>
           )}
         </div>

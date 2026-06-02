@@ -68,13 +68,13 @@ export default function TaskCard({ task, profile, repositories, showResult }: Pr
 
         {taskRepos.map((r) => (
           <Chip key={r.id} size="sm" variant="bordered" color="primary">
-            📁 {r.name}
+            <i className="fa-solid fa-folder" aria-hidden="true" /> {r.name}
           </Chip>
         ))}
 
         {(task.depends_on_task_ids ?? []).length > 0 && (
           <Chip size="sm" variant="bordered" color="default">
-            ⛓ {task.depends_on_task_ids!.length} dep{task.depends_on_task_ids!.length > 1 ? "s" : ""}
+            <i className="fa-solid fa-link" aria-hidden="true" /> {task.depends_on_task_ids!.length} dep{task.depends_on_task_ids!.length > 1 ? "s" : ""}
           </Chip>
         )}
       </div>

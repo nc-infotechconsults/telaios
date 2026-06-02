@@ -31,10 +31,10 @@ const REPO_STATUS_STYLES: Record<string, string> = {
 };
 
 const REPO_STATUS_ICON: Record<string, string> = {
-  ready: "✓",
-  error: "✗",
-  cloning: "⟳",
-  unconfigured: "○",
+  ready: "fa-check",
+  error: "fa-xmark",
+  cloning: "fa-rotate",
+  unconfigured: "fa-circle",
 };
 
 const PLAN_STATUS_COLOR: Record<
@@ -329,7 +329,7 @@ export default function ExecutionDashboard() {
           {skipped > 0 && <Chip size="sm" color="default" variant="flat">{skipped} skipped</Chip>}
           {totalDurationMs > 0 && (
             <Chip size="sm" color="default" variant="bordered" className="font-mono">
-              ⏱ {formatDuration(totalDurationMs)}
+              <i className="fa-solid fa-clock" aria-hidden="true" /> {formatDuration(totalDurationMs)}
             </Chip>
           )}
 
@@ -387,7 +387,7 @@ export default function ExecutionDashboard() {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium ${styleClass}`}
                     title={`${r.name}: ${formatStatus(st)}`}
                   >
-                    <span aria-hidden="true">{icon}</span>
+                    <i className={`fa-solid ${icon}`} aria-hidden="true" />
                     <span>{r.name}</span>
                     <span className="opacity-70">— {formatStatus(st)}</span>
                   </div>
@@ -400,7 +400,7 @@ export default function ExecutionDashboard() {
           <div className="flex-1 overflow-hidden p-4">
             {tasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center gap-3">
-                <div className="text-5xl">📋</div>
+                <i className="fa-solid fa-clipboard-list" aria-hidden="true" style={{ fontSize: 48 }} />
                 <p className="text-default-500 text-sm">
                   No tasks yet. Confirm a plan in the planning chat to start execution.
                 </p>
@@ -531,7 +531,7 @@ export default function ExecutionDashboard() {
                                   {/* Deps */}
                                   {depCount > 0 && (
                                     <span className="text-xs text-default-400 shrink-0 hidden sm:block">
-                                      ⛓ {depCount}
+                                      <i className="fa-solid fa-link" aria-hidden="true" /> {depCount}
                                     </span>
                                   )}
 

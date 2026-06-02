@@ -420,7 +420,7 @@ export default function ProjectAgents({ projectId }: { projectId: string }) {
                           <div className="set-group-h"><h2>Prompt</h2></div>
                           <div className="set-group-body">
                             <div style={{ padding: 14, fontFamily: "'Geist Mono', monospace", fontSize: 12.5, color: "var(--fg-2)", lineHeight: 1.6 }}>
-                              ✶ {a.role}
+                              <i className="fa-solid fa-robot" aria-hidden="true" /> {a.role}
                             </div>
                           </div>
                         </div>

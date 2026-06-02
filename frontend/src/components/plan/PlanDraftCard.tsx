@@ -47,7 +47,7 @@ export default function PlanDraftCard({
     <div className="w-full apple-card overflow-hidden">
       {/* ── Header ── */}
       <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/8 border-b border-divider/50">
-        <span aria-hidden="true" className="text-base">📋</span>
+        <i className="fa-solid fa-clipboard-list" aria-hidden="true" />
         <span className="font-semibold text-sm">
           Execution Plan{version > 1 ? ` (v${version})` : ""}
         </span>
@@ -100,17 +100,17 @@ export default function PlanDraftCard({
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-default-400 mt-0.5">
                     {taskRepos.map((r) => (
                       <span key={r.id}>
-                        <span aria-hidden="true">📁</span>&nbsp;{r.name}
+                        <i className="fa-solid fa-folder" aria-hidden="true" />&nbsp;{r.name}
                       </span>
                     ))}
                     {profile && (
                       <span>
-                        <span aria-hidden="true">🤖</span>&nbsp;{profile.name}
+                        <i className="fa-solid fa-robot" aria-hidden="true" />&nbsp;{profile.name}
                       </span>
                     )}
                     {depNums.length > 0 && (
                       <span>
-                        <span aria-hidden="true">⛓</span>&nbsp;after #{depNums.join(", #")}
+                        <i className="fa-solid fa-link" aria-hidden="true" />&nbsp;after #{depNums.join(", #")}
                       </span>
                     )}
                   </div>
@@ -125,15 +125,15 @@ export default function PlanDraftCard({
       {isDraft ? (
         <div className="flex gap-2 px-4 py-3 border-t border-divider bg-default-100">
           <Button size="sm" color="success" onPress={onConfirm} className="flex-1">
-            ✓ Confirm &amp; Execute
+            <i className="fa-solid fa-check" aria-hidden="true" /> Confirm &amp; Execute
           </Button>
           <Button size="sm" variant="bordered" onPress={onRequestChanges} className="flex-1">
-            ✎ Request Changes
+            <i className="fa-solid fa-pen" aria-hidden="true" /> Request Changes
           </Button>
         </div>
       ) : (
         <div className="px-4 py-2.5 border-t border-divider bg-success/10 text-success text-xs font-semibold text-center">
-          ✓ Plan confirmed — execution started
+          <i className="fa-solid fa-check" aria-hidden="true" /> Plan confirmed — execution started
         </div>
       )}
     </div>

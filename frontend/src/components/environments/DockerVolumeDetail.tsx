@@ -80,8 +80,8 @@ export default function DockerVolumeDetail({ environmentId, volume, onClose }: P
             <p className="text-sm font-semibold font-mono truncate">{volume.name}</p>
             <p className="text-xs text-default-400">{volume.driver}</p>
           </div>
-          <Button size="sm" variant="light" onPress={onClose} className="ml-2 flex-shrink-0">
-            ✕
+          <Button size="sm" variant="light" isIconOnly onPress={onClose} className="ml-2 flex-shrink-0">
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </Button>
         </div>
 

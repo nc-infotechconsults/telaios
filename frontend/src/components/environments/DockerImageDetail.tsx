@@ -95,8 +95,8 @@ export default function DockerImageDetail({ environmentId, image, onClose, onRef
           </p>
           <p className="text-xs font-mono text-default-400">{image.id.slice(7, 19)}</p>
         </div>
-        <Button size="sm" variant="light" onPress={onClose} className="ml-2 flex-shrink-0">
-          ✕
+        <Button size="sm" variant="light" isIconOnly onPress={onClose} className="ml-2 flex-shrink-0">
+          <i className="fa-solid fa-xmark" aria-hidden="true" />
         </Button>
       </div>
 

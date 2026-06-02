@@ -85,7 +85,7 @@ function TaskNode({ data }: NodeProps) {
         className="px-3 py-2 flex items-center gap-2"
         style={{ background: "rgba(0,0,0,0.25)", borderTop: "1px solid rgba(255,255,255,0.08)" }}
       >
-        <span className="text-sm leading-none" aria-hidden="true">🤖</span>
+        <i className="fa-solid fa-robot text-sm" aria-hidden="true" />
         {profile ? (
           <>
             <span className="font-medium text-[11px] flex-1 truncate" title={profile.name}>{profile.name}</span>
@@ -103,7 +103,7 @@ function TaskNode({ data }: NodeProps) {
         <div className="px-3 py-1.5 flex flex-wrap gap-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {repos.map((r) => (
             <span key={r.id} className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 truncate max-w-[100px]" title={r.name}>
-              📁 {r.name}
+              <i className="fa-solid fa-folder" aria-hidden="true" /> {r.name}
             </span>
           ))}
         </div>

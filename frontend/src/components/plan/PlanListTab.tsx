@@ -62,7 +62,7 @@ export default function PlanListTab({
   if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
-        <div className="text-5xl">📋</div>
+        <i className="fa-solid fa-clipboard-list" aria-hidden="true" style={{ fontSize: 48 }} />
         <p className="font-semibold text-lg">No plans yet</p>
         <p className="text-default-400 text-sm max-w-xs">
           Start a conversation in the Planning Chat tab to let the AI agent draft an execution plan.
@@ -269,7 +269,7 @@ export default function PlanListTab({
 
                     {planAgents.length > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-default-400 uppercase tracking-wide shrink-0">🤖</span>
+                        <i className="fa-solid fa-robot text-[10px] text-default-400 shrink-0" aria-hidden="true" />
                         <div className="flex flex-wrap gap-1">
                           {planAgents.map((a) => (
                             <Chip key={a.id} size="sm" variant="flat" color="primary" className="text-[10px]">
@@ -282,7 +282,7 @@ export default function PlanListTab({
 
                     {planRepos.length > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-default-400 uppercase tracking-wide shrink-0">📁</span>
+                        <i className="fa-solid fa-folder text-[10px] text-default-400 shrink-0" aria-hidden="true" />
                         <div className="flex flex-wrap gap-1">
                           {planRepos.map((r) => (
                             <Chip key={r.id} size="sm" variant="bordered" color="default" className="text-[10px]">

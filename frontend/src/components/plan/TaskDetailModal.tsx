@@ -38,12 +38,12 @@ const DRIVER_COLOR: Record<AgentProfile["agent_type"], "primary" | "secondary" |
 };
 
 const ARTIFACT_ICON: Record<ArtifactType, string> = {
-  diff: "±",
-  test_result: "✓",
-  review: "◎",
-  log: "≡",
-  file: "□",
-  link: "↗",
+  diff: "fa-code-compare",
+  test_result: "fa-check",
+  review: "fa-code-pull-request",
+  log: "fa-list",
+  file: "fa-file",
+  link: "fa-arrow-up-right-from-square",
 };
 
 interface Props {
@@ -125,7 +125,7 @@ function ArtifactCard({ artifact }: { artifact: TaskArtifact }) {
     return (
       <div className="flex flex-col gap-2">
         <p className="text-[11px] text-default-400 uppercase tracking-wide flex items-center gap-1.5">
-          <span>{ARTIFACT_ICON.diff}</span> {artifact.title}
+          <i className={`fa-solid ${ARTIFACT_ICON.diff}`} aria-hidden="true" /> {artifact.title}
         </p>
         <DiffViewer content={artifact.content} />
       </div>
@@ -136,7 +136,7 @@ function ArtifactCard({ artifact }: { artifact: TaskArtifact }) {
     return (
       <div className="flex flex-col gap-2">
         <p className="text-[11px] text-default-400 uppercase tracking-wide flex items-center gap-1.5">
-          <span>{ARTIFACT_ICON.test_result}</span> {artifact.title}
+          <i className={`fa-solid ${ARTIFACT_ICON.test_result}`} aria-hidden="true" /> {artifact.title}
         </p>
         <TestResultViewer content={artifact.content} />
       </div>
@@ -147,7 +147,7 @@ function ArtifactCard({ artifact }: { artifact: TaskArtifact }) {
     return (
       <div className="flex flex-col gap-2">
         <p className="text-[11px] text-default-400 uppercase tracking-wide flex items-center gap-1.5">
-          <span>{ARTIFACT_ICON.review}</span> {artifact.title}
+          <i className={`fa-solid ${ARTIFACT_ICON.review}`} aria-hidden="true" /> {artifact.title}
         </p>
         <ReviewViewer content={artifact.content} />
       </div>
@@ -162,7 +162,7 @@ function ArtifactCard({ artifact }: { artifact: TaskArtifact }) {
           onClick={() => setExpanded((v) => !v)}
           className="text-[11px] text-default-400 uppercase tracking-wide flex items-center gap-1.5 hover:text-default-600 transition-colors w-fit"
         >
-          <span>{ARTIFACT_ICON.log}</span>
+          <i className={`fa-solid ${ARTIFACT_ICON.log}`} aria-hidden="true" />
           <span>{artifact.title}</span>
           <svg
             width="10" height="10" viewBox="0 0 24 24" fill="none"
@@ -185,7 +185,7 @@ function ArtifactCard({ artifact }: { artifact: TaskArtifact }) {
   if (artifact.type === "link") {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-default-400">{ARTIFACT_ICON.link}</span>
+        <i className={`fa-solid ${ARTIFACT_ICON.link} text-xs text-default-400`} aria-hidden="true" />
         <a
           href={artifact.content}
           target="_blank"
@@ -202,7 +202,7 @@ function ArtifactCard({ artifact }: { artifact: TaskArtifact }) {
   return (
     <div className="flex flex-col gap-1">
       <p className="text-[11px] text-default-400 uppercase tracking-wide flex items-center gap-1.5">
-        <span>{ARTIFACT_ICON[artifact.type] ?? "□"}</span> {artifact.title}
+        <i className={`fa-solid ${ARTIFACT_ICON[artifact.type] ?? "fa-file"}`} aria-hidden="true" /> {artifact.title}
       </p>
       <pre className="text-xs text-default-500 bg-default-50 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap max-h-48">
         {artifact.content}
@@ -331,7 +331,7 @@ export default function TaskDetailModal({
                   <p className="text-[11px] text-default-400 mb-1.5 uppercase tracking-wide">Repositories</p>
                   <div className="flex flex-wrap gap-1.5">
                     {repos.map((r) => (
-                      <Chip key={r.id} size="sm" variant="bordered" color="primary">📁 {r.name}</Chip>
+                      <Chip key={r.id} size="sm" variant="bordered" color="primary"><i className="fa-solid fa-folder" aria-hidden="true" /> {r.name}</Chip>
                     ))}
                   </div>
                 </div>
@@ -349,7 +349,7 @@ export default function TaskDetailModal({
                         onClick={() => onNavigate?.(dep)}
                         className="text-xs px-2.5 py-1 rounded-full bg-default-100 hover:bg-default-200 text-foreground transition-colors"
                       >
-                        ⛓ {dep.title}
+                        <i className="fa-solid fa-link" aria-hidden="true" /> {dep.title}
                       </button>
                     ))}
                   </div>
