@@ -121,7 +121,7 @@ export default function OperatorOverview({ mode }: Props) {
           {
             l: "Total Projects",
             v: loading ? "—" : projects.length,
-            d: `${projects.filter((p) => p.status === "active").length} active`,
+            d: `${projects.filter((p) => String(p.status) === "active").length} active`,
             icon: "layers" as const,
             color: "#5e5ce6",
           },

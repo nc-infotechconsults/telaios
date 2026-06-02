@@ -147,7 +147,7 @@ export default function OperatorLayout() {
           {/* Spacer */}
           <div className="sb-spacer" />
 
-          {/* Exit + user row */}
+          {/* Exit */}
           <div style={{ display: "flex", flexDirection: "column", gap: 1, paddingTop: 8 }}>
             <button
               className="sb-row"
