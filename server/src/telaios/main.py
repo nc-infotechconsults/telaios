@@ -21,7 +21,8 @@ from telaios.auth.jwt import verify_token
 from telaios.db.base import set_audit_user
 from telaios.config.logging import configure_logging
 from telaios.config.settings import get_settings
-from telaios.db.session import dispose_engine
+from telaios.db.session import dispose_engine, get_sessionmaker
+from telaios.fixtures.agent_base_profiles import seed as seed_agent_base_profiles
 from telaios.infra.redis import close_redis
 from telaios.infra.s3 import ensure_bucket_exists
 from telaios.modules.agent_overrides.router import (
@@ -160,6 +161,12 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     logger.info("telaios starting")
     await ensure_bucket_exists()
+    try:
+        async with get_sessionmaker()() as session:
+            await seed_agent_base_profiles(session)
+            await session.commit()
+    except Exception:
+        logger.warning("Agent base profile seed failed; continuing startup", exc_info=True)
     try:
         from telaios.core.knowledge.factory import KnowledgePipelineFactory
         pipeline = await KnowledgePipelineFactory.get()
