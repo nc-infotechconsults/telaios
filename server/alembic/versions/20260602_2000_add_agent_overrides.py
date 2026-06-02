@@ -1,7 +1,7 @@
 """add_agent_overrides
 
 Revision ID: c1d2e3f4a5b6
-Revises: 92a813acdb1e
+Revises: ad54d9e31b91
 Create Date: 2026-06-02 20:00:00.000000+00:00
 """
 
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'c1d2e3f4a5b6'
-down_revision: str | None = '92a813acdb1e'
+down_revision: str | None = 'ad54d9e31b91'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
