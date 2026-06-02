@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "../../components/Icon";
+import { AppModal } from "../../components/AppModal";
 
 interface SessionEntry {
   id: string;
@@ -355,73 +356,57 @@ export default function WorkspaceSecurity() {
       </div>
 
       {/* SAML Config Modal */}
-      {showSamlModal && (
-        <div
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-            zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-          onClick={() => setShowSamlModal(false)}
-        >
-          <div
-            className="card"
-            style={{ width: 480, padding: 28, boxShadow: "var(--shadow-lg)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <Icon name="globe" size="sm" style={{ color: "#0a84ff" }} />
-              <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Configure SAML SSO</h2>
+      <AppModal
+        isOpen={showSamlModal}
+        onClose={() => setShowSamlModal(false)}
+        title="Configure SAML SSO"
+        subtitle="Enter your identity provider details below. Contact your IdP administrator for the required values."
+        width={480}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            { label: "Entity ID (SP)",    placeholder: "https://app.telaios.ai/saml/metadata"   },
+            { label: "SSO URL (IdP)",      placeholder: "https://idp.example.com/sso/saml"       },
+            { label: "X.509 Certificate",  placeholder: "-----BEGIN CERTIFICATE-----\n...",        isArea: true },
+          ].map(({ label, placeholder, isArea }) => (
+            <div key={label}>
+              <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 5 }}>{label}</label>
+              {isArea ? (
+                <textarea
+                  placeholder={placeholder}
+                  rows={3}
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8,
+                    border: "0.5px solid var(--hairline)", background: "var(--glass-weak)",
+                    color: "var(--fg)", fontSize: 12, outline: "none", resize: "none",
+                    fontFamily: "monospace",
+                  }}
+                />
+              ) : (
+                <input
+                  placeholder={placeholder}
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8,
+                    border: "0.5px solid var(--hairline)", background: "var(--glass-weak)",
+                    color: "var(--fg)", fontSize: 13, outline: "none",
+                  }}
+                />
+              )}
             </div>
-            <p style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 20 }}>
-              Enter your identity provider details below. Contact your IdP administrator for the required values.
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { label: "Entity ID (SP)",    placeholder: "https://app.telaios.ai/saml/metadata"   },
-                { label: "SSO URL (IdP)",      placeholder: "https://idp.example.com/sso/saml"       },
-                { label: "X.509 Certificate",  placeholder: "-----BEGIN CERTIFICATE-----\n...",        isArea: true },
-              ].map(({ label, placeholder, isArea }) => (
-                <div key={label}>
-                  <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 5 }}>{label}</label>
-                  {isArea ? (
-                    <textarea
-                      placeholder={placeholder}
-                      rows={3}
-                      style={{
-                        width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8,
-                        border: "0.5px solid var(--hairline)", background: "var(--glass-weak)",
-                        color: "var(--fg)", fontSize: 12, outline: "none", resize: "none",
-                        fontFamily: "monospace",
-                      }}
-                    />
-                  ) : (
-                    <input
-                      placeholder={placeholder}
-                      style={{
-                        width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8,
-                        border: "0.5px solid var(--hairline)", background: "var(--glass-weak)",
-                        color: "var(--fg)", fontSize: 13, outline: "none",
-                      }}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 22 }}>
-              <button className="pill-btn" onClick={() => setShowSamlModal(false)}>Cancel</button>
-              <button
-                className="pill-btn"
-                data-primary="true"
-                onClick={() => { setShowSamlModal(false); alert("SAML configuration saved (stub)."); }}
-              >
-                Save Configuration
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 22 }}>
+          <button className="pill-btn" onClick={() => setShowSamlModal(false)}>Cancel</button>
+          <button
+            className="pill-btn"
+            data-primary="true"
+            onClick={() => { setShowSamlModal(false); alert("SAML configuration saved (stub)."); }}
+          >
+            Save Configuration
+          </button>
+        </div>
+      </AppModal>
     </div>
   );
 }

@@ -47,7 +47,7 @@ const WS_VIEW_LABELS: Record<WsView, string> = {
   projects:  "Projects",
   library:   "Library",
   analytics: "Analytics",
-  agents:    "Agent Profiles",
+  agents:    "Agents",
   people:    "People",
   settings:  "Settings",
   audit:     "Audit Log",
@@ -60,7 +60,7 @@ const WS_NAV = [
   { id: "projects",  label: "Projects",       icon: "layers",   href: "/projects-list" },
   { id: "library",   label: "Library",        icon: "cube",     href: "/library" },
   { id: "analytics", label: "Analytics",      icon: "workflow", href: "/analytics" },
-  { id: "agents",    label: "Agent Profiles", icon: "bot",      href: "/agents" },
+  { id: "agents",    label: "Agents",         icon: "bot",      href: "/agents" },
 ] as const;
 
 const WS_ADMIN_NAV = [

@@ -12,6 +12,7 @@ import ProjectLayout from "./components/ProjectLayout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PlanningChat from "./pages/PlanningChat";
 import DesignChat from "./pages/DesignChat";
+import OperatorLayout from "./pages/operator/OperatorLayout";
 
 applyAppSettingsToDocument(loadCachedAppSettings());
 
@@ -28,13 +29,20 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                 {/* Protected routes */}
                 <Route element={<ProtectedRoute />}>
-                  {/* Workspace-level views */}
-                  <Route path="/"          element={<ProjectLayout wsView="projects"  />} />
-                  <Route path="/library"   element={<ProjectLayout wsView="library"   />} />
-                  <Route path="/analytics" element={<ProjectLayout wsView="analytics" />} />
-                  <Route path="/agents"    element={<ProjectLayout wsView="agents"    />} />
-                  <Route path="/users"     element={<ProjectLayout wsView="users"     />} />
-                  <Route path="/settings"  element={<ProjectLayout wsView="settings"  />} />
+                  {/* Admin Console (workspace-level views) */}
+                  <Route path="/"               element={<ProjectLayout wsView="overview"  />} />
+                  <Route path="/projects-list"  element={<ProjectLayout wsView="projects"  />} />
+                  <Route path="/library"        element={<ProjectLayout wsView="library"   />} />
+                  <Route path="/analytics"      element={<ProjectLayout wsView="analytics" />} />
+                  <Route path="/agents"         element={<ProjectLayout wsView="agents"    />} />
+                  <Route path="/people"         element={<ProjectLayout wsView="people"    />} />
+                  <Route path="/audit"          element={<ProjectLayout wsView="audit"     />} />
+                  <Route path="/billing"        element={<ProjectLayout wsView="billing"   />} />
+                  <Route path="/security"       element={<ProjectLayout wsView="security"  />} />
+                  <Route path="/settings"       element={<ProjectLayout wsView="settings"  />} />
+
+                  {/* Operator portal */}
+                  <Route path="/operator" element={<OperatorLayout />} />
 
                   {/* Project shell */}
                   <Route path="/projects/:projectId" element={<ProjectLayout />} />

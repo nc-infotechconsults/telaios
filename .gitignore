@@ -16,3 +16,5 @@ __pycache__
 /frontend/playwright-report/
 /server/tui.log
 /*.png
+.superpowers
+.claude

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../../components/Icon";
+import { AppModal } from "../../components/AppModal";
 import {
   deleteLibraryMCP, deleteLibrarySkill,
   listLibraryMCPs, listLibrarySkills,
@@ -10,45 +11,6 @@ import LibraryMCPForm from "../../components/library/LibraryMCPForm";
 import LibrarySkillForm from "../../components/library/LibrarySkillForm";
 
 type Tab = "mcps" | "skills";
-
-function ModalWrap({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, overflowY: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 40 }}
-      onClick={onClose}
-    >
-      <div style={{ width: "100%", maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function DeleteConfirm({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }}
-      onClick={onCancel}
-    >
-      <div className="card" style={{ width: 380, padding: 24 }} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Delete?</h2>
-        <p style={{ fontSize: 13, color: "var(--fg-3)", marginBottom: 20 }}>
-          "{name}" will be permanently deleted. This cannot be undone.
-        </p>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button className="pill-btn" onClick={onCancel}>Cancel</button>
-          <button
-            className="pill-btn"
-            style={{ background: "#ff3b30", color: "#fff", borderColor: "transparent" }}
-            onClick={onConfirm}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function WorkspaceLibrary() {
   const [tab, setTab] = useState<Tab>("mcps");
@@ -208,27 +170,60 @@ export default function WorkspaceLibrary() {
       )}
 
       {/* Modals */}
-      {showMcpForm && (
-        <ModalWrap onClose={() => setShowMcpForm(null)}>
+      <AppModal
+        isOpen={!!showMcpForm}
+        onClose={() => setShowMcpForm(null)}
+        title={showMcpForm === true ? "New MCP Server" : "Edit MCP Server"}
+        width={700}
+      >
+        {showMcpForm && (
           <LibraryMCPForm
             initialData={showMcpForm !== true ? showMcpForm : undefined}
             onSaved={(m) => { setMcps((prev) => showMcpForm !== true ? prev.map((x) => x.id === m.id ? m : x) : [...prev, m]); setShowMcpForm(null); }}
             onCancel={() => setShowMcpForm(null)}
           />
-        </ModalWrap>
-      )}
-      {showSkillForm && (
-        <ModalWrap onClose={() => setShowSkillForm(null)}>
+        )}
+      </AppModal>
+
+      <AppModal
+        isOpen={!!showSkillForm}
+        onClose={() => setShowSkillForm(null)}
+        title={showSkillForm === true ? "New Skill" : "Edit Skill"}
+        width={700}
+      >
+        {showSkillForm && (
           <LibrarySkillForm
             initialData={showSkillForm !== true ? showSkillForm : undefined}
             onSaved={(s) => { setSkills((prev) => showSkillForm !== true ? prev.map((x) => x.id === s.id ? s : x) : [...prev, s]); setShowSkillForm(null); }}
             onCancel={() => setShowSkillForm(null)}
           />
-        </ModalWrap>
-      )}
-      {deleteTarget && (
-        <DeleteConfirm name={deleteTarget.name} onConfirm={() => void confirmDelete()} onCancel={() => setDeleteTarget(null)} />
-      )}
+        )}
+      </AppModal>
+
+      <AppModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete?"
+        width={380}
+      >
+        {deleteTarget && (
+          <>
+            <p style={{ fontSize: 13, color: "var(--fg-3)", marginBottom: 20 }}>
+              "{deleteTarget.name}" will be permanently deleted. This cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button className="pill-btn" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button
+                className="pill-btn"
+                style={{ background: "#ff3b30", color: "#fff", borderColor: "transparent" }}
+                onClick={() => void confirmDelete()}
+              >
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+      </AppModal>
     </div>
   );
 }

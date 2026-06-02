@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
+import { AppModal } from "../../components/AppModal";
 import { useAuth } from "../../context/AuthContext";
 import * as api from "../../lib/api";
 import type { Project, ProjectMember, User } from "../../types";
@@ -741,19 +742,16 @@ export default function WorkspacePeople() {
       )}
 
       {/* Delete confirm modal */}
-      {confirmDeleteId && (() => {
-        const targetUser = users.find((u) => u.id === confirmDeleteId);
-        return (
-          <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center" }}
-            onClick={() => setConfirmDeleteId(null)}
-          >
-            <div
-              className="card"
-              style={{ width: 380, padding: 24 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, margin: "0 0 8px" }}>Delete User</h2>
+      <AppModal
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Delete User"
+        width={380}
+      >
+        {confirmDeleteId && (() => {
+          const targetUser = users.find((u) => u.id === confirmDeleteId);
+          return (
+            <>
               <p style={{ fontSize: 13, color: "var(--fg-2)", marginBottom: 20, lineHeight: 1.6 }}>
                 Are you sure you want to permanently delete{" "}
                 <strong>{targetUser?.display_name || targetUser?.email}</strong>?
@@ -769,94 +767,85 @@ export default function WorkspacePeople() {
                   {deleting === confirmDeleteId ? "Deleting…" : "Delete User"}
                 </button>
               </div>
-            </div>
-          </div>
-        );
-      })()}
+            </>
+          );
+        })()}
+      </AppModal>
 
       {/* Add User modal */}
-      {showAddUser && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={closeAddUser}
-        >
-          <div
-            className="card"
-            style={{ width: 440, padding: 24 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 4px" }}>Add User</h2>
-            <p style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 20 }}>Invite a new member to this workspace</p>
+      <AppModal
+        isOpen={showAddUser}
+        onClose={closeAddUser}
+        title="Add User"
+        subtitle="Invite a new member to this workspace"
+      >
+        {addError && (
+          <div style={{
+            padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            background: "rgba(255,55,95,0.12)", color: "#ff375f",
+            fontSize: 12.5, border: "0.5px solid rgba(255,55,95,0.3)",
+          }}>
+            {addError}
+          </div>
+        )}
 
-            {addError && (
-              <div style={{
-                padding: "8px 12px", borderRadius: 8, marginBottom: 12,
-                background: "rgba(255,55,95,0.12)", color: "#ff375f",
-                fontSize: 12.5, border: "0.5px solid rgba(255,55,95,0.3)",
-              }}>
-                {addError}
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Email *</label>
-                <input
-                  type="email"
-                  value={addEmail}
-                  onChange={(e) => setAddEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  autoFocus
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Display name</label>
-                <input
-                  value={addDisplayName}
-                  onChange={(e) => setAddDisplayName(e.target.value)}
-                  placeholder="Jane Smith"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Password *</label>
-                <input
-                  type="password"
-                  value={addPassword}
-                  onChange={(e) => setAddPassword(e.target.value)}
-                  placeholder="Temporary password"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Role</label>
-                <select
-                  value={addRole}
-                  onChange={(e) => setAddRole(e.target.value as User["system_role"])}
-                  style={{ ...inputStyle, cursor: "pointer" }}
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-              <button className="pill-btn" onClick={closeAddUser} disabled={adding}>Cancel</button>
-              <button
-                className="pill-btn"
-                data-primary="true"
-                style={{ opacity: (!addEmail.trim() || !addPassword.trim() || adding) ? 0.5 : 1 }}
-                onClick={() => void handleAddUser()}
-                disabled={!addEmail.trim() || !addPassword.trim() || adding}
-              >
-                {adding ? "Adding…" : "Add User"}
-              </button>
-            </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Email *</label>
+            <input
+              type="email"
+              value={addEmail}
+              onChange={(e) => setAddEmail(e.target.value)}
+              placeholder="user@example.com"
+              autoFocus
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Display name</label>
+            <input
+              value={addDisplayName}
+              onChange={(e) => setAddDisplayName(e.target.value)}
+              placeholder="Jane Smith"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Password *</label>
+            <input
+              type="password"
+              value={addPassword}
+              onChange={(e) => setAddPassword(e.target.value)}
+              placeholder="Temporary password"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Role</label>
+            <select
+              value={addRole}
+              onChange={(e) => setAddRole(e.target.value as User["system_role"])}
+              style={{ ...inputStyle, cursor: "pointer" }}
+            >
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
         </div>
-      )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+          <button className="pill-btn" onClick={closeAddUser} disabled={adding}>Cancel</button>
+          <button
+            className="pill-btn"
+            data-primary="true"
+            style={{ opacity: (!addEmail.trim() || !addPassword.trim() || adding) ? 0.5 : 1 }}
+            onClick={() => void handleAddUser()}
+            disabled={!addEmail.trim() || !addPassword.trim() || adding}
+          >
+            {adding ? "Adding…" : "Add User"}
+          </button>
+        </div>
+      </AppModal>
 
       <style>{`
         @keyframes slideInRight {
