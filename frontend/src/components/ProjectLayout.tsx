@@ -98,7 +98,7 @@ const COMMANDS = [
 export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const { user, logout } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { theme, toggle: toggleTheme, setTheme } = useTheme();
 
   const [project, setProject] = useState<Project | null>(null);
   const [sidebarProjects, setSidebarProjects] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -107,6 +107,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [density] = useState<"compact" | "regular" | "comfy">("regular");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // TEOS sidebar state
   const [teosMessages, setTeosMessages] = useState<Array<{ role: string; text: string; specialist?: string }>>([]);
