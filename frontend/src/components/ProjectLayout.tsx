@@ -20,7 +20,6 @@ import ProjectLibrary from "../pages/project/ProjectLibrary";
 import ProjectPlans from "../pages/project/ProjectPlans";
 import ProjectInbox from "../pages/project/ProjectInbox";
 import ProjectMembers from "../pages/project/ProjectMembers";
-import ProjectSettings from "../pages/project/ProjectSettings";
 
 // Workspace view components
 import WorkspaceOverview  from "../pages/workspace/WorkspaceOverview";
@@ -289,7 +288,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
       case "plans":        return <ProjectPlans projectId={projectId} />;
       case "inbox":        return <ProjectInbox projectId={projectId} />;
       case "members":      return <ProjectMembers projectId={projectId} />;
-      case "settings":     return <ProjectSettings projectId={projectId} />;
     }
   };
 
