@@ -18,51 +18,64 @@ import ProjectDesigns from "../pages/project/ProjectDesigns";
 import ProjectAgents from "../pages/project/ProjectAgents";
 import ProjectLibrary from "../pages/project/ProjectLibrary";
 import ProjectPlans from "../pages/project/ProjectPlans";
-import ProjectTeam from "../pages/project/ProjectTeam";
 import ProjectInbox from "../pages/project/ProjectInbox";
 import ProjectMembers from "../pages/project/ProjectMembers";
 import ProjectSettings from "../pages/project/ProjectSettings";
 
 // Workspace view components
+import WorkspaceOverview  from "../pages/workspace/WorkspaceOverview";
 import WorkspaceProjects  from "../pages/workspace/WorkspaceProjects";
 import WorkspaceLibrary   from "../pages/workspace/WorkspaceLibrary";
 import WorkspaceAnalytics from "../pages/workspace/WorkspaceAnalytics";
 import WorkspaceAgents    from "../pages/workspace/WorkspaceAgents";
-import WorkspaceUsers     from "../pages/workspace/WorkspaceUsers";
+import WorkspacePeople    from "../pages/workspace/WorkspacePeople";
 import WorkspaceSettings  from "../pages/workspace/WorkspaceSettings";
+import WorkspaceAuditLog  from "../pages/workspace/WorkspaceAuditLog";
+import WorkspaceBilling   from "../pages/workspace/WorkspaceBilling";
+import WorkspaceSecurity  from "../pages/workspace/WorkspaceSecurity";
 
 export type ProjectView =
   | "dashboard" | "conversation" | "repositories" | "documents"
-  | "designs" | "agents" | "library" | "plans" | "team"
+  | "designs" | "agents" | "library" | "plans"
   | "inbox" | "members" | "settings";
 
-export type WsView = "projects" | "library" | "analytics" | "agents" | "users" | "settings";
+export type WsView =
+  | "overview" | "projects" | "library" | "analytics" | "agents"
+  | "people" | "settings" | "audit" | "billing" | "security";
 
 const WS_VIEW_LABELS: Record<WsView, string> = {
+  overview:  "Overview",
   projects:  "Projects",
   library:   "Library",
   analytics: "Analytics",
   agents:    "Agent Profiles",
-  users:     "Users",
+  people:    "People",
   settings:  "Settings",
+  audit:     "Audit Log",
+  billing:   "Billing",
+  security:  "Security",
 };
 
 const WS_NAV = [
-  { id: "projects",  label: "Projects",       icon: "home",     href: "/" },
+  { id: "overview",  label: "Overview",       icon: "home",     href: "/" },
+  { id: "projects",  label: "Projects",       icon: "layers",   href: "/projects-list" },
   { id: "library",   label: "Library",        icon: "cube",     href: "/library" },
-  { id: "analytics", label: "Analytics",      icon: "layers",   href: "/analytics" },
+  { id: "analytics", label: "Analytics",      icon: "workflow", href: "/analytics" },
   { id: "agents",    label: "Agent Profiles", icon: "bot",      href: "/agents" },
 ] as const;
 
 const WS_ADMIN_NAV = [
-  { id: "users",    label: "Users",    icon: "users",    href: "/users" },
+  { id: "people",   label: "People",   icon: "users",    href: "/people"   },
+  { id: "audit",    label: "Audit Log", icon: "inbox",   href: "/audit"    },
+  { id: "billing",  label: "Billing",  icon: "layers",   href: "/billing"  },
+  { id: "security", label: "Security", icon: "settings", href: "/security" },
   { id: "settings", label: "Settings", icon: "settings", href: "/settings" },
 ] as const;
 
 const VIEW_LABELS: Record<ProjectView, string> = {
   dashboard: "Dashboard", conversation: "Conversation", repositories: "Repositories",
   documents: "Documents", designs: "Designs", agents: "Agents", library: "Library",
-  plans: "Plans", team: "Team", inbox: "Inbox", members: "Members", settings: "Settings",
+  plans: "Plans", inbox: "Inbox", members: "Members", settings: "Settings",
 };
 
 const SPECIALISTS: Record<string, { name: string; icon: string; color: string; tagline: string }> = {
@@ -106,6 +119,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [aiCollapsed, setAiCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [density] = useState<"compact" | "regular" | "comfy">("regular");
 
   // TEOS sidebar state
@@ -238,7 +252,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
     { id: "agents",       label: "Agents",       icon: "bot",      badge: null },
     { id: "library",      label: "Library",      icon: "cube",     badge: null },
     { id: "plans",        label: "Plans",        icon: "workflow", badge: null },
-    { id: "team",         label: "Team",         icon: "users",    badge: null },
   ] as const;
 
   const bottomNav = [
@@ -251,12 +264,16 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
     // Workspace mode
     if (wsView) {
       switch (wsView) {
+        case "overview":  return <WorkspaceOverview />;
         case "projects":  return <WorkspaceProjects />;
         case "library":   return <WorkspaceLibrary />;
         case "analytics": return <WorkspaceAnalytics />;
         case "agents":    return <WorkspaceAgents />;
-        case "users":     return <WorkspaceUsers />;
+        case "people":    return <WorkspacePeople />;
         case "settings":  return <WorkspaceSettings />;
+        case "audit":     return <WorkspaceAuditLog />;
+        case "billing":   return <WorkspaceBilling />;
+        case "security":  return <WorkspaceSecurity />;
       }
     }
     // Project mode
@@ -270,7 +287,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
       case "agents":       return <ProjectAgents projectId={projectId} />;
       case "library":      return <ProjectLibrary projectId={projectId} />;
       case "plans":        return <ProjectPlans projectId={projectId} />;
-      case "team":         return <ProjectTeam projectId={projectId} />;
       case "inbox":        return <ProjectInbox projectId={projectId} />;
       case "members":      return <ProjectMembers projectId={projectId} />;
       case "settings":     return <ProjectSettings projectId={projectId} />;
@@ -301,20 +317,75 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
           </div>
 
           {/* Workspace switcher */}
-          <div className="workspace-switch">
-            <div className="ws-avatar" style={{ background: projectColor }}>
-              {projectName.charAt(0).toUpperCase()}
-            </div>
-            <div className="ws-meta">
-              <b>{projectName}</b>
-              <span>Team · 24 members</span>
-            </div>
-            <div className="ws-arrows">
-              <Icon name="chevd" size="sm" />
-            </div>
+          <div style={{ position: "relative" }}>
+            <button
+              className="workspace-switch"
+              style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+              onClick={() => setSwitcherOpen((v) => !v)}
+            >
+              <div className="ws-avatar" style={{ background: projectColor }}>
+                {wsView ? "T" : projectName.charAt(0).toUpperCase()}
+              </div>
+              <div className="ws-meta">
+                <b>{wsView ? "TelaiOS" : projectName}</b>
+                <span>{wsView ? "Admin Console" : "Switch workspace"}</span>
+              </div>
+              <div className="ws-arrows">
+                <Icon name="chevd" size="sm" style={{ transform: switcherOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
+              </div>
+            </button>
+
+            {switcherOpen && (
+              <>
+                <div className="vis-backdrop" style={{ zIndex: 90 }} onClick={() => setSwitcherOpen(false)} />
+                <div
+                  className="glass"
+                  style={{
+                    position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+                    borderRadius: 10, border: "0.5px solid var(--hairline)",
+                    boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
+                  }}
+                >
+                  <button
+                    className="sb-row"
+                    style={{ width: "100%", borderRadius: 0, padding: "9px 12px", gap: 8 }}
+                    data-active={!!wsView}
+                    onClick={() => { setSwitcherOpen(false); window.location.href = "/"; }}
+                  >
+                    <div style={{
+                      width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+                      background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Icon name="settings" size="sm" style={{ color: "#fff", fontSize: 10 }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600 }}>Admin Console</div>
+                      <div style={{ fontSize: 11, color: "var(--fg-3)" }}>Workspace governance</div>
+                    </div>
+                  </button>
+                  {sidebarProjects.length > 0 && (
+                    <div style={{ borderTop: "0.5px solid var(--hairline)", padding: "4px 0" }}>
+                      {sidebarProjects.map((p) => (
+                        <button
+                          key={p.id}
+                          className="sb-row"
+                          style={{ width: "100%", borderRadius: 0, padding: "7px 12px", gap: 8 }}
+                          data-active={projectId === p.id && !wsView}
+                          onClick={() => { setSwitcherOpen(false); window.location.href = `/projects/${p.id}`; }}
+                        >
+                          <span className="proj-dot" style={{ background: p.color, width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
+                          <span style={{ fontSize: 12.5 }}>{p.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="sb-section">{wsView ? "Navigation" : "Workspace"}</div>
+          <div className="sb-section">{wsView ? "Navigation" : (project?.name ?? "Project")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {wsView ? (
               <>
@@ -428,10 +499,22 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         {/* ── Topbar ── */}
         <header className="topbar glass">
           <div className="crumb">
-            <b>{wsView ? "Workspace" : projectName}</b>
+            <span style={{ color: "var(--fg-3)" }}>TelaiOS</span>
             <span className="crumb-sep">/</span>
-            <span>{wsView ? WS_VIEW_LABELS[wsView] : VIEW_LABELS[view]}</span>
-            {!wsView && crumbTag[view] && <span className="crumb-tag">{crumbTag[view]}</span>}
+            {wsView ? (
+              <>
+                <span style={{ color: "var(--fg-3)" }}>Admin</span>
+                <span className="crumb-sep">/</span>
+                <b>{WS_VIEW_LABELS[wsView]}</b>
+              </>
+            ) : (
+              <>
+                <span style={{ color: "var(--fg-3)" }}>{project?.name ?? "…"}</span>
+                <span className="crumb-sep">/</span>
+                <b>{VIEW_LABELS[view]}</b>
+                {crumbTag[view] && <span className="crumb-tag">{crumbTag[view]}</span>}
+              </>
+            )}
           </div>
 
           <div className="tb-spacer" />

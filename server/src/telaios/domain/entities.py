@@ -51,7 +51,7 @@ class Project(BaseModel):
     id: ProjectId
     name: str
     description: str | None = None
-    status: ProjectStatus = ProjectStatus.PLANNING
+    status: ProjectStatus = ProjectStatus.ACTIVE
     created_at: datetime | None = None
 
 

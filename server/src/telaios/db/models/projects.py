@@ -36,7 +36,7 @@ class Project(Base, SoftDeleteAuditMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(
-        String, nullable=False, default="planning", server_default="planning"
+        String, nullable=False, default="active", server_default="active"
     )
 
     members: Mapped[list[ProjectMember]] = relationship(

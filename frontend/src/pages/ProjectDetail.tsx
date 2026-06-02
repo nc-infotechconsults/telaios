@@ -86,7 +86,7 @@ const MEMBER_ROLE_COLOR: Record<ProjectRole, "danger" | "primary" | "default"> =
   viewer: "default",
 };
 
-const PROJECT_STATUS_OPTIONS: ProjectStatus[] = ["planning", "executing", "done"];
+const PROJECT_STATUS_OPTIONS: ProjectStatus[] = ["active", "archived", "closed"];
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -129,7 +129,7 @@ export default function ProjectDetail() {
   // Edit project modal state
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
-  const [editProjectStatus, setEditProjectStatus] = useState<ProjectStatus>("planning");
+  const [editProjectStatus, setEditProjectStatus] = useState<ProjectStatus>("active");
   const [savingProject, setSavingProject] = useState(false);
 
   // Delete project state
@@ -374,7 +374,7 @@ export default function ProjectDetail() {
             onPress={() => {
               setEditProjectName(project?.name ?? "");
               setEditProjectDescription(project?.description ?? "");
-              setEditProjectStatus(project?.status ?? "planning");
+              setEditProjectStatus(project?.status ?? "active");
               onEditProjectOpen();
             }}
           >

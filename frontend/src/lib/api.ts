@@ -138,7 +138,7 @@ export const createProject = (data: Partial<Project>): Promise<Project> =>
         id: `demo-${Date.now()}`,
         name: data.name ?? "New Project",
         description: data.description ?? "",
-        status: "planning",
+        status: "active",
         created_at: new Date().toISOString(),
       })
     : http.post<Project>("/projects", data).then((r) => r.data);

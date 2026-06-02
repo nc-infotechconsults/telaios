@@ -158,7 +158,7 @@ class TestCreateProject:
         assert res.status_code == 201
         body = res.json()
         assert body["name"] == "New Project"
-        assert body["status"] == "planning"
+        assert body["status"] == "active"
         assert "id" in body
 
     def test_creates_with_description(

@@ -20,7 +20,7 @@ export const PROJECTS: Project[] = [
     name: "E-commerce API Refactor",
     description:
       "Migrating the monolithic REST API to microservices with improved auth and caching. Zero-downtime deployment using the strangler-fig pattern.",
-    status: "executing",
+    status: "active",
     created_at: "2026-03-28T10:00:00Z",
   },
   {
@@ -28,7 +28,7 @@ export const PROJECTS: Project[] = [
     name: "Mobile App — Onboarding Flow",
     description:
       "Redesigning the user onboarding experience with step-by-step guidance, error recovery, and A/B testing support.",
-    status: "planning",
+    status: "active",
     created_at: "2026-04-01T09:00:00Z",
   },
   {
@@ -36,7 +36,7 @@ export const PROJECTS: Project[] = [
     name: "Data Pipeline Orchestration",
     description:
       "Building a fault-tolerant ETL pipeline with Apache Airflow and dbt for the data analytics team.",
-    status: "done",
+    status: "closed",
     created_at: "2026-03-15T14:30:00Z",
   },
 ];

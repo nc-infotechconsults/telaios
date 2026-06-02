@@ -11,7 +11,7 @@ export interface User {
 }
 
 export type ProjectRole = "owner" | "editor" | "viewer";
-export type ProjectStatus = "planning" | "executing" | "done";
+export type ProjectStatus = "active" | "archived" | "closed";
 export type PlanStatus = "draft" | "confirmed" | "executing" | "completed" | "failed";
 export type TaskStatus = "pending" | "ready" | "in_progress" | "done" | "failed" | "cancelled" | "skipped";
 export type TaskType = "code" | "test" | "review" | "general" | "knowledge" | "infra";

@@ -145,9 +145,9 @@ class ArtifactType(StrEnum):
 
 
 class ProjectStatus(StrEnum):
-    PLANNING = "planning"
-    EXECUTING = "executing"
-    DONE = "done"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+    CLOSED = "closed"
 
 
 class ProjectRole(StrEnum):
