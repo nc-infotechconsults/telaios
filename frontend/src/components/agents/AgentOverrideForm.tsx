@@ -523,7 +523,7 @@ export default function AgentOverrideForm({
                     <div key={ei} className="grid grid-cols-[1fr_1fr_28px] gap-1.5 items-center">
                       <Input size="sm" placeholder="KEY" value={entry.key} onValueChange={(v) => updateEnvEntry(i, ei, { key: v })} aria-label="Env var key" />
                       <Input size="sm" placeholder="value" value={entry.value} onValueChange={(v) => updateEnvEntry(i, ei, { value: v })} aria-label="Env var value" />
-                      <button type="button" onClick={() => removeEnvEntry(i, ei)} className="text-danger text-xs leading-none hover:opacity-70" aria-label="Remove env var">✕</button>
+                      <button type="button" onClick={() => removeEnvEntry(i, ei)} className="text-danger text-xs leading-none hover:opacity-70" aria-label="Remove env var"><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
                     </div>
                   ))}
                 </div>
