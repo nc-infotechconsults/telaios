@@ -224,7 +224,7 @@ export default function OperatorLayout() {
           <div style={{ position: "relative" }}>
             <button
               className="tb-btn"
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px 3px 4px", borderRadius: 8, height: 32 }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px 3px 4px", borderRadius: 8, height: 32, width: "auto" }}
               onClick={() => setUserMenuOpen((v) => !v)}
             >
               <div style={{
