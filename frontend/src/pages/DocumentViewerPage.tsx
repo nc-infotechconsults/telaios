@@ -287,7 +287,7 @@ export default function DocumentViewerPage() {
                       : "border-transparent text-default-400 hover:text-foreground"
                   }`}
                 >
-                  {tab === "copilot" ? "✨ Copilot" : "Details"}
+                  {tab === "copilot" ? <><i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" /> Copilot</> : "Details"}
                 </button>
               ))}
             </div>

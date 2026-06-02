@@ -105,8 +105,8 @@ export default function DockerContainerDetail({ environmentId, container, onClos
           <p className="text-sm font-semibold truncate">{container.name}</p>
           <p className="text-xs font-mono text-default-400">{container.id.slice(0, 12)}</p>
         </div>
-        <Button size="sm" variant="light" onPress={onClose} className="ml-2 flex-shrink-0">
-          ✕
+        <Button size="sm" variant="light" isIconOnly onPress={onClose} className="ml-2 flex-shrink-0">
+          <i className="fa-solid fa-xmark" aria-hidden="true" />
         </Button>
       </div>
 

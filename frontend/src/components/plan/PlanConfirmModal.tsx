@@ -34,9 +34,9 @@ export default function PlanConfirmModal({
       <div className="p-3 rounded-xl bg-default-50 space-y-2">
         <p className="text-sm font-semibold">Plan Summary</p>
         <div className="flex flex-wrap gap-2 text-xs text-default-600">
-          <span>📋 {tasks.length} task{tasks.length !== 1 ? "s" : ""}</span>
-          <span>🗂 {repositories.length} repo{repositories.length !== 1 ? "s" : ""}</span>
-          <span>🤖 {profileSummary.length} agent profile{profileSummary.length !== 1 ? "s" : ""}</span>
+          <span><i className="fa-solid fa-clipboard-list" aria-hidden="true" /> {tasks.length} task{tasks.length !== 1 ? "s" : ""}</span>
+          <span><i className="fa-solid fa-folder-tree" aria-hidden="true" /> {repositories.length} repo{repositories.length !== 1 ? "s" : ""}</span>
+          <span><i className="fa-solid fa-robot" aria-hidden="true" /> {profileSummary.length} agent profile{profileSummary.length !== 1 ? "s" : ""}</span>
         </div>
         {profileSummary.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -78,10 +78,10 @@ export default function PlanConfirmModal({
 
       <div className="flex gap-2 pt-1">
         <Button color="success" onPress={onConfirm} className="flex-1">
-          ✓ Confirm &amp; Execute
+          <i className="fa-solid fa-check" aria-hidden="true" /> Confirm &amp; Execute
         </Button>
         <Button variant="bordered" onPress={onRequestChanges} className="flex-1">
-          ✎ Request Changes
+          <i className="fa-solid fa-pen" aria-hidden="true" /> Request Changes
         </Button>
       </div>
     </div>

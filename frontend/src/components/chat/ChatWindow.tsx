@@ -39,7 +39,7 @@ export default function ChatWindow({
     <>
       {isEmpty && (
         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center mt-12">
-          <div className="text-4xl" aria-hidden="true">🤖</div>
+          <i className="fa-solid fa-robot" aria-hidden="true" style={{ fontSize: 36 }} />
           <p className="text-default-500 text-sm max-w-xs">
             Hi! I'm your planning agent. Describe what you want to build and I'll help you create an execution plan.
           </p>
@@ -90,7 +90,7 @@ export default function ChatWindow({
                 </div>
                 {toolActivity && (
                   <span className="text-xs text-default-400 italic">
-                    🔍 {toolActivity.replace(/_/g, " ")}…
+                    <i className="fa-solid fa-magnifying-glass" aria-hidden="true" /> {toolActivity.replace(/_/g, " ")}…
                   </span>
                 )}
               </div>

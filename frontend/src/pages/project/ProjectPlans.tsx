@@ -123,7 +123,7 @@ export default function ProjectPlans({ projectId }: { projectId: string }) {
         </div>
       ) : plans.length === 0 ? (
         <div style={{ textAlign: "center", padding: "80px 20px", color: "var(--label-tertiary)" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+          <i className="fa-solid fa-clipboard-list" aria-hidden="true" style={{ fontSize: 48, marginBottom: 16, display: "block" }} />
           <p style={{ fontSize: 14, margin: 0, color: "var(--label-secondary)" }}>No plans yet</p>
           <p style={{ fontSize: 12, margin: "8px 0 0" }}>Create a plan to start the agentic SDLC workflow</p>
         </div>

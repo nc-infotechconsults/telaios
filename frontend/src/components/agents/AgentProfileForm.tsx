@@ -354,7 +354,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
                   className="text-danger text-xs leading-none hover:opacity-70"
                   aria-label="Remove parameter"
                 >
-                  ✕
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
                 </button>
               </div>
             ))}
@@ -697,12 +697,12 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
                               </Chip>
                               {profile.llm_model && (
                                 <Chip size="sm" variant="bordered" className="text-[10px]">
-                                  🧠 {profile.llm_model}
+                                  <i className="fa-solid fa-brain" aria-hidden="true" /> {profile.llm_model}
                                 </Chip>
                               )}
                               {profile.skills.length > 0 && (
                                 <Chip size="sm" variant="bordered" className="text-[10px]">
-                                  ⚡ {profile.skills.length} skill{profile.skills.length > 1 ? "s" : ""}
+                                  <i className="fa-solid fa-bolt" aria-hidden="true" /> {profile.skills.length} skill{profile.skills.length > 1 ? "s" : ""}
                                 </Chip>
                               )}
                             </div>
@@ -715,7 +715,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
                             aria-label={`Remove ${profile.name}`}
                             onPress={() => setSubAgentIds((prev) => prev.filter((sid) => sid !== id))}
                           >
-                            ✕
+                            <i className="fa-solid fa-xmark" aria-hidden="true" />
                           </Button>
                         </div>
                       </CardBody>
@@ -820,7 +820,7 @@ export default function AgentProfileForm({ initialData, onSaved, onCancel }: Pro
                             className="text-danger text-xs leading-none hover:opacity-70"
                             aria-label="Remove env var"
                           >
-                            ✕
+                            <i className="fa-solid fa-xmark" aria-hidden="true" />
                           </button>
                         </div>
                       ))}

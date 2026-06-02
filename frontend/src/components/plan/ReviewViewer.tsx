@@ -27,10 +27,10 @@ const SEVERITY_COLOR: Record<Severity, "danger" | "warning" | "primary" | "succe
 };
 
 const SEVERITY_ICON: Record<Severity, string> = {
-  error: "✗",
-  warning: "⚠",
-  suggestion: "◆",
-  praise: "✓",
+  error: "fa-xmark",
+  warning: "fa-triangle-exclamation",
+  suggestion: "fa-comment",
+  praise: "fa-check",
 };
 
 /**
@@ -109,12 +109,10 @@ export default function ReviewViewer({ content }: Props) {
                 className="rounded-lg border border-default-200 px-3 py-2.5 flex gap-2.5"
               >
                 {/* Severity icon */}
-                <span
-                  className={`shrink-0 mt-0.5 text-sm font-bold text-${SEVERITY_COLOR[c.severity]}`}
+                <i
+                  className={`fa-solid ${SEVERITY_ICON[c.severity]} shrink-0 mt-0.5 text-sm text-${SEVERITY_COLOR[c.severity]}`}
                   aria-label={c.severity}
-                >
-                  {SEVERITY_ICON[c.severity]}
-                </span>
+                />
 
                 <div className="flex flex-col gap-1 min-w-0">
                   {/* File + line */}

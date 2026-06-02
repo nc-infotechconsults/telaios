@@ -298,7 +298,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
       {/* Empty state */}
       {repositories.length === 0 && !showForm && (
         <div className="flex flex-col items-center py-10 gap-3 border border-dashed border-divider rounded-xl text-center">
-          <div className="text-4xl">📁</div>
+          <i className="fa-solid fa-folder" aria-hidden="true" style={{ fontSize: 36 }} />
           <div>
             <p className="text-sm font-medium">No repositories linked</p>
             <p className="text-xs text-default-400 mt-0.5">
@@ -326,7 +326,7 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">📁 {r.name}</span>
+                        <span className="font-medium text-sm"><i className="fa-solid fa-folder" aria-hidden="true" /> {r.name}</span>
                         <Chip
                           size="sm"
                           variant="bordered"
@@ -355,21 +355,21 @@ export default function RepositorySetup({ projectId, repositories, onChange }: P
 
                       {!isS3 && r.auth_type !== "none" && (
                         <p className="text-xs text-default-300 mt-0.5">
-                          Auth: {r.auth_type === "token" ? "🔑 Token" : "🔐 SSH Key"}
+                          Auth: {r.auth_type === "token" ? <><i className="fa-solid fa-key" aria-hidden="true" /> Token</> : <><i className="fa-solid fa-key" aria-hidden="true" /> SSH Key</>}
                           {r.has_credentials && (
-                            <span className="text-success ml-1">✓ credentials stored</span>
+                            <span className="text-success ml-1"><i className="fa-solid fa-check" aria-hidden="true" /> credentials stored</span>
                           )}
                         </p>
                       )}
 
                       {isS3 && r.has_credentials && (
                         <p className="text-xs text-default-300 mt-0.5">
-                          🔑 <span className="text-success">credentials stored</span>
+                          <i className="fa-solid fa-key" aria-hidden="true" /> <span className="text-success">credentials stored</span>
                         </p>
                       )}
 
                       {r.error_message && (
-                        <p className="text-xs text-danger mt-1">⚠ {r.error_message}</p>
+                        <p className="text-xs text-danger mt-1"><i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> {r.error_message}</p>
                       )}
                     </div>
 

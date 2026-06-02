@@ -25,13 +25,13 @@ interface Specialist {
 }
 
 const SPECIALISTS: Record<SpecialistKey, Specialist> = {
-  qa:       { name: "Q&A",      color: "#0a84ff", icon: "?",   tagline: "Grounded answers from indexed sources" },
-  explorer: { name: "Explorer", color: "#64d2ff", icon: "⌖",  tagline: "Find code, files, and patterns" },
-  reverse:  { name: "Reverse",  color: "#bf5af2", icon: "◈",  tagline: "Trace and map system flows" },
-  planner:  { name: "Planner",  color: "#30d158", icon: "⎇",  tagline: "Cross-repo implementation plans" },
-  coder:    { name: "Coder",    color: "#5e5ce6", icon: "</>", tagline: "Implement, refactor, and fix" },
-  designer: { name: "Designer", color: "#ff9f0a", icon: "✦",  tagline: "Design UIs from your brand kit" },
-  reviewer: { name: "Reviewer", color: "#ff375f", icon: "⊘",  tagline: "Review PRs and audit code" },
+  qa:       { name: "Q&A",      color: "#0a84ff", icon: "fa-circle-question",  tagline: "Grounded answers from indexed sources" },
+  explorer: { name: "Explorer", color: "#64d2ff", icon: "fa-magnifying-glass", tagline: "Find code, files, and patterns" },
+  reverse:  { name: "Reverse",  color: "#bf5af2", icon: "fa-diagram-project",  tagline: "Trace and map system flows" },
+  planner:  { name: "Planner",  color: "#30d158", icon: "fa-sitemap",          tagline: "Cross-repo implementation plans" },
+  coder:    { name: "Coder",    color: "#5e5ce6", icon: "fa-code",             tagline: "Implement, refactor, and fix" },
+  designer: { name: "Designer", color: "#ff9f0a", icon: "fa-pen-ruler",        tagline: "Design UIs from your brand kit" },
+  reviewer: { name: "Reviewer", color: "#ff375f", icon: "fa-code-pull-request", tagline: "Review PRs and audit code" },
 };
 
 interface UIMessage {
@@ -300,7 +300,7 @@ export default function ProjectConversation({ projectId }: { projectId: string }
               fontSize: 12,
               color: specialist.color,
             }}>
-              <span>{specialist.icon}</span>
+              <i className={`fa-solid ${specialist.icon}`} aria-hidden="true" />
               <span>{specialist.name} is thinking…</span>
             </div>
           )}
@@ -364,7 +364,7 @@ export default function ProjectConversation({ projectId }: { projectId: string }
               transition: "all 120ms",
             }}
           >
-            {s.icon} {s.name}
+            <i className={`fa-solid ${s.icon}`} aria-hidden="true" /> {s.name}
           </button>
         ))}
       </div>
@@ -456,7 +456,7 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
         flexShrink: 0,
         border: spec ? `1.5px solid ${spec.color}50` : "none",
       }}>
-        {isUser ? "U" : (spec?.icon ?? "AI")}
+        {isUser ? "U" : spec ? <i className={`fa-solid ${spec.icon}`} aria-hidden="true" style={{ fontSize: 10 }} /> : "AI"}
       </div>
 
       <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column", gap: 4 }}>

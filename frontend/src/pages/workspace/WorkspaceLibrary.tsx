@@ -165,7 +165,7 @@ export default function WorkspaceLibrary() {
           style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--fg)", fontSize: 13 }}
         />
         {search && (
-          <button onClick={() => setSearch("")} style={{ color: "var(--fg-3)", fontSize: 11, padding: "2px 6px", cursor: "pointer" }}>✕</button>
+          <button onClick={() => setSearch("")} style={{ color: "var(--fg-3)", fontSize: 11, padding: "2px 6px", cursor: "pointer" }}><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
         )}
       </div>
 

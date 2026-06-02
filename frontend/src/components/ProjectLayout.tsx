@@ -416,7 +416,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
                 title={theme === "dark" ? "Light mode" : "Dark mode"}
                 style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)", fontSize: 13 }}
               >
-                {theme === "dark" ? "☀" : "☽"}
+                <i className={theme === "dark" ? "fa-solid fa-sun" : "fa-solid fa-moon"} aria-hidden="true" />
               </button>
               <button onClick={logout} title="Log out" style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)" }}>
                 <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />

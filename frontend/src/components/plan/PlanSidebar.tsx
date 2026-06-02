@@ -216,7 +216,7 @@ export default function PlanSidebar({
 
                       {/* Agent row — dedicated strip */}
                       <div className="px-3 py-1.5 flex items-center gap-2 bg-default-100/60 border-y border-divider/60">
-                        <span className="text-sm leading-none" aria-hidden="true">🤖</span>
+                        <i className="fa-solid fa-robot text-sm" aria-hidden="true" />
                         {profile ? (
                           <>
                             <span className="text-[11px] font-medium text-foreground flex-1 truncate" title={profile.name}>
@@ -236,7 +236,7 @@ export default function PlanSidebar({
                         <Chip size="sm" color={TYPE_COLOR[t.type]} variant="bordered">{t.type}</Chip>
                         {taskRepos.map((r) => (
                           <Chip key={r.id} size="sm" variant="bordered" color="primary">
-                            📁 {r.name}
+                            <i className="fa-solid fa-folder" aria-hidden="true" /> {r.name}
                           </Chip>
                         ))}
                       </div>
@@ -244,7 +244,7 @@ export default function PlanSidebar({
                       {/* Dependencies */}
                       {depTasks.length > 0 && (
                         <div className="pl-10 pr-3 pb-1 flex flex-wrap items-center gap-1">
-                          <span className="text-[10px] text-default-400 shrink-0">⛓ needs:</span>
+                          <span className="text-[10px] text-default-400 shrink-0"><i className="fa-solid fa-link" aria-hidden="true" /> needs:</span>
                           {depTasks.map((dep) => (
                             <span
                               key={dep.id}

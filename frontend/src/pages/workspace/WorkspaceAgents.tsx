@@ -81,7 +81,7 @@ export default function WorkspaceAgents() {
           style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--fg)", fontSize: 13 }}
         />
         {search && (
-          <button onClick={() => setSearch("")} style={{ color: "var(--fg-3)", fontSize: 11, padding: "2px 6px", cursor: "pointer" }}>✕</button>
+          <button onClick={() => setSearch("")} style={{ color: "var(--fg-3)", fontSize: 11, padding: "2px 6px", cursor: "pointer" }}><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
         )}
       </div>
 
@@ -91,7 +91,7 @@ export default function WorkspaceAgents() {
 
       {!loading && profiles.length === 0 && !search && (
         <div style={{ textAlign: "center", padding: 60, color: "var(--fg-3)" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🤖</div>
+          <i className="fa-solid fa-robot" aria-hidden="true" style={{ fontSize: 36, marginBottom: 12, display: "block" }} />
           <p style={{ fontWeight: 600, fontSize: 15, color: "var(--fg)", marginBottom: 4 }}>No agent profiles yet</p>
           <p style={{ fontSize: 13, marginBottom: 16 }}>Create your first agent profile to get started.</p>
           <button

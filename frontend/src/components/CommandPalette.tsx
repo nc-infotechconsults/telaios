@@ -16,15 +16,15 @@ interface Command {
 }
 
 const COMMANDS: Command[] = [
-  { id: "dashboard",     label: "Go to Dashboard",      view: "dashboard",     icon: "⊞", category: "Navigation" },
-  { id: "conversation",  label: "Open Conversation",    view: "conversation",  icon: "◉", category: "Navigation" },
-  { id: "repositories",  label: "Repositories",         view: "repositories",  icon: "⎔", category: "Navigation" },
-  { id: "documents",     label: "Documents",            view: "documents",     icon: "⎕", category: "Navigation" },
-  { id: "designs",       label: "Designs",              view: "designs",       icon: "✦", category: "Navigation" },
-  { id: "agents",        label: "Agents",               view: "agents",        icon: "⊛", category: "Navigation" },
-  { id: "inbox",         label: "Inbox",                view: "inbox",         icon: "⊡", category: "Navigation" },
-  { id: "team",          label: "Team",                 view: "team",          icon: "⊗", category: "Navigation" },
-  { id: "settings",      label: "Settings",             view: "settings",      icon: "⊕", category: "Navigation" },
+  { id: "dashboard",     label: "Go to Dashboard",      view: "dashboard",     icon: "fa-table-cells-large", category: "Navigation" },
+  { id: "conversation",  label: "Open Conversation",    view: "conversation",  icon: "fa-comments",          category: "Navigation" },
+  { id: "repositories",  label: "Repositories",         view: "repositories",  icon: "fa-code-branch",       category: "Navigation" },
+  { id: "documents",     label: "Documents",            view: "documents",     icon: "fa-file-lines",        category: "Navigation" },
+  { id: "designs",       label: "Designs",              view: "designs",       icon: "fa-pen-ruler",         category: "Navigation" },
+  { id: "agents",        label: "Agents",               view: "agents",        icon: "fa-robot",             category: "Navigation" },
+  { id: "inbox",         label: "Inbox",                view: "inbox",         icon: "fa-inbox",             category: "Navigation" },
+  { id: "team",          label: "Team",                 view: "team",          icon: "fa-users",             category: "Navigation" },
+  { id: "settings",      label: "Settings",             view: "settings",      icon: "fa-gear",              category: "Navigation" },
 ];
 
 export default function CommandPalette({ isOpen, onClose, onNavigate, projectName }: CommandPaletteProps) {
@@ -165,9 +165,7 @@ export default function CommandPalette({ isOpen, onClose, onNavigate, projectNam
                   borderLeft: i === selected ? "2px solid #0a84ff" : "2px solid transparent",
                 }}
               >
-                <span style={{ fontSize: 16, width: 20, textAlign: "center", color: i === selected ? "#0a84ff" : "var(--label-tertiary)" }}>
-                  {cmd.icon}
-                </span>
+                <i className={`fa-solid ${cmd.icon}`} aria-hidden="true" style={{ fontSize: 14, width: 20, textAlign: "center", color: i === selected ? "#0a84ff" : "var(--label-tertiary)" }} />
                 <span style={{ flex: 1 }}>{cmd.label}</span>
                 <span style={{ fontSize: 11, color: "var(--label-quaternary)" }}>{cmd.category}</span>
               </button>
