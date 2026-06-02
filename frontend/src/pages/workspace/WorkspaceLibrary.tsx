@@ -1,22 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../../components/Icon";
 import {
-  cloneLibraryAgent, deleteLibraryAgent, deleteLibraryMCP, deleteLibrarySkill,
-  listLibraryAgents, listLibraryMCPs, listLibrarySkills,
+  deleteLibraryMCP, deleteLibrarySkill,
+  listLibraryMCPs, listLibrarySkills,
 } from "../../lib/api";
 import { toast } from "../../lib/toast";
-import type { AgentRole, LibraryAgent, LibraryMCP, LibrarySkill } from "../../types";
-import LibraryAgentForm from "../../components/library/LibraryAgentForm";
+import type { LibraryMCP, LibrarySkill } from "../../types";
 import LibraryMCPForm from "../../components/library/LibraryMCPForm";
 import LibrarySkillForm from "../../components/library/LibrarySkillForm";
 
-type Tab = "agents" | "mcps" | "skills";
-
-const ROLE_COLOR: Record<AgentRole, string> = {
-  planner: "#0a84ff", coder: "#30d158", reviewer: "#ff9f0a",
-  tester: "#bf5af2", infra: "#ff3b30", knowledge: "#5e5ce6",
-  custom: "#64d2ff", "document-copilot": "#ff9f0a", designer: "#ff6b6b",
-};
+type Tab = "mcps" | "skills";
 
 function ModalWrap({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
@@ -58,31 +51,26 @@ function DeleteConfirm({ name, onConfirm, onCancel }: { name: string; onConfirm:
 }
 
 export default function WorkspaceLibrary() {
-  const [tab, setTab] = useState<Tab>("agents");
-  const [agents, setAgents] = useState<LibraryAgent[]>([]);
+  const [tab, setTab] = useState<Tab>("mcps");
   const [mcps, setMcps] = useState<LibraryMCP[]>([]);
   const [skills, setSkills] = useState<LibrarySkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const [showAgentForm, setShowAgentForm] = useState<LibraryAgent | true | null>(null);
   const [showMcpForm, setShowMcpForm] = useState<LibraryMCP | true | null>(null);
   const [showSkillForm, setShowSkillForm] = useState<LibrarySkill | true | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ name: string; id: string; type: Tab } | null>(null);
 
   const load = () => {
     setLoading(true);
-    Promise.all([listLibraryAgents(), listLibraryMCPs(), listLibrarySkills()])
-      .then(([a, m, s]) => { setAgents(a); setMcps(m); setSkills(s); })
+    Promise.all([listLibraryMCPs(), listLibrarySkills()])
+      .then(([m, s]) => { setMcps(m); setSkills(s); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
 
-  const filteredAgents = useMemo(() =>
-    search ? agents.filter((a) => (a.name + " " + (a.description ?? "")).toLowerCase().includes(search.toLowerCase())) : agents,
-  [agents, search]);
   const filteredMcps = useMemo(() =>
     search ? mcps.filter((m) => (m.name + " " + (m.description ?? "")).toLowerCase().includes(search.toLowerCase())) : mcps,
   [mcps, search]);
@@ -93,7 +81,6 @@ export default function WorkspaceLibrary() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      if (deleteTarget.type === "agents") { await deleteLibraryAgent(deleteTarget.id); setAgents((a) => a.filter((x) => x.id !== deleteTarget.id)); }
       if (deleteTarget.type === "mcps")   { await deleteLibraryMCP(deleteTarget.id);   setMcps((m)  => m.filter((x) => x.id !== deleteTarget.id)); }
       if (deleteTarget.type === "skills") { await deleteLibrarySkill(deleteTarget.id); setSkills((s) => s.filter((x) => x.id !== deleteTarget.id)); }
       toast.success("Deleted");
@@ -104,17 +91,7 @@ export default function WorkspaceLibrary() {
     }
   };
 
-  const cloneAgent = async (id: string) => {
-    try {
-      const cloned = await cloneLibraryAgent(id);
-      setAgents((a) => [...a, cloned]);
-      toast.success("Cloned");
-    } catch {
-      toast.error("Failed to clone");
-    }
-  };
-
-  const counts = { agents: agents.length, mcps: mcps.length, skills: skills.length };
+  const counts = { mcps: mcps.length, skills: skills.length };
 
   return (
     <div className="main-scroll">
@@ -124,19 +101,18 @@ export default function WorkspaceLibrary() {
           className="pill-btn"
           style={{ background: "var(--accent-1)", color: "#fff", borderColor: "transparent" }}
           onClick={() => {
-            if (tab === "agents") setShowAgentForm(true);
             if (tab === "mcps")   setShowMcpForm(true);
             if (tab === "skills") setShowSkillForm(true);
           }}
         >
-          <Icon name="plus" size="sm" /> New {tab === "agents" ? "Agent" : tab === "mcps" ? "MCP" : "Skill"}
+          <Icon name="plus" size="sm" /> New {tab === "mcps" ? "MCP" : "Skill"}
         </button>
       </div>
-      <p className="sub-page">Reusable agents, MCP servers, and skills across all projects</p>
+      <p className="sub-page">Reusable MCP servers and skills across all projects</p>
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 2, marginBottom: 16, borderBottom: "0.5px solid var(--hairline)", paddingBottom: 0 }}>
-        {(["agents", "mcps", "skills"] as Tab[]).map((t) => (
+        {(["mcps", "skills"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -148,7 +124,7 @@ export default function WorkspaceLibrary() {
               marginBottom: -1, transition: "color 0.15s",
             }}
           >
-            {t === "agents" ? "Agents" : t === "mcps" ? "MCP Servers" : "Skills"}
+            {t === "mcps" ? "MCP Servers" : "Skills"}
             {" "}
             <span style={{ fontSize: 11, color: "var(--fg-3)" }}>({counts[t]})</span>
           </button>
@@ -170,49 +146,6 @@ export default function WorkspaceLibrary() {
       </div>
 
       {loading && <div style={{ textAlign: "center", padding: 40, color: "var(--fg-3)" }}>Loading…</div>}
-
-      {/* Agents tab */}
-      {!loading && tab === "agents" && (
-        filteredAgents.length === 0
-          ? <div style={{ textAlign: "center", padding: 40, color: "var(--fg-3)" }}>No agents found.</div>
-          : <div className="grid-3">
-              {filteredAgents.map((a) => (
-                <div key={a.id} className="card" style={{ padding: 16 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                      background: ROLE_COLOR[a.role as AgentRole] ?? "#0a84ff",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontWeight: 700, color: "#fff", fontSize: 14,
-                    }}>
-                      {a.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {a.name}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: "var(--fg-3)", marginTop: 2 }}>
-                        {a.role} · {a.usage_count} use{a.usage_count !== 1 ? "s" : ""}
-                      </div>
-                    </div>
-                  </div>
-                  {a.description && (
-                    <p style={{ fontSize: 12.5, color: "var(--fg-2)", margin: "0 0 10px", lineHeight: 1.5,
-                      overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box",
-                      WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
-                      {a.description}
-                    </p>
-                  )}
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="pill-btn" style={{ fontSize: 11 }} onClick={() => setShowAgentForm(a)}>Edit</button>
-                    <button className="pill-btn" style={{ fontSize: 11 }} onClick={() => void cloneAgent(a.id)}>Clone</button>
-                    <button className="pill-btn" style={{ fontSize: 11, borderColor: "#ff3b30", color: "#ff3b30" }}
-                      onClick={() => setDeleteTarget({ id: a.id, name: a.name, type: "agents" })}>Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-      )}
 
       {/* MCPs tab */}
       {!loading && tab === "mcps" && (
@@ -275,15 +208,6 @@ export default function WorkspaceLibrary() {
       )}
 
       {/* Modals */}
-      {showAgentForm && (
-        <ModalWrap onClose={() => setShowAgentForm(null)}>
-          <LibraryAgentForm
-            initialData={showAgentForm !== true ? showAgentForm : undefined}
-            onSaved={(a) => { setAgents((prev) => showAgentForm !== true ? prev.map((x) => x.id === a.id ? a : x) : [...prev, a]); setShowAgentForm(null); }}
-            onCancel={() => setShowAgentForm(null)}
-          />
-        </ModalWrap>
-      )}
       {showMcpForm && (
         <ModalWrap onClose={() => setShowMcpForm(null)}>
           <LibraryMCPForm

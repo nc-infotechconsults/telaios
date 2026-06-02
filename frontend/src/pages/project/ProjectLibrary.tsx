@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 import { Icon } from "../../components/Icon";
-import { listProjectMcps, listProjectSkills, createProjectMcp, deleteProjectMcp } from "../../lib/api";
+import {
+  listProjectMcps, listProjectSkills, createProjectMcp, deleteProjectMcp,
+  listLibraryMCPs, listLibrarySkills, createLibraryMCP, createLibrarySkill,
+} from "../../lib/api";
 import { toast } from "../../lib/toast";
-import type { ProjectMcp, ProjectSkill } from "../../types";
+import type { ProjectMcp, ProjectSkill, LibraryMCP, LibrarySkill } from "../../types";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
-const MCP_SERVERS = [
+// ─── Demo-only mock data ──────────────────────────────────────────────────────
+
+const DEMO_MCPS = [
   { id: "mcp-github",   name: "GitHub",              scope: "global",  description: "Read repos, branches, PRs, issues and CI status.", transport: "stdio · @modelcontextprotocol/server-github", icon: "git",      color: "#1f2328", status: "connected",    tools: 18, version: "1.4.2", author: "TelaiOS · verified", lastUsed: "2m ago" },
   { id: "mcp-figma",    name: "Figma",               scope: "global",  description: "Pull components, frames and design tokens from your team library.", transport: "http · figma.com/api", icon: "spark",    color: "#a259ff", status: "connected",    tools: 9,  version: "2.1.0", author: "TelaiOS · verified", lastUsed: "32m ago" },
   { id: "mcp-linear",   name: "Linear",              scope: "global",  description: "Query and update tickets, cycles, projects and roadmaps.", transport: "http · linear.app/api", icon: "layers",   color: "#5e6ad2", status: "connected",    tools: 14, version: "0.9.3", author: "Linear", lastUsed: "1h ago" },
@@ -17,35 +22,68 @@ const MCP_SERVERS = [
   { id: "mcp-stripe",   name: "Stripe (sandbox)",    scope: "global",  description: "Read customers, subscriptions and events in test mode.", transport: "http · stripe.com/api", icon: "cube",     color: "#635bff", status: "needs-auth",   tools: 23, version: "1.8.0", author: "Stripe", lastUsed: "—" },
 ];
 
-const SKILLS = [
-  { id: "sk-rfc",      name: "RFC drafter",          slug: "rfc-drafter",       scope: "global",  description: "Drafts a structured RFC from a feature brief.", icon: "book",     color: "#0a84ff", runs: 142, lastUsed: "1h ago",  version: "1.4.0", license: "MIT",    tags: ["writing", "planning"] },
-  { id: "sk-diagram",  name: "Diagram drawer",        slug: "diagram-drawer",    scope: "global",  description: "Generates Mermaid call graphs, sequence diagrams, and ER diagrams from source.", icon: "layers",   color: "#bf5af2", runs: 88,  lastUsed: "2d ago",  version: "0.9.3", license: "MIT",    tags: ["visual", "analysis"] },
-  { id: "sk-pr",       name: "PR reviewer",           slug: "pr-reviewer",       scope: "global",  description: "Posts inline review comments on a pull request grounded in the repository's conventions.", icon: "pr",       color: "#30d158", runs: 312, lastUsed: "12m ago", version: "2.1.0", license: "Apache-2.0", tags: ["code", "quality"] },
-  { id: "sk-tests",    name: "Test generator",        slug: "test-generator",    scope: "global",  description: "Authors unit and integration tests for a target module.", icon: "check",    color: "#30d158", runs: 64,  lastUsed: "5h ago",  version: "1.0.2", license: "MIT",    tags: ["code", "testing"] },
-  { id: "sk-ui-mock",  name: "UI mockup composer",    slug: "ui-mockup-composer", scope: "global", description: "Composes high-fidelity HTML mockups using the linked brand kit's tokens and components.", icon: "spark",    color: "#ff9f0a", runs: 47,  lastUsed: "32m ago", version: "0.7.1", license: "MIT",    tags: ["design"] },
-  { id: "sk-sql",      name: "SQL writer (Atlas)",    slug: "atlas-sql-writer",  scope: "project", description: "Authors safe read-only SELECT queries against the Atlas Postgres schema.", icon: "terminal", color: "#5e6ad2", runs: 28,  lastUsed: "18m ago", version: "0.4.0", license: "Proprietary", tags: ["data", "code"] },
+const DEMO_SKILLS = [
+  { id: "sk-rfc",      name: "RFC drafter",          slug: "rfc-drafter",        scope: "global",  description: "Drafts a structured RFC from a feature brief.", icon: "book",     color: "#0a84ff", runs: 142, lastUsed: "1h ago",  version: "1.4.0", license: "MIT",         tags: ["writing", "planning"] },
+  { id: "sk-diagram",  name: "Diagram drawer",        slug: "diagram-drawer",     scope: "global",  description: "Generates Mermaid call graphs, sequence diagrams, and ER diagrams from source.", icon: "layers",   color: "#bf5af2", runs: 88,  lastUsed: "2d ago",  version: "0.9.3", license: "MIT",         tags: ["visual", "analysis"] },
+  { id: "sk-pr",       name: "PR reviewer",           slug: "pr-reviewer",        scope: "global",  description: "Posts inline review comments on a pull request grounded in the repository's conventions.", icon: "pr",       color: "#30d158", runs: 312, lastUsed: "12m ago", version: "2.1.0", license: "Apache-2.0",  tags: ["code", "quality"] },
+  { id: "sk-tests",    name: "Test generator",        slug: "test-generator",     scope: "global",  description: "Authors unit and integration tests for a target module.", icon: "check",    color: "#30d158", runs: 64,  lastUsed: "5h ago",  version: "1.0.2", license: "MIT",         tags: ["code", "testing"] },
+  { id: "sk-ui-mock",  name: "UI mockup composer",    slug: "ui-mockup-composer", scope: "global",  description: "Composes high-fidelity HTML mockups using the linked brand kit's tokens and components.", icon: "spark",    color: "#ff9f0a", runs: 47,  lastUsed: "32m ago", version: "0.7.1", license: "MIT",         tags: ["design"] },
+  { id: "sk-sql",      name: "SQL writer (Atlas)",    slug: "atlas-sql-writer",   scope: "project", description: "Authors safe read-only SELECT queries against the Atlas Postgres schema.", icon: "terminal", color: "#5e6ad2", runs: 28,  lastUsed: "18m ago", version: "0.4.0", license: "Proprietary", tags: ["data", "code"] },
   { id: "sk-brand",    name: "Brand-kit checker",     slug: "atlas-brand-checker", scope: "project", description: "Validates a UI mockup against the Atlas brand kit's tokens and accessibility floor.", icon: "check",    color: "#30d158", runs: 18,  lastUsed: "1h ago",  version: "0.3.2", license: "Proprietary", tags: ["design", "quality"] },
-  { id: "sk-incident", name: "Incident triager",      slug: "incident-triager",  scope: "project", description: "Walks an on-call engineer through severity assignment and runbook steps for a live incident.", icon: "issue",    color: "#ff375f", runs: 9,   lastUsed: "1d ago",  version: "0.2.0", license: "Proprietary", tags: ["ops"] },
+  { id: "sk-incident", name: "Incident triager",      slug: "incident-triager",   scope: "project", description: "Walks an on-call engineer through severity assignment and runbook steps for a live incident.", icon: "issue",    color: "#ff375f", runs: 9,   lastUsed: "1d ago",  version: "0.2.0", license: "Proprietary", tags: ["ops"] },
 ];
 
 // ─── API → UI helpers ─────────────────────────────────────────────────────────
 
-function mcpToUi(m: ProjectMcp) {
+type UiMcp = {
+  id: string; name: string; scope: "global" | "project"; description: string;
+  transport: string; icon: string; color: string; status?: string;
+  tools: number; version: string; author: string; lastUsed: string;
+};
+
+type UiSkill = {
+  id: string; name: string; scope: "global" | "project"; slug: string;
+  description: string; icon: string; color: string;
+  runs: number; lastUsed: string; version: string; license: string; tags: string[];
+};
+
+function libraryMcpToUi(m: LibraryMCP): UiMcp {
   return {
-    id: m.id, name: m.name, scope: "project" as const,
+    id: m.id, name: m.name, scope: "global",
     description: m.description ?? "",
     transport: m.transport === "stdio" ? `stdio · ${m.command ?? ""}` : `http · ${m.url ?? ""}`,
-    icon: "cube" as const, color: "#0a84ff", status: "connected" as const,
+    icon: "cube", color: "#0a84ff",
+    tools: 0, version: m.version, author: m.published_by ?? "—",
+    lastUsed: m.usage_count ? `${m.usage_count} uses` : "—",
+  };
+}
+
+function librarySkillToUi(s: LibrarySkill): UiSkill {
+  return {
+    id: s.id, name: s.name, scope: "global", slug: s.slug,
+    description: s.description ?? "",
+    icon: "book", color: "#bf5af2",
+    runs: s.usage_count, lastUsed: "—", version: s.version,
+    license: s.license ?? "—", tags: s.tags ?? [],
+  };
+}
+
+function projectMcpToUi(m: ProjectMcp): UiMcp {
+  return {
+    id: m.id, name: m.name, scope: "project",
+    description: m.description ?? "",
+    transport: m.transport === "stdio" ? `stdio · ${m.command ?? ""}` : `http · ${m.url ?? ""}`,
+    icon: "cube", color: "#0a84ff", status: "connected",
     tools: 0, version: "—", author: "Custom", lastUsed: "—",
   };
 }
 
-function skillToUi(s: ProjectSkill) {
+function projectSkillToUi(s: ProjectSkill): UiSkill {
   return {
-    id: s.id, name: s.name, scope: "project" as const,
-    slug: s.slug, description: s.description ?? "",
-    icon: "book" as const, color: "#bf5af2",
-    runs: 0, lastUsed: "—", version: "—", license: "Custom", tags: [] as string[],
+    id: s.id, name: s.name, scope: "project", slug: s.slug,
+    description: s.description ?? "",
+    icon: "book", color: "#bf5af2",
+    runs: 0, lastUsed: "—", version: "—", license: "Custom", tags: [],
   };
 }
 
@@ -57,17 +95,27 @@ export default function ProjectLibrary({ projectId }: { projectId: string }) {
   const [addMcpOpen, setAddMcpOpen] = useState(false);
   const [mcpForm, setMcpForm] = useState(EMPTY_MCP_FORM);
   const [saving, setSaving] = useState(false);
-  const [apiMcps, setApiMcps] = useState<ReturnType<typeof mcpToUi>[]>([]);
-  const [apiSkills, setApiSkills] = useState<ReturnType<typeof skillToUi>[]>([]);
+  const [promoting, setPromoting] = useState<string | null>(null);
 
-  const reloadMcps = () => {
-    listProjectMcps(projectId).then((data) => setApiMcps(data.map(mcpToUi))).catch(() => {});
+  const [projectMcps, setProjectMcps] = useState<ProjectMcp[]>([]);
+  const [projectSkills, setProjectSkills] = useState<ProjectSkill[]>([]);
+  const [globalMcps, setGlobalMcps] = useState<LibraryMCP[]>([]);
+  const [globalSkills, setGlobalSkills] = useState<LibrarySkill[]>([]);
+
+  const reloadProjectMcps = () => {
+    listProjectMcps(projectId).then(setProjectMcps).catch(() => {});
+  };
+
+  const reloadGlobalMcps = () => {
+    listLibraryMCPs().then(setGlobalMcps).catch(() => {});
   };
 
   useEffect(() => {
     if (DEMO) return;
-    reloadMcps();
-    listProjectSkills(projectId).then((data) => setApiSkills(data.map(skillToUi))).catch(() => {});
+    reloadProjectMcps();
+    reloadGlobalMcps();
+    listProjectSkills(projectId).then(setProjectSkills).catch(() => {});
+    listLibrarySkills().then(setGlobalSkills).catch(() => {});
   }, [projectId]);
 
   const handleAddMcp = async () => {
@@ -76,13 +124,12 @@ export default function ProjectLibrary({ projectId }: { projectId: string }) {
     try {
       const slug = mcpForm.name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
       await createProjectMcp(projectId, {
-        name: mcpForm.name.trim(),
-        slug,
+        name: mcpForm.name.trim(), slug,
         transport: mcpForm.transport,
         command: mcpForm.transport === "stdio" ? mcpForm.command.trim() || undefined : undefined,
         url: mcpForm.transport !== "stdio" ? mcpForm.url.trim() || undefined : undefined,
       });
-      reloadMcps();
+      reloadProjectMcps();
       setMcpForm(EMPTY_MCP_FORM);
       setAddMcpOpen(false);
       toast.success("MCP server added");
@@ -96,21 +143,64 @@ export default function ProjectLibrary({ projectId }: { projectId: string }) {
   const handleDeleteMcp = async (mcpId: string) => {
     try {
       await deleteProjectMcp(projectId, mcpId);
-      setApiMcps((prev) => prev.filter((m) => m.id !== mcpId));
+      setProjectMcps((prev) => prev.filter((m) => m.id !== mcpId));
       toast.success("MCP server removed");
     } catch {
       toast.error("Failed to remove MCP server");
     }
   };
 
-  // Merge mock globals with real project-scoped items
-  const allMcps = DEMO ? MCP_SERVERS : [
-    ...MCP_SERVERS.filter((s) => s.scope === "global"),
-    ...apiMcps,
+  const handlePromoteMcp = async (mcpId: string) => {
+    const mcp = projectMcps.find((m) => m.id === mcpId);
+    if (!mcp) return;
+    setPromoting(mcpId);
+    try {
+      await createLibraryMCP({
+        name: mcp.name, slug: mcp.slug,
+        description: mcp.description ?? undefined,
+        transport: mcp.transport,
+        command: mcp.command ?? undefined,
+        args: mcp.args, env: mcp.env,
+        url: mcp.url ?? undefined,
+        headers: mcp.headers,
+        tags: [],
+      });
+      reloadGlobalMcps();
+      toast.success("Promoted to global library");
+    } catch {
+      toast.error("Failed to promote");
+    } finally {
+      setPromoting(null);
+    }
+  };
+
+  const handlePromoteSkill = async (skillId: string) => {
+    const skill = projectSkills.find((s) => s.id === skillId);
+    if (!skill) return;
+    setPromoting(skillId);
+    try {
+      await createLibrarySkill({
+        name: skill.name, slug: skill.slug,
+        description: skill.description ?? undefined,
+        content: skill.content,
+        tags: [],
+      });
+      listLibrarySkills().then(setGlobalSkills).catch(() => {});
+      toast.success("Promoted to global library");
+    } catch {
+      toast.error("Failed to promote");
+    } finally {
+      setPromoting(null);
+    }
+  };
+
+  const allMcps: UiMcp[] = DEMO ? DEMO_MCPS as UiMcp[] : [
+    ...globalMcps.map(libraryMcpToUi),
+    ...projectMcps.map(projectMcpToUi),
   ];
-  const allSkills = DEMO ? SKILLS : [
-    ...SKILLS.filter((s) => s.scope === "global"),
-    ...apiSkills,
+  const allSkills: UiSkill[] = DEMO ? DEMO_SKILLS as UiSkill[] : [
+    ...globalSkills.map(librarySkillToUi),
+    ...projectSkills.map(projectSkillToUi),
   ];
 
   const mcpFiltered = allMcps.filter((s) => scopeFilter === "all" || s.scope === scopeFilter);
@@ -119,14 +209,14 @@ export default function ProjectLibrary({ projectId }: { projectId: string }) {
   return (
     <>
       <h1 className="h-page">Library</h1>
-      <p className="sub-page">MCP servers and skills your agents can use. Global items are shared across the workspace; project items are scoped to Atlas.</p>
+      <p className="sub-page">MCP servers and skills your agents can use. Global items are shared across the workspace; project items are scoped to this project.</p>
 
       <div className="grid-4" style={{ marginBottom: 14 }}>
         {[
-          { l: "MCP servers",    v: allMcps.length, d: `${allMcps.filter(s => s.status === "connected").length} connected` },
-          { l: "Skills",         v: allSkills.length, d: "agent instruction packs" },
-          { l: "Total tools",    v: allMcps.reduce((a, s) => a + s.tools, 0), d: "across all servers" },
-          { l: "Skill runs",     v: allSkills.reduce((a, s) => a + s.runs, 0), d: "this month" },
+          { l: "MCP servers", v: allMcps.length,   d: `${allMcps.filter((s) => s.scope === "global").length} global` },
+          { l: "Skills",      v: allSkills.length,  d: `${allSkills.filter((s) => s.scope === "global").length} global` },
+          { l: "Project MCPs",   v: allMcps.filter((s) => s.scope === "project").length,   d: "project-scoped" },
+          { l: "Project skills", v: allSkills.filter((s) => s.scope === "project").length, d: "project-scoped" },
         ].map((s, i) => (
           <div key={i} className="card stat">
             <span className="stat-l">{s.l}</span>
@@ -171,34 +261,44 @@ export default function ProjectLibrary({ projectId }: { projectId: string }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span className="lib-card-name">{s.name}</span>
                     <span className="scope-pill" data-s={s.scope}>{s.scope}</span>
-                    <span className="lib-status" data-s={s.status}>
-                      <span className="lib-status-dot" />{s.status}
-                    </span>
+                    {s.status && (
+                      <span className="lib-status" data-s={s.status}>
+                        <span className="lib-status-dot" />{s.status}
+                      </span>
+                    )}
                   </div>
                   <div className="lib-card-desc">{s.description}</div>
                   <div style={{ fontSize: 11.5, color: "var(--fg-3)", marginTop: 4 }}>
-                    <span className="mono">{s.transport}</span> · v{s.version} · by {s.author}
+                    <span className="mono">{s.transport}</span>
+                    {s.version !== "—" && <> · v{s.version}</>}
+                    {s.author !== "—" && <> · by {s.author}</>}
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end", flexShrink: 0 }}>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--fg-3)" }}>
-                      <b style={{ color: "var(--fg-2)" }}>{s.tools}</b> tools · used {s.lastUsed}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {s.scope === "project" && !DEMO ? (
-                      <button className="pill-btn danger" title="Remove" onClick={() => handleDeleteMcp(s.id)}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  {s.scope === "project" && !DEMO && (
+                    <>
+                      <button
+                        className="pill-btn"
+                        style={{ fontSize: 11 }}
+                        disabled={promoting === s.id}
+                        title="Promote to global library"
+                        onClick={() => void handlePromoteMcp(s.id)}
+                      >
+                        <Icon name="upload" size="sm" /> {promoting === s.id ? "…" : "Promote"}
+                      </button>
+                      <button className="pill-btn danger" title="Remove" onClick={() => void handleDeleteMcp(s.id)}>
                         <Icon name="trash" size="sm" />
                       </button>
-                    ) : s.status === "connected" ? (
-                      <button className="pill-btn"><Icon name="settings" size="sm" /></button>
-                    ) : (
-                      <button className="pill-btn" data-primary="true">
-                        <Icon name="play2" size="sm" /> Connect
-                      </button>
-                    )}
-                  </div>
+                    </>
+                  )}
+                  {s.scope === "global" && s.status === "connected" && (
+                    <button className="pill-btn"><Icon name="settings" size="sm" /></button>
+                  )}
+                  {s.scope === "global" && s.status === "needs-auth" && (
+                    <button className="pill-btn" data-primary="true">
+                      <Icon name="play2" size="sm" /> Connect
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -226,24 +326,36 @@ export default function ProjectLibrary({ projectId }: { projectId: string }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span className="lib-card-name">{s.name}</span>
                     <span className="scope-pill" data-s={s.scope}>{s.scope}</span>
-                    <span style={{ fontSize: 11, color: "var(--fg-3)" }}>v{s.version}</span>
-                    <span style={{ fontSize: 11, color: "var(--fg-3)"}}>{s.license}</span>
+                    {s.version !== "—" && <span style={{ fontSize: 11, color: "var(--fg-3)" }}>v{s.version}</span>}
+                    {s.license !== "—" && s.license !== "Custom" && <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{s.license}</span>}
                   </div>
                   <div className="lib-card-desc">{s.description}</div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-                    {s.tags.map((t) => (
-                      <span key={t} className="crumb-tag" style={{ fontSize: 10.5 }}>{t}</span>
-                    ))}
-                  </div>
+                  {s.tags.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                      {s.tags.map((t) => (
+                        <span key={t} className="crumb-tag" style={{ fontSize: 10.5 }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end", flexShrink: 0 }}>
-                  <span style={{ fontSize: 11.5, color: "var(--fg-3)" }}>
-                    <b style={{ color: "var(--fg-2)" }}>{s.runs}</b> runs · {s.lastUsed}
-                  </span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="pill-btn"><Icon name="eye" size="sm" /> View</button>
-                    <button className="pill-btn"><Icon name="settings" size="sm" /></button>
-                  </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  {s.runs > 0 && (
+                    <span style={{ fontSize: 11.5, color: "var(--fg-3)" }}>
+                      <b style={{ color: "var(--fg-2)" }}>{s.runs}</b> runs
+                    </span>
+                  )}
+                  {s.scope === "project" && !DEMO && (
+                    <button
+                      className="pill-btn"
+                      style={{ fontSize: 11 }}
+                      disabled={promoting === s.id}
+                      title="Promote to global library"
+                      onClick={() => void handlePromoteSkill(s.id)}
+                    >
+                      <Icon name="upload" size="sm" /> {promoting === s.id ? "…" : "Promote"}
+                    </button>
+                  )}
+                  {s.scope === "global" && <button className="pill-btn"><Icon name="eye" size="sm" /> View</button>}
                 </div>
               </div>
             </div>
