@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../../components/Icon";
 import * as api from "../../lib/api";
 import type { Document, Project, ProjectMember, Repository, User } from "../../types";
@@ -736,8 +737,8 @@ export default function WorkspaceProjects() {
         </>
       )}
 
-      {/* Context menu */}
-      {menu && (
+      {/* Context menu — portal to body avoids overflow-x:hidden clipping on .main-scroll */}
+      {menu && createPortal(
         <div
           ref={menuRef}
           className="card"
@@ -771,7 +772,8 @@ export default function WorkspaceProjects() {
               {item.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Create modal */}
