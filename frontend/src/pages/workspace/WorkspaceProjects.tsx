@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
 import * as api from "../../lib/api";
-import type { Project, ProjectMember, Repository } from "../../types";
+import type { Document, Project, ProjectMember, Repository, User } from "../../types";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const PROJECT_COLORS = [
   "#0a84ff", "#bf5af2", "#30d158", "#ff9f0a", "#ff375f", "#5e5ce6",
@@ -22,20 +24,44 @@ const STATUS_COLOR: Record<Project["status"], { bg: string; fg: string }> = {
   closed: { bg: "rgba(120,120,128,0.18)", fg: "#8e8e93" },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function dateStr(d: string) {
   return new Date(d).toLocaleDateString(undefined, {
     month: "short", day: "numeric", year: "numeric",
   });
 }
 
+function relativeTime(d: string) {
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return dateStr(d);
+}
+
 function projectColor(idx: number) {
   return PROJECT_COLORS[idx % PROJECT_COLORS.length];
 }
 
-interface ProjectRowData {
+function ownerFromMembers(members: ProjectMember[]): string {
+  const owner = members.find((m) => m.role === "owner");
+  if (!owner) return "—";
+  return owner.user.display_name || owner.user.email;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ProjectCardData {
   project: Project;
   repos: Repository[];
   members: ProjectMember[];
+  documents: Document[];
+  messageCount: number;
   colorIdx: number;
 }
 
@@ -45,58 +71,448 @@ interface MenuState {
   y: number;
 }
 
+// ─── Stat Pill ────────────────────────────────────────────────────────────────
+
+function StatPill({ icon, value, label }: { icon: string; value: number | string; label: string }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 4,
+      padding: "3px 8px", borderRadius: 8,
+      background: "var(--glass-weak)",
+      border: "0.5px solid var(--hairline)",
+    }}>
+      <span style={{ fontSize: 11 }}>{icon}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>{value}</span>
+      <span style={{ fontSize: 10.5, color: "var(--fg-3)" }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── Project Card ─────────────────────────────────────────────────────────────
+
+function ProjectCard({
+  data,
+  onMenuOpen,
+  onClick,
+}: {
+  data: ProjectCardData;
+  onMenuOpen: (e: React.MouseEvent, id: string) => void;
+  onClick: (id: string) => void;
+}) {
+  const { project: p, repos, members, documents, messageCount, colorIdx } = data;
+  const color = projectColor(colorIdx);
+  const sc = STATUS_COLOR[p.status];
+  const owner = ownerFromMembers(members);
+  const lastActivity = p.updated_at || p.created_at;
+  const ownerInitial = owner !== "—" ? owner.charAt(0).toUpperCase() : "?";
+
+  return (
+    <div
+      className="card project-card"
+      onClick={() => onClick(p.id)}
+      style={{
+        padding: 0,
+        overflow: "hidden",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        transition: "transform 0.15s, box-shadow 0.15s",
+      }}
+    >
+      {/* Colored accent bar */}
+      <div style={{ height: 3, background: color, flexShrink: 0 }} />
+
+      <div style={{ padding: "16px 16px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+
+        {/* Header: avatar, name, status, menu */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, background: color, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 700, color: "#fff", fontSize: 15,
+          }}>
+            {p.name.charAt(0).toUpperCase()}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontWeight: 600, fontSize: 14,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              marginBottom: 4, color: "var(--fg)",
+            }}>
+              {p.name}
+            </div>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "2px 8px", borderRadius: 20,
+              background: sc.bg, color: sc.fg,
+              fontSize: 10.5, fontWeight: 600,
+            }}>
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: sc.fg }} />
+              {STATUS_LABEL[p.status]}
+            </span>
+          </div>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); onMenuOpen(e, p.id); }}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--fg-3)", padding: "2px 6px", borderRadius: 6,
+              fontSize: 16, lineHeight: 1, flexShrink: 0,
+            }}
+            title="More actions"
+          >
+            ⋯
+          </button>
+        </div>
+
+        {/* Owner */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{
+            width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+            background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 700, color: "#fff", fontSize: 9,
+          }}>
+            {ownerInitial}
+          </div>
+          <span style={{
+            fontSize: 12, color: "var(--fg-2)",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {owner}
+          </span>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          <StatPill icon="⎇" value={repos.length} label="repos" />
+          <StatPill icon="📄" value={documents.length} label="docs" />
+          <StatPill icon="👥" value={members.length} label="members" />
+          <StatPill icon="💬" value={messageCount} label="msgs" />
+        </div>
+
+        {/* Dates */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          paddingTop: 8, borderTop: "0.5px solid var(--hairline)",
+          marginTop: "auto",
+        }}>
+          <div style={{ fontSize: 11, color: "var(--fg-4)" }}>
+            <span style={{ color: "var(--fg-3)" }}>Activity</span>
+            {" "}{relativeTime(lastActivity)}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--fg-4)" }}>
+            <span style={{ color: "var(--fg-3)" }}>Created</span>
+            {" "}{dateStr(p.created_at)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Owner Selector ───────────────────────────────────────────────────────────
+
+function OwnerSelector({
+  users,
+  value,
+  onChange,
+  inputStyle,
+}: {
+  users: User[];
+  value: string;
+  onChange: (id: string) => void;
+  inputStyle: React.CSSProperties;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const selectedUser = users.find((u) => u.id === value);
+
+  const filtered = q
+    ? users.filter((u) =>
+        (u.display_name || u.email).toLowerCase().includes(q.toLowerCase()) ||
+        u.email.toLowerCase().includes(q.toLowerCase())
+      )
+    : users;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQ("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          ...inputStyle,
+          textAlign: "left", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
+        }}
+      >
+        {selectedUser ? (
+          <>
+            <div style={{
+              width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, color: "#fff", fontSize: 9,
+            }}>
+              {(selectedUser.display_name || selectedUser.email).charAt(0).toUpperCase()}
+            </div>
+            <span style={{ flex: 1, fontSize: 13, color: "var(--fg)" }}>
+              {selectedUser.display_name || selectedUser.email}
+            </span>
+          </>
+        ) : (
+          <span style={{ color: "var(--fg-3)", fontSize: 13 }}>Select owner…</span>
+        )}
+        <span style={{ color: "var(--fg-3)", fontSize: 10, marginLeft: "auto" }}>▾</span>
+      </button>
+
+      {open && (
+        <div
+          className="card"
+          style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+            zIndex: 200, maxHeight: 220, overflow: "hidden",
+            display: "flex", flexDirection: "column",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <div style={{ padding: "8px 8px 4px" }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search users…"
+              autoFocus
+              style={{ ...inputStyle, padding: "6px 10px", fontSize: 12 }}
+            />
+          </div>
+          <div style={{ overflowY: "auto", padding: "4px 0 8px" }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: "8px 16px", fontSize: 12, color: "var(--fg-3)" }}>No users found</div>
+            )}
+            {filtered.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => { onChange(u.id); setOpen(false); setQ(""); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "7px 14px",
+                  background: u.id === value ? "var(--hover)" : "none",
+                  border: "none", cursor: "pointer", textAlign: "left",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--hover)"; }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    u.id === value ? "var(--hover)" : "none";
+                }}
+              >
+                <div style={{
+                  width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                  background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 700, color: "#fff", fontSize: 9,
+                }}>
+                  {(u.display_name || u.email).charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {u.display_name || u.email}
+                  </div>
+                  {u.display_name && (
+                    <div style={{ fontSize: 11, color: "var(--fg-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {u.email}
+                    </div>
+                  )}
+                </div>
+                {u.id === value && <span style={{ fontSize: 11, color: "#30d158" }}>✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Project Form Modal ───────────────────────────────────────────────────────
+
+interface ProjectFormProps {
+  mode: "create" | "edit";
+  initialName?: string;
+  initialDesc?: string;
+  initialOwnerId?: string;
+  users: User[];
+  saving: boolean;
+  onSave: (name: string, desc: string, ownerId: string) => void;
+  onClose: () => void;
+}
+
+function ProjectFormModal({
+  mode,
+  initialName = "",
+  initialDesc = "",
+  initialOwnerId = "",
+  users,
+  saving,
+  onSave,
+  onClose,
+}: ProjectFormProps) {
+  const [name, setName] = useState(initialName);
+  const [desc, setDesc] = useState(initialDesc);
+  const [ownerId, setOwnerId] = useState(initialOwnerId);
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", boxSizing: "border-box" as const, padding: "8px 12px", borderRadius: 8,
+    border: "0.5px solid var(--hairline)", background: "var(--glass-weak)",
+    color: "var(--fg)", fontSize: 13, outline: "none",
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{ width: 440, padding: 24, boxShadow: "var(--shadow-sm)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 4px" }}>
+          {mode === "create" ? "New Project" : "Edit Project"}
+        </h2>
+        <p style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 20 }}>
+          {mode === "create" ? "Start a new AI-assisted planning session" : "Update project details"}
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>
+              Project name *
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. E-commerce API refactor"
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && name.trim() && !saving && onSave(name.trim(), desc.trim(), ownerId)}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>
+              Description
+            </label>
+            <textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="What are you building? Any relevant context…"
+              rows={3}
+              style={{ ...inputStyle, resize: "none" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>
+              Owner
+            </label>
+            <OwnerSelector
+              users={users}
+              value={ownerId}
+              onChange={setOwnerId}
+              inputStyle={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 22 }}>
+          <button className="pill-btn" onClick={onClose} disabled={saving}>Cancel</button>
+          <button
+            className="pill-btn"
+            data-primary="true"
+            style={{ opacity: (!name.trim() || saving) ? 0.5 : 1 }}
+            onClick={() => onSave(name.trim(), desc.trim(), ownerId)}
+            disabled={!name.trim() || saving}
+          >
+            {saving
+              ? (mode === "create" ? "Creating…" : "Saving…")
+              : (mode === "create" ? "Create & Start" : "Save Changes")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function WorkspaceProjects() {
-  const [rows, setRows] = useState<ProjectRowData[]>([]);
+  const [cards, setCards] = useState<ProjectCardData[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drawerMembers, setDrawerMembers] = useState<ProjectMember[]>([]);
-  const [drawerMembersLoading, setDrawerMembersLoading] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
 
-  const lastClick = useRef<{ id: string; time: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  // Load projects + repos + members
+  useEffect(() => {
+    api.listUsers().catch(() => [] as User[]).then(setUsers);
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     api.getProjects({ q: debouncedSearch || undefined })
       .then(async ({ items, total: t }) => {
         setTotal(t);
-        const rowData = await Promise.all(
+        const cardData = await Promise.all(
           items.map(async (p, idx) => {
-            const [repos, members] = await Promise.all([
+            const [repos, members, documents, convHistory] = await Promise.all([
               api.getRepositories(p.id).catch(() => [] as Repository[]),
               api.listProjectMembers(p.id).catch(() => [] as ProjectMember[]),
+              api.listDocuments(p.id).catch(() => [] as Document[]),
+              api.getConversationHistory(p.id, { limit: 1 }).catch(() => ({ messages: [], total: 0 })),
             ]);
-            return { project: p, repos, members, colorIdx: idx };
+            return { project: p, repos, members, documents, messageCount: convHistory.total, colorIdx: idx };
           })
         );
-        setRows(rowData);
+        setCards(cardData);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [debouncedSearch]);
 
-  // Close menu on outside click
   useEffect(() => {
     if (!menu) return;
     const handler = (e: MouseEvent) => {
@@ -108,36 +524,17 @@ export default function WorkspaceProjects() {
     return () => document.removeEventListener("mousedown", handler);
   }, [menu]);
 
-  const filteredRows = statusFilter === "all"
-    ? rows
-    : rows.filter((r) => r.project.status === statusFilter);
+  const filteredCards = statusFilter === "all"
+    ? cards
+    : cards.filter((c) => c.project.status === statusFilter);
 
-  const selectedRow = rows.find((r) => r.project.id === selectedId) ?? null;
-
-  function openDrawer(id: string) {
-    setSelectedId(id);
-    setDrawerMembers([]);
-    setDrawerMembersLoading(true);
-    api.listProjectMembers(id)
-      .then(setDrawerMembers)
-      .catch(console.error)
-      .finally(() => setDrawerMembersLoading(false));
-  }
-
-  function handleRowClick(id: string) {
-    const now = Date.now();
-    if (lastClick.current?.id === id && now - lastClick.current.time < 400) {
-      window.location.href = `/projects/${id}`;
-    } else {
-      lastClick.current = { id, time: now };
-      openDrawer(id);
-    }
-  }
+  const editingCard = editingId ? cards.find((c) => c.project.id === editingId) ?? null : null;
 
   function openContextMenu(e: React.MouseEvent, projectId: string) {
     e.preventDefault();
     e.stopPropagation();
-    setMenu({ projectId, x: e.clientX, y: e.clientY });
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenu({ projectId, x: rect.right - 160, y: rect.bottom + 4 });
   }
 
   async function handleArchive(id: string) {
@@ -145,14 +542,7 @@ export default function WorkspaceProjects() {
     setMenu(null);
     try {
       const updated = await api.updateProject(id, { status: "archived" });
-      setRows((prev) => prev.map((r) => r.project.id === id
-        ? { ...r, project: updated }
-        : r
-      ));
-      if (selectedId === id && selectedRow) {
-        // refresh drawer
-        openDrawer(id);
-      }
+      setCards((prev) => prev.map((c) => c.project.id === id ? { ...c, project: updated } : c));
     } catch (err) {
       console.error(err);
     } finally {
@@ -164,10 +554,9 @@ export default function WorkspaceProjects() {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
     setDeleting(id);
     setMenu(null);
-    if (selectedId === id) setSelectedId(null);
     try {
       await api.deleteProject(id);
-      setRows((prev) => prev.filter((r) => r.project.id !== id));
+      setCards((prev) => prev.filter((c) => c.project.id !== id));
       setTotal((t) => t - 1);
     } catch (err) {
       console.error(err);
@@ -176,11 +565,14 @@ export default function WorkspaceProjects() {
     }
   }
 
-  async function handleCreate() {
-    if (!newName.trim() || creating) return;
+  async function handleCreate(name: string, desc: string, ownerId: string) {
+    if (!name.trim() || creating) return;
     setCreating(true);
     try {
-      const p = await api.createProject({ name: newName.trim(), description: newDesc.trim() });
+      const p = await api.createProject({ name: name.trim(), description: desc.trim() });
+      if (ownerId) {
+        await api.addProjectMember(p.id, { user_id: ownerId, role: "owner" }).catch(console.error);
+      }
       window.location.href = `/projects/${p.id}`;
     } catch (err) {
       console.error(err);
@@ -189,17 +581,31 @@ export default function WorkspaceProjects() {
     }
   }
 
-  function closeCreate() {
-    setShowCreate(false);
-    setNewName("");
-    setNewDesc("");
+  async function handleEdit(name: string, desc: string, ownerId: string) {
+    if (!editingId || !name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const updated = await api.updateProject(editingId, { name: name.trim(), description: desc.trim() });
+      if (ownerId) {
+        const card = cards.find((c) => c.project.id === editingId);
+        const currentOwner = card?.members.find((m) => m.role === "owner");
+        if (!currentOwner || currentOwner.user_id !== ownerId) {
+          await api.addProjectMember(editingId, { user_id: ownerId, role: "owner" }).catch(console.error);
+          const members = await api.listProjectMembers(editingId).catch(() => card?.members ?? []);
+          setCards((prev) => prev.map((c) => c.project.id === editingId ? { ...c, project: updated, members } : c));
+        } else {
+          setCards((prev) => prev.map((c) => c.project.id === editingId ? { ...c, project: updated } : c));
+        }
+      } else {
+        setCards((prev) => prev.map((c) => c.project.id === editingId ? { ...c, project: updated } : c));
+      }
+      setEditingId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   }
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%", boxSizing: "border-box", padding: "8px 12px", borderRadius: 8,
-    border: "0.5px solid var(--hairline)", background: "var(--glass-weak)",
-    color: "var(--fg)", fontSize: 13, outline: "none",
-  };
 
   const statusChips: { label: string; value: StatusFilter }[] = [
     { label: "All", value: "all" },
@@ -213,11 +619,7 @@ export default function WorkspaceProjects() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
         <h1 className="h-page" style={{ margin: 0, flex: 1 }}>Projects</h1>
-        <button
-          className="pill-btn"
-          data-primary="true"
-          onClick={() => setShowCreate(true)}
-        >
+        <button className="pill-btn" data-primary="true" onClick={() => setShowCreate(true)}>
           <Icon name="plus" size="sm" /> New Project
         </button>
       </div>
@@ -226,7 +628,7 @@ export default function WorkspaceProjects() {
       </p>
 
       {/* Filter bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <div className="card" style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 180 }}>
           <Icon name="search" size="sm" style={{ color: "var(--fg-3)" }} />
           <input
@@ -258,126 +660,56 @@ export default function WorkspaceProjects() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card" style={{ padding: 0, overflow: "hidden", marginRight: selectedId ? 500 : 0, transition: "margin-right 0.25s" }}>
-        {/* Table header */}
+      {/* Loading */}
+      {loading && (
+        <div style={{ textAlign: "center", padding: 60, color: "var(--fg-3)" }}>Loading…</div>
+      )}
+
+      {/* Empty state */}
+      {!loading && filteredCards.length === 0 && (
+        <div style={{ textAlign: "center", padding: 60, color: "var(--fg-3)" }}>
+          {debouncedSearch
+            ? `No projects match "${debouncedSearch}"`
+            : statusFilter !== "all"
+              ? `No ${statusFilter} projects`
+              : (
+                <div>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🚀</div>
+                  <p style={{ fontWeight: 600, fontSize: 15, color: "var(--fg)", marginBottom: 4 }}>No projects yet</p>
+                  <p style={{ fontSize: 13, marginBottom: 16 }}>Create your first project to get started.</p>
+                  <button className="pill-btn" data-primary="true" onClick={() => setShowCreate(true)}>
+                    Create First Project
+                  </button>
+                </div>
+              )
+          }
+        </div>
+      )}
+
+      {/* Card grid */}
+      {!loading && filteredCards.length > 0 && (
         <div style={{
           display: "grid",
-          gridTemplateColumns: "1fr 110px 80px 80px 120px 44px",
-          padding: "10px 16px",
-          borderBottom: "0.5px solid var(--hairline)",
-          fontSize: 11.5, fontWeight: 600, color: "var(--fg-3)",
-          textTransform: "uppercase", letterSpacing: "0.04em",
+          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+          gap: 16,
         }}>
-          <span>Name</span>
-          <span>Status</span>
-          <span style={{ textAlign: "center" }}>Repos</span>
-          <span style={{ textAlign: "center" }}>Members</span>
-          <span>Created</span>
-          <span></span>
-        </div>
-
-        {loading && (
-          <div style={{ textAlign: "center", padding: 40, color: "var(--fg-3)" }}>Loading…</div>
-        )}
-
-        {!loading && filteredRows.length === 0 && (
-          <div style={{ textAlign: "center", padding: 60, color: "var(--fg-3)" }}>
-            {debouncedSearch
-              ? `No projects match "${debouncedSearch}"`
-              : statusFilter !== "all"
-                ? `No ${statusFilter} projects`
-                : (
-                  <div>
-                    <div style={{ fontSize: 32, marginBottom: 12 }}>🚀</div>
-                    <p style={{ fontWeight: 600, fontSize: 15, color: "var(--fg)", marginBottom: 4 }}>No projects yet</p>
-                    <p style={{ fontSize: 13, marginBottom: 16 }}>Create your first project to get started.</p>
-                    <button className="pill-btn" data-primary="true" onClick={() => setShowCreate(true)}>
-                      Create First Project
-                    </button>
-                  </div>
-                )
-            }
-          </div>
-        )}
-
-        {!loading && filteredRows.map((r, idx) => {
-          const { project: p, repos, members } = r;
-          const color = projectColor(r.colorIdx);
-          const sc = STATUS_COLOR[p.status];
-          const isSelected = selectedId === p.id;
-          const isDeleting = deleting === p.id;
-          const isArchiving = archiving === p.id;
-
-          return (
+          {filteredCards.map((c) => (
             <div
-              key={p.id}
-              onClick={() => handleRowClick(p.id)}
-              onDoubleClick={() => { window.location.href = `/projects/${p.id}`; }}
+              key={c.project.id}
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 110px 80px 80px 120px 44px",
-                padding: "12px 16px",
-                alignItems: "center",
-                borderTop: idx > 0 ? "0.5px solid var(--hairline)" : undefined,
-                background: isSelected ? "var(--hover)" : "transparent",
-                cursor: "pointer",
-                transition: "background 0.12s",
-                opacity: isDeleting || isArchiving ? 0.5 : 1,
+                opacity: (deleting === c.project.id || archiving === c.project.id) ? 0.4 : 1,
+                transition: "opacity 0.15s",
               }}
-              onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = "var(--hover)"; }}
-              onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
             >
-              {/* Name + dot */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8, background: color, flexShrink: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, color: "#fff", fontSize: 12,
-                }}>
-                  {p.name.charAt(0).toUpperCase()}
-                </div>
-                <span style={{ fontWeight: 500, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {p.name}
-                </span>
-              </div>
-
-              {/* Status */}
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 5,
-                padding: "3px 9px", borderRadius: 20,
-                background: sc.bg, color: sc.fg,
-                fontSize: 11.5, fontWeight: 600,
-              }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: sc.fg, flexShrink: 0 }} />
-                {STATUS_LABEL[p.status]}
-              </span>
-
-              {/* Repos */}
-              <span style={{ textAlign: "center", fontSize: 13, color: "var(--fg-2)" }}>{repos.length}</span>
-
-              {/* Members */}
-              <span style={{ textAlign: "center", fontSize: 13, color: "var(--fg-2)" }}>{members.length}</span>
-
-              {/* Created */}
-              <span style={{ fontSize: 12, color: "var(--fg-3)" }}>{dateStr(p.created_at)}</span>
-
-              {/* Actions */}
-              <button
-                onClick={(e) => openContextMenu(e, p.id)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "var(--fg-3)", padding: "4px 8px", borderRadius: 6,
-                  fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-                title="More actions"
-              >
-                ⋯
-              </button>
+              <ProjectCard
+                data={c}
+                onMenuOpen={openContextMenu}
+                onClick={(id) => { window.location.href = `/projects/${id}`; }}
+              />
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Context menu */}
       {menu && (
@@ -390,275 +722,60 @@ export default function WorkspaceProjects() {
           }}
         >
           {[
-            {
-              label: "Open project",
-              onClick: () => { window.location.href = `/projects/${menu.projectId}`; },
-            },
-            {
-              label: "Archive",
-              onClick: () => void handleArchive(menu.projectId),
-            },
-            {
-              label: "Delete",
-              onClick: () => void handleDelete(menu.projectId),
-              danger: true,
-            },
+            { label: "Open project", icon: "↗", danger: false, onClick: () => { window.location.href = `/projects/${menu.projectId}`; setMenu(null); } },
+            { label: "Edit", icon: "✎", danger: false, onClick: () => { setEditingId(menu.projectId); setMenu(null); } },
+            { label: "Archive", icon: "⬓", danger: false, onClick: () => void handleArchive(menu.projectId) },
+            { label: "Delete", icon: "✕", danger: true, onClick: () => void handleDelete(menu.projectId) },
           ].map((item) => (
             <button
               key={item.label}
-              onClick={() => { item.onClick(); setMenu(null); }}
+              onClick={item.onClick}
               style={{
-                display: "block", width: "100%", textAlign: "left",
-                padding: "8px 16px", background: "none", border: "none",
+                display: "flex", alignItems: "center", gap: 10,
+                width: "100%", textAlign: "left",
+                padding: "8px 14px", background: "none", border: "none",
                 fontSize: 13, cursor: "pointer",
                 color: item.danger ? "#ff375f" : "var(--fg)",
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--hover)"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
             >
+              <span style={{ fontSize: 13, width: 16, flexShrink: 0, opacity: 0.6 }}>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Slide-over drawer */}
-      {selectedId && selectedRow && (
-        <>
-          {/* Backdrop */}
-          <div
-            onClick={() => setSelectedId(null)}
-            style={{ position: "fixed", inset: 0, zIndex: 900 }}
-          />
-          <div
-            className="glass"
-            style={{
-              position: "fixed", top: 0, right: 0, bottom: 0,
-              width: 480, zIndex: 1000,
-              background: "var(--glass-strong)", backdropFilter: "blur(20px) saturate(1.6)",
-              borderLeft: "0.5px solid var(--hairline)",
-              display: "flex", flexDirection: "column",
-              animation: "slideInRight 0.22s ease",
-            }}
-          >
-            {/* Drawer header */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 12, padding: "20px 20px 16px",
-              borderBottom: "0.5px solid var(--hairline)",
-            }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                background: projectColor(selectedRow.colorIdx),
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 700, color: "#fff", fontSize: 20,
-              }}>
-                {selectedRow.project.name.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {selectedRow.project.name}
-                </div>
-                {(() => {
-                  const sc = STATUS_COLOR[selectedRow.project.status];
-                  return (
-                    <span style={{
-                      display: "inline-flex", alignItems: "center", gap: 4,
-                      padding: "2px 8px", borderRadius: 20,
-                      background: sc.bg, color: sc.fg,
-                      fontSize: 11, fontWeight: 600, marginTop: 3,
-                    }}>
-                      <span style={{ width: 4, height: 4, borderRadius: "50%", background: sc.fg }} />
-                      {STATUS_LABEL[selectedRow.project.status]}
-                    </span>
-                  );
-                })()}
-              </div>
-              <button
-                onClick={() => setSelectedId(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-3)", fontSize: 18, padding: 4, borderRadius: 6 }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Drawer body */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-              {/* Description */}
-              {selectedRow.project.description ? (
-                <p style={{ fontSize: 13, color: "var(--fg-2)", lineHeight: 1.6, marginBottom: 20 }}>
-                  {selectedRow.project.description}
-                </p>
-              ) : (
-                <p style={{ fontSize: 13, color: "var(--fg-4)", fontStyle: "italic", marginBottom: 20 }}>No description.</p>
-              )}
-
-              {/* Meta */}
-              <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-                {[
-                  { label: "Repos", value: selectedRow.repos.length },
-                  { label: "Members", value: selectedRow.members.length },
-                  { label: "Created", value: dateStr(selectedRow.project.created_at) },
-                ].map((m) => (
-                  <div key={m.label} className="card" style={{ padding: "10px 16px", flex: 1, minWidth: 80, textAlign: "center" }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "var(--fg)" }}>{m.value}</div>
-                    <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 2 }}>{m.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Status control */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--fg-3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Change Status</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {(["active", "archived", "closed"] as Project["status"][]).map((s) => {
-                    const sc = STATUS_COLOR[s];
-                    const active = selectedRow.project.status === s;
-                    return (
-                      <button
-                        key={s}
-                        className="pill-btn"
-                        onClick={() => void (async () => {
-                          try {
-                            const updated = await api.updateProject(selectedRow.project.id, { status: s });
-                            setRows((prev) => prev.map((r) => r.project.id === updated.id ? { ...r, project: updated } : r));
-                          } catch (e) { console.error(e); }
-                        })()}
-                        style={{
-                          background: active ? sc.bg : "var(--glass-weak)",
-                          color: active ? sc.fg : "var(--fg-2)",
-                          borderColor: active ? sc.fg + "44" : "var(--hairline)",
-                          fontWeight: active ? 700 : 400,
-                        }}
-                      >
-                        {STATUS_LABEL[s]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Members section */}
-              <div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--fg-3)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Members
-                </div>
-                {drawerMembersLoading ? (
-                  <div style={{ fontSize: 12, color: "var(--fg-3)" }}>Loading members…</div>
-                ) : drawerMembers.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--fg-4)" }}>No members yet.</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {drawerMembers.map((m) => (
-                      <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{
-                          width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                          background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontWeight: 600, color: "#fff", fontSize: 11,
-                        }}>
-                          {(m.user.display_name || m.user.email).charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {m.user.display_name || m.user.email}
-                          </div>
-                          <div style={{ fontSize: 11, color: "var(--fg-3)" }}>{m.user.email}</div>
-                        </div>
-                        <span style={{ fontSize: 11, color: "var(--fg-3)", textTransform: "capitalize", background: "var(--glass-weak)", padding: "2px 8px", borderRadius: 20 }}>
-                          {m.role}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Drawer footer */}
-            <div style={{ padding: "16px 20px", borderTop: "0.5px solid var(--hairline)", display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                className="pill-btn"
-                data-primary="true"
-                style={{ flex: 1 }}
-                onClick={() => { window.location.href = `/projects/${selectedRow.project.id}`; }}
-              >
-                <Icon name="arrow" size="sm" /> Open Project
-              </button>
-              <button
-                className="pill-btn"
-                onClick={() => void handleArchive(selectedRow.project.id)}
-                disabled={archiving === selectedRow.project.id}
-              >
-                Archive
-              </button>
-              <button
-                className="pill-btn danger"
-                onClick={() => void handleDelete(selectedRow.project.id)}
-                disabled={deleting === selectedRow.project.id}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </>
+      {/* Create modal */}
+      {showCreate && (
+        <ProjectFormModal
+          mode="create"
+          users={users}
+          saving={creating}
+          onSave={(name, desc, ownerId) => void handleCreate(name, desc, ownerId)}
+          onClose={() => setShowCreate(false)}
+        />
       )}
 
-      {/* New Project modal */}
-      {showCreate && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={closeCreate}
-        >
-          <div
-            className="card"
-            style={{ width: 420, padding: 24, boxShadow: "var(--shadow-sm)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, margin: "0 0 4px" }}>New Project</h2>
-            <p style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 20 }}>Start a new AI-assisted planning session</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Project name *</label>
-                <input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g. E-commerce API refactor"
-                  autoFocus
-                  onKeyDown={(e) => e.key === "Enter" && void handleCreate()}
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: "var(--fg-2)", display: "block", marginBottom: 4 }}>Description</label>
-                <textarea
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  placeholder="What are you building? Any relevant context…"
-                  rows={3}
-                  style={{ ...inputStyle, resize: "none" }}
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-              <button className="pill-btn" onClick={closeCreate} disabled={creating}>Cancel</button>
-              <button
-                className="pill-btn"
-                data-primary="true"
-                style={{ opacity: (!newName.trim() || creating) ? 0.5 : 1 }}
-                onClick={() => void handleCreate()}
-                disabled={!newName.trim() || creating}
-              >
-                {creating ? "Creating…" : "Create & Start"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Edit modal */}
+      {editingId && editingCard && (
+        <ProjectFormModal
+          mode="edit"
+          initialName={editingCard.project.name}
+          initialDesc={editingCard.project.description}
+          initialOwnerId={editingCard.members.find((m) => m.role === "owner")?.user_id ?? ""}
+          users={users}
+          saving={saving}
+          onSave={(name, desc, ownerId) => void handleEdit(name, desc, ownerId)}
+          onClose={() => setEditingId(null)}
+        />
       )}
 
       <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
+        .project-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.15);
         }
       `}</style>
     </div>
