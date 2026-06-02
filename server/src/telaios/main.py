@@ -24,6 +24,11 @@ from telaios.config.settings import get_settings
 from telaios.db.session import dispose_engine
 from telaios.infra.redis import close_redis
 from telaios.infra.s3 import ensure_bucket_exists
+from telaios.modules.agent_overrides.router import (
+    agent_base_profiles_router,
+    project_agent_overrides_router,
+    workspace_agent_overrides_router,
+)
 from telaios.modules.agent_profiles import agent_profiles_router
 from telaios.modules.analytics import analytics_router
 from telaios.modules.chat import chat_router
@@ -89,6 +94,11 @@ _MODULES: dict[str, list[APIRouter]] = {
     "environments": [environments_router],
     "settings": [settings_router, llm_router],
     "library": [library_router],
+    "agent_overrides": [
+        agent_base_profiles_router,
+        workspace_agent_overrides_router,
+        project_agent_overrides_router,
+    ],
     "agent_profiles": [agent_profiles_router],
     "plans": [project_plans_router, plan_router],
     "tasks": [plan_tasks_router, project_tasks_router, task_router],
