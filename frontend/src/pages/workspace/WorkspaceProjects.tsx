@@ -411,6 +411,56 @@ function OwnerSelector({
   );
 }
 
+// ─── Confirm Modal ────────────────────────────────────────────────────────────
+
+interface ConfirmState {
+  type: "archive" | "unarchive" | "delete";
+  projectId: string;
+  projectName: string;
+}
+
+function ConfirmModal({ state, onConfirm, onClose, busy }: {
+  state: ConfirmState;
+  onConfirm: () => void;
+  onClose: () => void;
+  busy: boolean;
+}) {
+  const cfg = {
+    archive:   { title: "Archive project",   icon: "fa-box-archive", color: "#ff9f0a", bg: "rgba(255,159,10,0.15)", danger: false, label: "Archive",   msg: `Archive "${state.projectName}"? It will be hidden from active view but can be restored.` },
+    unarchive: { title: "Unarchive project", icon: "fa-box-open",    color: "#30d158", bg: "rgba(48,209,88,0.15)",  danger: false, label: "Unarchive", msg: `Restore "${state.projectName}" to active status?` },
+    delete:    { title: "Delete project",    icon: "fa-trash",       color: "#ff375f", bg: "rgba(255,55,95,0.15)",  danger: true,  label: "Delete",    msg: `Permanently delete "${state.projectName}"? This cannot be undone.` },
+  }[state.type];
+
+  return createPortal(
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)" }}
+      onClick={onClose}
+    >
+      <div className="card" style={{ width: 400, padding: 24, boxShadow: "var(--shadow-lg)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: cfg.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Fa icon={cfg.icon} style={{ fontSize: 16, color: cfg.color }} />
+          </div>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--fg)" }}>{cfg.title}</h3>
+        </div>
+        <p style={{ fontSize: 13.5, color: "var(--fg-2)", margin: "0 0 20px", lineHeight: 1.55 }}>{cfg.msg}</p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button className="pill-btn" onClick={onClose} disabled={busy}>Cancel</button>
+          <button
+            className="pill-btn"
+            style={{ background: cfg.danger ? "#ff375f" : "var(--accent-1)", color: "#fff", borderColor: "transparent", opacity: busy ? 0.5 : 1 }}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy ? `${cfg.label}ing…` : cfg.label}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ─── Project Form Modal ───────────────────────────────────────────────────────
 
 interface ProjectFormProps {
@@ -512,6 +562,7 @@ export default function WorkspaceProjects() {
   const [saving, setSaving] = useState(false);
 
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
 
@@ -575,26 +626,43 @@ export default function WorkspaceProjects() {
     setMenu({ projectId, x, y: e.clientY });
   }
 
-  async function handleArchive(id: string) {
-    setArchiving(id);
+  function requestArchive(id: string, name: string) {
     setMenu(null);
-    try {
-      const updated = await api.updateProject(id, { status: "archived" });
-      setCards((prev) => prev.map((c) => c.project.id === id ? { ...c, project: updated } : c));
-    } catch (err) { console.error(err); }
-    finally { setArchiving(null); }
+    setConfirm({ type: "archive", projectId: id, projectName: name });
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Delete this project? This cannot be undone.")) return;
-    setDeleting(id);
+  function requestUnarchive(id: string, name: string) {
     setMenu(null);
-    try {
-      await api.deleteProject(id);
-      setCards((prev) => prev.filter((c) => c.project.id !== id));
-      setTotal((t) => t - 1);
-    } catch (err) { console.error(err); }
-    finally { setDeleting(null); }
+    setConfirm({ type: "unarchive", projectId: id, projectName: name });
+  }
+
+  function requestDelete(id: string, name: string) {
+    setMenu(null);
+    setConfirm({ type: "delete", projectId: id, projectName: name });
+  }
+
+  async function doConfirm() {
+    if (!confirm) return;
+    const { type, projectId } = confirm;
+    if (type === "archive" || type === "unarchive") {
+      setArchiving(projectId);
+      setConfirm(null);
+      try {
+        const status = type === "archive" ? "archived" : "active";
+        const updated = await api.updateProject(projectId, { status });
+        setCards((prev) => prev.map((c) => c.project.id === projectId ? { ...c, project: updated } : c));
+      } catch (err) { console.error(err); }
+      finally { setArchiving(null); }
+    } else {
+      setDeleting(projectId);
+      setConfirm(null);
+      try {
+        await api.deleteProject(projectId);
+        setCards((prev) => prev.filter((c) => c.project.id !== projectId));
+        setTotal((t) => t - 1);
+      } catch (err) { console.error(err); }
+      finally { setDeleting(null); }
+    }
   }
 
   async function handleCreate(name: string, desc: string, ownerId: string) {
@@ -747,12 +815,19 @@ export default function WorkspaceProjects() {
             minWidth: 180, padding: "4px 0", boxShadow: "var(--shadow-sm)",
           }}
         >
-          {[
-            { label: "Open project", icon: "fa-arrow-up-right-from-square", danger: false, sep: false, onClick: () => { window.location.href = `/projects/${menu.projectId}`; setMenu(null); } },
-            { label: "Edit", icon: "fa-pen", danger: false, sep: false, onClick: () => { setEditingId(menu.projectId); setMenu(null); } },
-            { label: "Archive", icon: "fa-box-archive", danger: false, sep: false, onClick: () => void handleArchive(menu.projectId) },
-            { label: "Delete", icon: "fa-trash", danger: true, sep: true, onClick: () => void handleDelete(menu.projectId) },
-          ].map((item) => (
+          {(() => {
+            const menuProject = cards.find((c) => c.project.id === menu.projectId)?.project;
+            const isArchived = menuProject?.status === "archived";
+            const pName = menuProject?.name ?? "";
+            return [
+              { label: "Open project", icon: "fa-arrow-up-right-from-square", danger: false, sep: false, onClick: () => { window.location.href = `/projects/${menu.projectId}`; setMenu(null); } },
+              { label: "Edit", icon: "fa-pen", danger: false, sep: false, onClick: () => { setEditingId(menu.projectId); setMenu(null); } },
+              isArchived
+                ? { label: "Unarchive", icon: "fa-box-open", danger: false, sep: false, onClick: () => requestUnarchive(menu.projectId, pName) }
+                : { label: "Archive",   icon: "fa-box-archive", danger: false, sep: false, onClick: () => requestArchive(menu.projectId, pName) },
+              { label: "Delete", icon: "fa-trash", danger: true, sep: true, onClick: () => requestDelete(menu.projectId, pName) },
+            ];
+          })().map((item) => (
             <button
               key={item.label}
               onClick={item.onClick}
@@ -774,6 +849,16 @@ export default function WorkspaceProjects() {
           ))}
         </div>,
         document.body
+      )}
+
+      {/* Confirm modal */}
+      {confirm && (
+        <ConfirmModal
+          state={confirm}
+          onConfirm={() => void doConfirm()}
+          onClose={() => setConfirm(null)}
+          busy={!!(deleting || archiving)}
+        />
       )}
 
       {/* Create modal */}
