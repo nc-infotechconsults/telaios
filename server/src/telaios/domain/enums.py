@@ -287,6 +287,7 @@ class AgentRole(StrEnum):
     KNOWLEDGE = "knowledge"
     CUSTOM = "custom"
     DOCUMENT_COPILOT = "document-copilot"
+    DESIGNER = "designer"
 
 
 class AgentType(StrEnum):
