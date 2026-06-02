@@ -569,7 +569,9 @@ export default function WorkspaceProjects() {
   function openContextMenu(e: React.MouseEvent, projectId: string) {
     e.preventDefault();
     e.stopPropagation();
-    setMenu({ projectId, x: e.clientX, y: e.clientY });
+    const MENU_WIDTH = 180;
+    const x = Math.min(e.clientX, window.innerWidth - MENU_WIDTH - 8);
+    setMenu({ projectId, x, y: e.clientY });
   }
 
   async function handleArchive(id: string) {
