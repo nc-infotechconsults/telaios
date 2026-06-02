@@ -71,6 +71,7 @@ class ProjectRead(BaseModel):
     description: str | None
     status: ProjectStatus
     created_at: datetime
+    updated_at: datetime
 
 
 class ProjectCreate(BaseModel):
