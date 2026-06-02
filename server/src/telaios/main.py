@@ -26,6 +26,7 @@ from telaios.infra.redis import close_redis
 from telaios.infra.s3 import ensure_bucket_exists
 from telaios.modules.agent_overrides.router import (
     agent_base_profiles_router,
+    global_agent_profiles_router,
     project_agent_overrides_router,
     workspace_agent_overrides_router,
 )
@@ -95,6 +96,7 @@ _MODULES: dict[str, list[APIRouter]] = {
     "settings": [settings_router, llm_router],
     "library": [library_router],
     "agent_overrides": [
+        global_agent_profiles_router,
         agent_base_profiles_router,
         workspace_agent_overrides_router,
         project_agent_overrides_router,

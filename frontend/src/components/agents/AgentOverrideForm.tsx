@@ -19,6 +19,8 @@ import {
   discoverMcpTools,
   upsertWorkspaceAgentOverride,
   deleteWorkspaceAgentOverride,
+  upsertAgentOverride,
+  deleteAgentOverride,
 } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type {
@@ -35,7 +37,8 @@ import { McpToolBody } from "../McpToolBody";
 interface Props {
   base: AgentBaseProfile;
   existing?: AgentOverride;
-  workspaceId: string;
+  /** When empty, uses global (non-workspace-scoped) endpoints. */
+  workspaceId?: string;
   onSaved: () => void;
   onCancel: () => void;
 }
@@ -192,7 +195,11 @@ export default function AgentOverrideForm({
         mcp_servers: mcpServers.length > 0 ? mcpServers : null,
         skills: skills.length > 0 ? skills : null,
       };
-      await upsertWorkspaceAgentOverride(workspaceId, base.id, payload);
+      if (workspaceId) {
+        await upsertWorkspaceAgentOverride(workspaceId, base.id, payload);
+      } else {
+        await upsertAgentOverride(base.id, payload);
+      }
       toast.success("Agent customisation saved");
       onSaved();
     } catch {
@@ -205,7 +212,11 @@ export default function AgentOverrideForm({
   const handleResetAll = async () => {
     setSaving(true);
     try {
-      await deleteWorkspaceAgentOverride(workspaceId, base.id);
+      if (workspaceId) {
+        await deleteWorkspaceAgentOverride(workspaceId, base.id);
+      } else {
+        await deleteAgentOverride(base.id);
+      }
       toast.success("Agent reset to platform defaults");
       onSaved();
     } catch {

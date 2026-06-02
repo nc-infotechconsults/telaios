@@ -424,6 +424,27 @@ export const discoverMcpTools = (
 
 // ─── Agent Base Profiles & Overrides ─────────────────────────────────────────
 
+// Global (no workspace scope) — used by workspace admin view at /agents
+export const listAgentBaseProfiles = (): Promise<AgentBaseProfile[]> =>
+  DEMO
+    ? delay<AgentBaseProfile[]>([])
+    : http.get<AgentBaseProfile[]>("/agent-base-profiles").then((r) => r.data);
+
+export const listAgentOverrides = (): Promise<AgentOverride[]> =>
+  DEMO
+    ? delay<AgentOverride[]>([])
+    : http.get<AgentOverride[]>("/agent-overrides").then((r) => r.data);
+
+export const upsertAgentOverride = (
+  baseProfileId: string,
+  data: AgentOverrideUpsert
+): Promise<AgentOverride> =>
+  http.put<AgentOverride>(`/agent-overrides/${baseProfileId}`, data).then((r) => r.data);
+
+export const deleteAgentOverride = (baseProfileId: string): Promise<void> =>
+  http.delete(`/agent-overrides/${baseProfileId}`).then(() => undefined);
+
+// Workspace-scoped variants (kept for project-level pages)
 export const getAgentBaseProfiles = (workspaceId: string): Promise<AgentBaseProfile[]> =>
   DEMO
     ? delay<AgentBaseProfile[]>([])

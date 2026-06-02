@@ -2,10 +2,18 @@
 
 Endpoints:
 
-Base profiles (read-only, workspace-scoped for auth):
+Base profiles — global (no workspace scope needed for admin view):
+  GET  /agent-base-profiles
+
+Workspace-level overrides — global (project_id IS NULL):
+  GET     /agent-overrides
+  PUT     /agent-overrides/{base_profile_id}
+  DELETE  /agent-overrides/{base_profile_id}
+
+Base profiles — workspace-scoped (auth only, returns same data):
   GET  /workspaces/{workspace_id}/agent-base-profiles
 
-Workspace-level overrides (project_id IS NULL):
+Workspace-level overrides — workspace-scoped (auth only):
   GET     /workspaces/{workspace_id}/agent-overrides
   PUT     /workspaces/{workspace_id}/agent-overrides/{base_profile_id}
   DELETE  /workspaces/{workspace_id}/agent-overrides/{base_profile_id}
@@ -96,6 +104,60 @@ async def upsert_workspace_agent_override(
 )
 async def delete_workspace_agent_override(
     workspace_id: uuid.UUID,
+    base_profile_id: uuid.UUID,
+    _principal: CurrentPrincipal,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    await AgentOverrideService(session).delete_workspace_override(base_profile_id)
+
+
+# ── Global endpoints (no workspace scope — for admin view) ────────────────────
+
+global_agent_profiles_router = APIRouter(tags=["agent-overrides"])
+
+
+@global_agent_profiles_router.get(
+    "/agent-base-profiles",
+    response_model=list[AgentBaseProfileRead],
+)
+async def list_agent_base_profiles_global(
+    _principal: CurrentPrincipal,
+    session: AsyncSession = Depends(get_session),
+) -> list[AgentBaseProfileRead]:
+    return await AgentOverrideService(session).list_base_profiles()
+
+
+@global_agent_profiles_router.get(
+    "/agent-overrides",
+    response_model=list[AgentOverrideRead],
+)
+async def list_workspace_agent_overrides_global(
+    _principal: CurrentPrincipal,
+    session: AsyncSession = Depends(get_session),
+) -> list[AgentOverrideRead]:
+    return await AgentOverrideService(session).list_workspace_overrides()
+
+
+@global_agent_profiles_router.put(
+    "/agent-overrides/{base_profile_id}",
+    response_model=AgentOverrideRead,
+)
+async def upsert_workspace_agent_override_global(
+    base_profile_id: uuid.UUID,
+    body: AgentOverrideUpsert,
+    _principal: CurrentPrincipal,
+    session: AsyncSession = Depends(get_session),
+) -> AgentOverrideRead:
+    return await AgentOverrideService(session).upsert_workspace_override(
+        base_profile_id, body
+    )
+
+
+@global_agent_profiles_router.delete(
+    "/agent-overrides/{base_profile_id}",
+    status_code=204,
+)
+async def delete_workspace_agent_override_global(
     base_profile_id: uuid.UUID,
     _principal: CurrentPrincipal,
     session: AsyncSession = Depends(get_session),
