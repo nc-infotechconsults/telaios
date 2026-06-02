@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { Icon } from "../../components/Icon";
 import { TelaiOSLogo } from "../../components/common/TelaiOSLogo";
 import MeshBackground from "../../components/MeshBackground";
@@ -48,8 +49,10 @@ const VIEW_LABELS: Record<OperatorView, string> = {
 
 export default function OperatorLayout() {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [view, setView] = useState<OperatorView>("overview");
   const [mode, setMode] = useState<OperatorMode>("saas");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const userInitials =
     user?.display_name
@@ -144,7 +147,7 @@ export default function OperatorLayout() {
           {/* Spacer */}
           <div className="sb-spacer" />
 
-          {/* Exit + user row */}
+          {/* Exit */}
           <div style={{ display: "flex", flexDirection: "column", gap: 1, paddingTop: 8 }}>
             <button
               className="sb-row"
@@ -155,51 +158,7 @@ export default function OperatorLayout() {
               <span>Exit Operator</span>
             </button>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 10px 4px",
-              }}
-            >
-              <div
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "50%",
-                  background: "linear-gradient(135deg, #ff9f0a, #ff375f)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "#fff",
-                  flexShrink: 0,
-                }}
-              >
-                {userInitials}
-              </div>
-              <span
-                style={{
-                  flex: 1,
-                  fontSize: 12,
-                  color: "var(--fg-2)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {user?.display_name || user?.email || "Operator"}
-              </span>
-              <button
-                onClick={logout}
-                title="Log out"
-                style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)" }}
-              >
-                <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />
-              </button>
-            </div>
+
           </div>
         </aside>
 
@@ -261,11 +220,115 @@ export default function OperatorLayout() {
             </button>
           </div>
 
-          <div
-            className="tb-avatar"
-            style={{ background: "linear-gradient(135deg, #ff9f0a, #ff375f)" }}
-          >
-            {userInitials}
+          {/* User menu */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="tb-btn"
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px 3px 4px", borderRadius: 8, height: 32 }}
+              onClick={() => setUserMenuOpen((v) => !v)}
+            >
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: "linear-gradient(135deg, #ff9f0a, #ff375f)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 600, color: "#fff", flexShrink: 0,
+              }}>
+                {userInitials}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2, textAlign: "left" }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600 }}>{user?.display_name ?? "Operator"}</span>
+                <span style={{ fontSize: 10, color: "var(--fg-3)", textTransform: "capitalize" }}>{user?.system_role ?? "operator"}</span>
+              </div>
+              <Icon name="chevd" size="sm" style={{ color: "var(--fg-3)", fontSize: 10, transform: userMenuOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
+            </button>
+
+            {userMenuOpen && (
+              <>
+                <div className="vis-backdrop" onClick={() => setUserMenuOpen(false)} />
+                <div
+                  className="glass"
+                  style={{
+                    position: "absolute", top: "calc(100% + 6px)", right: 0,
+                    width: 240, borderRadius: 10, border: "0.5px solid var(--hairline)",
+                    boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
+                  }}
+                >
+                  {/* Header */}
+                  <div style={{ padding: "14px 14px 12px", borderBottom: "0.5px solid var(--hairline)", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: "50%",
+                      background: "linear-gradient(135deg, #ff9f0a, #ff375f)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0,
+                    }}>
+                      {userInitials}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{user?.display_name ?? "Operator"}</div>
+                      <div style={{ fontSize: 11, color: "var(--fg-3)" }}>{user?.email ?? ""}</div>
+                    </div>
+                  </div>
+                  {/* Account settings */}
+                  <div style={{ padding: 4 }}>
+                    <button
+                      className="sb-row"
+                      style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8 }}
+                      onClick={() => { setUserMenuOpen(false); window.location.href = "/settings"; }}
+                    >
+                      <Icon name="settings" size="sm" />
+                      <span>Account settings</span>
+                    </button>
+                  </div>
+                  {/* Theme */}
+                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
+                    <div style={{ padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                      <Icon name="spark" size="sm" style={{ color: "var(--fg-3)" }} />
+                      <span style={{ flex: 1, fontSize: 13 }}>Theme</span>
+                      <div style={{
+                        display: "flex", background: "var(--glass-weak)",
+                        border: "0.5px solid var(--hairline)", borderRadius: 6,
+                        overflow: "hidden", fontSize: 11,
+                      }}>
+                        <button
+                          style={{
+                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
+                            fontWeight: theme === "light" ? 600 : 400,
+                            background: theme === "light" ? "var(--glass)" : "transparent",
+                            color: theme === "light" ? "var(--fg)" : "var(--fg-3)",
+                            borderRight: "0.5px solid var(--hairline)",
+                          }}
+                          onClick={() => setTheme("light")}
+                        >
+                          Light
+                        </button>
+                        <button
+                          style={{
+                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
+                            fontWeight: theme === "dark" ? 600 : 400,
+                            background: theme === "dark" ? "var(--glass)" : "transparent",
+                            color: theme === "dark" ? "var(--fg)" : "var(--fg-3)",
+                          }}
+                          onClick={() => setTheme("dark")}
+                        >
+                          Dark
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Logout */}
+                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
+                    <button
+                      className="sb-row"
+                      style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8, color: "#ff375f" }}
+                      onClick={() => { setUserMenuOpen(false); logout(); }}
+                    >
+                      <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />
+                      <span>Log out</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </header>
 

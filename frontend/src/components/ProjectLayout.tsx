@@ -110,7 +110,7 @@ const COMMANDS = [
 export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const { user, logout } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const [project, setProject] = useState<Project | null>(null);
   const [sidebarProjects, setSidebarProjects] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -120,6 +120,8 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [density] = useState<"compact" | "regular" | "comfy">("regular");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   // TEOS sidebar state
   const [teosMessages, setTeosMessages] = useState<Array<{ role: string; text: string; specialist?: string }>>([]);
@@ -314,75 +316,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)", fontWeight: 500 }}>v2.4</span>
           </div>
 
-          {/* Workspace switcher */}
-          <div style={{ position: "relative" }}>
-            <button
-              className="workspace-switch"
-              style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
-              onClick={() => setSwitcherOpen((v) => !v)}
-            >
-              <div className="ws-avatar" style={{ background: projectColor }}>
-                {wsView ? "T" : projectName.charAt(0).toUpperCase()}
-              </div>
-              <div className="ws-meta">
-                <b>{wsView ? "TelaiOS" : projectName}</b>
-                <span>{wsView ? "Admin Console" : "Switch workspace"}</span>
-              </div>
-              <div className="ws-arrows">
-                <Icon name="chevd" size="sm" style={{ transform: switcherOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
-              </div>
-            </button>
-
-            {switcherOpen && (
-              <>
-                <div className="vis-backdrop" style={{ zIndex: 90 }} onClick={() => setSwitcherOpen(false)} />
-                <div
-                  className="glass"
-                  style={{
-                    position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
-                    borderRadius: 10, border: "0.5px solid var(--hairline)",
-                    boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
-                  }}
-                >
-                  <button
-                    className="sb-row"
-                    style={{ width: "100%", borderRadius: 0, padding: "9px 12px", gap: 8 }}
-                    data-active={!!wsView}
-                    onClick={() => { setSwitcherOpen(false); window.location.href = "/"; }}
-                  >
-                    <div style={{
-                      width: 20, height: 20, borderRadius: 5, flexShrink: 0,
-                      background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <Icon name="settings" size="sm" style={{ color: "#fff", fontSize: 10 }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600 }}>Admin Console</div>
-                      <div style={{ fontSize: 11, color: "var(--fg-3)" }}>Workspace governance</div>
-                    </div>
-                  </button>
-                  {sidebarProjects.length > 0 && (
-                    <div style={{ borderTop: "0.5px solid var(--hairline)", padding: "4px 0" }}>
-                      {sidebarProjects.map((p) => (
-                        <button
-                          key={p.id}
-                          className="sb-row"
-                          style={{ width: "100%", borderRadius: 0, padding: "7px 12px", gap: 8 }}
-                          data-active={projectId === p.id && !wsView}
-                          onClick={() => { setSwitcherOpen(false); window.location.href = `/projects/${p.id}`; }}
-                        >
-                          <span className="proj-dot" style={{ background: p.color, width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
-                          <span style={{ fontSize: 12.5 }}>{p.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
           <div className="sb-section">{wsView ? "Navigation" : (project?.name ?? "Project")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {wsView ? (
@@ -469,31 +402,73 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
               </button>
             ))}
 
-            {/* User row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px 4px" }}>
-              <div
-                style={{
-                  width: 26, height: 26, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, fontWeight: 600, color: "#fff", flexShrink: 0,
-                }}
-              >
-                {userInitials}
-              </div>
-              <span style={{ flex: 1, fontSize: 12, color: "var(--fg-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user?.display_name || user?.email || "User"}
-              </span>
+            {/* Workspace switcher */}
+            <div style={{ position: "relative" }}>
               <button
-                onClick={toggleTheme}
-                title={theme === "dark" ? "Light mode" : "Dark mode"}
-                style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)", fontSize: 13 }}
+                className="workspace-switch"
+                style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+                onClick={() => setSwitcherOpen((v) => !v)}
               >
-                <i className={theme === "dark" ? "fa-solid fa-sun" : "fa-solid fa-moon"} aria-hidden="true" />
+                <div className="ws-avatar" style={{ background: projectColor }}>
+                  {wsView ? "T" : projectName.charAt(0).toUpperCase()}
+                </div>
+                <div className="ws-meta">
+                  <b>{wsView ? "TelaiOS" : projectName}</b>
+                  <span>{wsView ? "Admin Console" : "Switch workspace"}</span>
+                </div>
+                <div className="ws-arrows">
+                  <Icon name="chevd" size="sm" style={{ transform: switcherOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
+                </div>
               </button>
-              <button onClick={logout} title="Log out" style={{ padding: 4, borderRadius: 6, color: "var(--fg-3)" }}>
-                <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />
-              </button>
+
+              {switcherOpen && (
+                <>
+                  <div className="vis-backdrop" style={{ zIndex: 90 }} onClick={() => setSwitcherOpen(false)} />
+                  <div
+                    className="glass"
+                    style={{
+                      position: "absolute", bottom: "calc(100% + 6px)", top: "auto", left: 0, right: 0,
+                      borderRadius: 10, border: "0.5px solid var(--hairline)",
+                      boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
+                    }}
+                  >
+                    <button
+                      className="sb-row"
+                      style={{ width: "100%", borderRadius: 0, padding: "9px 12px", gap: 8 }}
+                      data-active={!!wsView}
+                      onClick={() => { setSwitcherOpen(false); window.location.href = "/"; }}
+                    >
+                      <div style={{
+                        width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+                        background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Icon name="settings" size="sm" style={{ color: "#fff", fontSize: 10 }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>Admin Console</div>
+                        <div style={{ fontSize: 11, color: "var(--fg-3)" }}>Workspace governance</div>
+                      </div>
+                    </button>
+                    {sidebarProjects.length > 0 && (
+                      <div style={{ borderTop: "0.5px solid var(--hairline)", padding: "4px 0" }}>
+                        {sidebarProjects.map((p) => (
+                          <button
+                            key={p.id}
+                            className="sb-row"
+                            style={{ width: "100%", borderRadius: 0, padding: "7px 12px", gap: 8 }}
+                            data-active={projectId === p.id && !wsView}
+                            onClick={() => { setSwitcherOpen(false); window.location.href = `/projects/${p.id}`; }}
+                          >
+                            <span className="proj-dot" style={{ background: p.color, width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
+                            <span style={{ fontSize: 12.5 }}>{p.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </aside>
@@ -549,7 +524,116 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
               <Icon name="panel" size="sm" />
             </button>
           )}
-          <div className="tb-avatar">{userInitials}</div>
+          {/* User menu */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="tb-btn"
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px 3px 4px", borderRadius: 8, height: 32 }}
+              onClick={() => setUserMenuOpen((v) => !v)}
+            >
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 600, color: "#fff", flexShrink: 0,
+              }}>
+                {userInitials}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2, textAlign: "left" }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600 }}>{user?.display_name ?? "User"}</span>
+                <span style={{ fontSize: 10, color: "var(--fg-3)", textTransform: "capitalize" }}>{user?.system_role ?? "member"}</span>
+              </div>
+              <Icon name="chevd" size="sm" style={{ color: "var(--fg-3)", fontSize: 10, transform: userMenuOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
+            </button>
+
+            {userMenuOpen && (
+              <>
+                <div className="vis-backdrop" onClick={() => setUserMenuOpen(false)} />
+                <div
+                  className="glass"
+                  style={{
+                    position: "absolute", top: "calc(100% + 6px)", right: 0,
+                    width: 240, borderRadius: 10, border: "0.5px solid var(--hairline)",
+                    boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
+                  }}
+                >
+                  {/* Header */}
+                  <div style={{ padding: "14px 14px 12px", borderBottom: "0.5px solid var(--hairline)", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: "50%",
+                      background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0,
+                    }}>
+                      {userInitials}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{user?.display_name ?? "User"}</div>
+                      <div style={{ fontSize: 11, color: "var(--fg-3)" }}>{user?.email ?? ""}</div>
+                    </div>
+                  </div>
+                  {/* Account settings */}
+                  <div style={{ padding: 4 }}>
+                    <button
+                      className="sb-row"
+                      style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8 }}
+                      onClick={() => { setUserMenuOpen(false); window.location.href = "/settings"; }}
+                    >
+                      <Icon name="settings" size="sm" />
+                      <span>Account settings</span>
+                    </button>
+                  </div>
+                  {/* Theme */}
+                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
+                    <div style={{ padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                      <Icon name="spark" size="sm" style={{ color: "var(--fg-3)" }} />
+                      <span style={{ flex: 1, fontSize: 13 }}>Theme</span>
+                      <div style={{
+                        display: "flex", background: "var(--glass-weak)",
+                        border: "0.5px solid var(--hairline)", borderRadius: 6,
+                        overflow: "hidden", fontSize: 11,
+                      }}>
+                        <button
+                          style={{
+                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
+                            fontWeight: theme === "light" ? 600 : 400,
+                            background: theme === "light" ? "var(--glass)" : "transparent",
+                            color: theme === "light" ? "var(--fg)" : "var(--fg-3)",
+                            borderRight: "0.5px solid var(--hairline)",
+                          }}
+                          onClick={() => setTheme("light")}
+                        >
+                          Light
+                        </button>
+                        <button
+                          style={{
+                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
+                            fontWeight: theme === "dark" ? 600 : 400,
+                            background: theme === "dark" ? "var(--glass)" : "transparent",
+                            color: theme === "dark" ? "var(--fg)" : "var(--fg-3)",
+                          }}
+                          onClick={() => setTheme("dark")}
+                        >
+                          Dark
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Logout */}
+                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
+                    <button
+                      className="sb-row"
+                      style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8, color: "#ff375f" }}
+                      onClick={() => { setUserMenuOpen(false); logout(); }}
+                    >
+                      <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />
+                      <span>Log out</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </header>
 
         {/* ── Main ── */}
