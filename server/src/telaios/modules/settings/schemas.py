@@ -59,8 +59,8 @@ class SettingsRead(BaseModel):
     logo_url: str | None
     favicon_url: str | None
     default_theme: str
-    density: str | None = None
-    glass_blur: int | None = None
+    density: str
+    glass_blur: int
     theme_preset: str | None = None
     custom_theme: dict[str, Any] | None = None
     updated_at: datetime

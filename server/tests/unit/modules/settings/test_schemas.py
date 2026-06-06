@@ -29,6 +29,8 @@ class TestSettingsRead:
             "logo_url": "data:image/png;base64,abc",
             "favicon_url": "data:image/x-icon;base64,def",
             "default_theme": "dark",
+            "density": "regular",
+            "glass_blur": 28,
             "updated_at": _now(),
         }
         read = SettingsRead.model_validate(data)
@@ -36,6 +38,8 @@ class TestSettingsRead:
         assert read.brand_name == "TelaiOS"
         assert read.brand_color == "#006FEE"
         assert read.default_theme == "dark"
+        assert read.density == "regular"
+        assert read.glass_blur == 28
 
     def test_minimal(self):
         data = {
@@ -45,6 +49,8 @@ class TestSettingsRead:
             "logo_url": None,
             "favicon_url": None,
             "default_theme": "dark",
+            "density": "regular",
+            "glass_blur": 28,
             "updated_at": _now(),
         }
         read = SettingsRead.model_validate(data)

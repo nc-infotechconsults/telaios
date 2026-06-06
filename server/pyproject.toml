@@ -84,7 +84,9 @@ dev = [
     # TUI eval CLI
     "textual>=1.0",
     "vllm-mlx>=0.3.0",
-    "mlx-optiq>=0.0.10"
+    "mlx-optiq>=0.0.10",
+    "aioboto3>=15.5.0",
+    "pgvector>=0.4.2",
 ]
 
 [build-system]

@@ -24,6 +24,8 @@ def _make_settings_obj(
     logo_url: str | None = None,
     favicon_url: str | None = None,
     default_theme: str = "dark",
+    density: str = "regular",
+    glass_blur: int = 28,
     theme_preset: str | None = None,
     custom_theme: dict | None = None,
 ) -> MagicMock:
@@ -34,6 +36,8 @@ def _make_settings_obj(
     obj.logo_url = logo_url
     obj.favicon_url = favicon_url
     obj.default_theme = default_theme
+    obj.density = density
+    obj.glass_blur = glass_blur
     obj.theme_preset = theme_preset
     obj.custom_theme = custom_theme
     obj.updated_at = _now()
