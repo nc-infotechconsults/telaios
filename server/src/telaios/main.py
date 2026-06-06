@@ -18,9 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from telaios.auth.dependencies import SERVICE_PRINCIPAL_ID, set_user_loader
 from telaios.auth.internal_api_key import is_internal_api_key
 from telaios.auth.jwt import verify_token
-from telaios.db.base import set_audit_user
 from telaios.config.logging import configure_logging
 from telaios.config.settings import get_settings
+from telaios.db.base import set_audit_user
 from telaios.db.session import dispose_engine, get_sessionmaker
 from telaios.fixtures.agent_base_profiles import seed as seed_agent_base_profiles
 from telaios.infra.redis import close_redis
@@ -57,9 +57,9 @@ from telaios.modules.documents import (
 from telaios.modules.environments import environments_router
 from telaios.modules.health import health_router
 from telaios.modules.internal import internal_router
+from telaios.modules.knowledge import knowledge_router
 from telaios.modules.library import library_router
 from telaios.modules.messages import messages_router
-from telaios.modules.knowledge import knowledge_router
 from telaios.modules.planner import planner_router
 from telaios.modules.plans import plan_router, project_plans_router
 from telaios.modules.projects import (
@@ -91,7 +91,14 @@ logger = logging.getLogger(__name__)
 _MODULES: dict[str, list[APIRouter]] = {
     "users": [auth_router, users_router],
     "workspaces": [project_workspaces_router, workspace_router],
-    "projects": [projects_router, members_router, agents_router, conversation_router, project_skills_router, project_mcps_router],
+    "projects": [
+        projects_router,
+        members_router,
+        agents_router,
+        conversation_router,
+        project_skills_router,
+        project_mcps_router,
+    ],
     "repositories": [repositories_router],
     "environments": [environments_router],
     "settings": [settings_router, llm_router],
@@ -160,7 +167,10 @@ def _extract_audit_user_id(request: Request) -> str | None:
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     logger.info("telaios starting")
-    await ensure_bucket_exists()
+    try:
+        await ensure_bucket_exists()
+    except Exception:
+        logger.warning("S3 bucket setup failed; continuing startup", exc_info=True)
     try:
         async with get_sessionmaker()() as session:
             await seed_agent_base_profiles(session)
@@ -169,6 +179,7 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.warning("Agent base profile seed failed; continuing startup", exc_info=True)
     try:
         from telaios.core.knowledge.factory import KnowledgePipelineFactory
+
         pipeline = await KnowledgePipelineFactory.get()
         await pipeline.warm_up()
     except Exception:

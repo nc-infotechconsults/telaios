@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
-import { useTheme } from "../../context/ThemeContext";
-import { getSettings, patchSettings } from "../../lib/api";
-import type { AppSettings } from "../../types";
-import { persistAndApplyAppSettings } from "../../lib/appSettings";
+import { useAppSettings } from "../../context/AppSettingsContext";
+import { fileToDataUrl, validateImageDataUrl } from "../../lib/image";
+import { THEME_PRESETS } from "../../lib/appSettings";
+import type { Density, ThemePreset } from "../../types";
 import { toast } from "../../lib/toast";
 
 // ─── Settings sections ────────────────────────────────────────────────────────
@@ -78,152 +78,225 @@ function SetSelect({ value, options, onChange }: {
   );
 }
 
+function ReadOnlyNotice() {
+  return (
+    <div className="set-readonly-note" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", color: "var(--fg-3)", fontSize: 12.5 }}>
+      <Icon name="lock" size="sm" /> Only workspace admins can change these settings.
+    </div>
+  );
+}
+
 // ─── Section components ───────────────────────────────────────────────────────
 
+const LOGO_MAX = 700_000;
+const FAVICON_MAX = 150_000;
+
 function BrandingSection() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { settings, isAdmin, save } = useAppSettings();
+  const [brandName, setBrandName] = useState(settings.brand_name);
+  const [brandColor, setBrandColor] = useState(settings.brand_color);
+  const [logo, setLogo] = useState<string | null>(settings.logo_url);
+  const [favicon, setFavicon] = useState<string | null>(settings.favicon_url);
   const [saving, setSaving] = useState(false);
-  const [brandName, setBrandName] = useState("");
-  const [brandColor, setBrandColor] = useState("#0a84ff");
+  const logoInput = useRef<HTMLInputElement>(null);
+  const faviconInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setLoading(true);
-    getSettings()
-      .then((s) => {
-        setSettings(s);
-        setBrandName(s.brand_name ?? "");
-        setBrandColor(s.brand_color ?? "#0a84ff");
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    setBrandName(settings.brand_name);
+    setBrandColor(settings.brand_color);
+    setLogo(settings.logo_url);
+    setFavicon(settings.favicon_url);
+  }, [settings]);
 
-  const save = async () => {
-    if (!settings || saving) return;
+  const pick = async (file: File | undefined, max: number, set: (v: string) => void) => {
+    if (!file) return;
+    try {
+      const url = await fileToDataUrl(file, max);
+      const v = validateImageDataUrl(url, max);
+      if (!v.ok) return toast.error(v.error ?? "Invalid image");
+      set(url);
+    } catch {
+      toast.error("Could not read image");
+    }
+  };
+
+  const onSave = async () => {
+    if (saving) return;
     setSaving(true);
     try {
-      const updated = await patchSettings({ brand_name: brandName, brand_color: brandColor });
-      setSettings(updated);
-      persistAndApplyAppSettings(updated);
-      toast.success("Branding saved");
+      await save({ brand_name: brandName, brand_color: brandColor, logo_url: logo, favicon_url: favicon });
+      toast.success("Settings saved");
     } catch {
-      toast.error("Failed to save branding");
+      toast.error("Failed to save settings");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div style={{ padding: 24, color: "var(--fg-3)", fontSize: 13 }}>Loading…</div>;
-
   return (
     <SetGroup title="Branding" desc="Customise how TelaiOS presents itself across your workspace.">
-      <SetRow label="Brand name" hint="Replaces 'TelaiOS' throughout the interface.">
-        <input
-          className="form-input"
-          value={brandName}
-          onChange={(e) => setBrandName(e.target.value)}
-          placeholder="TelaiOS"
-        />
+      {!isAdmin && <ReadOnlyNotice />}
+      <SetRow label="Brand name" hint="Replaces the product name in the title bar and sidebar.">
+        <input className="form-input" value={brandName} disabled={!isAdmin}
+          onChange={(e) => setBrandName(e.target.value)} placeholder="TelaiOS" />
       </SetRow>
-      <SetRow label="Brand color" hint="Used for primary actions and the TEOS orb.">
+      <SetRow label="Accent color" hint="Drives primary actions, focus states and the TEOS orb.">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input
-            type="color"
-            value={brandColor}
+          <input type="color" value={brandColor} disabled={!isAdmin}
             onChange={(e) => setBrandColor(e.target.value)}
-            style={{ width: 36, height: 36, borderRadius: 6, border: "0.5px solid var(--hairline)", cursor: "pointer", padding: 2 }}
-          />
-          <input
-            className="form-input"
-            value={brandColor}
-            onChange={(e) => setBrandColor(e.target.value)}
-            placeholder="#0a84ff"
-            style={{ width: 110 }}
-          />
+            style={{ width: 36, height: 36, borderRadius: 6, border: "0.5px solid var(--hairline)", cursor: isAdmin ? "pointer" : "default", padding: 2 }} />
+          <input className="form-input" value={brandColor} disabled={!isAdmin}
+            onChange={(e) => setBrandColor(e.target.value)} placeholder="#0a84ff" style={{ width: 110 }} />
         </div>
       </SetRow>
-      <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 4 }}>
-        <button
-          className="pill-btn"
-          style={{ background: "var(--accent-1)", color: "#fff", borderColor: "transparent", opacity: saving ? 0.5 : 1 }}
-          onClick={() => void save()}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save Changes"}
-        </button>
-      </div>
+      <SetRow label="Logo" hint="Shown in the sidebar. PNG or SVG, up to 700 KB.">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {logo && <img src={logo} alt="Preview" style={{ height: 28, borderRadius: 6 }} />}
+          <input ref={logoInput} type="file" accept="image/*" hidden
+            onChange={(e) => void pick(e.target.files?.[0], LOGO_MAX, setLogo)} />
+          <button className="pill-btn" disabled={!isAdmin} onClick={() => logoInput.current?.click()}>
+            <Icon name="upload" size="sm" /> Upload
+          </button>
+          {logo && <button className="pill-btn" disabled={!isAdmin} onClick={() => setLogo(null)}>Remove</button>}
+        </div>
+      </SetRow>
+      <SetRow label="Favicon" hint="Browser tab icon. Up to 150 KB.">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {favicon && <img src={favicon} alt="Favicon preview" style={{ height: 24, width: 24, borderRadius: 4 }} />}
+          <input ref={faviconInput} type="file" accept="image/*" hidden
+            onChange={(e) => void pick(e.target.files?.[0], FAVICON_MAX, setFavicon)} />
+          <button className="pill-btn" disabled={!isAdmin} onClick={() => faviconInput.current?.click()}>
+            <Icon name="upload" size="sm" /> Upload
+          </button>
+          {favicon && <button className="pill-btn" disabled={!isAdmin} onClick={() => setFavicon(null)}>Remove</button>}
+        </div>
+      </SetRow>
+      {isAdmin && (
+        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 4 }}>
+          <button className="pill-btn" style={{ background: "var(--accent-1)", color: "#fff", borderColor: "transparent", opacity: saving ? 0.5 : 1 }}
+            onClick={() => void onSave()} disabled={saving}>
+            {saving ? "Saving…" : "Save Settings"}
+          </button>
+        </div>
+      )}
     </SetGroup>
   );
 }
 
+const THEME_OPTIONS: { id: "light" | "dark" | ThemePreset; label: string }[] = [
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+  { id: "corporate", label: "Corporate" },
+  { id: "midnight", label: "Midnight" },
+  { id: "minimal", label: "Minimal" },
+  { id: "ocean", label: "Ocean" },
+  { id: "forest", label: "Forest" },
+  { id: "sunset", label: "Sunset" },
+  { id: "warm", label: "Warm" },
+];
+
 function AppearanceSection() {
-  const { theme, setTheme } = useTheme();
-  const [density, setDensity] = useState("regular");
-  const [glass, setGlass] = useState(32);
-  const [aiVisible, setAiVisible] = useState(true);
+  const { settings, isAdmin, save } = useAppSettings();
+  const [saving, setSaving] = useState(false);
+
+  const current: "light" | "dark" | ThemePreset = settings.theme_preset ?? (settings.default_theme === "light" ? "light" : "dark");
+
+  const chip = (id: "light" | "dark" | ThemePreset) => {
+    if (id === "light") return { bg: "#ffffff", fg: "#111111" };
+    if (id === "dark") return { bg: "#0b0d12", fg: "#f4f4f7" };
+    const p = THEME_PRESETS[id];
+    return { bg: p.background, fg: p.foreground };
+  };
+
+  const persist = async (patch: Parameters<typeof save>[0]) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await save(patch);
+      toast.success("Settings saved");
+    } catch {
+      toast.error("Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectTheme = (id: "light" | "dark" | ThemePreset) => {
+    if (!isAdmin) return;
+    if (id === "light" || id === "dark") void persist({ default_theme: id, theme_preset: null });
+    else void persist({ theme_preset: id, default_theme: THEME_PRESETS[id].polarity });
+  };
 
   return (
     <>
-      <SetGroup title="Theme" desc="Workspace-wide appearance defaults.">
-        <SetRow label="Dark mode" hint="Match the system or pick manually.">
-          <SetToggle value={theme === "dark"} onChange={(v) => setTheme(v ? "dark" : "light")} />
-        </SetRow>
-        <SetRow label="Accent color" hint="Used across primary actions, focus states and the TEOS orb.">
-          <div style={{ display: "flex", gap: 8 }}>
-            {[
-              { id: "blueviolet", a: "#0a84ff", b: "#bf5af2" },
-              { id: "ocean",      a: "#0a84ff", b: "#64d2ff" },
-              { id: "sunset",     a: "#ff375f", b: "#ff9f0a" },
-              { id: "forest",     a: "#30d158", b: "#0a84ff" },
-              { id: "rose",       a: "#bf5af2", b: "#ff375f" },
-            ].map((o) => (
-              <button key={o.id}
-                style={{
-                  width: 22, height: 22, borderRadius: "50%", border: "2px solid transparent",
-                  background: `linear-gradient(135deg, ${o.a}, ${o.b})`, cursor: "pointer",
-                }}
-                title={o.id}
-                onClick={() => {}}
-              />
-            ))}
+      <SetGroup title="Theme" desc="Workspace-wide appearance. Applies to everyone.">
+        {!isAdmin && <ReadOnlyNotice />}
+        <SetRow label="Theme" hint="Light, Dark, or a branded preset palette." vertical>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 4 }}>
+            {THEME_OPTIONS.map((o) => {
+              const c = chip(o.id);
+              const active = current === o.id;
+              return (
+                <button key={o.id} disabled={!isAdmin} onClick={() => selectTheme(o.id)}
+                  data-active={active ? "true" : undefined}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+                    borderRadius: 10, cursor: isAdmin ? "pointer" : "default",
+                    border: active ? "1.5px solid var(--accent-1)" : "1px solid var(--hairline)",
+                    background: "var(--glass-weak)",
+                  }}>
+                  <span style={{ width: 18, height: 18, borderRadius: 5, background: c.bg, border: "1px solid var(--hairline)", display: "inline-block" }}>
+                    <span style={{ display: "block", width: 8, height: 8, margin: "5px", borderRadius: 2, background: c.fg }} />
+                  </span>
+                  <span style={{ fontSize: 12.5 }}>{o.label}</span>
+                </button>
+              );
+            })}
           </div>
         </SetRow>
       </SetGroup>
 
-      <SetGroup title="Materials" desc="Tune the glass and density of the interface.">
-        <SetRow label="Glass blur" hint={`${glass}px backdrop blur on translucent panels.`}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="range" min="0" max="60" value={glass}
-              onChange={(e) => setGlass(parseInt(e.target.value))} style={{ flex: 1 }} />
-            <span className="mono" style={{ fontSize: 12, color: "var(--fg-3)", minWidth: 36 }}>{glass}px</span>
-          </div>
-        </SetRow>
+      <SetGroup title="Materials" desc="Tune the density and glass of the interface.">
         <SetRow label="Density" hint="How tight rows, cards and lists feel.">
           <div className="seg">
-            {["compact", "regular", "comfy"].map((d) => (
-              <button key={d} className="seg-btn"
-                data-active={density === d ? "true" : undefined}
-                onClick={() => setDensity(d)}>
+            {(["compact", "regular", "comfy"] as Density[]).map((d) => (
+              <button key={d} className="seg-btn" disabled={!isAdmin}
+                data-active={settings.density === d ? "true" : undefined}
+                onClick={() => void persist({ density: d })}>
                 {d}
               </button>
             ))}
           </div>
         </SetRow>
-        <SetRow label="Reduce motion" hint="Disables non-essential animations.">
-          <SetToggle value={false} onChange={() => {}} />
-        </SetRow>
-      </SetGroup>
-
-      <SetGroup title="Layout">
-        <SetRow label="Show AI sidebar by default" hint="When off, TEOS hides until users press its toggle.">
-          <SetToggle value={aiVisible} onChange={setAiVisible} />
-        </SetRow>
-        <SetRow label="Sidebar collapsed" hint="Show icons only in the left rail.">
-          <SetToggle value={false} onChange={() => {}} />
+        <SetRow label="Glass blur" hint={`${settings.glass_blur}px backdrop blur on translucent panels.`}>
+          <GlassBlurControl
+            value={settings.glass_blur}
+            disabled={!isAdmin}
+            onCommit={(v) => void persist({ glass_blur: v })}
+          />
         </SetRow>
       </SetGroup>
     </>
+  );
+}
+
+function GlassBlurControl({ value, disabled, onCommit }: { value: number; disabled: boolean; onCommit: (v: number) => void }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 220 }}>
+      <input type="range" min={0} max={60} value={local} disabled={disabled}
+        aria-label="Glass blur"
+        onChange={(e) => {
+          const v = parseInt(e.target.value);
+          setLocal(v);
+          document.documentElement.style.setProperty("--blur", `${v}px`); // live preview
+        }}
+        onMouseUp={() => onCommit(local)}
+        onTouchEnd={() => onCommit(local)}
+        style={{ flex: 1 }} />
+      <span className="mono" style={{ fontSize: 12, color: "var(--fg-3)", minWidth: 36 }}>{local}px</span>
+    </div>
   );
 }
 
