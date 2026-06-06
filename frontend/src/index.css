@@ -78,6 +78,16 @@
 [data-density="compact"] { --density-pad: 12px; --density-row: 38px; }
 [data-density="comfy"] { --density-pad: 22px; --density-row: 52px; }
 
+/* Respect each user's OS-level reduced-motion preference (replaces the old toggle). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; }
 body {
