@@ -1,173 +1,80 @@
-import type { AppSettings, CustomTheme, FontFamilyKey, RadiusStep, ShadowStep, ThemePreset } from "../types";
+import type {
+  AppSettings,
+  CustomTheme,
+  FontFamilyKey,
+  RadiusStep,
+  ShadowStep,
+  ThemePreset,
+} from "../types";
 
 const DEFAULT_BRAND_NAME = "TelaiOS";
-const DEFAULT_BRAND_COLOR = "#3B82F6";
+const DEFAULT_BRAND_COLOR = "#0a84ff";
 const DEFAULT_FAVICON_PATH = "/favicon.svg";
-
-type Theme = "light" | "dark";
-type Rgb = { r: number; g: number; b: number };
-
-const WHITE: Rgb = { r: 255, g: 255, b: 255 };
-const BLACK: Rgb = { r: 0, g: 0, b: 0 };
-
-const PRIMARY_STOPS: Array<{ key: string; target: Rgb; amount: number }> = [
-  { key: "50", target: WHITE, amount: 0.92 },
-  { key: "100", target: WHITE, amount: 0.82 },
-  { key: "200", target: WHITE, amount: 0.66 },
-  { key: "300", target: WHITE, amount: 0.5 },
-  { key: "400", target: WHITE, amount: 0.3 },
-  { key: "500", target: WHITE, amount: 0 },
-  { key: "600", target: BLACK, amount: 0.12 },
-  { key: "700", target: BLACK, amount: 0.24 },
-  { key: "800", target: BLACK, amount: 0.38 },
-  { key: "900", target: BLACK, amount: 0.54 },
-];
 
 export const APP_SETTINGS_STORAGE_KEY = "telaios_app_settings";
 export const APP_SETTINGS_UPDATED_EVENT = "telaios:app-settings-updated";
 
-// ── Preset definitions ────────────────────────────────────────────────────────
+type Theme = "light" | "dark";
+type Rgb = { r: number; g: number; b: number };
 
-/** A fully-resolved theme (all keys present) used internally for CSS var injection. */
-export interface ResolvedTheme {
+// ── Preset definitions (values reused; now applied to glass-shell vars) ──────
+
+interface ShellTheme {
+  polarity: Theme;
   background: string;
   foreground: string;
-  content1: string;
-  content2: string;
-  content3: string;
-  divider: string;
+  surfaceStrong: string; // content1 -> --glass-strong
+  surface: string; // content2 -> --glass
+  surfaceWeak: string; // content3 -> --glass-weak
+  divider: string; // -> --hairline
   radius: RadiusStep;
   shadow: ShadowStep;
   font_family: FontFamilyKey;
-  sidebar_background: string;
 }
 
-export const THEME_PRESETS: Record<ThemePreset, ResolvedTheme> = {
-  default: {
-    background: "#1c1c1e",
-    foreground: "rgba(255,255,255,0.90)",
-    content1: "#2c2c2e",
-    content2: "#3a3a3c",
-    content3: "#48484a",
-    divider: "rgba(84,84,88,0.35)",
-    radius: "medium",
-    shadow: "medium",
-    font_family: "system",
-    sidebar_background: "#1c1c1e",
-  },
-  corporate: {
-    background: "#ffffff",
-    foreground: "#111111",
-    content1: "#f5f5f5",
-    content2: "#eeeeee",
-    content3: "#e8e8e8",
-    divider: "#dddddd",
-    radius: "none",
-    shadow: "none",
-    font_family: "helvetica",
-    sidebar_background: "#f0f0f0",
-  },
-  midnight: {
-    background: "#050c1a",
-    foreground: "#e8f0ff",
-    content1: "#0a1628",
-    content2: "#081322",
-    content3: "#06101d",
-    divider: "#1a2d4d",
-    radius: "medium",
-    shadow: "large",
-    font_family: "inter",
-    sidebar_background: "#080f1e",
-  },
-  warm: {
-    background: "#fdf8f2",
-    foreground: "#2d1f0e",
-    content1: "#fef4e8",
-    content2: "#fdf0e0",
-    content3: "#fcebd8",
-    divider: "#e8d5ba",
-    radius: "large",
-    shadow: "small",
-    font_family: "georgia",
-    sidebar_background: "#f9f0e4",
-  },
-  minimal: {
-    background: "#ffffff",
-    foreground: "#000000",
-    content1: "#fafafa",
-    content2: "#f5f5f5",
-    content3: "#f0f0f0",
-    divider: "#e0e0e0",
-    radius: "none",
-    shadow: "none",
-    font_family: "system",
-    sidebar_background: "#f8f8f8",
-  },
-  ocean: {
-    background: "#04101a",
-    foreground: "#d6eeff",
-    content1: "#071c2e",
-    content2: "#061726",
-    content3: "#05121e",
-    divider: "#0f3050",
-    radius: "medium",
-    shadow: "large",
-    font_family: "inter",
-    sidebar_background: "#060f1a",
-  },
-  forest: {
-    background: "#061209",
-    foreground: "#d4f0da",
-    content1: "#0d2114",
-    content2: "#0b1c11",
-    content3: "#09170e",
-    divider: "#163a1f",
-    radius: "large",
-    shadow: "medium",
-    font_family: "georgia",
-    sidebar_background: "#071410",
-  },
-  sunset: {
-    background: "#160508",
-    foreground: "#fde8d8",
-    content1: "#26080f",
-    content2: "#1f060c",
-    content3: "#180509",
-    divider: "#3d1018",
-    radius: "medium",
-    shadow: "large",
-    font_family: "system",
-    sidebar_background: "#1a060b",
-  },
+export const THEME_PRESETS: Record<ThemePreset, ShellTheme> = {
+  default: { polarity: "dark", background: "#0b0d12", foreground: "#f4f4f7", surfaceStrong: "#2c2c2e", surface: "#1c1c1e", surfaceWeak: "#141418", divider: "rgba(255,255,255,0.08)", radius: "medium", shadow: "medium", font_family: "system" },
+  corporate: { polarity: "light", background: "#ffffff", foreground: "#111111", surfaceStrong: "#f5f5f5", surface: "#eeeeee", surfaceWeak: "#e8e8e8", divider: "#dddddd", radius: "none", shadow: "none", font_family: "helvetica" },
+  midnight: { polarity: "dark", background: "#050c1a", foreground: "#e8f0ff", surfaceStrong: "#0a1628", surface: "#081322", surfaceWeak: "#06101d", divider: "#1a2d4d", radius: "medium", shadow: "large", font_family: "inter" },
+  warm: { polarity: "light", background: "#fdf8f2", foreground: "#2d1f0e", surfaceStrong: "#fef4e8", surface: "#fdf0e0", surfaceWeak: "#fcebd8", divider: "#e8d5ba", radius: "large", shadow: "small", font_family: "georgia" },
+  minimal: { polarity: "light", background: "#ffffff", foreground: "#000000", surfaceStrong: "#fafafa", surface: "#f5f5f5", surfaceWeak: "#f0f0f0", divider: "#e0e0e0", radius: "none", shadow: "none", font_family: "system" },
+  ocean: { polarity: "dark", background: "#04101a", foreground: "#d6eeff", surfaceStrong: "#071c2e", surface: "#061726", surfaceWeak: "#05121e", divider: "#0f3050", radius: "medium", shadow: "large", font_family: "inter" },
+  forest: { polarity: "dark", background: "#061209", foreground: "#d4f0da", surfaceStrong: "#0d2114", surface: "#0b1c11", surfaceWeak: "#09170e", divider: "#163a1f", radius: "large", shadow: "medium", font_family: "georgia" },
+  sunset: { polarity: "dark", background: "#160508", foreground: "#fde8d8", surfaceStrong: "#26080f", surface: "#1f060c", surfaceWeak: "#180509", divider: "#3d1018", radius: "medium", shadow: "large", font_family: "system" },
 };
 
-// ── Radius / shadow / font value maps ─────────────────────────────────────────
-
-const RADIUS_VALUES: Record<RadiusStep, { small: string; medium: string; large: string }> = {
-  none:   { small: "0px",   medium: "0px",   large: "0px" },
-  small:  { small: "4px",   medium: "8px",   large: "12px" },
-  medium: { small: "8px",   medium: "12px",  large: "16px" },
-  large:  { small: "12px",  medium: "16px",  large: "24px" },
-  full:   { small: "999px", medium: "999px", large: "999px" },
+const RADIUS_VALUES: Record<RadiusStep, { xs: string; sm: string; md: string; lg: string; xl: string }> = {
+  none: { xs: "0px", sm: "0px", md: "0px", lg: "0px", xl: "0px" },
+  small: { xs: "4px", sm: "6px", md: "8px", lg: "10px", xl: "12px" },
+  medium: { xs: "8px", sm: "12px", md: "16px", lg: "22px", xl: "28px" },
+  large: { xs: "12px", sm: "18px", md: "24px", lg: "30px", xl: "36px" },
+  full: { xs: "999px", sm: "999px", md: "999px", lg: "999px", xl: "999px" },
 };
 
-const SHADOW_VALUES: Record<ShadowStep, string> = {
-  none:   "none",
-  small:  "0 1px 3px rgba(0,0,0,0.12)",
-  medium: "0 4px 12px rgba(0,0,0,0.18)",
-  large:  "0 8px 32px rgba(0,0,0,0.28)",
+const SHADOW_VALUES: Record<ShadowStep, { lg: string; sm: string }> = {
+  none: { lg: "none", sm: "none" },
+  small: { lg: "0 6px 18px -8px rgba(20,20,40,0.18)", sm: "0 1px 3px rgba(0,0,0,0.12)" },
+  medium: { lg: "0 12px 32px -16px rgba(20,20,40,0.28)", sm: "0 2px 8px -2px rgba(0,0,0,0.18)" },
+  large: { lg: "0 30px 80px -30px rgba(0,0,0,0.6), 0 12px 32px -16px rgba(0,0,0,0.45)", sm: "0 6px 18px -8px rgba(0,0,0,0.4)" },
 };
 
 const FONT_FAMILY_VALUES: Record<FontFamilyKey, string> = {
-  system:    "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\", \"Helvetica Neue\", Arial, sans-serif",
-  inter:     "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
-  roboto:    "Roboto, Helvetica Neue, Arial, sans-serif",
-  helvetica: "Helvetica Neue, Helvetica, Arial, sans-serif",
-  georgia:   "Georgia, Times New Roman, serif",
-  mono:      "ui-monospace, \"SF Mono\", \"Fira Code\", \"Cascadia Code\", monospace",
+  system: "'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif",
+  inter: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+  roboto: "Roboto, 'Helvetica Neue', Arial, sans-serif",
+  helvetica: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  georgia: "Georgia, 'Times New Roman', serif",
+  mono: "ui-monospace, 'SF Mono', 'Geist Mono', 'Fira Code', monospace",
 };
 
-// ── Colour utilities ──────────────────────────────────────────────────────────
+// Every shell var the bridge may set when a preset/custom theme is active.
+// Listed so they can be cleared when reverting to the plain Light/Dark stylesheet.
+const PRESET_SHELL_VARS = [
+  "--bg", "--fg", "--fg-2", "--fg-3", "--fg-4",
+  "--glass", "--glass-strong", "--glass-weak", "--hairline",
+  "--radius-xs", "--radius-sm", "--radius-md", "--radius-lg", "--radius-xl",
+  "--shadow-lg", "--shadow-sm",
+];
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 1,
@@ -176,39 +83,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   logo_url: null,
   favicon_url: null,
   default_theme: "dark",
+  density: "regular",
+  glass_blur: 28,
   theme_preset: null,
   custom_theme: null,
   updated_at: new Date().toISOString(),
 };
 
-function normalizeAppSettings(parsed: Partial<AppSettings>): AppSettings {
-  return {
-    id: typeof parsed.id === "number" ? parsed.id : DEFAULT_APP_SETTINGS.id,
-    brand_name:
-      typeof parsed.brand_name === "string" && parsed.brand_name.trim().length > 0
-        ? parsed.brand_name
-        : DEFAULT_APP_SETTINGS.brand_name,
-    brand_color: isHexColor(parsed.brand_color)
-      ? parsed.brand_color
-      : DEFAULT_APP_SETTINGS.brand_color,
-    logo_url: typeof parsed.logo_url === "string" ? parsed.logo_url : null,
-    favicon_url: typeof parsed.favicon_url === "string" ? parsed.favicon_url : null,
-    default_theme: isThemeValue(parsed.default_theme)
-      ? parsed.default_theme
-      : DEFAULT_APP_SETTINGS.default_theme,
-    theme_preset:
-      parsed.theme_preset != null && parsed.theme_preset in THEME_PRESETS
-        ? (parsed.theme_preset as ThemePreset)
-        : null,
-    custom_theme: parsed.custom_theme != null && typeof parsed.custom_theme === "object"
-      ? (parsed.custom_theme as CustomTheme)
-      : null,
-    updated_at:
-      typeof parsed.updated_at === "string"
-        ? parsed.updated_at
-        : DEFAULT_APP_SETTINGS.updated_at,
-  };
-}
+// ── Colour utilities ────────────────────────────────────────────────────────
 
 export function isHexColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
@@ -218,153 +100,171 @@ export function isThemeValue(value: unknown): value is Theme {
   return value === "light" || value === "dark";
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
 }
 
 function parseHexColor(hex: string): Rgb {
-  const normalized = isHexColor(hex) ? hex : DEFAULT_BRAND_COLOR;
-  const int = Number.parseInt(normalized.slice(1), 16);
-  return {
-    r: (int >> 16) & 0xff,
-    g: (int >> 8) & 0xff,
-    b: int & 0xff,
-  };
+  const n = isHexColor(hex) ? hex : DEFAULT_BRAND_COLOR;
+  const int = Number.parseInt(n.slice(1), 16);
+  return { r: (int >> 16) & 0xff, g: (int >> 8) & 0xff, b: int & 0xff };
 }
 
-function mixRgb(base: Rgb, target: Rgb, amount: number): Rgb {
-  return {
-    r: Math.round(base.r + (target.r - base.r) * amount),
-    g: Math.round(base.g + (target.g - base.g) * amount),
-    b: Math.round(base.b + (target.b - base.b) * amount),
-  };
+function rgbToHex({ r, g, b }: Rgb): string {
+  const h = (x: number) => clamp(Math.round(x), 0, 255).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
 }
 
-function rgbToHslChannels(rgb: Rgb): string {
-  const r = rgb.r / 255;
-  const g = rgb.g / 255;
-  const b = rgb.b / 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-
+function rgbToHsl({ r, g, b }: Rgb): { h: number; s: number; l: number } {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const d = max - min;
   let h = 0;
-  if (delta !== 0) {
-    if (max === r) h = ((g - b) / delta) % 6;
-    else if (max === g) h = (b - r) / delta + 2;
-    else h = (r - g) / delta + 4;
-    h *= 60;
-    if (h < 0) h += 360;
+  if (d !== 0) {
+    if (max === rn) h = ((gn - bn) / d) % 6;
+    else if (max === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h = (h * 60 + 360) % 360;
   }
-
   const l = (max + min) / 2;
-  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
-
-  return `${h.toFixed(2)} ${(s * 100).toFixed(2)}% ${(l * 100).toFixed(2)}%`;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  return { h, s, l };
 }
 
-function hexToHslChannels(hex: string): string {
-  return rgbToHslChannels(parseHexColor(hex));
+function hslToRgb(h: number, s: number, l: number): Rgb {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r1 = 0, g1 = 0, b1 = 0;
+  if (h < 60) [r1, g1, b1] = [c, x, 0];
+  else if (h < 120) [r1, g1, b1] = [x, c, 0];
+  else if (h < 180) [r1, g1, b1] = [0, c, x];
+  else if (h < 240) [r1, g1, b1] = [0, x, c];
+  else if (h < 300) [r1, g1, b1] = [x, 0, c];
+  else [r1, g1, b1] = [c, 0, x];
+  return { r: (r1 + m) * 255, g: (g1 + m) * 255, b: (b1 + m) * 255 };
 }
 
-function luminanceChannel(channel: number): number {
-  const normalized = channel / 255;
-  return normalized <= 0.03928
-    ? normalized / 12.92
-    : ((normalized + 0.055) / 1.055) ** 2.4;
+/** A harmonious secondary accent: rotate hue +50°, nudge lightness up. */
+export function deriveSecondaryAccent(hex: string): string {
+  const { h, s, l } = rgbToHsl(parseHexColor(hex));
+  return rgbToHex(hslToRgb((h + 50) % 360, clamp(s, 0, 1), clamp(l + 0.08, 0, 1)));
+}
+
+function luminanceChannel(c: number): number {
+  const n = c / 255;
+  return n <= 0.03928 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4;
 }
 
 function relativeLuminance(rgb: Rgb): number {
-  return (
-    0.2126 * luminanceChannel(rgb.r) +
-    0.7152 * luminanceChannel(rgb.g) +
-    0.0722 * luminanceChannel(rgb.b)
-  );
+  return 0.2126 * luminanceChannel(rgb.r) + 0.7152 * luminanceChannel(rgb.g) + 0.0722 * luminanceChannel(rgb.b);
 }
 
-function pickForegroundChannels(baseColor: Rgb): string {
-  const baseLum = relativeLuminance(baseColor);
-  const whiteContrast = (1.05 + 0.0001) / (baseLum + 0.05 + 0.0001);
-  const blackContrast = (baseLum + 0.05 + 0.0001) / (0.05 + 0.0001);
-  return whiteContrast >= blackContrast ? "0 0% 100%" : "0 0% 0%";
+/** WCAG contrast ratio between two hex colours (1..21). */
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(parseHexColor(a));
+  const lb = relativeLuminance(parseHexColor(b));
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
 }
 
-function buildPrimaryScaleChannels(hexColor: string): Record<string, string> {
-  const base = parseHexColor(hexColor);
-  const channels: Record<string, string> = {};
+function pickForegroundChannels(base: Rgb): string {
+  const lum = relativeLuminance(base);
+  const white = 1.05 / (lum + 0.05);
+  const black = (lum + 0.05) / 0.05;
+  return white >= black ? "0 0% 100%" : "0 0% 0%";
+}
 
+function rgbToHslChannels(rgb: Rgb): string {
+  const { h, s, l } = rgbToHsl(rgb);
+  return `${h.toFixed(2)} ${(s * 100).toFixed(2)}% ${(l * 100).toFixed(2)}%`;
+}
+
+// HeroUI primary scale (kept for embedded HeroUI controls in plan/chat/ProviderForm).
+const PRIMARY_STOPS: Array<{ key: string; amount: number; toWhite: boolean }> = [
+  { key: "50", amount: 0.92, toWhite: true }, { key: "100", amount: 0.82, toWhite: true },
+  { key: "200", amount: 0.66, toWhite: true }, { key: "300", amount: 0.5, toWhite: true },
+  { key: "400", amount: 0.3, toWhite: true }, { key: "500", amount: 0, toWhite: true },
+  { key: "600", amount: 0.12, toWhite: false }, { key: "700", amount: 0.24, toWhite: false },
+  { key: "800", amount: 0.38, toWhite: false }, { key: "900", amount: 0.54, toWhite: false },
+];
+
+function buildPrimaryScale(hex: string): Record<string, string> {
+  const base = parseHexColor(hex);
+  const out: Record<string, string> = {};
   for (const stop of PRIMARY_STOPS) {
-    const amount = clamp(stop.amount, 0, 1);
-    const mixed = amount === 0 ? base : mixRgb(base, stop.target, amount);
-    channels[stop.key] = rgbToHslChannels(mixed);
+    const t = stop.toWhite ? 255 : 0;
+    const mixed: Rgb = stop.amount === 0 ? base : {
+      r: base.r + (t - base.r) * stop.amount,
+      g: base.g + (t - base.g) * stop.amount,
+      b: base.b + (t - base.b) * stop.amount,
+    };
+    out[stop.key] = rgbToHslChannels(mixed);
   }
-
-  return channels;
+  return out;
 }
 
-// ── Theme override application ────────────────────────────────────────────────
+function alpha(hex: string, a: number): string {
+  const { r, g, b } = parseHexColor(hex);
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
+}
 
-/**
- * Resolve a preset + optional overrides into a complete theme object,
- * then inject all CSS custom properties onto `document.documentElement`.
- */
-export function applyThemeOverrides(
-  preset: ThemePreset | null,
-  overrides: CustomTheme | null,
-): void {
-  if (typeof document === "undefined") return;
+// ── Theme resolution + application ───────────────────────────────────────────
 
-  const base: ResolvedTheme = THEME_PRESETS[preset ?? "default"];
-
-  const resolved: ResolvedTheme = {
-    background:        (isHexColor(overrides?.background)  ? overrides!.background!  : base.background),
-    foreground:        (isHexColor(overrides?.foreground)   ? overrides!.foreground!  : base.foreground),
-    content1:          (isHexColor(overrides?.content1)     ? overrides!.content1!    : base.content1),
-    content2:          (isHexColor(overrides?.content2)     ? overrides!.content2!    : base.content2),
-    content3:          (isHexColor(overrides?.content3)     ? overrides!.content3!    : base.content3),
-    divider:           (isHexColor(overrides?.divider)      ? overrides!.divider!     : base.divider),
-    radius:            overrides?.radius      ?? base.radius,
-    shadow:            overrides?.shadow      ?? base.shadow,
-    font_family:       overrides?.font_family ?? base.font_family,
-    sidebar_background:(isHexColor(overrides?.sidebar_background) ? overrides!.sidebar_background! : base.sidebar_background),
+function resolveShellTheme(preset: ThemePreset | null, custom: CustomTheme | null): ShellTheme | null {
+  if (!preset && !custom) return null;
+  const base = THEME_PRESETS[preset ?? "default"];
+  return {
+    polarity: base.polarity,
+    background: isHexColor(custom?.background) ? custom!.background! : base.background,
+    foreground: isHexColor(custom?.foreground) ? custom!.foreground! : base.foreground,
+    surfaceStrong: isHexColor(custom?.content1) ? custom!.content1! : base.surfaceStrong,
+    surface: isHexColor(custom?.content2) ? custom!.content2! : base.surface,
+    surfaceWeak: isHexColor(custom?.content3) ? custom!.content3! : base.surfaceWeak,
+    divider: isHexColor(custom?.divider) ? custom!.divider! : base.divider,
+    radius: custom?.radius ?? base.radius,
+    shadow: custom?.shadow ?? base.shadow,
+    font_family: custom?.font_family ?? base.font_family,
   };
-
-  const rootStyle = document.documentElement.style;
-
-  // Colours — HeroUI uses HSL channel-only format (no hsl() wrapper)
-  rootStyle.setProperty("--heroui-background",  hexToHslChannels(resolved.background));
-  rootStyle.setProperty("--heroui-foreground",  hexToHslChannels(resolved.foreground));
-  rootStyle.setProperty("--heroui-content1",    hexToHslChannels(resolved.content1));
-  rootStyle.setProperty("--heroui-content2",    hexToHslChannels(resolved.content2));
-  rootStyle.setProperty("--heroui-content3",    hexToHslChannels(resolved.content3));
-  rootStyle.setProperty("--heroui-divider",     hexToHslChannels(resolved.divider));
-
-  // Sidebar (custom var — hex)
-  rootStyle.setProperty("--sidebar-background", resolved.sidebar_background);
-
-  // Border radius
-  const r = RADIUS_VALUES[resolved.radius];
-  rootStyle.setProperty("--heroui-radius-small",  r.small);
-  rootStyle.setProperty("--heroui-radius-medium", r.medium);
-  rootStyle.setProperty("--heroui-radius-large",  r.large);
-
-  // Box shadow
-  const s = SHADOW_VALUES[resolved.shadow];
-  rootStyle.setProperty("--heroui-box-shadow-small",  s);
-  rootStyle.setProperty("--heroui-box-shadow-medium", s);
-  rootStyle.setProperty("--heroui-box-shadow-large",  s);
-
-  // Font family
-  rootStyle.setProperty("font-family", FONT_FAMILY_VALUES[resolved.font_family]);
 }
 
-// ── Favicon / meta helpers ────────────────────────────────────────────────────
+function applyShellTheme(theme: ShellTheme): void {
+  const s = document.documentElement.style;
+  s.setProperty("--bg", theme.background);
+  if (isHexColor(theme.foreground)) {
+    s.setProperty("--fg", theme.foreground);
+    s.setProperty("--fg-2", alpha(theme.foreground, 0.64));
+    s.setProperty("--fg-3", alpha(theme.foreground, 0.4));
+    s.setProperty("--fg-4", alpha(theme.foreground, 0.18));
+  } else {
+    s.setProperty("--fg", theme.foreground);
+  }
+  s.setProperty("--glass-strong", theme.surfaceStrong);
+  s.setProperty("--glass", theme.surface);
+  s.setProperty("--glass-weak", theme.surfaceWeak);
+  s.setProperty("--hairline", theme.divider);
+  const r = RADIUS_VALUES[theme.radius];
+  s.setProperty("--radius-xs", r.xs); s.setProperty("--radius-sm", r.sm);
+  s.setProperty("--radius-md", r.md); s.setProperty("--radius-lg", r.lg);
+  s.setProperty("--radius-xl", r.xl);
+  const sh = SHADOW_VALUES[theme.shadow];
+  s.setProperty("--shadow-lg", sh.lg); s.setProperty("--shadow-sm", sh.sm);
+  // Font-family must go on <body>: index.css has a direct `body { font-family }`
+  // rule that beats inheritance from <html>, so setting it on the root is inert.
+  if (document.body) document.body.style.setProperty("font-family", FONT_FAMILY_VALUES[theme.font_family]);
+}
 
-function ensureDynamicFaviconLink(): HTMLLinkElement {
+function clearShellTheme(): void {
+  const s = document.documentElement.style;
+  for (const v of PRESET_SHELL_VARS) s.removeProperty(v);
+  if (document.body) document.body.style.removeProperty("font-family");
+}
+
+// ── Favicon / title helpers ──────────────────────────────────────────────────
+
+function ensureFaviconLink(): HTMLLinkElement {
   let link = document.querySelector<HTMLLinkElement>("link[data-app-favicon='true']");
   if (link) return link;
-
   link = document.createElement("link");
   link.setAttribute("data-app-favicon", "true");
   link.rel = "icon";
@@ -373,44 +273,72 @@ function ensureDynamicFaviconLink(): HTMLLinkElement {
 }
 
 function setFavicon(url: string | null): void {
-  const link = ensureDynamicFaviconLink();
-  const nextHref = url ?? DEFAULT_FAVICON_PATH;
-  link.href = nextHref;
+  const link = ensureFaviconLink();
+  const href = url ?? DEFAULT_FAVICON_PATH;
+  link.href = href;
+  link.type = href.startsWith("data:image/png") ? "image/png"
+    : href.endsWith(".ico") ? "image/x-icon" : "image/svg+xml";
+}
 
-  if (nextHref.startsWith("data:image/svg+xml")) {
-    link.type = "image/svg+xml";
-  } else if (nextHref.startsWith("data:image/png")) {
-    link.type = "image/png";
-  } else if (nextHref.startsWith("data:image/x-icon") || nextHref.endsWith(".ico")) {
-    link.type = "image/x-icon";
+// ── Main apply ───────────────────────────────────────────────────────────────
+
+export function applyAppSettingsToDocument(settings: AppSettings): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const s = root.style;
+
+  // Accent (drives the whole glass shell)
+  const brandColor = isHexColor(settings.brand_color) ? settings.brand_color : DEFAULT_BRAND_COLOR;
+  const accent2 = deriveSecondaryAccent(brandColor);
+  s.setProperty("--accent-1", brandColor);
+  s.setProperty("--accent-2", accent2);
+  s.setProperty("--accent-grad", `linear-gradient(135deg, ${brandColor} 0%, ${accent2} 100%)`);
+
+  // HeroUI primary (embedded controls)
+  const scale = buildPrimaryScale(brandColor);
+  s.setProperty("--heroui-primary", scale["500"]);
+  s.setProperty("--heroui-primary-foreground", pickForegroundChannels(parseHexColor(brandColor)));
+  for (const [k, v] of Object.entries(scale)) s.setProperty(`--heroui-primary-${k}`, v);
+
+  // Theme + density + blur
+  const theme = resolveShellTheme(settings.theme_preset ?? null, settings.custom_theme ?? null);
+  if (theme) {
+    root.setAttribute("data-theme", theme.polarity);
+    applyShellTheme(theme);
   } else {
-    link.type = "image/svg+xml";
+    root.setAttribute("data-theme", isThemeValue(settings.default_theme) ? settings.default_theme : "dark");
+    clearShellTheme();
   }
+  root.setAttribute("data-density", settings.density ?? "regular");
+  s.setProperty("--blur", `${clamp(settings.glass_blur ?? 28, 0, 60)}px`);
+
+  // Title + favicon
+  document.title = settings.brand_name?.trim() || DEFAULT_BRAND_NAME;
+  setFavicon(settings.favicon_url ?? null);
 }
 
-function ensureThemeColorMeta(): HTMLMetaElement {
-  let meta = document.querySelector<HTMLMetaElement>("meta[name='theme-color']");
-  if (meta) return meta;
+// ── Cache + broadcast ────────────────────────────────────────────────────────
 
-  meta = document.createElement("meta");
-  meta.name = "theme-color";
-  document.head.appendChild(meta);
-  return meta;
+function normalize(parsed: Partial<AppSettings>): AppSettings {
+  return {
+    ...DEFAULT_APP_SETTINGS,
+    ...parsed,
+    brand_name: typeof parsed.brand_name === "string" && parsed.brand_name.trim() ? parsed.brand_name : DEFAULT_APP_SETTINGS.brand_name,
+    brand_color: isHexColor(parsed.brand_color) ? parsed.brand_color : DEFAULT_APP_SETTINGS.brand_color,
+    default_theme: isThemeValue(parsed.default_theme) ? parsed.default_theme : DEFAULT_APP_SETTINGS.default_theme,
+    density: parsed.density === "compact" || parsed.density === "comfy" || parsed.density === "regular" ? parsed.density : DEFAULT_APP_SETTINGS.density,
+    glass_blur: typeof parsed.glass_blur === "number" ? clamp(parsed.glass_blur, 0, 60) : DEFAULT_APP_SETTINGS.glass_blur,
+    theme_preset: parsed.theme_preset != null && parsed.theme_preset in THEME_PRESETS ? (parsed.theme_preset as ThemePreset) : null,
+    custom_theme: parsed.custom_theme != null && typeof parsed.custom_theme === "object" ? (parsed.custom_theme as CustomTheme) : null,
+  };
 }
-
-// ── Cache helpers ─────────────────────────────────────────────────────────────
 
 export function loadCachedAppSettings(): AppSettings {
-  if (typeof window === "undefined") {
-    return DEFAULT_APP_SETTINGS;
-  }
-
+  if (typeof window === "undefined") return DEFAULT_APP_SETTINGS;
   try {
     const raw = window.localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
     if (!raw) return DEFAULT_APP_SETTINGS;
-
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return normalizeAppSettings(parsed);
+    return normalize(JSON.parse(raw) as Partial<AppSettings>);
   } catch {
     return DEFAULT_APP_SETTINGS;
   }
@@ -421,78 +349,36 @@ export function saveCachedAppSettings(settings: AppSettings): void {
   try {
     window.localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   } catch {
-    // Ignore storage errors (e.g., private browsing).
+    /* ignore */
   }
 }
 
 export function persistAndApplyAppSettings(settings: AppSettings): void {
   saveCachedAppSettings(settings);
   applyAppSettingsToDocument(settings);
-
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent<AppSettings>(APP_SETTINGS_UPDATED_EVENT, { detail: settings }));
   }
 }
 
-export function subscribeToAppSettingsUpdates(
-  listener: (settings: AppSettings) => void,
-): () => void {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-
-  const onEvent = (event: Event) => {
-    const customEvent = event as CustomEvent<AppSettings>;
-    if (customEvent.detail) {
-      listener(customEvent.detail);
-    }
+export function subscribeToAppSettingsUpdates(listener: (s: AppSettings) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onEvent = (e: Event) => {
+    const ce = e as CustomEvent<AppSettings>;
+    if (ce.detail) listener(ce.detail);
   };
-
-  const onStorage = (event: StorageEvent) => {
-    if (event.key !== APP_SETTINGS_STORAGE_KEY || !event.newValue) return;
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== APP_SETTINGS_STORAGE_KEY || !e.newValue) return;
     try {
-      const parsed = JSON.parse(event.newValue) as Partial<AppSettings>;
-      listener(normalizeAppSettings(parsed));
+      listener(normalize(JSON.parse(e.newValue) as Partial<AppSettings>));
     } catch {
-      // Ignore malformed storage payloads.
+      /* ignore */
     }
   };
-
   window.addEventListener(APP_SETTINGS_UPDATED_EVENT, onEvent as EventListener);
   window.addEventListener("storage", onStorage);
-
   return () => {
     window.removeEventListener(APP_SETTINGS_UPDATED_EVENT, onEvent as EventListener);
     window.removeEventListener("storage", onStorage);
   };
-}
-
-// ── Main document apply ───────────────────────────────────────────────────────
-
-export function applyAppSettingsToDocument(settings: AppSettings): void {
-  if (typeof document === "undefined") return;
-
-  const brandName = settings.brand_name.trim() || DEFAULT_BRAND_NAME;
-  const brandColor = isHexColor(settings.brand_color)
-    ? settings.brand_color
-    : DEFAULT_BRAND_COLOR;
-  const scale = buildPrimaryScaleChannels(brandColor);
-  const foreground = pickForegroundChannels(parseHexColor(brandColor));
-
-  const rootStyle = document.documentElement.style;
-  rootStyle.setProperty("--brand-primary", brandColor);
-  rootStyle.setProperty("--heroui-primary", scale["500"]);
-  rootStyle.setProperty("--heroui-primary-foreground", foreground);
-
-  for (const [shade, value] of Object.entries(scale)) {
-    rootStyle.setProperty(`--heroui-primary-${shade}`, value);
-  }
-
-  document.title = brandName;
-  setFavicon(settings.favicon_url ?? null);
-
-  const themeColorMeta = ensureThemeColorMeta();
-  themeColorMeta.content = brandColor;
-
-  applyThemeOverrides(settings.theme_preset ?? null, settings.custom_theme ?? null);
 }
