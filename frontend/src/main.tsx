@@ -3,7 +3,6 @@ import ReactDOM from "react-dom/client";
 import { ToastProvider } from "@heroui/toast";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./stores/appStore";
-import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { AppSettingsProvider } from "./context/AppSettingsContext";
 import { applyAppSettingsToDocument, loadCachedAppSettings } from "./lib/appSettings";
@@ -19,7 +18,7 @@ applyAppSettingsToDocument(loadCachedAppSettings());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider>
+    <>
       <ToastProvider placement="bottom-right" maxVisibleToasts={5} disableAnimation={true} />
         <AuthProvider>
           <AppSettingsProvider>
@@ -58,6 +57,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </AppProvider>
           </AppSettingsProvider>
         </AuthProvider>
-    </ThemeProvider>
+    </>
   </React.StrictMode>
 );
