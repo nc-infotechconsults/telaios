@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { useTheme } from "../../context/ThemeContext";
+import { useAppSettings } from "../../context/AppSettingsContext";
 import { Icon } from "../../components/Icon";
 import { TelaiOSLogo } from "../../components/common/TelaiOSLogo";
 import MeshBackground from "../../components/MeshBackground";
@@ -49,7 +49,7 @@ const VIEW_LABELS: Record<OperatorView, string> = {
 
 export default function OperatorLayout() {
   const { user, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { settings: appSettings } = useAppSettings();
   const [view, setView] = useState<OperatorView>("overview");
   const [mode, setMode] = useState<OperatorMode>("saas");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -165,7 +165,7 @@ export default function OperatorLayout() {
         {/* ── Topbar ── */}
         <header className="topbar glass">
           <div className="crumb">
-            <b style={{ color: "#ff9f0a" }}>TelaiOS Operator</b>
+            <b style={{ color: "#ff9f0a" }}>{(appSettings.brand_name?.trim() || "TelaiOS")} Operator</b>
             <span className="crumb-sep">/</span>
             <span>{VIEW_LABELS[view]}</span>
           </div>
@@ -278,42 +278,6 @@ export default function OperatorLayout() {
                       <Icon name="settings" size="sm" />
                       <span>Account settings</span>
                     </button>
-                  </div>
-                  {/* Theme */}
-                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
-                    <div style={{ padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
-                      <Icon name="spark" size="sm" style={{ color: "var(--fg-3)" }} />
-                      <span style={{ flex: 1, fontSize: 13 }}>Theme</span>
-                      <div style={{
-                        display: "flex", background: "var(--glass-weak)",
-                        border: "0.5px solid var(--hairline)", borderRadius: 6,
-                        overflow: "hidden", fontSize: 11,
-                      }}>
-                        <button
-                          style={{
-                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
-                            fontWeight: theme === "light" ? 600 : 400,
-                            background: theme === "light" ? "var(--glass)" : "transparent",
-                            color: theme === "light" ? "var(--fg)" : "var(--fg-3)",
-                            borderRight: "0.5px solid var(--hairline)",
-                          }}
-                          onClick={() => setTheme("light")}
-                        >
-                          Light
-                        </button>
-                        <button
-                          style={{
-                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
-                            fontWeight: theme === "dark" ? 600 : 400,
-                            background: theme === "dark" ? "var(--glass)" : "transparent",
-                            color: theme === "dark" ? "var(--fg)" : "var(--fg-3)",
-                          }}
-                          onClick={() => setTheme("dark")}
-                        >
-                          Dark
-                        </button>
-                      </div>
-                    </div>
                   </div>
                   {/* Logout */}
                   <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
+import { useAppSettings } from "../context/AppSettingsContext";
 import { getProjects, sendConversationMessage } from "../lib/api";
 import type { Project } from "../types";
 import { Icon } from "./Icon";
@@ -110,7 +110,8 @@ const COMMANDS = [
 export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const { user, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { settings: appSettings } = useAppSettings();
+  const brand = appSettings.brand_name?.trim() || "TelaiOS";
 
   const [project, setProject] = useState<Project | null>(null);
   const [sidebarProjects, setSidebarProjects] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -238,7 +239,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
     // Response arrives via the sidebar SSE connection
   };
 
-  const projectName = wsView ? "TelaiOS" : (project?.name ?? "Project");
+  const projectName = wsView ? brand : (project?.name ?? "Project");
   const projectColor = wsView ? "#0a84ff" : (sidebarProjects.find((p) => p.id === projectId)?.color ?? "#0a84ff");
   const userInitials = user?.display_name?.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() ?? "U";
   const unreadNotifs = 0;
@@ -303,7 +304,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
       <MeshBackground />
       <div
         className="app"
-        data-theme={theme}
         data-density={density}
         data-ai-collapsed={(wsView || aiCollapsed) ? "true" : undefined}
       >
@@ -311,7 +311,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         <aside className="sidebar glass">
           <div className="sb-brand">
             <div className="sb-logo" />
-            <span>TelaiOS</span>
+            {appSettings.logo_url ? <img src={appSettings.logo_url} alt={`${brand} logo`} style={{ height: 20 }} /> : <span>{brand}</span>}
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)", fontWeight: 500 }}>v2.4</span>
           </div>
 
@@ -412,7 +412,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
                   {wsView ? "T" : projectName.charAt(0).toUpperCase()}
                 </div>
                 <div className="ws-meta">
-                  <b>{wsView ? "TelaiOS" : projectName}</b>
+                  <b>{wsView ? brand : projectName}</b>
                   <span>{wsView ? "Admin Console" : "Switch workspace"}</span>
                 </div>
                 <div className="ws-arrows">
@@ -475,7 +475,7 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         {/* ── Topbar ── */}
         <header className="topbar glass">
           <div className="crumb">
-            <span style={{ color: "var(--fg-3)" }}>TelaiOS</span>
+            <span style={{ color: "var(--fg-3)" }}>{brand}</span>
             <span className="crumb-sep">/</span>
             {wsView ? (
               <>
@@ -581,42 +581,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
                       <Icon name="settings" size="sm" />
                       <span>Account settings</span>
                     </button>
-                  </div>
-                  {/* Theme */}
-                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
-                    <div style={{ padding: "8px 10px", display: "flex", alignItems: "center", gap: 8 }}>
-                      <Icon name="spark" size="sm" style={{ color: "var(--fg-3)" }} />
-                      <span style={{ flex: 1, fontSize: 13 }}>Theme</span>
-                      <div style={{
-                        display: "flex", background: "var(--glass-weak)",
-                        border: "0.5px solid var(--hairline)", borderRadius: 6,
-                        overflow: "hidden", fontSize: 11,
-                      }}>
-                        <button
-                          style={{
-                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
-                            fontWeight: theme === "light" ? 600 : 400,
-                            background: theme === "light" ? "var(--glass)" : "transparent",
-                            color: theme === "light" ? "var(--fg)" : "var(--fg-3)",
-                            borderRight: "0.5px solid var(--hairline)",
-                          }}
-                          onClick={() => setTheme("light")}
-                        >
-                          Light
-                        </button>
-                        <button
-                          style={{
-                            padding: "3px 10px", border: "none", fontSize: 11, cursor: "pointer",
-                            fontWeight: theme === "dark" ? 600 : 400,
-                            background: theme === "dark" ? "var(--glass)" : "transparent",
-                            color: theme === "dark" ? "var(--fg)" : "var(--fg-3)",
-                          }}
-                          onClick={() => setTheme("dark")}
-                        >
-                          Dark
-                        </button>
-                      </div>
-                    </div>
                   </div>
                   {/* Logout */}
                   <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
