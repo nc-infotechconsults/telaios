@@ -105,3 +105,24 @@ class TestPatchSettingsDto:
     def test_rejects_non_data_url_favicon(self):
         with pytest.raises(ValidationError):
             PatchSettingsDto(favicon_url="/favicon.ico")
+
+
+class TestDensityGlassBlur:
+    def test_accepts_valid_density_and_blur(self) -> None:
+        dto = PatchSettingsDto(density="compact", glass_blur=30)
+        assert dto.density == "compact"
+        assert dto.glass_blur == 30
+
+    def test_rejects_unknown_density(self) -> None:
+        with pytest.raises(ValidationError):
+            PatchSettingsDto(density="huge")
+
+    @pytest.mark.parametrize("blur", [-1, 61, 100])
+    def test_rejects_out_of_range_blur(self, blur: int) -> None:
+        with pytest.raises(ValidationError):
+            PatchSettingsDto(glass_blur=blur)
+
+    def test_fields_optional(self) -> None:
+        dto = PatchSettingsDto()
+        assert dto.density is None
+        assert dto.glass_blur is None

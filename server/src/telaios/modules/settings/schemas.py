@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.functional_validators import field_validator
@@ -59,6 +59,8 @@ class SettingsRead(BaseModel):
     logo_url: str | None
     favicon_url: str | None
     default_theme: str
+    density: str | None = None
+    glass_blur: int | None = None
     theme_preset: str | None = None
     custom_theme: dict[str, Any] | None = None
     updated_at: datetime
@@ -70,6 +72,8 @@ class PatchSettingsDto(BaseModel):
     logo_url: str | None = Field(default=None, max_length=700_000)  # base64 data URL
     favicon_url: str | None = Field(default=None, max_length=150_000)  # base64 data URL
     default_theme: str | None = Field(default=None, pattern=r"^(light|dark)$")
+    density: Literal["compact", "regular", "comfy"] | None = None
+    glass_blur: int | None = Field(default=None, ge=0, le=60)
     theme_preset: ThemePreset | None = None
     custom_theme: CustomTheme | None = None
 
