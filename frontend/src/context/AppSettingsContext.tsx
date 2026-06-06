@@ -40,6 +40,13 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
+    // Only fetch when authenticated. Unauthenticated routes (e.g. /login) would
+    // otherwise hit GET /settings → 401 → a spurious "session expired" redirect.
+    // Re-runs after login because `user` is a dependency.
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const fresh = await getSettings();
       apply(fresh);
@@ -48,7 +55,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [apply]);
+  }, [apply, user]);
 
   const save = useCallback(
     async (patch: PatchSettingsPayload) => {

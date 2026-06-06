@@ -119,7 +119,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [aiCollapsed, setAiCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [density] = useState<"compact" | "regular" | "comfy">("regular");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
@@ -304,7 +303,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
       <MeshBackground />
       <div
         className="app"
-        data-density={density}
         data-ai-collapsed={(wsView || aiCollapsed) ? "true" : undefined}
       >
         {/* ── Sidebar ── */}
