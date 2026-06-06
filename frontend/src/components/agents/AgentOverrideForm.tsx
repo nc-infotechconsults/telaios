@@ -169,7 +169,7 @@ export default function AgentOverrideForm({
   // ── Skill helpers ─────────────────────────────────────────────────────────────
 
   const addSkill = () =>
-    setSkills((prev) => [...prev, { name: "", description: "", instructions: "", inputSchema: { type: "object", properties: {}, required: [] } }]);
+    setSkills((prev) => [...prev, { name: "", description: "", content: "" }]);
 
   const updateSkill = (i: number, update: Partial<typeof skills[0]>) =>
     setSkills((prev) => prev.map((s, j) => (j === i ? { ...s, ...update } : s)));
