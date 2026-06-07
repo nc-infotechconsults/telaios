@@ -1,4 +1,5 @@
 import { Avatar, Button, Dropdown, Kbd } from "@heroui/react";
+import { Icon } from "../Icon";
 import { useAuth } from "../../context/AuthContext";
 
 interface TopbarProps {
@@ -6,6 +7,11 @@ interface TopbarProps {
   breadcrumbColor?: string;
   viewLabel: string;
   onOpenCommandPalette: () => void;
+  /** When defined, renders an AI sidebar toggle button to its left of the avatar. */
+  aiSidebar?: {
+    collapsed: boolean;
+    onToggle: () => void;
+  };
 }
 
 export function Topbar({
@@ -13,6 +19,7 @@ export function Topbar({
   breadcrumbColor,
   viewLabel,
   onOpenCommandPalette,
+  aiSidebar,
 }: TopbarProps) {
   const { user, logout } = useAuth();
   const initials =
@@ -49,6 +56,33 @@ export function Topbar({
           <Kbd.Content>K</Kbd.Content>
         </Kbd>
       </Button>
+
+      {/* Notifications */}
+      <Dropdown>
+        <Button isIconOnly size="sm" variant="tertiary" aria-label="Notifications">
+          <i className="fa-solid fa-bell text-muted" aria-hidden />
+        </Button>
+        <Dropdown.Popover>
+          <div className="w-[320px] px-4 py-3">
+            <div className="mb-1 text-[13px] font-semibold text-foreground">Notifications</div>
+            <p className="text-[12.5px] text-muted">You're all caught up.</p>
+          </div>
+        </Dropdown.Popover>
+      </Dropdown>
+
+      {/* AI sidebar toggle — project mode, non-conversation views */}
+      {aiSidebar && (
+        <Button
+          isIconOnly
+          size="sm"
+          variant={aiSidebar.collapsed ? "tertiary" : "secondary"}
+          onPress={aiSidebar.onToggle}
+          aria-label={aiSidebar.collapsed ? "Show TEOS assistant" : "Hide TEOS assistant"}
+          aria-pressed={!aiSidebar.collapsed}
+        >
+          <Icon name="panel" size="sm" />
+        </Button>
+      )}
 
       <Dropdown>
         <Button isIconOnly size="sm" variant="tertiary" aria-label="User menu">

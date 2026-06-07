@@ -264,6 +264,11 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
           breadcrumbTitle={wsView ? brand : (project?.name ?? "Project")}
           viewLabel={wsView ? WS_VIEW_LABELS[wsView] : VIEW_LABELS[view]}
           onOpenCommandPalette={() => setCmdOpen(true)}
+          aiSidebar={
+            !wsView && view !== "conversation"
+              ? { collapsed: aiCollapsed, onToggle: () => setAiCollapsed((c) => !c) }
+              : undefined
+          }
         />
 
         {/* ── Main ── */}
