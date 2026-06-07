@@ -56,10 +56,6 @@ from telaios.domain.enums import (
     SystemRole,
     TaskStatus,
     TaskType,
-    ThemeFontFamily,
-    ThemePreset,
-    ThemeRadius,
-    ThemeShadow,
     WorkspaceStatus,
 )
 from telaios.domain.events import (
@@ -184,10 +180,6 @@ __all__ = [
     "TaskStatus",
     "TaskStatusChanged",
     "TaskType",
-    "ThemeFontFamily",
-    "ThemePreset",
-    "ThemeRadius",
-    "ThemeShadow",
     "User",
     "UserId",
     "Workspace",

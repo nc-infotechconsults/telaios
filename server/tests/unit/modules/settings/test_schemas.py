@@ -29,8 +29,6 @@ class TestSettingsRead:
             "logo_url": "data:image/png;base64,abc",
             "favicon_url": "data:image/x-icon;base64,def",
             "default_theme": "dark",
-            "density": "regular",
-            "glass_blur": 28,
             "updated_at": _now(),
         }
         read = SettingsRead.model_validate(data)
@@ -38,8 +36,6 @@ class TestSettingsRead:
         assert read.brand_name == "TelaiOS"
         assert read.brand_color == "#006FEE"
         assert read.default_theme == "dark"
-        assert read.density == "regular"
-        assert read.glass_blur == 28
 
     def test_minimal(self):
         data = {
@@ -49,8 +45,6 @@ class TestSettingsRead:
             "logo_url": None,
             "favicon_url": None,
             "default_theme": "dark",
-            "density": "regular",
-            "glass_blur": 28,
             "updated_at": _now(),
         }
         read = SettingsRead.model_validate(data)
@@ -113,22 +107,3 @@ class TestPatchSettingsDto:
             PatchSettingsDto(favicon_url="/favicon.ico")
 
 
-class TestDensityGlassBlur:
-    def test_accepts_valid_density_and_blur(self) -> None:
-        dto = PatchSettingsDto(density="compact", glass_blur=30)
-        assert dto.density == "compact"
-        assert dto.glass_blur == 30
-
-    def test_rejects_unknown_density(self) -> None:
-        with pytest.raises(ValidationError):
-            PatchSettingsDto(density="huge")
-
-    @pytest.mark.parametrize("blur", [-1, 61, 100])
-    def test_rejects_out_of_range_blur(self, blur: int) -> None:
-        with pytest.raises(ValidationError):
-            PatchSettingsDto(glass_blur=blur)
-
-    def test_fields_optional(self) -> None:
-        dto = PatchSettingsDto()
-        assert dto.density is None
-        assert dto.glass_blur is None

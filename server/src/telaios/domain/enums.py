@@ -372,38 +372,6 @@ class K8sResourceKind(StrEnum):
 
 
 # ── UI Theme ───────────────────────────────────────────────────────────────────
-
-
-class ThemeRadius(StrEnum):
-    NONE = "none"
-    SMALL = "small"
-    MEDIUM = "medium"
-    LARGE = "large"
-    FULL = "full"
-
-
-class ThemeShadow(StrEnum):
-    NONE = "none"
-    SMALL = "small"
-    MEDIUM = "medium"
-    LARGE = "large"
-
-
-class ThemeFontFamily(StrEnum):
-    SYSTEM = "system"
-    INTER = "inter"
-    ROBOTO = "roboto"
-    HELVETICA = "helvetica"
-    GEORGIA = "georgia"
-    MONO = "mono"
-
-
-class ThemePreset(StrEnum):
-    DEFAULT = "default"
-    CORPORATE = "corporate"
-    MIDNIGHT = "midnight"
-    WARM = "warm"
-    MINIMAL = "minimal"
-    OCEAN = "ocean"
-    FOREST = "forest"
-    SUNSET = "sunset"
+# (Removed in HeroUI v3 migration Slice 3: ThemeRadius, ThemeShadow,
+#  ThemeFontFamily, ThemePreset — all were specific to the glass design
+#  system's per-property custom_theme settings.)

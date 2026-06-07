@@ -55,8 +55,8 @@ class TestGetSettings:
         res = client.get("/settings", headers={"Authorization": f"Bearer {member_token}"})
         assert res.status_code == 200
         body = res.json()
-        assert body["density"] == "regular"
-        assert body["glass_blur"] == 28
+        assert body["brand_name"] == "TelaiOS"
+        assert body["default_theme"] == "dark"
 
     def test_requires_auth(self, client: TestClient) -> None:
         res = client.get("/settings")
@@ -118,23 +118,3 @@ class TestPatchSettings:
         res = client.patch("/settings", json={"brand_name": "No Auth"})
         assert res.status_code == 401
 
-    def test_admin_can_patch_density_and_glass_blur(
-        self, client: TestClient, admin_token: str
-    ) -> None:
-        res = client.patch(
-            "/settings",
-            json={"density": "compact", "glass_blur": 40},
-            headers={"Authorization": f"Bearer {admin_token}"},
-        )
-        assert res.status_code == 200
-        body = res.json()
-        assert body["density"] == "compact"
-        assert body["glass_blur"] == 40
-
-    def test_rejects_invalid_density(self, client: TestClient, admin_token: str) -> None:
-        res = client.patch(
-            "/settings",
-            json={"density": "huge"},
-            headers={"Authorization": f"Bearer {admin_token}"},
-        )
-        assert res.status_code == 422

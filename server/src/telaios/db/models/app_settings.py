@@ -1,13 +1,12 @@
 """Global application settings singleton (``settings`` table).
 
 Ported from ``data-api/src/entities/Settings.entity.ts``. Single-row table
-holding UI customisation settings.
+holding UI customisation settings: brand identity and theme polarity.
 """
 
 from __future__ import annotations
 
 from sqlalchemy import Integer, String
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from telaios.db.base import Base, SoftDeleteAuditMixin
@@ -32,13 +31,3 @@ class AppSettings(Base, SoftDeleteAuditMixin):
     default_theme: Mapped[str] = mapped_column(
         String, nullable=False, default="dark", server_default="dark"
     )
-    density: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="regular", server_default="regular"
-    )
-    glass_blur: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=28, server_default="28"
-    )
-
-    # ── Extended theme customisation ─────────────────────────────────────────
-    theme_preset: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    custom_theme: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
