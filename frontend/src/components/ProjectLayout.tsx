@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import { useAppSettings } from "../context/AppSettingsContext";
 import { getProjects, sendConversationMessage } from "../lib/api";
 import type { Project } from "../types";
 import { Icon } from "./Icon";
 import MeshBackground from "./MeshBackground";
 import { Sidebar } from "./shell/Sidebar";
+import { Topbar } from "./shell/Topbar";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
@@ -75,7 +75,6 @@ const SPECIALISTS: Record<string, { name: string; icon: string; color: string; t
 
 const PROJECT_COLORS = ["#0a84ff", "#bf5af2", "#30d158", "#ff9f0a", "#ff375f", "#5e5ce6"];
 
-const MOCK_NOTIFICATIONS: never[] = [];
 
 const COMMANDS = [
   { section: "Ask TEOS", items: [
@@ -95,7 +94,6 @@ const COMMANDS = [
 
 export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
-  const { user, logout } = useAuth();
   const { settings: appSettings } = useAppSettings();
   const brand = appSettings.brand_name?.trim() || "TelaiOS";
 
@@ -104,8 +102,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [view, setView] = useState<ProjectView>("dashboard");
   const [aiCollapsed, setAiCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // TEOS sidebar state
   const [teosMessages, setTeosMessages] = useState<Array<{ role: string; text: string; specialist?: string }>>([]);
@@ -223,8 +219,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
     // Response arrives via the sidebar SSE connection
   };
 
-  const userInitials = user?.display_name?.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() ?? "U";
-  const unreadNotifs = 0;
 
   const renderView = () => {
     // Workspace mode
@@ -288,131 +282,12 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         />
 
         {/* ── Topbar ── */}
-        <header className="topbar glass">
-          <div className="crumb">
-            <span style={{ color: "var(--fg-3)" }}>{brand}</span>
-            <span className="crumb-sep">/</span>
-            {wsView ? (
-              <>
-                <span style={{ color: "var(--fg-3)" }}>Admin</span>
-                <span className="crumb-sep">/</span>
-                <b>{WS_VIEW_LABELS[wsView]}</b>
-              </>
-            ) : (
-              <>
-                <span style={{ color: "var(--fg-3)" }}>{project?.name ?? "…"}</span>
-                <span className="crumb-sep">/</span>
-                <b>{VIEW_LABELS[view]}</b>
-                {crumbTag[view] && <span className="crumb-tag">{crumbTag[view]}</span>}
-              </>
-            )}
-          </div>
-
-          <div className="tb-spacer" />
-
-          <button className="tb-search" onClick={() => setCmdOpen(true)}>
-            <Icon name="search" size="sm" />
-            <span>Search or ask TEOS…</span>
-            <kbd>⌘K</kbd>
-          </button>
-
-          {/* Notifications */}
-          <div className="notif-wrap">
-            <button className="tb-btn" title="Notifications" onClick={() => setNotifOpen(!notifOpen)}>
-              <Icon name="bell" size="sm" />
-              {unreadNotifs > 0 && <span className="notif-dot" />}
-            </button>
-            {notifOpen && (
-              <>
-                <div className="vis-backdrop" onClick={() => setNotifOpen(false)} />
-                <NotifPopover
-                  notifications={MOCK_NOTIFICATIONS}
-                  openInbox={() => { setView("inbox"); setNotifOpen(false); }}
-                />
-              </>
-            )}
-          </div>
-
-          {!wsView && view !== "conversation" && (
-            <button className="tb-btn" title={aiCollapsed ? "Show AI" : "Hide AI"} data-active={!aiCollapsed} onClick={() => setAiCollapsed((v) => !v)}>
-              <Icon name="panel" size="sm" />
-            </button>
-          )}
-          {/* User menu */}
-          <div style={{ position: "relative" }}>
-            <button
-              className="tb-btn"
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px 3px 4px", borderRadius: 8, height: 32, width: "auto" }}
-              onClick={() => setUserMenuOpen((v) => !v)}
-            >
-              <div style={{
-                width: 22, height: 22, borderRadius: "50%",
-                background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 9, fontWeight: 600, color: "#fff", flexShrink: 0,
-              }}>
-                {userInitials}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2, textAlign: "left" }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600 }}>{user?.display_name ?? "User"}</span>
-                <span style={{ fontSize: 10, color: "var(--fg-3)", textTransform: "capitalize" }}>{user?.system_role ?? "member"}</span>
-              </div>
-              <Icon name="chevd" size="sm" style={{ color: "var(--fg-3)", fontSize: 10, transform: userMenuOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
-            </button>
-
-            {userMenuOpen && (
-              <>
-                <div className="vis-backdrop" onClick={() => setUserMenuOpen(false)} />
-                <div
-                  className="glass"
-                  style={{
-                    position: "absolute", top: "calc(100% + 6px)", right: 0,
-                    width: 240, borderRadius: 10, border: "0.5px solid var(--hairline)",
-                    boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
-                  }}
-                >
-                  {/* Header */}
-                  <div style={{ padding: "14px 14px 12px", borderBottom: "0.5px solid var(--hairline)", display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      background: "linear-gradient(135deg, #0a84ff, #5e5ce6)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0,
-                    }}>
-                      {userInitials}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{user?.display_name ?? "User"}</div>
-                      <div style={{ fontSize: 11, color: "var(--fg-3)" }}>{user?.email ?? ""}</div>
-                    </div>
-                  </div>
-                  {/* Account settings */}
-                  <div style={{ padding: 4 }}>
-                    <button
-                      className="sb-row"
-                      style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8 }}
-                      onClick={() => { setUserMenuOpen(false); window.location.href = "/settings"; }}
-                    >
-                      <Icon name="settings" size="sm" />
-                      <span>Account settings</span>
-                    </button>
-                  </div>
-                  {/* Logout */}
-                  <div style={{ padding: "4px 4px 4px", borderTop: "0.5px solid var(--hairline)" }}>
-                    <button
-                      className="sb-row"
-                      style={{ width: "100%", borderRadius: 7, padding: "8px 10px", gap: 8, color: "#ff375f" }}
-                      onClick={() => { setUserMenuOpen(false); logout(); }}
-                    >
-                      <Icon name="arrow" size="sm" style={{ transform: "rotate(180deg)" }} />
-                      <span>Log out</span>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </header>
+        <Topbar
+          breadcrumbTitle={wsView ? brand : (project?.name ?? "Project")}
+          viewLabel={wsView ? WS_VIEW_LABELS[wsView] : VIEW_LABELS[view]}
+          extraTag={!wsView ? crumbTag[view] : undefined}
+          onOpenCommandPalette={() => setCmdOpen(true)}
+        />
 
         {/* ── Main ── */}
         <main className="main glass">
@@ -579,27 +454,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         />
       )}
     </>
-  );
-}
-
-/* ── NotifPopover ── */
-function NotifPopover({ notifications: _notifications, openInbox }: {
-  notifications: never[];
-  openInbox: () => void;
-}) {
-  return (
-    <div className="notif-pop glass">
-      <div className="notif-head">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>Notifications</span>
-        </div>
-        <div style={{ flex: 1 }} />
-        <button className="pill-btn" onClick={openInbox} style={{ fontSize: 11 }}>Open Inbox</button>
-      </div>
-      <div className="notif-body" style={{ padding: "20px 16px", textAlign: "center", color: "var(--fg-3)", fontSize: 13 }}>
-        You're all caught up.
-      </div>
-    </div>
   );
 }
 
