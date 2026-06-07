@@ -280,7 +280,12 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         </main>
 
         {/* ── AI Sidebar (project mode only) ── */}
-        {!wsView && <aside className="ai-side glass glass-strong">
+        {!wsView && <aside
+          aria-label="TEOS AI assistant"
+          className={`row-span-2 col-start-3 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-surface transition-[width,opacity] duration-300 ${
+            aiCollapsed ? "pointer-events-none w-0 opacity-0" : "w-[380px] opacity-100"
+          }`}
+        >
           <div className="ai-head">
             <div className="ai-head-title">
               <span className="ai-orb" />
