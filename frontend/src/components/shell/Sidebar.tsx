@@ -67,7 +67,6 @@ export function Sidebar({ mode }: SidebarProps) {
           <TelaiOSLogo size={26} />
         )}
         <span className="truncate text-foreground">{brand}</span>
-        <span className="ms-auto text-[11px] font-medium text-muted">v2.4</span>
       </div>
 
       {mode.kind === "workspace" ? (
