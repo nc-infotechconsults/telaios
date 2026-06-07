@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { Icon } from "../../components/Icon";
 import { TelaiOSLogo } from "../../components/common/TelaiOSLogo";
-import MeshBackground from "../../components/MeshBackground";
 
 import OperatorOverview   from "./OperatorOverview";
 import OperatorWorkspaces from "./OperatorWorkspaces";
@@ -73,7 +72,6 @@ export default function OperatorLayout() {
 
   return (
     <OperatorContext.Provider value={{ mode, setMode }}>
-      <MeshBackground />
       <div
         className="app"
         data-ai-collapsed="true"
