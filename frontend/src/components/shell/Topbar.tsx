@@ -1,11 +1,10 @@
-import { Avatar, Button, Chip, Dropdown, Kbd } from "@heroui/react";
+import { Avatar, Button, Dropdown, Kbd } from "@heroui/react";
 import { useAuth } from "../../context/AuthContext";
 
 interface TopbarProps {
   breadcrumbTitle: string;
   breadcrumbColor?: string;
   viewLabel: string;
-  extraTag?: string;
   onOpenCommandPalette: () => void;
 }
 
@@ -13,7 +12,6 @@ export function Topbar({
   breadcrumbTitle,
   breadcrumbColor,
   viewLabel,
-  extraTag,
   onOpenCommandPalette,
 }: TopbarProps) {
   const { user, logout } = useAuth();
@@ -33,11 +31,6 @@ export function Topbar({
         <b className="truncate font-semibold text-foreground">{breadcrumbTitle}</b>
         <span className="text-muted/60">/</span>
         <span className="truncate">{viewLabel}</span>
-        {extraTag && (
-          <Chip size="sm" variant="secondary" className="ms-1">
-            {extraTag}
-          </Chip>
-        )}
       </div>
 
       <div className="flex-1" />
@@ -57,10 +50,6 @@ export function Topbar({
         </Kbd>
       </Button>
 
-      <Button isIconOnly size="sm" variant="tertiary" aria-label="Notifications">
-        <i className="fa-solid fa-bell text-muted" aria-hidden />
-      </Button>
-
       <Dropdown>
         <Button isIconOnly size="sm" variant="tertiary" aria-label="User menu">
           <Avatar size="sm" className="bg-accent text-accent-foreground">
@@ -73,9 +62,6 @@ export function Topbar({
             if (key === "logout") logout();
           }}
         >
-          <Dropdown.Item id="profile" textValue="Profile">
-            Profile
-          </Dropdown.Item>
           <Dropdown.Item id="logout" textValue="Sign out" variant="danger">
             Sign out
           </Dropdown.Item>

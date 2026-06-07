@@ -237,12 +237,6 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
     }
   };
 
-  const crumbTag: Record<string, string> = {
-    repositories: "5 sources · 22.4k symbols",
-    documents: "10 indexed · 752 pages",
-    library: "8 MCP servers · 8 skills",
-  };
-
   return (
     <>
       <div
@@ -269,7 +263,6 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
         <Topbar
           breadcrumbTitle={wsView ? brand : (project?.name ?? "Project")}
           viewLabel={wsView ? WS_VIEW_LABELS[wsView] : VIEW_LABELS[view]}
-          extraTag={!wsView ? crumbTag[view] : undefined}
           onOpenCommandPalette={() => setCmdOpen(true)}
         />
 
