@@ -364,10 +364,10 @@ export const getLlmProviders = (): Promise<LlmProviderDefinition[]> =>
 // ─── System Settings (admin) ──────────────────────────────────────────────────
 
 export const getSettings = (): Promise<AppSettings> =>
-  DEMO ? delay<AppSettings>({ id: 1, brand_name: "TelaiOS", brand_color: "#006FEE", logo_url: null, favicon_url: null, default_theme: "dark", density: "regular", glass_blur: 28, theme_preset: null, custom_theme: null, updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
+  DEMO ? delay<AppSettings>({ id: 1, brand_name: "TelaiOS", brand_color: "#006FEE", logo_url: null, favicon_url: null, default_theme: "dark", updated_at: new Date().toISOString() }) : http.get<AppSettings>("/settings").then((r) => r.data);
 
 export const patchSettings = (data: PatchSettingsPayload): Promise<AppSettings> =>
-  DEMO ? delay<AppSettings>({ id: 1, brand_name: data.brand_name ?? "TelaiOS", brand_color: data.brand_color ?? "#006FEE", logo_url: data.logo_url ?? null, favicon_url: data.favicon_url ?? null, default_theme: data.default_theme ?? "dark", density: data.density ?? "regular", glass_blur: data.glass_blur ?? 28, theme_preset: data.theme_preset ?? null, custom_theme: data.custom_theme ?? null, updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
+  DEMO ? delay<AppSettings>({ id: 1, brand_name: data.brand_name ?? "TelaiOS", brand_color: data.brand_color ?? "#006FEE", logo_url: data.logo_url ?? null, favicon_url: data.favicon_url ?? null, default_theme: data.default_theme ?? "dark", updated_at: new Date().toISOString() }) : http.patch<AppSettings>("/settings", data).then((r) => r.data);
 
 // ─── Agent Profiles (legacy — retained for settings/admin pages) ──────────────
 

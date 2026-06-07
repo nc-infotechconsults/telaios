@@ -946,25 +946,6 @@ export interface DocumentAnalytics {
 
 // ── System Settings ────────────────────────────────────────────────────────────
 
-export type ThemePreset = "default" | "corporate" | "midnight" | "warm" | "minimal" | "ocean" | "forest" | "sunset";
-export type RadiusStep = "none" | "small" | "medium" | "large" | "full";
-export type ShadowStep = "none" | "small" | "medium" | "large";
-export type FontFamilyKey = "system" | "inter" | "roboto" | "helvetica" | "georgia" | "mono";
-export type Density = "compact" | "regular" | "comfy";
-
-export interface CustomTheme {
-  background?: string;
-  foreground?: string;
-  content1?: string;
-  content2?: string;
-  content3?: string;
-  divider?: string;
-  radius?: RadiusStep;
-  shadow?: ShadowStep;
-  font_family?: FontFamilyKey;
-  sidebar_background?: string;
-}
-
 export interface AppSettings {
   id: number;
   brand_name: string;
@@ -972,10 +953,6 @@ export interface AppSettings {
   logo_url: string | null;
   favicon_url: string | null;
   default_theme: string;
-  density: Density;
-  glass_blur: number;
-  theme_preset: ThemePreset | null;
-  custom_theme: CustomTheme | null;
   updated_at: string;
 }
 
@@ -985,10 +962,6 @@ export interface PatchSettingsPayload {
   logo_url?: string | null;
   favicon_url?: string | null;
   default_theme?: string;
-  density?: Density;
-  glass_blur?: number;
-  theme_preset?: ThemePreset | null;
-  custom_theme?: CustomTheme | null;
 }
 
 // ── Conversation ──────────────────────────────────────────────────────────────

@@ -1,11 +1,4 @@
-import type {
-  AppSettings,
-  CustomTheme,
-  FontFamilyKey,
-  RadiusStep,
-  ShadowStep,
-  ThemePreset,
-} from "../types";
+import type { AppSettings } from "../types";
 
 const DEFAULT_BRAND_NAME = "TelaiOS";
 const DEFAULT_BRAND_COLOR = "#0a84ff";
@@ -17,65 +10,6 @@ export const APP_SETTINGS_UPDATED_EVENT = "telaios:app-settings-updated";
 type Theme = "light" | "dark";
 type Rgb = { r: number; g: number; b: number };
 
-// ── Preset definitions (values reused; now applied to glass-shell vars) ──────
-
-interface ShellTheme {
-  polarity: Theme;
-  background: string;
-  foreground: string;
-  surfaceStrong: string; // content1 -> --glass-strong
-  surface: string; // content2 -> --glass
-  surfaceWeak: string; // content3 -> --glass-weak
-  divider: string; // -> --hairline
-  radius: RadiusStep;
-  shadow: ShadowStep;
-  font_family: FontFamilyKey;
-}
-
-export const THEME_PRESETS: Record<ThemePreset, ShellTheme> = {
-  default: { polarity: "dark", background: "#0b0d12", foreground: "#f4f4f7", surfaceStrong: "#2c2c2e", surface: "#1c1c1e", surfaceWeak: "#141418", divider: "rgba(255,255,255,0.08)", radius: "medium", shadow: "medium", font_family: "system" },
-  corporate: { polarity: "light", background: "#ffffff", foreground: "#111111", surfaceStrong: "#f5f5f5", surface: "#eeeeee", surfaceWeak: "#e8e8e8", divider: "#dddddd", radius: "none", shadow: "none", font_family: "helvetica" },
-  midnight: { polarity: "dark", background: "#050c1a", foreground: "#e8f0ff", surfaceStrong: "#0a1628", surface: "#081322", surfaceWeak: "#06101d", divider: "#1a2d4d", radius: "medium", shadow: "large", font_family: "inter" },
-  warm: { polarity: "light", background: "#fdf8f2", foreground: "#2d1f0e", surfaceStrong: "#fef4e8", surface: "#fdf0e0", surfaceWeak: "#fcebd8", divider: "#e8d5ba", radius: "large", shadow: "small", font_family: "georgia" },
-  minimal: { polarity: "light", background: "#ffffff", foreground: "#000000", surfaceStrong: "#fafafa", surface: "#f5f5f5", surfaceWeak: "#f0f0f0", divider: "#e0e0e0", radius: "none", shadow: "none", font_family: "system" },
-  ocean: { polarity: "dark", background: "#04101a", foreground: "#d6eeff", surfaceStrong: "#071c2e", surface: "#061726", surfaceWeak: "#05121e", divider: "#0f3050", radius: "medium", shadow: "large", font_family: "inter" },
-  forest: { polarity: "dark", background: "#061209", foreground: "#d4f0da", surfaceStrong: "#0d2114", surface: "#0b1c11", surfaceWeak: "#09170e", divider: "#163a1f", radius: "large", shadow: "medium", font_family: "georgia" },
-  sunset: { polarity: "dark", background: "#160508", foreground: "#fde8d8", surfaceStrong: "#26080f", surface: "#1f060c", surfaceWeak: "#180509", divider: "#3d1018", radius: "medium", shadow: "large", font_family: "system" },
-};
-
-const RADIUS_VALUES: Record<RadiusStep, { xs: string; sm: string; md: string; lg: string; xl: string }> = {
-  none: { xs: "0px", sm: "0px", md: "0px", lg: "0px", xl: "0px" },
-  small: { xs: "4px", sm: "6px", md: "8px", lg: "10px", xl: "12px" },
-  medium: { xs: "8px", sm: "12px", md: "16px", lg: "22px", xl: "28px" },
-  large: { xs: "12px", sm: "18px", md: "24px", lg: "30px", xl: "36px" },
-  full: { xs: "999px", sm: "999px", md: "999px", lg: "999px", xl: "999px" },
-};
-
-const SHADOW_VALUES: Record<ShadowStep, { lg: string; sm: string }> = {
-  none: { lg: "none", sm: "none" },
-  small: { lg: "0 6px 18px -8px rgba(20,20,40,0.18)", sm: "0 1px 3px rgba(0,0,0,0.12)" },
-  medium: { lg: "0 12px 32px -16px rgba(20,20,40,0.28)", sm: "0 2px 8px -2px rgba(0,0,0,0.18)" },
-  large: { lg: "0 30px 80px -30px rgba(0,0,0,0.6), 0 12px 32px -16px rgba(0,0,0,0.45)", sm: "0 6px 18px -8px rgba(0,0,0,0.4)" },
-};
-
-const FONT_FAMILY_VALUES: Record<FontFamilyKey, string> = {
-  system: "'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif",
-  inter: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
-  roboto: "Roboto, 'Helvetica Neue', Arial, sans-serif",
-  helvetica: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  georgia: "Georgia, 'Times New Roman', serif",
-  mono: "ui-monospace, 'SF Mono', 'Geist Mono', 'Fira Code', monospace",
-};
-
-// Every shell var the bridge may set when a preset/custom theme is active.
-// Listed so they can be cleared when reverting to the plain Light/Dark stylesheet.
-const PRESET_SHELL_VARS = [
-  "--bg", "--fg", "--fg-2", "--fg-3", "--fg-4",
-  "--glass", "--glass-strong", "--glass-weak", "--hairline",
-  "--radius-xs", "--radius-sm", "--radius-md", "--radius-lg", "--radius-xl",
-  "--shadow-lg", "--shadow-sm",
-];
-
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 1,
   brand_name: DEFAULT_BRAND_NAME,
@@ -83,10 +17,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   logo_url: null,
   favicon_url: null,
   default_theme: "dark",
-  density: "regular",
-  glass_blur: 28,
-  theme_preset: null,
-  custom_theme: null,
   updated_at: new Date().toISOString(),
 };
 
@@ -168,63 +98,7 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-function alpha(hex: string, a: number): string {
-  const { r, g, b } = parseHexColor(hex);
-  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
-}
-
-// ── Theme resolution + application ───────────────────────────────────────────
-
-function resolveShellTheme(preset: ThemePreset | null, custom: CustomTheme | null): ShellTheme | null {
-  if (!preset && !custom) return null;
-  const base = THEME_PRESETS[preset ?? "default"];
-  return {
-    polarity: base.polarity,
-    background: isHexColor(custom?.background) ? custom!.background! : base.background,
-    foreground: isHexColor(custom?.foreground) ? custom!.foreground! : base.foreground,
-    surfaceStrong: isHexColor(custom?.content1) ? custom!.content1! : base.surfaceStrong,
-    surface: isHexColor(custom?.content2) ? custom!.content2! : base.surface,
-    surfaceWeak: isHexColor(custom?.content3) ? custom!.content3! : base.surfaceWeak,
-    divider: isHexColor(custom?.divider) ? custom!.divider! : base.divider,
-    radius: custom?.radius ?? base.radius,
-    shadow: custom?.shadow ?? base.shadow,
-    font_family: custom?.font_family ?? base.font_family,
-  };
-}
-
-function applyShellTheme(theme: ShellTheme): void {
-  const s = document.documentElement.style;
-  s.setProperty("--bg", theme.background);
-  if (isHexColor(theme.foreground)) {
-    s.setProperty("--fg", theme.foreground);
-    s.setProperty("--fg-2", alpha(theme.foreground, 0.64));
-    s.setProperty("--fg-3", alpha(theme.foreground, 0.4));
-    s.setProperty("--fg-4", alpha(theme.foreground, 0.18));
-  } else {
-    s.setProperty("--fg", theme.foreground);
-  }
-  s.setProperty("--glass-strong", theme.surfaceStrong);
-  s.setProperty("--glass", theme.surface);
-  s.setProperty("--glass-weak", theme.surfaceWeak);
-  s.setProperty("--hairline", theme.divider);
-  const r = RADIUS_VALUES[theme.radius];
-  s.setProperty("--radius-xs", r.xs); s.setProperty("--radius-sm", r.sm);
-  s.setProperty("--radius-md", r.md); s.setProperty("--radius-lg", r.lg);
-  s.setProperty("--radius-xl", r.xl);
-  const sh = SHADOW_VALUES[theme.shadow];
-  s.setProperty("--shadow-lg", sh.lg); s.setProperty("--shadow-sm", sh.sm);
-  // Font-family must go on <body>: index.css has a direct `body { font-family }`
-  // rule that beats inheritance from <html>, so setting it on the root is inert.
-  if (document.body) document.body.style.setProperty("font-family", FONT_FAMILY_VALUES[theme.font_family]);
-}
-
-function clearShellTheme(): void {
-  const s = document.documentElement.style;
-  for (const v of PRESET_SHELL_VARS) s.removeProperty(v);
-  if (document.body) document.body.style.removeProperty("font-family");
-}
-
-// ── Favicon / title helpers ──────────────────────────────────────────────────
+// ── Favicon helpers ──────────────────────────────────────────────────────────
 
 function ensureFaviconLink(): HTMLLinkElement {
   let link = document.querySelector<HTMLLinkElement>("link[data-app-favicon='true']");
@@ -240,8 +114,11 @@ function setFavicon(url: string | null): void {
   const link = ensureFaviconLink();
   const href = url ?? DEFAULT_FAVICON_PATH;
   link.href = href;
-  link.type = href.startsWith("data:image/png") ? "image/png"
-    : href.endsWith(".ico") ? "image/x-icon" : "image/svg+xml";
+  link.type = href.startsWith("data:image/png")
+    ? "image/png"
+    : href.endsWith(".ico")
+      ? "image/x-icon"
+      : "image/svg+xml";
 }
 
 // ── Main apply ───────────────────────────────────────────────────────────────
@@ -251,37 +128,23 @@ export function applyAppSettingsToDocument(settings: AppSettings): void {
   const root = document.documentElement;
   const s = root.style;
 
-  // Accent (drives the whole glass shell)
+  // Brand accent (legacy glass --accent-* vars stay for unmigrated pages;
+  // HeroUI v3 reads --accent / --accent-foreground).
   const brandColor = isHexColor(settings.brand_color) ? settings.brand_color : DEFAULT_BRAND_COLOR;
   const accent2 = deriveSecondaryAccent(brandColor);
   s.setProperty("--accent-1", brandColor);
   s.setProperty("--accent-2", accent2);
   s.setProperty("--accent-grad", `linear-gradient(135deg, ${brandColor} 0%, ${accent2} 100%)`);
-
-  // HeroUI v3 accent (the primary brand color across all HeroUI components).
-  // v3 uses a single --accent var, not a 50..900 scale. We emit the raw hex —
-  // HeroUI's color-mix-based calculated colors (--accent-hover, --accent-soft,
-  // etc.) handle the blending. --accent-foreground is plain black or white
-  // chosen by the brand color's relative luminance.
   s.setProperty("--accent", brandColor);
   s.setProperty(
     "--accent-foreground",
     relativeLuminance(parseHexColor(brandColor)) > 0.5 ? "#000000" : "#ffffff",
   );
 
-  // Theme + density + blur
-  const theme = resolveShellTheme(settings.theme_preset ?? null, settings.custom_theme ?? null);
-  if (theme) {
-    root.setAttribute("data-theme", theme.polarity);
-    applyShellTheme(theme);
-  } else {
-    root.setAttribute("data-theme", isThemeValue(settings.default_theme) ? settings.default_theme : "dark");
-    clearShellTheme();
-  }
-  root.setAttribute("data-density", settings.density ?? "regular");
-  s.setProperty("--blur", `${clamp(settings.glass_blur ?? 28, 0, 60)}px`);
+  // Theme polarity.
+  root.setAttribute("data-theme", isThemeValue(settings.default_theme) ? settings.default_theme : "dark");
 
-  // Title + favicon
+  // Title + favicon.
   document.title = settings.brand_name?.trim() || DEFAULT_BRAND_NAME;
   setFavicon(settings.favicon_url ?? null);
 }
@@ -292,13 +155,12 @@ function normalize(parsed: Partial<AppSettings>): AppSettings {
   return {
     ...DEFAULT_APP_SETTINGS,
     ...parsed,
-    brand_name: typeof parsed.brand_name === "string" && parsed.brand_name.trim() ? parsed.brand_name : DEFAULT_APP_SETTINGS.brand_name,
+    brand_name:
+      typeof parsed.brand_name === "string" && parsed.brand_name.trim()
+        ? parsed.brand_name
+        : DEFAULT_APP_SETTINGS.brand_name,
     brand_color: isHexColor(parsed.brand_color) ? parsed.brand_color : DEFAULT_APP_SETTINGS.brand_color,
     default_theme: isThemeValue(parsed.default_theme) ? parsed.default_theme : DEFAULT_APP_SETTINGS.default_theme,
-    density: parsed.density === "compact" || parsed.density === "comfy" || parsed.density === "regular" ? parsed.density : DEFAULT_APP_SETTINGS.density,
-    glass_blur: typeof parsed.glass_blur === "number" ? clamp(parsed.glass_blur, 0, 60) : DEFAULT_APP_SETTINGS.glass_blur,
-    theme_preset: parsed.theme_preset != null && parsed.theme_preset in THEME_PRESETS ? (parsed.theme_preset as ThemePreset) : null,
-    custom_theme: parsed.custom_theme != null && typeof parsed.custom_theme === "object" ? (parsed.custom_theme as CustomTheme) : null,
   };
 }
 

@@ -15,8 +15,6 @@ describe("appSettings bridge", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute("style");
     document.documentElement.removeAttribute("data-theme");
-    document.documentElement.removeAttribute("data-density");
-    document.body.removeAttribute("style");
   });
 
   it("sets the accent var from brand_color", () => {
@@ -44,47 +42,9 @@ describe("appSettings bridge", () => {
     expect(document.documentElement.style.getPropertyValue("--heroui-primary-foreground")).toBe("");
   });
 
-  it("sets data-theme and data-density", () => {
-    applyAppSettingsToDocument(settings({ default_theme: "light", density: "compact" }));
+  it("sets data-theme from default_theme", () => {
+    applyAppSettingsToDocument(settings({ default_theme: "light" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
-    expect(document.documentElement.getAttribute("data-density")).toBe("compact");
-  });
-
-  it("sets --blur from glass_blur", () => {
-    applyAppSettingsToDocument(settings({ glass_blur: 42 }));
-    expect(document.documentElement.style.getPropertyValue("--blur")).toBe("42px");
-  });
-
-  it("applies a preset palette to shell vars", () => {
-    applyAppSettingsToDocument(settings({ theme_preset: "corporate" }));
-    // corporate background is #ffffff
-    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#ffffff");
-  });
-
-  it("clears preset shell vars when no preset/custom", () => {
-    applyAppSettingsToDocument(settings({ theme_preset: "corporate" }));
-    applyAppSettingsToDocument(settings({ theme_preset: null, custom_theme: null }));
-    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("");
-  });
-
-  it("custom_theme overrides a preset", () => {
-    applyAppSettingsToDocument(
-      settings({ theme_preset: "corporate", custom_theme: { background: "#010203" } }),
-    );
-    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#010203");
-  });
-
-  it("applies the preset font to <body> (not the inert <html>)", () => {
-    // corporate -> font_family "helvetica"
-    applyAppSettingsToDocument(settings({ theme_preset: "corporate" }));
-    expect(document.body.style.getPropertyValue("font-family")).toContain("Helvetica Neue");
-    expect(document.documentElement.style.getPropertyValue("font-family")).toBe("");
-  });
-
-  it("clears the body font when reverting to plain Light/Dark", () => {
-    applyAppSettingsToDocument(settings({ theme_preset: "corporate" }));
-    applyAppSettingsToDocument(settings({ theme_preset: null, custom_theme: null }));
-    expect(document.body.style.getPropertyValue("font-family")).toBe("");
   });
 
   it("computes contrast ratio (white on black ~21)", () => {

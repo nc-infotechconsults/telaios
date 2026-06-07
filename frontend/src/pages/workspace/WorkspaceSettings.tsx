@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Button, Input, Radio, RadioGroup } from "@heroui/react";
 import { Icon } from "../../components/Icon";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { fileToDataUrl, validateImageDataUrl } from "../../lib/image";
-import { THEME_PRESETS } from "../../lib/appSettings";
-import type { Density, ThemePreset } from "../../types";
 import { toast } from "../../lib/toast";
 
 // ─── Settings sections ────────────────────────────────────────────────────────
@@ -134,85 +133,106 @@ function BrandingSection() {
   };
 
   return (
-    <SetGroup title="Branding" desc="Customise how TelaiOS presents itself across your workspace.">
+    <SetGroup title="Branding" desc="Customise how the app presents itself across your workspace.">
       {!isAdmin && <ReadOnlyNotice />}
       <SetRow label="Brand name" hint="Replaces the product name in the title bar and sidebar.">
-        <input className="form-input" value={brandName} disabled={!isAdmin}
-          onChange={(e) => setBrandName(e.target.value)} placeholder="TelaiOS" />
+        <Input
+          value={brandName}
+          onChange={(e) => setBrandName(e.target.value)}
+          disabled={!isAdmin}
+          placeholder="TelaiOS"
+          className="w-full max-w-xs"
+        />
       </SetRow>
-      <SetRow label="Accent color" hint="Drives primary actions, focus states and the TEOS orb.">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input type="color" value={brandColor} disabled={!isAdmin}
+      <SetRow label="Accent color" hint="Drives primary actions, focus states and the Sign-in button.">
+        <div className="flex items-center gap-2.5">
+          <input
+            type="color"
+            value={brandColor}
+            disabled={!isAdmin}
             onChange={(e) => setBrandColor(e.target.value)}
-            style={{ width: 36, height: 36, borderRadius: 6, border: "0.5px solid var(--hairline)", cursor: isAdmin ? "pointer" : "default", padding: 2 }} />
-          <input className="form-input" value={brandColor} disabled={!isAdmin}
-            onChange={(e) => setBrandColor(e.target.value)} placeholder="#0a84ff" style={{ width: 110 }} />
+            className="size-9 cursor-pointer rounded-md border border-border p-0.5 disabled:cursor-default"
+            aria-label="Brand color picker"
+          />
+          <Input
+            value={brandColor}
+            onChange={(e) => setBrandColor(e.target.value)}
+            disabled={!isAdmin}
+            placeholder="#0a84ff"
+            className="w-32"
+          />
         </div>
       </SetRow>
       <SetRow label="Logo" hint="Shown in the sidebar. PNG or SVG, up to 700 KB.">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {logo && <img src={logo} alt="Preview" style={{ height: 28, borderRadius: 6 }} />}
-          <input ref={logoInput} type="file" accept="image/*" hidden
-            onChange={(e) => void pick(e.target.files?.[0], LOGO_MAX, setLogo)} />
-          <button className="pill-btn" disabled={!isAdmin} onClick={() => logoInput.current?.click()}>
+        <div className="flex items-center gap-2.5">
+          {logo && <img src={logo} alt="Logo preview" className="h-7 rounded-md" />}
+          <input
+            ref={logoInput}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => void pick(e.target.files?.[0], LOGO_MAX, setLogo)}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            isDisabled={!isAdmin}
+            onPress={() => logoInput.current?.click()}
+          >
             <Icon name="upload" size="sm" /> Upload
-          </button>
-          {logo && <button className="pill-btn" disabled={!isAdmin} onClick={() => setLogo(null)}>Remove</button>}
+          </Button>
+          {logo && (
+            <Button size="sm" variant="tertiary" isDisabled={!isAdmin} onPress={() => setLogo(null)}>
+              Remove
+            </Button>
+          )}
         </div>
       </SetRow>
       <SetRow label="Favicon" hint="Browser tab icon. Up to 150 KB.">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {favicon && <img src={favicon} alt="Favicon preview" style={{ height: 24, width: 24, borderRadius: 4 }} />}
-          <input ref={faviconInput} type="file" accept="image/*" hidden
-            onChange={(e) => void pick(e.target.files?.[0], FAVICON_MAX, setFavicon)} />
-          <button className="pill-btn" disabled={!isAdmin} onClick={() => faviconInput.current?.click()}>
+        <div className="flex items-center gap-2.5">
+          {favicon && <img src={favicon} alt="Favicon preview" className="size-6 rounded" />}
+          <input
+            ref={faviconInput}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => void pick(e.target.files?.[0], FAVICON_MAX, setFavicon)}
+          />
+          <Button
+            size="sm"
+            variant="secondary"
+            isDisabled={!isAdmin}
+            onPress={() => faviconInput.current?.click()}
+          >
             <Icon name="upload" size="sm" /> Upload
-          </button>
-          {favicon && <button className="pill-btn" disabled={!isAdmin} onClick={() => setFavicon(null)}>Remove</button>}
+          </Button>
+          {favicon && (
+            <Button size="sm" variant="tertiary" isDisabled={!isAdmin} onPress={() => setFavicon(null)}>
+              Remove
+            </Button>
+          )}
         </div>
       </SetRow>
       {isAdmin && (
-        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 4 }}>
-          <button className="pill-btn" style={{ background: "var(--accent-1)", color: "#fff", borderColor: "transparent", opacity: saving ? 0.5 : 1 }}
-            onClick={() => void onSave()} disabled={saving}>
-            {saving ? "Saving…" : "Save Settings"}
-          </button>
+        <div className="flex justify-end pt-1">
+          <Button onPress={() => void onSave()} isPending={saving}>
+            Save Settings
+          </Button>
         </div>
       )}
     </SetGroup>
   );
 }
 
-const THEME_OPTIONS: { id: "light" | "dark" | ThemePreset; label: string }[] = [
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
-  { id: "corporate", label: "Corporate" },
-  { id: "midnight", label: "Midnight" },
-  { id: "minimal", label: "Minimal" },
-  { id: "ocean", label: "Ocean" },
-  { id: "forest", label: "Forest" },
-  { id: "sunset", label: "Sunset" },
-  { id: "warm", label: "Warm" },
-];
-
 function AppearanceSection() {
   const { settings, isAdmin, save } = useAppSettings();
   const [saving, setSaving] = useState(false);
 
-  const current: "light" | "dark" | ThemePreset = settings.theme_preset ?? (settings.default_theme === "light" ? "light" : "dark");
-
-  const chip = (id: "light" | "dark" | ThemePreset) => {
-    if (id === "light") return { bg: "#ffffff", fg: "#111111" };
-    if (id === "dark") return { bg: "#0b0d12", fg: "#f4f4f7" };
-    const p = THEME_PRESETS[id];
-    return { bg: p.background, fg: p.foreground };
-  };
-
-  const persist = async (patch: Parameters<typeof save>[0]) => {
-    if (saving) return;
+  const persist = async (theme: "light" | "dark") => {
+    if (!isAdmin || saving) return;
     setSaving(true);
     try {
-      await save(patch);
+      await save({ default_theme: theme });
       toast.success("Settings saved");
     } catch {
       toast.error("Failed to save settings");
@@ -221,82 +241,23 @@ function AppearanceSection() {
     }
   };
 
-  const selectTheme = (id: "light" | "dark" | ThemePreset) => {
-    if (!isAdmin) return;
-    if (id === "light" || id === "dark") void persist({ default_theme: id, theme_preset: null });
-    else void persist({ theme_preset: id, default_theme: THEME_PRESETS[id].polarity });
-  };
-
   return (
-    <>
-      <SetGroup title="Theme" desc="Workspace-wide appearance. Applies to everyone.">
-        {!isAdmin && <ReadOnlyNotice />}
-        <SetRow label="Theme" hint="Light, Dark, or a branded preset palette." vertical>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 4 }}>
-            {THEME_OPTIONS.map((o) => {
-              const c = chip(o.id);
-              const active = current === o.id;
-              return (
-                <button key={o.id} disabled={!isAdmin} onClick={() => selectTheme(o.id)}
-                  data-active={active ? "true" : undefined}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
-                    borderRadius: 10, cursor: isAdmin ? "pointer" : "default",
-                    border: active ? "1.5px solid var(--accent-1)" : "1px solid var(--hairline)",
-                    background: "var(--glass-weak)",
-                  }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 5, background: c.bg, border: "1px solid var(--hairline)", display: "inline-block" }}>
-                    <span style={{ display: "block", width: 8, height: 8, margin: "5px", borderRadius: 2, background: c.fg }} />
-                  </span>
-                  <span style={{ fontSize: 12.5 }}>{o.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </SetRow>
-      </SetGroup>
-
-      <SetGroup title="Materials" desc="Tune the density and glass of the interface.">
-        <SetRow label="Density" hint="How tight rows, cards and lists feel.">
-          <div className="seg">
-            {(["compact", "regular", "comfy"] as Density[]).map((d) => (
-              <button key={d} className="seg-btn" disabled={!isAdmin}
-                data-active={settings.density === d ? "true" : undefined}
-                onClick={() => void persist({ density: d })}>
-                {d}
-              </button>
-            ))}
-          </div>
-        </SetRow>
-        <SetRow label="Glass blur" hint={`${settings.glass_blur}px backdrop blur on translucent panels.`}>
-          <GlassBlurControl
-            value={settings.glass_blur}
-            disabled={!isAdmin}
-            onCommit={(v) => void persist({ glass_blur: v })}
-          />
-        </SetRow>
-      </SetGroup>
-    </>
-  );
-}
-
-function GlassBlurControl({ value, disabled, onCommit }: { value: number; disabled: boolean; onCommit: (v: number) => void }) {
-  const [local, setLocal] = useState(value);
-  useEffect(() => setLocal(value), [value]);
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 220 }}>
-      <input type="range" min={0} max={60} value={local} disabled={disabled}
-        aria-label="Glass blur"
-        onChange={(e) => {
-          const v = parseInt(e.target.value);
-          setLocal(v);
-          document.documentElement.style.setProperty("--blur", `${v}px`); // live preview
-        }}
-        onMouseUp={() => onCommit(local)}
-        onTouchEnd={() => onCommit(local)}
-        style={{ flex: 1 }} />
-      <span className="mono" style={{ fontSize: 12, color: "var(--fg-3)", minWidth: 36 }}>{local}px</span>
-    </div>
+    <SetGroup title="Theme" desc="Workspace-wide appearance. Applies to everyone.">
+      {!isAdmin && <ReadOnlyNotice />}
+      <SetRow label="Theme" hint="Light or dark mode for the whole workspace." vertical>
+        <RadioGroup
+          value={settings.default_theme === "light" ? "light" : "dark"}
+          onChange={(v) => void persist(v === "light" ? "light" : "dark")}
+          isDisabled={!isAdmin}
+          aria-label="Theme polarity"
+          orientation="horizontal"
+          className="pt-1"
+        >
+          <Radio value="light">Light</Radio>
+          <Radio value="dark">Dark</Radio>
+        </RadioGroup>
+      </SetRow>
+    </SetGroup>
   );
 }
 
