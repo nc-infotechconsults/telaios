@@ -25,6 +25,25 @@ describe("appSettings bridge", () => {
     expect(document.documentElement.style.getPropertyValue("--accent-grad")).toContain("#112233");
   });
 
+  it("emits HeroUI v3 --accent + --accent-foreground from brand_color", () => {
+    applyAppSettingsToDocument(settings({ brand_color: "#0a84ff" }));
+    expect(document.documentElement.style.getPropertyValue("--accent")).toBe("#0a84ff");
+    // brand color is medium-luminance blue → foreground should be white
+    expect(document.documentElement.style.getPropertyValue("--accent-foreground")).toBe("#ffffff");
+  });
+
+  it("picks black foreground for light brand_color", () => {
+    applyAppSettingsToDocument(settings({ brand_color: "#fff8a0" })); // pale yellow
+    expect(document.documentElement.style.getPropertyValue("--accent-foreground")).toBe("#000000");
+  });
+
+  it("no longer emits the v2-style --heroui-primary-* scale", () => {
+    applyAppSettingsToDocument(settings({ brand_color: "#0a84ff" }));
+    expect(document.documentElement.style.getPropertyValue("--heroui-primary")).toBe("");
+    expect(document.documentElement.style.getPropertyValue("--heroui-primary-500")).toBe("");
+    expect(document.documentElement.style.getPropertyValue("--heroui-primary-foreground")).toBe("");
+  });
+
   it("sets data-theme and data-density", () => {
     applyAppSettingsToDocument(settings({ default_theme: "light", density: "compact" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");

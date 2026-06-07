@@ -168,42 +168,6 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-function pickForegroundChannels(base: Rgb): string {
-  const lum = relativeLuminance(base);
-  const white = 1.05 / (lum + 0.05);
-  const black = (lum + 0.05) / 0.05;
-  return white >= black ? "0 0% 100%" : "0 0% 0%";
-}
-
-function rgbToHslChannels(rgb: Rgb): string {
-  const { h, s, l } = rgbToHsl(rgb);
-  return `${h.toFixed(2)} ${(s * 100).toFixed(2)}% ${(l * 100).toFixed(2)}%`;
-}
-
-// HeroUI primary scale (kept for embedded HeroUI controls in plan/chat/ProviderForm).
-const PRIMARY_STOPS: Array<{ key: string; amount: number; toWhite: boolean }> = [
-  { key: "50", amount: 0.92, toWhite: true }, { key: "100", amount: 0.82, toWhite: true },
-  { key: "200", amount: 0.66, toWhite: true }, { key: "300", amount: 0.5, toWhite: true },
-  { key: "400", amount: 0.3, toWhite: true }, { key: "500", amount: 0, toWhite: true },
-  { key: "600", amount: 0.12, toWhite: false }, { key: "700", amount: 0.24, toWhite: false },
-  { key: "800", amount: 0.38, toWhite: false }, { key: "900", amount: 0.54, toWhite: false },
-];
-
-function buildPrimaryScale(hex: string): Record<string, string> {
-  const base = parseHexColor(hex);
-  const out: Record<string, string> = {};
-  for (const stop of PRIMARY_STOPS) {
-    const t = stop.toWhite ? 255 : 0;
-    const mixed: Rgb = stop.amount === 0 ? base : {
-      r: base.r + (t - base.r) * stop.amount,
-      g: base.g + (t - base.g) * stop.amount,
-      b: base.b + (t - base.b) * stop.amount,
-    };
-    out[stop.key] = rgbToHslChannels(mixed);
-  }
-  return out;
-}
-
 function alpha(hex: string, a: number): string {
   const { r, g, b } = parseHexColor(hex);
   return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${a})`;
@@ -294,11 +258,16 @@ export function applyAppSettingsToDocument(settings: AppSettings): void {
   s.setProperty("--accent-2", accent2);
   s.setProperty("--accent-grad", `linear-gradient(135deg, ${brandColor} 0%, ${accent2} 100%)`);
 
-  // HeroUI primary (embedded controls)
-  const scale = buildPrimaryScale(brandColor);
-  s.setProperty("--heroui-primary", scale["500"]);
-  s.setProperty("--heroui-primary-foreground", pickForegroundChannels(parseHexColor(brandColor)));
-  for (const [k, v] of Object.entries(scale)) s.setProperty(`--heroui-primary-${k}`, v);
+  // HeroUI v3 accent (the primary brand color across all HeroUI components).
+  // v3 uses a single --accent var, not a 50..900 scale. We emit the raw hex —
+  // HeroUI's color-mix-based calculated colors (--accent-hover, --accent-soft,
+  // etc.) handle the blending. --accent-foreground is plain black or white
+  // chosen by the brand color's relative luminance.
+  s.setProperty("--accent", brandColor);
+  s.setProperty(
+    "--accent-foreground",
+    relativeLuminance(parseHexColor(brandColor)) > 0.5 ? "#000000" : "#ffffff",
+  );
 
   // Theme + density + blur
   const theme = resolveShellTheme(settings.theme_preset ?? null, settings.custom_theme ?? null);
