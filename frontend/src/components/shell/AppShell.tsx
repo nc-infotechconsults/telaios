@@ -283,7 +283,7 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
         {/* ── AI Sidebar (project mode only) ── */}
         {!wsView && <aside
           aria-label="TEOS AI assistant"
-          className={`relative row-span-2 col-start-3 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-surface transition-[width,opacity] duration-300 ${
+          className={`relative col-start-3 row-start-1 row-span-2 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-surface transition-[width,opacity] duration-300 ${
             aiCollapsed ? "pointer-events-none w-0 opacity-0" : "w-[380px] opacity-100"
           }`}
         >
