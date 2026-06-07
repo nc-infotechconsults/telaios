@@ -301,9 +301,6 @@ export const getTaskArtifacts = (taskId: string): Promise<TaskArtifact[]> =>
 export const getPlanMessages = (planId: string): Promise<Message[]> =>
   DEMO ? delay(demo.MESSAGES[planId] ?? []) : http.get<Message[]>(`/plans/${planId}/messages`).then((r) => r.data);
 
-export const getMessages = (projectId: string): Promise<Message[]> =>
-  DEMO ? delay(demo.MESSAGES[projectId] ?? []) : http.get<Message[]>(`/messages?project_id=${projectId}`).then((r) => r.data);
-
 // ─── Design Chat ─────────────────────────────────────────────────────────────
 
 export const listDesignSessions = (projectId: string): Promise<DesignSession[]> =>

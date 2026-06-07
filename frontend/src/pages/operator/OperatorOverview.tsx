@@ -27,7 +27,7 @@ export default function OperatorOverview({ mode }: Props) {
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
-      api.getProjects({ limit: 200 }).catch(() => ({ items: [] as Project[], total: 0 })),
+      api.getProjects({ limit: 100 }).catch(() => ({ items: [] as Project[], total: 0 })),
       api.listUsers().catch(() => [] as User[]),
     ])
       .then(([{ items }, us]) => {

@@ -114,7 +114,7 @@ export default function WorkspacePeople() {
 
   // Pre-load projects + memberships for drawer
   useEffect(() => {
-    api.getProjects({ limit: 200 })
+    api.getProjects({ limit: 100 })
       .then(async ({ items }) => {
         setAllProjects(items);
         const entries = await Promise.all(
@@ -584,14 +584,13 @@ export default function WorkspacePeople() {
             style={{ position: "fixed", inset: 0, zIndex: 900 }}
           />
           <div
-            className="glass"
             style={{
               position: "fixed", top: 0, right: 0, bottom: 0,
               width: 440, zIndex: 1000,
-              background: "var(--glass-strong)", backdropFilter: "blur(20px) saturate(1.6)",
-              borderLeft: "0.5px solid var(--hairline)",
+              background: "var(--overlay)",
+              borderLeft: "0.5px solid var(--border)",
+              boxShadow: "var(--overlay-shadow)",
               display: "flex", flexDirection: "column",
-              animation: "slideInRight 0.22s ease",
             }}
           >
             {/* Drawer header */}

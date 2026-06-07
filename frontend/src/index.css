@@ -34,6 +34,38 @@
   --accent-1: #0a84ff;
   --accent-2: #bf5af2;
   --accent-grad: linear-gradient(135deg, #0a84ff 0%, #bf5af2 100%);
+
+  /* Legacy glass-var aliases for inline-styled components not yet migrated.
+     Each maps to a HeroUI v3 token; remove once all inline references are
+     converted to Tailwind utilities. */
+  --fg:                   var(--foreground);
+  --fg-2:                 color-mix(in oklab, var(--foreground) 70%, transparent);
+  --fg-3:                 color-mix(in oklab, var(--foreground) 50%, transparent);
+  --fg-4:                 color-mix(in oklab, var(--foreground) 30%, transparent);
+  --label-primary:        var(--foreground);
+  --label-secondary:      color-mix(in oklab, var(--foreground) 70%, transparent);
+  --label-tertiary:       color-mix(in oklab, var(--foreground) 50%, transparent);
+  --label-quaternary:     color-mix(in oklab, var(--foreground) 30%, transparent);
+  --hairline:             var(--separator);
+  --hover:                var(--surface-hover);
+  --hover-glass:          var(--surface-hover);
+  --glass:                var(--surface);
+  --glass-strong:         var(--surface-tertiary);
+  --glass-weak:           var(--surface-secondary);
+  --glass-edge:           var(--border);
+  --glass-panel:          var(--surface);
+  --shadow-glass-panel:   var(--surface-shadow);
+  --shadow-glass-lg:      var(--overlay-shadow);
+  --fill-primary:         var(--default);
+  --fill-secondary:       var(--surface-secondary);
+  --fill-tertiary:        var(--surface-tertiary);
+  --fill-quaternary:      var(--default);
+  --color-blue:           var(--accent);
+  --color-green:          var(--success);
+  --color-purple:         #bf5af2;
+  --color-orange:         var(--warning);
+  --color-red:            var(--danger);
+  --color-indigo:         #5e5ce6;
 }
 
 /* ── Base resets in @layer base so HeroUI components win on the cascade ──── */

@@ -6,14 +6,14 @@ import {
   listDocuments,
   listProjectTasks,
   getProjectAnalytics,
-  getMessages,
+  getConversationHistory,
 } from "../../lib/api";
 import type {
   Repository,
   Document as ApiDocument,
   Project,
   Task,
-  Message,
+  ConversationMessage,
   ProjectAnalytics,
 } from "../../types";
 
@@ -98,7 +98,7 @@ export default function ProjectDashboard({
   const [repos, setRepos]         = useState<RepoRow[]>(DEMO ? DEMO_REPOS : []);
   const [docCount, setDocCount]   = useState(DEMO ? 12 : 0);
   const [tasks, setTasks]         = useState<Task[]>([]);
-  const [messages, setMessages]   = useState<Message[]>([]);
+  const [messages, setMessages]   = useState<ConversationMessage[]>([]);
   const [analytics, setAnalytics] = useState<ProjectAnalytics | null>(null);
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function ProjectDashboard({
       listDocuments(projectId).then((docs: ApiDocument[]) => setDocCount(docs.length)),
       listProjectTasks(projectId, { limit: 8 }).then(setTasks),
       getProjectAnalytics(projectId).then(setAnalytics),
-      getMessages(projectId).then((msgs) => setMessages(msgs.slice(-6).reverse())),
+      getConversationHistory(projectId, { limit: 6 }).then((r) => setMessages(r.messages)),
     ]).catch(() => undefined);
   }, [projectId]);
 
@@ -314,7 +314,7 @@ export default function ProjectDashboard({
         </div>
         <div>
           {messages.map((m) => {
-            const isUser = m.role === "user";
+            const isUser = m.sender_type === "user";
             const displayName = isUser ? "User" : "TEOS";
             const initial = isUser ? initials("User") : null;
             const avatarBg = isUser ? "bg-success" : "bg-accent";
