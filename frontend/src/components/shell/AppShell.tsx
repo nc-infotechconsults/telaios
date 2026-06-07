@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { Button } from "@heroui/react";
 import { useAppSettings } from "../../context/AppSettingsContext";
 import { getProjects, sendConversationMessage } from "../../lib/api";
 import type { Project } from "../../types";
@@ -284,143 +285,196 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
         {/* ── AI Sidebar (project mode only) ── */}
         {!wsView && <aside
           aria-label="TEOS AI assistant"
-          className={`row-span-2 col-start-3 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-surface transition-[width,opacity] duration-300 ${
+          className={`relative row-span-2 col-start-3 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-surface transition-[width,opacity] duration-300 ${
             aiCollapsed ? "pointer-events-none w-0 opacity-0" : "w-[380px] opacity-100"
           }`}
         >
-          <div className="ai-head">
-            <div className="ai-head-title">
-              <span className="ai-orb" />
-              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>TEOS</span>
-                </div>
-                <span style={{ fontSize: 10.5, color: "var(--fg-3)" }}>Always-on assistant</span>
-              </div>
+          {/* Header */}
+          <header className="flex items-center gap-2.5 border-b border-separator px-4 py-3">
+            <span
+              aria-hidden
+              className="block size-[18px] shrink-0 rounded-full"
+              style={{
+                background: "var(--accent-grad, linear-gradient(135deg,#0a84ff,#bf5af2))",
+                boxShadow: "0 0 0 2px rgba(10,132,255,0.18), 0 0 12px rgba(191,90,242,0.5)",
+              }}
+            />
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="text-[13.5px] font-semibold text-foreground">TEOS</span>
+              <span className="text-[10.5px] text-muted">Always-on assistant</span>
             </div>
-            <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-              <button className="tb-btn" style={{ width: 28, height: 28 }} title="Sessions" onClick={() => setShowSessions(true)}>
+            <div className="ms-auto flex items-center gap-1">
+              <Button isIconOnly size="sm" variant="tertiary" aria-label="Sessions" onPress={() => setShowSessions(true)}>
                 <Icon name="inbox" size="sm" />
-              </button>
-              <button className="tb-btn" style={{ width: 28, height: 28 }} title="New session" onClick={() => setTeosMessages([])}>
+              </Button>
+              <Button isIconOnly size="sm" variant="tertiary" aria-label="New session" onPress={() => setTeosMessages([])}>
                 <Icon name="plus" size="sm" />
-              </button>
-              <button className="tb-btn" style={{ width: 28, height: 28 }} title="Hide" onClick={() => setAiCollapsed(true)}>
+              </Button>
+              <Button isIconOnly size="sm" variant="tertiary" aria-label="Hide sidebar" onPress={() => setAiCollapsed(true)}>
                 <Icon name="chev" size="sm" />
-              </button>
+              </Button>
             </div>
-          </div>
+          </header>
 
           {/* Session meta */}
-          <div className="session-meta">
-            <div className="vis-wrap">
-              <button className="vis-btn">
-                <Icon name="users" size="sm" />
-                <span>Team</span>
-                <Icon name="chevd" size="sm" className="vis-chev" />
-              </button>
+          <div className="flex items-center gap-2 border-b border-separator px-4 py-2 text-[11.5px] text-muted">
+            <Button size="sm" variant="tertiary" className="h-7 gap-1.5 px-2 text-[11.5px]" aria-label="Visibility">
+              <Icon name="users" size="sm" />
+              <span>Team</span>
+              <Icon name="chevd" size="sm" className="opacity-60" />
+            </Button>
+            <div className="flex items-center">
+              <span className="-me-1.5 inline-flex size-5 items-center justify-center rounded-full bg-success text-[9px] font-semibold text-success-foreground ring-2 ring-surface">EN</span>
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent text-[9px] font-semibold text-accent-foreground ring-2 ring-surface">SO</span>
             </div>
-            <div className="participants-stack">
-              <div className="tm-avatar stack av-2" style={{ zIndex: 10 }}>EN<span className="tm-online" /></div>
-              <div className="tm-avatar stack av-2" style={{ zIndex: 9 }}>SO<span className="tm-online" /></div>
-            </div>
-            <span className="participants-count">2 active</span>
+            <span>2 active</span>
           </div>
 
-          <div className="ai-thread" ref={threadRef}>
+          {/* Thread */}
+          <div ref={threadRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
             {teosMessages.length === 0 && (
-              <div className="ai-empty">
-                <span className="ai-orb" style={{ width: 28, height: 28 }} />
-                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 12 }}>How can I help?</div>
-                <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 4, maxWidth: 280 }}>
-                  I'll route to the right specialist — Designer, Planner, Reviewer, Coder, Explorer, Reverse Engineer or Q&A — based on what you ask.
-                </div>
+              <div className="flex flex-col items-center gap-2 py-8 text-center text-muted">
+                <span
+                  aria-hidden
+                  className="block size-7 rounded-full"
+                  style={{
+                    background: "var(--accent-grad, linear-gradient(135deg,#0a84ff,#bf5af2))",
+                    boxShadow: "0 0 0 2px rgba(10,132,255,0.18), 0 0 12px rgba(191,90,242,0.5)",
+                  }}
+                />
+                <div className="mt-3 text-sm font-semibold text-foreground">How can I help?</div>
+                <p className="mt-1 max-w-[280px] text-xs text-muted">
+                  I'll route to the right specialist — Designer, Planner, Reviewer, Coder, Explorer, Reverse Engineer or Q&amp;A — based on what you ask.
+                </p>
               </div>
             )}
             {teosMessages.map((m, i) => {
               const spec = m.specialist ? SPECIALISTS[m.specialist] : null;
+              const isUser = m.role === "user";
               return (
-                <div key={i} className="ai-msg" data-role={m.role}>
-                  <div className="ai-msg-from">
-                    {m.role === "user" ? "You" : (
-                      <>
-                        TEOS
-                        {spec && (
-                          <span className="ai-msg-spec" style={{ color: spec.color }}>
-                            <Icon name={spec.icon} size="sm" />{spec.name}
-                          </span>
-                        )}
-                      </>
+                <div key={i} className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+                  <div className="flex items-center gap-1.5 px-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
+                    {isUser ? "You" : "TEOS"}
+                    {!isUser && spec && (
+                      <span className="flex items-center gap-1" style={{ color: spec.color }}>
+                        <Icon name={spec.icon} size="sm" />
+                        {spec.name}
+                      </span>
                     )}
                   </div>
-                  <div className="ai-bubble">{m.text}</div>
+                  <div
+                    className={
+                      isUser
+                        ? "max-w-[85%] rounded-2xl rounded-tr-sm bg-accent px-3.5 py-2 text-sm text-accent-foreground"
+                        : "max-w-[85%] rounded-2xl rounded-tl-sm bg-surface-secondary px-3.5 py-2 text-sm text-foreground"
+                    }
+                  >
+                    {m.text}
+                  </div>
                 </div>
               );
             })}
             {teosBusy && (
-              <div className="ai-msg" data-role="assistant">
-                <div className="ai-msg-from">TEOS</div>
-                <div className="ai-bubble">
-                  {teosStreamContent
-                    ? <>{teosStreamContent}<span style={{ display: "inline-block", width: 7, height: 13, background: "#0a84ff", marginLeft: 2, borderRadius: 2, animation: "blink 1s infinite" }} /></>
-                    : <div className="ai-typing"><span /><span /><span /></div>
-                  }
+              <div className="flex flex-col items-start gap-1">
+                <div className="px-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted">TEOS</div>
+                <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-surface-secondary px-3.5 py-2 text-sm text-foreground">
+                  {teosStreamContent ? (
+                    <>
+                      {teosStreamContent}
+                      <span className="ms-0.5 inline-block h-3 w-[7px] rounded-sm bg-accent align-baseline animate-pulse" />
+                    </>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 py-1">
+                      <span className="size-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="size-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="size-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </span>
+                  )}
                 </div>
               </div>
             )}
           </div>
 
-          <div className="ai-input-wrap">
-            <div className="ai-chip-row">
+          {/* Input bar */}
+          <footer className="flex flex-col gap-2 border-t border-separator px-3 py-3">
+            <div className="flex flex-wrap gap-1.5">
               {["How does auth work?", "Plan a new feature", "Review this code"].map((s, i) => (
-                <button key={i} className="ai-chip" onClick={() => sendTeosMessage(s)}>{s}</button>
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => sendTeosMessage(s)}
+                  className="rounded-full bg-surface-secondary px-3 py-1 text-[11.5px] text-muted hover:bg-default hover:text-foreground"
+                >
+                  {s}
+                </button>
               ))}
             </div>
-            <div className="ai-input">
+            <div className="flex items-end gap-1.5 rounded-2xl border border-border bg-surface-secondary px-3 py-2 focus-within:border-accent">
               <textarea
                 ref={taRef}
                 value={teosDraft}
                 placeholder="Ask TEOS or describe a task…"
                 onChange={(e) => setTeosDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTeosMessage(teosDraft); }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendTeosMessage(teosDraft);
+                  }
                 }}
+                className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
+                style={{ height: 22, maxHeight: 140 }}
               />
-              <button className="ai-send" disabled={!teosDraft.trim() || teosBusy} onClick={() => sendTeosMessage(teosDraft)}>
+              <Button
+                isIconOnly
+                size="sm"
+                isDisabled={!teosDraft.trim() || teosBusy}
+                onPress={() => sendTeosMessage(teosDraft)}
+                aria-label="Send message"
+              >
                 <Icon name="send" size="sm" />
-              </button>
+              </Button>
             </div>
-          </div>
+          </footer>
 
           {/* Sessions drawer */}
           {showSessions && (
-            <div className="sessions-drawer">
-              <div className="sessions-head">
+            <div className="absolute inset-0 z-10 flex flex-col bg-surface">
+              <header className="flex items-center gap-2 border-b border-separator px-4 py-3">
                 <Icon name="inbox" size="sm" />
-                <span style={{ fontWeight: 600, fontSize: 13.5 }}>Sessions</span>
-                <div style={{ flex: 1 }} />
-                <button className="tb-btn" style={{ width: 28, height: 28 }} onClick={() => setShowSessions(false)}>
+                <span className="text-[13.5px] font-semibold text-foreground">Sessions</span>
+                <div className="flex-1" />
+                <Button isIconOnly size="sm" variant="tertiary" aria-label="Close sessions" onPress={() => setShowSessions(false)}>
                   <Icon name="chev" size="sm" />
-                </button>
-              </div>
-              <div className="sessions-body">
+                </Button>
+              </header>
+              <div className="flex-1 overflow-y-auto p-3">
                 {[
-                  { id: "s-1", title: "Ship SSO via Okta — end-to-end", time: "now",    visibility: "team",    specs: ["explorer", "planner"] },
-                  { id: "s-2", title: "Redesign the billing dashboard",  time: "1h ago", visibility: "team",    specs: ["designer"] },
+                  { id: "s-1", title: "Ship SSO via Okta — end-to-end",      time: "now",     visibility: "team",    specs: ["explorer", "planner"] },
+                  { id: "s-2", title: "Redesign the billing dashboard",       time: "1h ago",  visibility: "team",    specs: ["designer"] },
                   { id: "s-3", title: "How does our refresh-token flow work?", time: "2d ago", visibility: "private", specs: ["qa"] },
                 ].map((s) => (
-                  <button key={s.id} className="session-row" onClick={() => { setTeosMessages([]); setShowSessions(false); }}>
-                    <div className="session-row-head">
-                      <span className="session-title">{s.title}</span>
-                      <span className="session-time">{s.time}</span>
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { setTeosMessages([]); setShowSessions(false); }}
+                    className="mb-1.5 flex w-full flex-col gap-1.5 rounded-xl border border-border bg-surface-secondary px-3 py-2.5 text-start hover:border-accent"
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="flex-1 truncate text-[13px] font-medium text-foreground">{s.title}</span>
+                      <span className="text-[10.5px] text-muted">{s.time}</span>
                     </div>
-                    <div className="session-specs">
+                    <div className="flex flex-wrap gap-1">
                       {s.specs.map((sp) => {
                         const specialist = SPECIALISTS[sp];
                         if (!specialist) return null;
                         return (
-                          <span key={sp} className="spec-trail-chip mini" style={{ color: specialist.color }}>
-                            <Icon name={specialist.icon} size="sm" />{specialist.name}
+                          <span
+                            key={sp}
+                            className="inline-flex items-center gap-1 rounded-md bg-default px-1.5 py-0.5 text-[10.5px]"
+                            style={{ color: specialist.color }}
+                          >
+                            <Icon name={specialist.icon} size="sm" />
+                            {specialist.name}
                           </span>
                         );
                       })}
