@@ -202,8 +202,14 @@
 @media (max-width: 900px)  { .grid-3 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
 .stack { display: flex; flex-direction: column; gap: 14px; }
 
-/* Card — slimmed to HeroUI Surface */
+/* Card — slimmed to HeroUI Surface.
+   flex-direction reset because @heroui/styles defines .card as
+   { display: flex; flex-direction: column; } for the HeroUI Card
+   compound component — that leaks into our legacy .card uses
+   (search bars, filter rows, etc.) which expect inline-row content. */
 .card {
+  display: block;
+  flex-direction: row;
   padding: 16px;
   border-radius: 14px;
   background: var(--surface);
