@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAppSettings } from "../../context/AppSettingsContext";
+import { Icon } from "../Icon";
 import { TelaiOSLogo } from "../common/TelaiOSLogo";
 import { SidebarNav, type SidebarNavItem } from "./SidebarNav";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
@@ -98,6 +99,28 @@ export function Sidebar({ mode }: SidebarProps) {
         </>
       ) : (
         <>
+          <h2 className="px-2.5 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
+            Workspace
+          </h2>
+          <nav aria-label="Workspace shortcuts" className="flex flex-col gap-0.5">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-muted hover:bg-default/50 hover:text-foreground"
+            >
+              <Icon name="settings" className="size-4 shrink-0" />
+              <span className="flex-1 truncate text-start">Management Console</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/projects-list")}
+              className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-muted hover:bg-default/50 hover:text-foreground"
+            >
+              <Icon name="layers" className="size-4 shrink-0" />
+              <span className="flex-1 truncate text-start">All Projects</span>
+            </button>
+          </nav>
+
           <h2 className="truncate px-2.5 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
             {mode.projectName}
           </h2>
@@ -107,38 +130,32 @@ export function Sidebar({ mode }: SidebarProps) {
             onSelect={mode.onSelectView}
             ariaLabel="Project navigation"
           />
-          <h2 className="px-2.5 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
-            Projects
-          </h2>
-          <ul className="flex flex-col gap-0.5 px-0.5">
-            {mode.projects.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/projects/${p.id}`)}
-                  data-active={mode.projectId === p.id}
-                  className="flex h-7 w-full items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] text-muted hover:bg-default/50 hover:text-foreground data-[active=true]:bg-surface-secondary data-[active=true]:text-foreground"
-                >
-                  <span
-                    aria-hidden
-                    className="size-1.5 shrink-0 rounded-full"
-                    style={{ background: p.color }}
-                  />
-                  <span className="truncate">{p.name}</span>
-                </button>
-              </li>
-            ))}
-            <li>
-              <button
-                type="button"
-                onClick={() => navigate("/")}
-                className="flex h-7 w-full items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] text-muted hover:bg-default/50 hover:text-foreground"
-              >
-                <span className="w-4 text-center text-muted">+</span>
-                <span>All projects</span>
-              </button>
-            </li>
-          </ul>
+          {mode.projects.length > 1 && (
+            <>
+              <h2 className="px-2.5 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
+                Switch project
+              </h2>
+              <ul className="flex flex-col gap-0.5 px-0.5">
+                {mode.projects.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/projects/${p.id}`)}
+                      data-active={mode.projectId === p.id || undefined}
+                      className="flex h-7 w-full items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] text-muted hover:bg-default/50 hover:text-foreground data-[active=true]:bg-surface-secondary data-[active=true]:text-foreground"
+                    >
+                      <span
+                        aria-hidden
+                        className="size-1.5 shrink-0 rounded-full"
+                        style={{ background: p.color }}
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </>
       )}
 
