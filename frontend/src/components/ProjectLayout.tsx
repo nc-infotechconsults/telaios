@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAppSettings } from "../context/AppSettingsContext";
 import { getProjects, sendConversationMessage } from "../lib/api";
@@ -7,6 +7,7 @@ import { Icon } from "./Icon";
 import MeshBackground from "./MeshBackground";
 import { Sidebar } from "./shell/Sidebar";
 import { Topbar } from "./shell/Topbar";
+import { CommandPalette } from "./shell/CommandPalette";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
@@ -75,22 +76,6 @@ const SPECIALISTS: Record<string, { name: string; icon: string; color: string; t
 
 const PROJECT_COLORS = ["#0a84ff", "#bf5af2", "#30d158", "#ff9f0a", "#ff375f", "#5e5ce6"];
 
-
-const COMMANDS = [
-  { section: "Ask TEOS", items: [
-    { i: "chat",     name: "How does the edge tier handle expired refresh tokens?", kind: "Q&A",     view: null },
-    { i: "layers",   name: "Reverse-engineer the payments flow",                   kind: "Reverse",  view: null },
-    { i: "workflow", name: "Plan: add SSO via Okta",                               kind: "Feature",  view: null },
-  ]},
-  { section: "Navigate", items: [
-    { i: "home",   name: "Dashboard",    kind: "Nav", view: "dashboard" },
-    { i: "git",    name: "Repositories", kind: "Nav", view: "repositories" },
-    { i: "book",   name: "Documents",    kind: "Nav", view: "documents" },
-    { i: "bot",    name: "Agents",       kind: "Nav", view: "agents" },
-    { i: "cube",   name: "Library",      kind: "Nav", view: "library" },
-    { i: "inbox",  name: "Inbox",        kind: "Nav", view: "inbox" },
-  ]},
-];
 
 export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
@@ -442,88 +427,12 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
       </div>
 
       {/* Command palette */}
-      {cmdOpen && (
-        <CommandPalette
-          commands={COMMANDS}
-          onClose={() => setCmdOpen(false)}
-          onAction={(item: { name: string; view?: string | null }) => {
-            if (item.view) setView(item.view as ProjectView);
-            else sendTeosMessage(item.name);
-            setCmdOpen(false);
-          }}
-        />
-      )}
+      <CommandPalette
+        isOpen={cmdOpen}
+        onOpenChange={setCmdOpen}
+        onNavigate={(v) => setView(v as ProjectView)}
+        projectName={wsView ? brand : (project?.name ?? "Project")}
+      />
     </>
-  );
-}
-
-/* ── CommandPalette ── */
-function CommandPalette({ commands, onClose, onAction }: {
-  commands: typeof COMMANDS;
-  onClose: () => void;
-  onAction: (item: { name: string; view?: string | null; i?: string }) => void;
-}) {
-  const [q, setQ] = useState("");
-  const [sel, setSel] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { inputRef.current?.focus(); }, []);
-
-  type FlatItem = { section?: string; name?: string; kind?: string; view?: string | null; i?: string };
-  const flat: FlatItem[] = [];
-  commands.forEach((sec) => {
-    const filtered = sec.items.filter((it) => !q || it.name.toLowerCase().includes(q.toLowerCase()));
-    if (filtered.length) {
-      flat.push({ section: sec.section });
-      filtered.forEach((it) => flat.push({ ...it }));
-    }
-  });
-  const selectable = flat.filter((f) => !f.section);
-
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-    if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(selectable.length - 1, s + 1)); }
-    if (e.key === "ArrowUp")   { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
-    if (e.key === "Enter" && selectable[sel]) onAction(selectable[sel] as { name: string; view?: string | null; i?: string });
-  };
-
-  let selIdx = -1;
-  return (
-    <div className="cmd-overlay" onClick={onClose}>
-      <div className="cmd-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="cmd-input">
-          <Icon name="search" />
-          <input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setSel(0); }}
-            onKeyDown={onKey}
-            placeholder="Search or ask TEOS…"
-          />
-          <kbd style={{ fontSize: 10.5, padding: "3px 6px", borderRadius: 5, background: "var(--glass-weak)", border: "0.5px solid var(--hairline)", color: "var(--fg-3)" }}>esc</kbd>
-        </div>
-        <div className="cmd-list">
-          {flat.map((f, i) => {
-            if (f.section) return <div key={i} className="cmd-section">{f.section}</div>;
-            selIdx++;
-            const isSel = selIdx === sel;
-            return (
-              <div key={i} className="cmd-item" data-sel={isSel}
-                onMouseEnter={() => setSel(selIdx)}
-                onClick={() => onAction(f as { name: string; view?: string | null; i?: string })}>
-                {f.i && <Icon name={f.i} size="sm" />}
-                <span>{f.name}</span>
-                <span className="cmd-item-kind">{f.kind}</span>
-              </div>
-            );
-          })}
-          {flat.length === 0 && (
-            <div style={{ padding: 20, textAlign: "center", color: "var(--fg-3)", fontSize: 13 }}>
-              No matches. Press Enter to ask TEOS.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
