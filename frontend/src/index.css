@@ -1,5 +1,32 @@
 @import "tailwindcss";
-@config "../tailwind.config.cjs";
+@import "@heroui/styles";
+
+/* HeroUI v3 reads class/data-attr based dark mode. Our bridge already
+   sets data-theme on <html>; mirror Tailwind's dark variant onto it. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Legacy v2-style Tailwind token bridge — keeps 77 unmigrated files
+   rendering until their slice. Slice 7 of the HeroUI v3 migration
+   deletes this @theme block. */
+@theme inline {
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-foreground);
+  --color-content1: var(--surface);
+  --color-content2: var(--surface-secondary);
+  --color-content3: var(--surface-tertiary);
+  --color-divider: var(--separator);
+  --color-default-50:  color-mix(in oklab, var(--default) 35%, var(--background));
+  --color-default-100: color-mix(in oklab, var(--default) 55%, var(--background));
+  --color-default-200: color-mix(in oklab, var(--default) 75%, var(--background));
+  --color-default-300: color-mix(in oklab, var(--default) 92%, var(--background));
+  --color-default-400: color-mix(in oklab, var(--default-foreground) 35%, var(--default));
+  --color-default-500: color-mix(in oklab, var(--default-foreground) 50%, var(--default));
+  --color-default-600: color-mix(in oklab, var(--default-foreground) 62%, var(--default));
+  --color-default-700: color-mix(in oklab, var(--default-foreground) 75%, var(--default));
+  --color-default-800: color-mix(in oklab, var(--default-foreground) 88%, var(--default));
+  --color-default-900: var(--default-foreground);
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
 
 /* ── TelaiOS Design System — Agentic OS Platform ── */
