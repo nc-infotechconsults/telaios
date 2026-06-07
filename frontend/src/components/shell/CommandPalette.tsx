@@ -52,7 +52,13 @@ export function CommandPalette({ isOpen, onOpenChange, onNavigate, projectName }
                 autoFocus
                 aria-label={`Search or ask TEOS about ${projectName}`}
                 className="w-full"
-              />
+              >
+                <SearchField.Group className="w-full">
+                  <SearchField.SearchIcon />
+                  <SearchField.Input placeholder={`Search or ask TEOS about ${projectName}…`} />
+                  <SearchField.ClearButton />
+                </SearchField.Group>
+              </SearchField>
             </Modal.Header>
             <Modal.Body className="p-1">
               {filtered.length === 0 ? (
