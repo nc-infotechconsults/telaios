@@ -3,7 +3,7 @@ import { useAppSettings } from "../../context/AppSettingsContext";
 import { TelaiOSLogo } from "../common/TelaiOSLogo";
 import { SidebarNav, type SidebarNavItem } from "./SidebarNav";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-import type { ProjectView, WsView } from "../ProjectLayout";
+import type { ProjectView, WsView } from "./AppShell";
 
 const WS_NAV: ReadonlyArray<SidebarNavItem<WsView> & { href: string }> = [
   { key: "overview",  label: "Overview",  icon: "home",     href: "/" },

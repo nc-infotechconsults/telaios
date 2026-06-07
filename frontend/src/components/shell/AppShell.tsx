@@ -1,39 +1,38 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { useAppSettings } from "../context/AppSettingsContext";
-import { getProjects, sendConversationMessage } from "../lib/api";
-import type { Project } from "../types";
-import { Icon } from "./Icon";
-import MeshBackground from "./MeshBackground";
-import { Sidebar } from "./shell/Sidebar";
-import { Topbar } from "./shell/Topbar";
-import { CommandPalette } from "./shell/CommandPalette";
+import { useAppSettings } from "../../context/AppSettingsContext";
+import { getProjects, sendConversationMessage } from "../../lib/api";
+import type { Project } from "../../types";
+import { Icon } from "../Icon";
+import { Sidebar } from "./Sidebar";
+import { Topbar } from "./Topbar";
+import { CommandPalette } from "./CommandPalette";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
 // Project view components
-import ProjectDashboard from "../pages/project/ProjectDashboard";
-import ProjectConversation from "../pages/project/ProjectConversation";
-import ProjectRepositories from "../pages/project/ProjectRepositories";
-import ProjectDocuments from "../pages/project/ProjectDocuments";
-import ProjectDesigns from "../pages/project/ProjectDesigns";
-import ProjectAgents from "../pages/project/ProjectAgents";
-import ProjectLibrary from "../pages/project/ProjectLibrary";
-import ProjectPlans from "../pages/project/ProjectPlans";
-import ProjectInbox from "../pages/project/ProjectInbox";
-import ProjectMembers from "../pages/project/ProjectMembers";
+import ProjectDashboard from "../../pages/project/ProjectDashboard";
+import ProjectConversation from "../../pages/project/ProjectConversation";
+import ProjectRepositories from "../../pages/project/ProjectRepositories";
+import ProjectDocuments from "../../pages/project/ProjectDocuments";
+import ProjectDesigns from "../../pages/project/ProjectDesigns";
+import ProjectAgents from "../../pages/project/ProjectAgents";
+import ProjectLibrary from "../../pages/project/ProjectLibrary";
+import ProjectPlans from "../../pages/project/ProjectPlans";
+import ProjectInbox from "../../pages/project/ProjectInbox";
+import ProjectMembers from "../../pages/project/ProjectMembers";
 
 // Workspace view components
-import WorkspaceOverview  from "../pages/workspace/WorkspaceOverview";
-import WorkspaceProjects  from "../pages/workspace/WorkspaceProjects";
-import WorkspaceLibrary   from "../pages/workspace/WorkspaceLibrary";
-import WorkspaceAnalytics from "../pages/workspace/WorkspaceAnalytics";
-import WorkspaceAgents    from "../pages/workspace/WorkspaceAgents";
-import WorkspacePeople    from "../pages/workspace/WorkspacePeople";
-import WorkspaceSettings  from "../pages/workspace/WorkspaceSettings";
-import WorkspaceAuditLog  from "../pages/workspace/WorkspaceAuditLog";
-import WorkspaceBilling   from "../pages/workspace/WorkspaceBilling";
-import WorkspaceSecurity  from "../pages/workspace/WorkspaceSecurity";
+import WorkspaceOverview  from "../../pages/workspace/WorkspaceOverview";
+import WorkspaceProjects  from "../../pages/workspace/WorkspaceProjects";
+import WorkspaceLibrary   from "../../pages/workspace/WorkspaceLibrary";
+import WorkspaceAnalytics from "../../pages/workspace/WorkspaceAnalytics";
+import WorkspaceAgents    from "../../pages/workspace/WorkspaceAgents";
+import WorkspacePeople    from "../../pages/workspace/WorkspacePeople";
+import WorkspaceSettings  from "../../pages/workspace/WorkspaceSettings";
+import WorkspaceAuditLog  from "../../pages/workspace/WorkspaceAuditLog";
+import WorkspaceBilling   from "../../pages/workspace/WorkspaceBilling";
+import WorkspaceSecurity  from "../../pages/workspace/WorkspaceSecurity";
 
 export type ProjectView =
   | "dashboard" | "conversation" | "repositories" | "documents"
@@ -77,7 +76,7 @@ const SPECIALISTS: Record<string, { name: string; icon: string; color: string; t
 const PROJECT_COLORS = ["#0a84ff", "#bf5af2", "#30d158", "#ff9f0a", "#ff375f", "#5e5ce6"];
 
 
-export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
+export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const { settings: appSettings } = useAppSettings();
   const brand = appSettings.brand_name?.trim() || "TelaiOS";
@@ -245,9 +244,8 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
 
   return (
     <>
-      <MeshBackground />
       <div
-        className="app"
+        className="grid h-screen grid-cols-[240px_1fr_auto] grid-rows-[56px_1fr] gap-2.5 bg-background p-2.5 text-foreground"
         data-ai-collapsed={(wsView || aiCollapsed) ? "true" : undefined}
       >
         {/* ── Sidebar ── */}
@@ -275,8 +273,12 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         />
 
         {/* ── Main ── */}
-        <main className="main glass">
-          {renderView()}
+        <main
+          className={`col-start-2 flex flex-col overflow-hidden rounded-2xl bg-surface shadow-surface ${
+            view === "conversation" && !wsView ? "" : "p-7"
+          }`}
+        >
+          <div className="flex-1 overflow-y-auto">{renderView()}</div>
         </main>
 
         {/* ── AI Sidebar (project mode only) ── */}

@@ -8,7 +8,7 @@ import { AppSettingsProvider } from "./context/AppSettingsContext";
 import { applyAppSettingsToDocument, loadCachedAppSettings } from "./lib/appSettings";
 import "./index.css";
 import LoginPage from "./pages/Login";
-import ProjectLayout from "./components/ProjectLayout";
+import AppShell from "./components/shell/AppShell";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PlanningChat from "./pages/PlanningChat";
 import DesignChat from "./pages/DesignChat";
@@ -31,22 +31,22 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 {/* Protected routes */}
                 <Route element={<ProtectedRoute />}>
                   {/* Admin Console (workspace-level views) */}
-                  <Route path="/"               element={<ProjectLayout wsView="overview"  />} />
-                  <Route path="/projects-list"  element={<ProjectLayout wsView="projects"  />} />
-                  <Route path="/library"        element={<ProjectLayout wsView="library"   />} />
-                  <Route path="/analytics"      element={<ProjectLayout wsView="analytics" />} />
-                  <Route path="/agents"         element={<ProjectLayout wsView="agents"    />} />
-                  <Route path="/people"         element={<ProjectLayout wsView="people"    />} />
-                  <Route path="/audit"          element={<ProjectLayout wsView="audit"     />} />
-                  <Route path="/billing"        element={<ProjectLayout wsView="billing"   />} />
-                  <Route path="/security"       element={<ProjectLayout wsView="security"  />} />
-                  <Route path="/settings"       element={<ProjectLayout wsView="settings"  />} />
+                  <Route path="/"               element={<AppShell wsView="overview"  />} />
+                  <Route path="/projects-list"  element={<AppShell wsView="projects"  />} />
+                  <Route path="/library"        element={<AppShell wsView="library"   />} />
+                  <Route path="/analytics"      element={<AppShell wsView="analytics" />} />
+                  <Route path="/agents"         element={<AppShell wsView="agents"    />} />
+                  <Route path="/people"         element={<AppShell wsView="people"    />} />
+                  <Route path="/audit"          element={<AppShell wsView="audit"     />} />
+                  <Route path="/billing"        element={<AppShell wsView="billing"   />} />
+                  <Route path="/security"       element={<AppShell wsView="security"  />} />
+                  <Route path="/settings"       element={<AppShell wsView="settings"  />} />
 
                   {/* Operator portal */}
                   <Route path="/operator" element={<OperatorLayout />} />
 
                   {/* Project shell */}
-                  <Route path="/projects/:projectId" element={<ProjectLayout />} />
+                  <Route path="/projects/:projectId" element={<AppShell />} />
 
                   {/* Deep-link sub-pages rendered outside the project shell */}
                   <Route path="/projects/:projectId/plans/:planId" element={<PlanningChat />} />
