@@ -24,11 +24,13 @@ export function WorkspaceSwitcher() {
           </span>
         </div>
       </Button>
-      <Dropdown.Menu aria-label="Switch workspace">
-        <Dropdown.Item id="current" textValue={brand}>
-          {brand}
-        </Dropdown.Item>
-      </Dropdown.Menu>
+      <Dropdown.Popover>
+        <Dropdown.Menu aria-label="Switch workspace">
+          <Dropdown.Item id="current" textValue={brand}>
+            {brand}
+          </Dropdown.Item>
+        </Dropdown.Menu>
+      </Dropdown.Popover>
     </Dropdown>
   );
 }

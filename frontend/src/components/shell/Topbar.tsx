@@ -56,16 +56,18 @@ export function Topbar({
             <Avatar.Fallback>{initials}</Avatar.Fallback>
           </Avatar>
         </Button>
-        <Dropdown.Menu
-          aria-label="User actions"
-          onAction={(key) => {
-            if (key === "logout") logout();
-          }}
-        >
-          <Dropdown.Item id="logout" textValue="Sign out" variant="danger">
-            Sign out
-          </Dropdown.Item>
-        </Dropdown.Menu>
+        <Dropdown.Popover>
+          <Dropdown.Menu
+            aria-label="User actions"
+            onAction={(key) => {
+              if (key === "logout") logout();
+            }}
+          >
+            <Dropdown.Item id="logout" textValue="Sign out" variant="danger">
+              Sign out
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
       </Dropdown>
     </header>
   );
