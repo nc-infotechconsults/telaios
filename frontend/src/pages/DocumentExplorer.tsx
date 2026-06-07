@@ -54,7 +54,7 @@ export default function DocumentExplorer({ projectId: propProjectId }: Props = {
   const [newFolderName, setNewFolderName] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollAttemptsRef = useRef(0);
   const MAX_POLL_ATTEMPTS = 40; // ~2 minutes at 3 s intervals
