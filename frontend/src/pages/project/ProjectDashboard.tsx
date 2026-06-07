@@ -134,83 +134,106 @@ export default function ProjectDashboard({
   const runningCount = tasks.filter((t) => t.status === "in_progress").length;
 
   return (
-    <div className="main-scroll">
-      <h1 className="h-page">{project?.name ?? (DEMO ? "Atlas" : "Project")}</h1>
-      <p className="sub-page">
+    <div className="flex-1 overflow-y-auto">
+      <h1 className="text-[26px] font-semibold tracking-tight mb-1">{project?.name ?? (DEMO ? "Atlas" : "Project")}</h1>
+      <p className="text-[13.5px] text-muted mb-6">
         {project?.description ?? (DEMO ? "Core platform & infra" : "")}
         {(project?.description || DEMO) ? " · " : ""}
-        <b style={{ color: "var(--fg-2)" }}>{repos.length} repos</b> and{" "}
-        <b style={{ color: "var(--fg-2)" }}>{docCount} documents</b> indexed for knowledge
+        <b className="text-foreground">{repos.length} repos</b> and{" "}
+        <b className="text-foreground">{docCount} documents</b> indexed for knowledge
       </p>
 
       {/* Stats */}
-      <div className="grid-4" style={{ marginBottom: 14 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3.5">
         {[
           { l: "Repos connected",   v: repos.length,                                   d: `${synced} synced`      },
           { l: "Documents indexed", v: docCount,                                        d: "indexed for search"    },
           { l: "Tasks completed",   v: analytics?.task_status_counts.done     ?? "—",  d: "all time"              },
           { l: "Tasks in progress", v: analytics?.task_status_counts.in_progress ?? "—", d: "running now"         },
         ].map((s, i) => (
-          <div key={i} className="card stat">
-            <span className="stat-l">{s.l}</span>
-            <span className="stat-v">{s.v}</span>
-            <span className="stat-delta">{s.d}</span>
+          <div key={i} className="flex flex-col gap-1.5 rounded-2xl bg-surface p-4 shadow-surface">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted">{s.l}</span>
+            <span className="text-[28px] font-semibold tracking-tight tabular-nums">{s.v}</span>
+            <span className="text-[11.5px] font-medium text-success">{s.d}</span>
           </div>
         ))}
       </div>
 
       {/* Hero Ask TEOS */}
-      <div className="card hero-ask" style={{ marginBottom: 14, padding: 22 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <span className="ai-orb" style={{ width: 22, height: 22 }} />
+      <div className="rounded-2xl bg-surface p-6 shadow-surface mb-3.5">
+        <div className="flex items-center gap-3 mb-3.5">
+          <span
+            aria-hidden
+            className="block size-[22px] shrink-0 rounded-full"
+            style={{
+              background: "var(--accent-grad, linear-gradient(135deg,#0a84ff,#bf5af2))",
+              boxShadow: "0 0 0 2px rgba(10,132,255,0.18), 0 0 12px rgba(191,90,242,0.5)",
+            }}
+          />
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.015em" }}>
+            <div className="text-[15px] font-semibold tracking-tight">
               Ask TEOS about anything you've connected
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>
+            <div className="text-[12.5px] text-muted mt-0.5">
               TEOS can answer questions, reverse-engineer systems, plan features and design new interfaces — grounded in your repos and documents.
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="flex flex-wrap gap-2">
           {SUGGEST_CHIPS.map((c, i) => (
-            <button key={i} className="suggest-chip" onClick={() => onNavigate("conversation")}>
+            <button
+              key={i}
+              type="button"
+              onClick={() => onNavigate("conversation")}
+              className="flex items-center gap-2 rounded-full bg-surface-secondary px-3 py-1.5 text-[12.5px] text-muted hover:bg-default hover:text-foreground"
+            >
               <Icon name={c.icon} size="sm" />
               <span>{c.text}</span>
-              <Icon name="arrow" size="sm" className="chip-arrow" />
+              <Icon name="arrow" size="sm" className="opacity-50" />
             </button>
           ))}
         </div>
       </div>
 
       {/* Two-column grid */}
-      <div className="grid-2" style={{ marginBottom: 14 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3.5 mb-3.5">
         {/* Connected repos */}
-        <div className="card">
-          <div className="card-head">
+        <div className="rounded-2xl bg-surface p-4 shadow-surface">
+          <div className="flex items-center gap-2.5 mb-3">
             <Icon name="git" size="sm" />
-            <span className="card-title">Connected repositories</span>
-            <span className="card-sub">{repos.length} sources</span>
-            <button className="pill-btn" style={{ marginLeft: 8 }} onClick={() => onNavigate("repositories")}>
+            <span className="text-[13px] font-semibold">Connected repositories</span>
+            <span className="text-xs text-muted ms-auto">{repos.length} sources</span>
+            <button
+              type="button"
+              onClick={() => onNavigate("repositories")}
+              className="ms-2 inline-flex items-center gap-1 rounded-lg bg-surface-secondary px-3 py-1 text-[12px] font-medium text-muted hover:bg-default hover:text-foreground"
+            >
               View all <Icon name="arrow" size="sm" />
             </button>
           </div>
           <div>
             {repos.slice(0, 4).map((r) => (
-              <div key={r.name} className="repo-row">
-                <span className="lang-dot" style={{ background: r.langColor }} />
-                <div className="repo-name">
-                  <b>{r.name}</b>
-                  <span>{r.branch}{r.files ? ` · ${r.files.toLocaleString()} files` : ""}</span>
+              <div key={r.name} className="grid grid-cols-[12px_1fr_auto_auto] gap-3.5 items-center py-2.5 border-b border-separator last:border-b-0 text-[13px]">
+                <span className="size-2 rounded-full" style={{ background: r.langColor }} />
+                <div>
+                  <b className="font-semibold">{r.name}</b>
+                  <span className="text-muted ms-1.5 text-xs">{r.branch}{r.files ? ` · ${r.files.toLocaleString()} files` : ""}</span>
                 </div>
-                <span className="task-status" data-s={statusAttr(r.status)}>
+                <span
+                  className={
+                    "text-[10.5px] font-medium px-1.5 py-0.5 rounded " +
+                    (statusAttr(r.status) === "done" ? "bg-success-soft text-success-soft-foreground" :
+                     statusAttr(r.status) === "running" ? "bg-accent-soft text-accent-soft-foreground" :
+                     "bg-danger-soft text-danger-soft-foreground")
+                  }
+                >
                   {r.status}
                 </span>
-                <span className="repo-meta">{r.lastSync}</span>
+                <span className="text-[11.5px] text-muted">{r.lastSync}</span>
               </div>
             ))}
             {repos.length === 0 && !DEMO && (
-              <div style={{ fontSize: 12.5, color: "var(--fg-3)", padding: "12px 14px" }}>
+              <div className="text-[12.5px] text-muted px-3.5 py-3">
                 No repositories connected yet.
               </div>
             )}
@@ -218,11 +241,11 @@ export default function ProjectDashboard({
         </div>
 
         {/* TEOS tasks */}
-        <div className="card">
-          <div className="card-head">
+        <div className="rounded-2xl bg-surface p-4 shadow-surface">
+          <div className="flex items-center gap-2.5 mb-3">
             <Icon name="sparkle" size="sm" />
-            <span className="card-title">TEOS is working on</span>
-            <span className="card-sub">{runningCount} running</span>
+            <span className="text-[13px] font-semibold">TEOS is working on</span>
+            <span className="text-xs text-muted ms-auto">{runningCount} running</span>
           </div>
           {tasks.map((t) => {
             const uiStatus = taskStatusToUi(t.status);
@@ -231,25 +254,36 @@ export default function ProjectDashboard({
               uiStatus === "running" ? 50 :
               0;
             return (
-              <div key={t.id} className="agent-task">
-                <div className="task-icon">
+              <div key={t.id} className="flex gap-3 rounded-xl bg-surface-secondary border border-border p-3 mt-2 first:mt-0">
+                <div
+                  className="flex size-7.5 shrink-0 items-center justify-center rounded-lg text-accent-foreground"
+                  style={{ background: "var(--accent-grad, linear-gradient(135deg,#0a84ff,#bf5af2))" }}
+                >
                   <Icon name={taskIcon(t.type)} size="sm" />
                 </div>
-                <div className="task-body">
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="task-title">{t.title}</span>
-                    <span className="task-status" data-s={uiStatus} style={{ marginLeft: "auto" }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12.5px] font-semibold">{t.title}</span>
+                    <span
+                      className={
+                        "ms-auto text-[10.5px] font-medium px-1.5 py-0.5 rounded " +
+                        (uiStatus === "done" ? "bg-success-soft text-success-soft-foreground" :
+                         uiStatus === "running" ? "bg-accent-soft text-accent-soft-foreground" :
+                         uiStatus === "failed" ? "bg-danger-soft text-danger-soft-foreground" :
+                         "bg-default text-muted")
+                      }
+                    >
                       {uiStatus}
                     </span>
                   </div>
                   {t.description && (
-                    <div className="task-sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div className="text-[11.5px] text-muted mt-0.5 truncate">
                       {t.description}
                     </div>
                   )}
                   {uiStatus !== "queued" && (
-                    <div className="task-bar">
-                      <div style={{ width: progress + "%" }} />
+                    <div className="h-1 rounded-full bg-default border border-border mt-2 overflow-hidden">
+                      <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: progress + "%" }} />
                     </div>
                   )}
                 </div>
@@ -257,7 +291,7 @@ export default function ProjectDashboard({
             );
           })}
           {tasks.length === 0 && (
-            <div style={{ fontSize: 12.5, color: "var(--fg-3)", padding: "12px 14px" }}>
+            <div className="text-[12.5px] text-muted px-3.5 py-3">
               No tasks yet. Start by creating a plan.
             </div>
           )}
@@ -265,12 +299,16 @@ export default function ProjectDashboard({
       </div>
 
       {/* Activity feed */}
-      <div className="card">
-        <div className="card-head">
+      <div className="rounded-2xl bg-surface p-4 shadow-surface">
+        <div className="flex items-center gap-2.5 mb-3">
           <Icon name="layers" size="sm" />
-          <span className="card-title">Recent activity</span>
-          <span className="card-sub">Conversation history</span>
-          <button className="pill-btn" style={{ marginLeft: 8 }} onClick={() => onNavigate("conversation")}>
+          <span className="text-[13px] font-semibold">Recent activity</span>
+          <span className="text-xs text-muted ms-auto">Conversation history</span>
+          <button
+            type="button"
+            onClick={() => onNavigate("conversation")}
+            className="ms-2 inline-flex items-center gap-1 rounded-lg bg-surface-secondary px-3 py-1 text-[12px] font-medium text-muted hover:bg-default hover:text-foreground"
+          >
             <Icon name="spark" size="sm" /> Open
           </button>
         </div>
@@ -279,22 +317,24 @@ export default function ProjectDashboard({
             const isUser = m.role === "user";
             const displayName = isUser ? "User" : "TEOS";
             const initial = isUser ? initials("User") : null;
-            const avatarClass = isUser ? "av-2" : "av-3";
+            const avatarBg = isUser ? "bg-success" : "bg-accent";
             const tag = isUser ? "Question" : "Answer";
             const truncated = m.content.length > 120 ? m.content.slice(0, 120) + "…" : m.content;
             return (
-              <div key={m.id} className="act-row">
-                <div className={"act-avatar " + avatarClass}>{initial ?? <i className="fa-solid fa-robot" aria-hidden="true" />}</div>
-                <div className="act-body">
-                  <span className="act-tag">{tag}</span>
-                  <b>{displayName}</b> {truncated}
-                  <div className="act-time">{formatRelativeTime(m.created_at)}</div>
+              <div key={m.id} className="flex gap-3 py-2.5 border-b border-separator last:border-b-0">
+                <div className={`size-6.5 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold text-accent-foreground ${avatarBg}`}>
+                  {initial ?? <i className="fa-solid fa-robot" aria-hidden="true" />}
+                </div>
+                <div className="flex-1 min-w-0 text-[12.5px] leading-relaxed text-muted">
+                  <span className="inline-block text-[10.5px] font-medium px-1.5 py-0.5 rounded bg-surface-secondary border border-border me-1">{tag}</span>
+                  <b className="text-foreground">{displayName}</b> {truncated}
+                  <div className="text-[11px] text-muted/70 mt-0.5">{formatRelativeTime(m.created_at)}</div>
                 </div>
               </div>
             );
           })}
           {messages.length === 0 && (
-            <div style={{ fontSize: 12.5, color: "var(--fg-3)", padding: "12px 14px" }}>
+            <div className="text-[12.5px] text-muted px-3.5 py-3">
               No conversation history yet. Ask TEOS something to get started.
             </div>
           )}
