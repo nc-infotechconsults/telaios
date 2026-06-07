@@ -6,6 +6,7 @@ import { getProjects, sendConversationMessage } from "../lib/api";
 import type { Project } from "../types";
 import { Icon } from "./Icon";
 import MeshBackground from "./MeshBackground";
+import { Sidebar } from "./shell/Sidebar";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
 
@@ -55,21 +56,6 @@ const WS_VIEW_LABELS: Record<WsView, string> = {
   security:  "Security",
 };
 
-const WS_NAV = [
-  { id: "overview",  label: "Overview",       icon: "home",     href: "/" },
-  { id: "projects",  label: "Projects",       icon: "layers",   href: "/projects-list" },
-  { id: "library",   label: "Library",        icon: "cube",     href: "/library" },
-  { id: "analytics", label: "Analytics",      icon: "workflow", href: "/analytics" },
-  { id: "agents",    label: "Agents",         icon: "bot",      href: "/agents" },
-] as const;
-
-const WS_ADMIN_NAV = [
-  { id: "people",   label: "People",   icon: "users",    href: "/people"   },
-  { id: "audit",    label: "Audit Log", icon: "inbox",   href: "/audit"    },
-  { id: "billing",  label: "Billing",  icon: "layers",   href: "/billing"  },
-  { id: "security", label: "Security", icon: "settings", href: "/security" },
-  { id: "settings", label: "Settings", icon: "settings", href: "/settings" },
-] as const;
 
 const VIEW_LABELS: Record<ProjectView, string> = {
   dashboard: "Dashboard", conversation: "Conversation", repositories: "Repositories",
@@ -120,7 +106,6 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   // TEOS sidebar state
   const [teosMessages, setTeosMessages] = useState<Array<{ role: string; text: string; specialist?: string }>>([]);
@@ -238,27 +223,8 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
     // Response arrives via the sidebar SSE connection
   };
 
-  const projectName = wsView ? brand : (project?.name ?? "Project");
-  const projectColor = wsView ? "#0a84ff" : (sidebarProjects.find((p) => p.id === projectId)?.color ?? "#0a84ff");
   const userInitials = user?.display_name?.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() ?? "U";
   const unreadNotifs = 0;
-
-  const mainNav = [
-    { id: "dashboard",    label: "Dashboard",    icon: "home",     badge: null },
-    { id: "conversation", label: "Conversation", icon: "chat",     badge: null },
-    { id: "repositories", label: "Repositories", icon: "git",      badge: null },
-    { id: "documents",    label: "Documents",    icon: "book",     badge: null },
-    { id: "designs",      label: "Designs",      icon: "spark",    badge: null },
-    { id: "agents",       label: "Agents",       icon: "bot",      badge: null },
-    { id: "library",      label: "Library",      icon: "cube",     badge: null },
-    { id: "plans",        label: "Plans",        icon: "workflow", badge: null },
-  ] as const;
-
-  const bottomNav = [
-    { id: "inbox",    label: "Inbox",    icon: "inbox",    badge: null },
-    { id: "members",  label: "Members",  icon: "users",    badge: null },
-    { id: "settings", label: "Settings", icon: "settings", badge: null },
-  ] as const;
 
   const renderView = () => {
     // Workspace mode
@@ -306,169 +272,20 @@ export default function ProjectLayout({ wsView }: { wsView?: WsView } = {}) {
         data-ai-collapsed={(wsView || aiCollapsed) ? "true" : undefined}
       >
         {/* ── Sidebar ── */}
-        <aside className="sidebar glass">
-          <div className="sb-brand">
-            <div className="sb-logo" />
-            {appSettings.logo_url ? <img src={appSettings.logo_url} alt={`${brand} logo`} style={{ height: 20 }} /> : <span>{brand}</span>}
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-3)", fontWeight: 500 }}>v2.4</span>
-          </div>
-
-          <div className="sb-section">{wsView ? "Navigation" : (project?.name ?? "Project")}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {wsView ? (
-              <>
-                {WS_NAV.map((n) => (
-                  <button
-                    key={n.id}
-                    className="sb-row"
-                    data-active={wsView === n.id}
-                    onClick={() => { window.location.href = n.href; }}
-                  >
-                    <Icon name={n.icon} className="sb-icon" />
-                    <span>{n.label}</span>
-                  </button>
-                ))}
-                <div className="sb-section" style={{ marginTop: 4 }}>Admin</div>
-                {WS_ADMIN_NAV.map((n) => (
-                  <button
-                    key={n.id}
-                    className="sb-row"
-                    data-active={wsView === n.id}
-                    onClick={() => { window.location.href = n.href; }}
-                  >
-                    <Icon name={n.icon} className="sb-icon" />
-                    <span>{n.label}</span>
-                  </button>
-                ))}
-              </>
-            ) : (
-              mainNav.map((n) => (
-                <button
-                  key={n.id}
-                  className="sb-row"
-                  data-active={view === n.id}
-                  onClick={() => setView(n.id as ProjectView)}
-                >
-                  <Icon name={n.icon} className="sb-icon" />
-                  <span>{n.label}</span>
-                  {n.badge && <span className="sb-badge">{n.badge}</span>}
-                </button>
-              ))
-            )}
-          </div>
-
-          {!wsView && (
-            <>
-              <div className="sb-section">Projects</div>
-              <div className="projects-list">
-                {sidebarProjects.map((p) => (
-                  <button
-                    key={p.id}
-                    className="proj-row"
-                    data-active={projectId === p.id}
-                    onClick={() => { window.location.href = `/projects/${p.id}`; }}
-                  >
-                    <span className="proj-dot" style={{ background: p.color }} />
-                    <span>{p.name}</span>
-                  </button>
-                ))}
-                <button className="proj-row" style={{ color: "var(--fg-3)" }}
-                  onClick={() => { window.location.href = "/"; }}>
-                  <Icon name="plus" size="sm" className="sb-icon" />
-                  <span>All projects</span>
-                </button>
-              </div>
-            </>
-          )}
-
-          <div className="sb-spacer" />
-
-          {/* Bottom nav (project mode only) */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 1, paddingTop: 8 }}>
-            {!wsView && bottomNav.map((n) => (
-              <button
-                key={n.id}
-                className="sb-row"
-                style={{ height: 30, fontSize: 12.5 }}
-                data-active={view === n.id}
-                onClick={() => setView(n.id as ProjectView)}
-              >
-                <Icon name={n.icon} className="sb-icon" />
-                <span>{n.label}</span>
-                {n.badge && <span className="sb-badge">{n.badge}</span>}
-              </button>
-            ))}
-
-            {/* Workspace switcher */}
-            <div style={{ position: "relative" }}>
-              <button
-                className="workspace-switch"
-                style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
-                onClick={() => setSwitcherOpen((v) => !v)}
-              >
-                <div className="ws-avatar" style={{ background: projectColor }}>
-                  {wsView ? "T" : projectName.charAt(0).toUpperCase()}
-                </div>
-                <div className="ws-meta">
-                  <b>{wsView ? brand : projectName}</b>
-                  <span>{wsView ? "Admin Console" : "Switch workspace"}</span>
-                </div>
-                <div className="ws-arrows">
-                  <Icon name="chevd" size="sm" style={{ transform: switcherOpen ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }} />
-                </div>
-              </button>
-
-              {switcherOpen && (
-                <>
-                  <div className="vis-backdrop" style={{ zIndex: 90 }} onClick={() => setSwitcherOpen(false)} />
-                  <div
-                    className="glass"
-                    style={{
-                      position: "absolute", bottom: "calc(100% + 6px)", top: "auto", left: 0, right: 0,
-                      borderRadius: 10, border: "0.5px solid var(--hairline)",
-                      boxShadow: "var(--shadow-lg)", zIndex: 100, overflow: "hidden",
-                    }}
-                  >
-                    <button
-                      className="sb-row"
-                      style={{ width: "100%", borderRadius: 0, padding: "9px 12px", gap: 8 }}
-                      data-active={!!wsView}
-                      onClick={() => { setSwitcherOpen(false); window.location.href = "/"; }}
-                    >
-                      <div style={{
-                        width: 20, height: 20, borderRadius: 5, flexShrink: 0,
-                        background: "linear-gradient(135deg, #0a84ff, #bf5af2)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        <Icon name="settings" size="sm" style={{ color: "#fff", fontSize: 10 }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12.5, fontWeight: 600 }}>Admin Console</div>
-                        <div style={{ fontSize: 11, color: "var(--fg-3)" }}>Workspace governance</div>
-                      </div>
-                    </button>
-                    {sidebarProjects.length > 0 && (
-                      <div style={{ borderTop: "0.5px solid var(--hairline)", padding: "4px 0" }}>
-                        {sidebarProjects.map((p) => (
-                          <button
-                            key={p.id}
-                            className="sb-row"
-                            style={{ width: "100%", borderRadius: 0, padding: "7px 12px", gap: 8 }}
-                            data-active={projectId === p.id && !wsView}
-                            onClick={() => { setSwitcherOpen(false); window.location.href = `/projects/${p.id}`; }}
-                          >
-                            <span className="proj-dot" style={{ background: p.color, width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
-                            <span style={{ fontSize: 12.5 }}>{p.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </aside>
+        <Sidebar
+          mode={
+            wsView
+              ? { kind: "workspace", wsView }
+              : {
+                  kind: "project",
+                  projectId: projectId!,
+                  projectName: project?.name ?? "Project",
+                  view,
+                  onSelectView: setView,
+                  projects: sidebarProjects,
+                }
+          }
+        />
 
         {/* ── Topbar ── */}
         <header className="topbar glass">
