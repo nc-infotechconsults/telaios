@@ -211,7 +211,7 @@ export default function WorkspaceLibrary() {
             <p style={{ fontSize: 13, color: "var(--fg-3)", marginBottom: 20 }}>
               "{deleteTarget.name}" will be permanently deleted. This cannot be undone.
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <div className="modal-actions" data-align="end">
               <button className="pill-btn" onClick={() => setDeleteTarget(null)}>Cancel</button>
               <button
                 className="pill-btn"

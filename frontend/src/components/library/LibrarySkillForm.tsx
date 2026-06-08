@@ -21,6 +21,30 @@ interface Props {
   onCancel: () => void;
 }
 
+// ─── Form section wrapper ────────────────────────────────────────────────────
+
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {description && (
+          <p className="text-[11px] text-default-400 mt-0.5">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /**
  * Create / edit form for a LibrarySkill catalog entry.
  *
@@ -148,141 +172,64 @@ export default function LibrarySkillForm({ initialData, onSaved, onCancel }: Pro
   };
 
   const disabled = saving || loadingFiles;
+  const charCount = content.length;
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Basic fields */}
-      <Input
-        autoFocus
-        isRequired
-        label="Name"
-        placeholder="e.g. code-review"
-        value={name}
-        onValueChange={(v) => { setName(v); setNameTouched(true); }}
-        onBlur={() => setNameTouched(true)}
-        isInvalid={nameTouched && !name.trim()}
-        errorMessage={nameTouched && !name.trim() ? "Name is required" : undefined}
-        isDisabled={disabled}
-      />
-
-      <Textarea
-        label="Description"
-        placeholder="When should this skill be used?"
-        value={description}
-        onValueChange={setDescription}
-        isDisabled={disabled}
-        minRows={2}
-      />
-
-      <Textarea
-        isRequired
-        label="SKILL.md body"
-        placeholder="Paste the full skill instructions in markdown… (frontmatter is generated automatically)"
-        value={content}
-        onValueChange={(v) => { setContent(v); setContentTouched(true); }}
-        onBlur={() => setContentTouched(true)}
-        isInvalid={contentTouched && !content.trim()}
-        errorMessage={contentTouched && !content.trim() ? "SKILL.md body is required" : undefined}
-        isDisabled={disabled}
-        minRows={8}
-        maxRows={20}
-        classNames={{ input: "font-mono text-xs" }}
-      />
-
-      {/* Tags + Version */}
-      <div className="flex gap-3">
+    <div className="flex flex-col gap-6">
+      {/* ── Identity ──────────────────────────────────────────────────────── */}
+      <FormSection
+        title="Identity"
+        description="How this skill appears in the workspace library."
+      >
         <Input
-          label="Tags"
-          placeholder="Comma-separated, e.g. review, quality"
-          value={tagsRaw}
-          onValueChange={setTagsRaw}
+          autoFocus
+          isRequired
+          label="Name"
+          placeholder="e.g. code-review"
+          value={name}
+          onValueChange={(v) => { setName(v); setNameTouched(true); }}
+          onBlur={() => setNameTouched(true)}
+          isInvalid={nameTouched && !name.trim()}
+          errorMessage={nameTouched && !name.trim() ? "Name is required" : undefined}
           isDisabled={disabled}
-          className="flex-1"
         />
-        <Input
-          label="Version"
-          placeholder="1.0.0"
-          value={version}
-          onValueChange={setVersion}
+        <Textarea
+          label="Description"
+          placeholder="When should this skill be used?"
+          value={description}
+          onValueChange={setDescription}
           isDisabled={disabled}
-          className="w-32"
+          minRows={2}
         />
-      </div>
+      </FormSection>
 
-      {/* Package metadata */}
-      <div className="flex gap-3">
-        <Input
-          label="License"
-          placeholder="MIT"
-          value={license}
-          onValueChange={setLicense}
+      {/* ── Skill body ────────────────────────────────────────────────────── */}
+      <FormSection
+        title="SKILL.md body"
+        description="Full skill instructions in markdown — frontmatter is generated for you on save."
+      >
+        <Textarea
+          isRequired
+          aria-label="SKILL.md body"
+          placeholder="# What this skill does&#10;&#10;## When to use it&#10;&#10;## Steps"
+          value={content}
+          onValueChange={(v) => { setContent(v); setContentTouched(true); }}
+          onBlur={() => setContentTouched(true)}
+          isInvalid={contentTouched && !content.trim()}
+          errorMessage={contentTouched && !content.trim() ? "SKILL.md body is required" : undefined}
           isDisabled={disabled}
-          className="flex-1"
+          minRows={10}
+          maxRows={24}
+          classNames={{ input: "font-mono text-xs" }}
+          description={charCount > 0 ? `${charCount.toLocaleString()} characters` : undefined}
         />
-        <Input
-          label="Compatibility"
-          placeholder="claude-code, opencode"
-          value={compatibility}
-          onValueChange={setCompatibility}
-          isDisabled={disabled}
-          className="flex-1"
-        />
-      </div>
+      </FormSection>
 
-      {/* Skill metadata key-value pairs */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-default-600">Metadata</span>
-          {!disabled && (
-            <Button size="sm" variant="flat" onPress={addMetaEntry}>
-              + Add entry
-            </Button>
-          )}
-        </div>
-        {metaEntries.length === 0 && (
-          <p className="text-xs text-default-400">
-            No metadata entries. Key-value pairs are included in the SKILL.md frontmatter.
-          </p>
-        )}
-        {metaEntries.map((entry, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input
-              size="sm"
-              placeholder="key"
-              value={entry.key}
-              onValueChange={(v) => updateMetaEntry(i, { key: v })}
-              isDisabled={disabled}
-              classNames={{ input: "font-mono text-xs" }}
-              className="flex-1"
-            />
-            <Input
-              size="sm"
-              placeholder="value"
-              value={entry.value}
-              onValueChange={(v) => updateMetaEntry(i, { value: v })}
-              isDisabled={disabled}
-              classNames={{ input: "font-mono text-xs" }}
-              className="flex-1"
-            />
-            {!disabled && (
-              <Button
-                isIconOnly
-                size="sm"
-                variant="light"
-                color="danger"
-                aria-label={`Remove metadata entry ${i + 1}`}
-                onPress={() => removeMetaEntry(i)}
-              >
-                ×
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Supporting files */}
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-default-600">Supporting files</span>
+      {/* ── Supporting files ──────────────────────────────────────────────── */}
+      <FormSection
+        title="Supporting files"
+        description="Scripts, references, or other files shipped alongside SKILL.md."
+      >
         {loadingFiles ? (
           <div className="flex justify-center py-4">
             <Spinner size="sm" label="Loading files…" />
@@ -290,10 +237,115 @@ export default function LibrarySkillForm({ initialData, onSaved, onCancel }: Pro
         ) : (
           <SkillFilePanel value={files} onChange={setFiles} disabled={disabled} />
         )}
-      </div>
+      </FormSection>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between gap-2 pt-2">
+      {/* ── Catalog metadata ──────────────────────────────────────────────── */}
+      <FormSection
+        title="Catalog metadata"
+        description="Surfaced in the library and packaged into the skill's frontmatter."
+      >
+        <div className="grid grid-cols-[1fr_8rem] gap-3">
+          <Input
+            label="Tags"
+            placeholder="review, quality"
+            value={tagsRaw}
+            onValueChange={setTagsRaw}
+            isDisabled={disabled}
+            description="Comma-separated."
+          />
+          <Input
+            label="Version"
+            placeholder="1.0.0"
+            value={version}
+            onValueChange={setVersion}
+            isDisabled={disabled}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="License"
+            placeholder="MIT"
+            value={license}
+            onValueChange={setLicense}
+            isDisabled={disabled}
+          />
+          <Input
+            label="Compatibility"
+            placeholder="claude-code, opencode"
+            value={compatibility}
+            onValueChange={setCompatibility}
+            isDisabled={disabled}
+            description="Runtimes this skill targets."
+          />
+        </div>
+
+        {/* Custom metadata KV editor */}
+        <div className="rounded-xl border border-divider bg-default-50/50 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Custom metadata</p>
+              <p className="text-[11px] text-default-400 mt-0.5">
+                Extra key-value pairs merged into the SKILL.md frontmatter.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={addMetaEntry}
+              isDisabled={disabled}
+              className="h-7 px-2.5 text-[11px] shrink-0"
+            >
+              <i className="fa-solid fa-plus" aria-hidden="true" /> Add
+            </Button>
+          </div>
+          {metaEntries.length === 0 ? (
+            <p className="text-[11px] text-default-400 italic px-1 py-1">
+              None — click <b>Add</b> to define one.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {metaEntries.map((entry, i) => (
+                <div key={i} className="grid grid-cols-[1fr_auto_1fr_28px] gap-1.5 items-center">
+                  <Input
+                    size="sm"
+                    placeholder="key"
+                    value={entry.key}
+                    onValueChange={(v) => updateMetaEntry(i, { key: v })}
+                    isDisabled={disabled}
+                    classNames={{ input: "font-mono text-xs" }}
+                    aria-label="Metadata key"
+                  />
+                  <span className="text-default-300 text-xs">=</span>
+                  <Input
+                    size="sm"
+                    placeholder="value"
+                    value={entry.value}
+                    onValueChange={(v) => updateMetaEntry(i, { value: v })}
+                    isDisabled={disabled}
+                    classNames={{ input: "font-mono text-xs" }}
+                    aria-label="Metadata value"
+                  />
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="light"
+                    color="danger"
+                    aria-label={`Remove metadata entry ${i + 1}`}
+                    onPress={() => removeMetaEntry(i)}
+                    isDisabled={disabled}
+                    className="h-7 w-7 min-w-7"
+                  >
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </FormSection>
+
+      {/* ── Actions ──────────────────────────────────────────────────────── */}
+      <div className="modal-actions" data-align="between">
         {isEdit ? (
           <Button
             size="sm"
@@ -302,7 +354,7 @@ export default function LibrarySkillForm({ initialData, onSaved, onCancel }: Pro
             isLoading={exporting}
             isDisabled={saving || loadingFiles}
           >
-            Download .zip
+            <i className="fa-solid fa-download" aria-hidden="true" /> Download .zip
           </Button>
         ) : (
           <span />

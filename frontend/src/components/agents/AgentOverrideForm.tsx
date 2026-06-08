@@ -7,16 +7,14 @@ import {
   Slider,
   Textarea,
   Divider,
-  Card,
-  CardBody,
   Chip,
   Tabs,
   Tab,
-  Switch,
 } from "../ui";
 import {
   getLlmProviders,
-  discoverMcpTools,
+  listLibraryMCPs,
+  listLibrarySkills,
   upsertWorkspaceAgentOverride,
   deleteWorkspaceAgentOverride,
   upsertAgentOverride,
@@ -27,12 +25,12 @@ import type {
   AgentBaseProfile,
   AgentOverride,
   AgentOverrideUpsert,
-  McpServer,
-  McpToolConfig,
-  McpToolPermission,
+  InlineSkill,
+  LibraryMCP,
+  LibrarySkill,
   LlmProviderDefinition,
+  McpServer,
 } from "../../types";
-import { McpToolBody } from "../McpToolBody";
 
 interface Props {
   base: AgentBaseProfile;
@@ -43,18 +41,29 @@ interface Props {
   onCancel: () => void;
 }
 
-interface EnvEntry { key: string; value: string; }
-
-function envRecordToEntries(env?: Record<string, string>): EnvEntry[] {
-  if (!env) return [];
-  return Object.entries(env).map(([key, value]) => ({ key, value }));
+/** Snapshot a Library MCP entry into the inline McpServer shape stored on the override. */
+function libraryMcpToServer(m: LibraryMCP): McpServer {
+  const base: McpServer = {
+    name: m.name,
+    transport: m.transport,
+  };
+  if (m.transport === "stdio") {
+    if (m.command) base.command = m.command;
+    if (m.args && m.args.length) base.args = m.args;
+    if (m.env && Object.keys(m.env).length) base.env = m.env;
+  } else {
+    if (m.url) base.url = m.url;
+    if (m.headers && Object.keys(m.headers).length) base.headers = m.headers;
+  }
+  return base;
 }
 
-function envEntriesToRecord(entries: EnvEntry[]): Record<string, string> {
-  return entries.reduce<Record<string, string>>((acc, { key, value }) => {
-    if (key.trim()) acc[key.trim()] = value;
-    return acc;
-  }, {});
+function librarySkillToInline(s: LibrarySkill): InlineSkill {
+  return {
+    name: s.name,
+    description: s.description,
+    content: s.content,
+  };
 }
 
 /** Blue dot shown next to a field label when the user has set an override. */
@@ -84,6 +93,7 @@ export default function AgentOverrideForm({
   // LLM fields — null means "use platform default"
   const [llmProvider, setLlmProvider] = useState<string | null>(existing?.llm_provider ?? null);
   const [llmModel, setLlmModel] = useState<string | null>(existing?.llm_model ?? null);
+  const [llmBaseUrl, setLlmBaseUrl] = useState<string | null>(existing?.llm_base_url ?? null);
   const [temperature, setTemperature] = useState<number | null>(existing?.llm_temperature ?? null);
   const [maxTokens, setMaxTokens] = useState<string>(
     existing?.llm_max_tokens != null ? String(existing.llm_max_tokens) : ""
@@ -105,17 +115,19 @@ export default function AgentOverrideForm({
     (existing?.system_prompt_mode as "override" | "extend" | null) ?? null
   );
 
-  // MCP + Skills
+  // MCP + Skills (snapshots picked from the workspace Library)
   const [mcpServers, setMcpServers] = useState<McpServer[]>(existing?.mcp_servers ?? []);
-  const [mcpEnvEntries, setMcpEnvEntries] = useState<EnvEntry[][]>(
-    (existing?.mcp_servers ?? []).map((s) => envRecordToEntries(s.env))
-  );
-  const [skills, setSkills] = useState(existing?.skills ?? []);
+  const [skills, setSkills] = useState<InlineSkill[]>(existing?.skills ?? []);
 
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [llmProviders, setLlmProviders] = useState<LlmProviderDefinition[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
+
+  // Library catalog (loaded once)
+  const [libraryMcps, setLibraryMcps] = useState<LibraryMCP[]>([]);
+  const [librarySkills, setLibrarySkills] = useState<LibrarySkill[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(true);
 
   useEffect(() => {
     getLlmProviders()
@@ -124,55 +136,44 @@ export default function AgentOverrideForm({
       .finally(() => setLoadingProviders(false));
   }, []);
 
+  useEffect(() => {
+    Promise.all([listLibraryMCPs(), listLibrarySkills()])
+      .then(([mcps, sk]) => { setLibraryMcps(mcps); setLibrarySkills(sk); })
+      .catch(() => {})
+      .finally(() => setLoadingLibrary(false));
+  }, []);
+
   const effectiveProvider = llmProvider ?? base.llm_provider ?? "";
   const currentProvider = llmProviders.find((p) => p.id === effectiveProvider);
   const isOnPrem = currentProvider?.type === "onprem";
+  const needsBaseUrl =
+    currentProvider?.needs_base_url ??
+    ["ollama", "vllm", "lmstudio"].includes(effectiveProvider);
 
-  // ── MCP helpers ──────────────────────────────────────────────────────────────
+  // ── Library picker helpers ───────────────────────────────────────────────────
 
-  const addMcp = () => {
-    setMcpServers((prev) => [...prev, { name: "", transport: "stdio", command: "" }]);
-    setMcpEnvEntries((prev) => [...prev, []]);
+  const addMcpFromLibrary = (id: string) => {
+    const lib = libraryMcps.find((m) => m.id === id);
+    if (!lib) return;
+    if (mcpServers.some((s) => s.name === lib.name)) {
+      toast.error(`"${lib.name}" is already attached`);
+      return;
+    }
+    setMcpServers((prev) => [...prev, libraryMcpToServer(lib)]);
   };
 
-  const updateMcp = (i: number, update: Partial<McpServer>) =>
-    setMcpServers((prev) => prev.map((s, j) => (j === i ? { ...s, ...update } : s)));
-
-  const removeMcp = (i: number) => {
+  const removeMcp = (i: number) =>
     setMcpServers((prev) => prev.filter((_, j) => j !== i));
-    setMcpEnvEntries((prev) => prev.filter((_, j) => j !== i));
+
+  const addSkillFromLibrary = (id: string) => {
+    const lib = librarySkills.find((s) => s.id === id);
+    if (!lib) return;
+    if (skills.some((s) => s.name === lib.name)) {
+      toast.error(`"${lib.name}" is already attached`);
+      return;
+    }
+    setSkills((prev) => [...prev, librarySkillToInline(lib)]);
   };
-
-  const addEnvEntry = (si: number) =>
-    setMcpEnvEntries((prev) => prev.map((entries, j) =>
-      j === si ? [...entries, { key: "", value: "" }] : entries
-    ));
-
-  const updateEnvEntry = (si: number, ei: number, update: Partial<EnvEntry>) => {
-    setMcpEnvEntries((prev) => {
-      const next = prev.map((entries, j) =>
-        j === si ? entries.map((e, k) => (k === ei ? { ...e, ...update } : e)) : entries
-      );
-      setMcpServers((ss) => ss.map((s, j) => j === si ? { ...s, env: envEntriesToRecord(next[si]) } : s));
-      return next;
-    });
-  };
-
-  const removeEnvEntry = (si: number, ei: number) => {
-    setMcpEnvEntries((prev) => {
-      const next = prev.map((entries, j) => j === si ? entries.filter((_, k) => k !== ei) : entries);
-      setMcpServers((ss) => ss.map((s, j) => j === si ? { ...s, env: envEntriesToRecord(next[si]) } : s));
-      return next;
-    });
-  };
-
-  // ── Skill helpers ─────────────────────────────────────────────────────────────
-
-  const addSkill = () =>
-    setSkills((prev) => [...prev, { name: "", description: "", content: "" }]);
-
-  const updateSkill = (i: number, update: Partial<typeof skills[0]>) =>
-    setSkills((prev) => prev.map((s, j) => (j === i ? { ...s, ...update } : s)));
 
   const removeSkill = (i: number) =>
     setSkills((prev) => prev.filter((_, j) => j !== i));
@@ -185,6 +186,7 @@ export default function AgentOverrideForm({
       const payload: AgentOverrideUpsert = {
         llm_provider: llmProvider,
         llm_model: llmModel,
+        llm_base_url: llmBaseUrl,
         llm_temperature: temperature,
         llm_max_tokens: maxTokens ? parseInt(maxTokens) : null,
         llm_top_p: topP ? parseFloat(topP) : null,
@@ -277,10 +279,11 @@ export default function AgentOverrideForm({
         </div>
         {isOnPrem ? (
           <Input
-            placeholder={base.llm_model ? `${base.llm_model} (platform default)` : "Model name"}
+            placeholder={base.llm_model ? `${base.llm_model} (platform default)` : "e.g. llama3, mistral, phi3"}
             value={llmModel ?? ""}
             onValueChange={(v) => setLlmModel(v || null)}
             aria-label="LLM model"
+            description="Enter the model name as it appears in your local server."
           />
         ) : (
           <Select
@@ -299,6 +302,23 @@ export default function AgentOverrideForm({
           </Select>
         )}
       </div>
+
+      {/* Base URL — shown for on-prem / OpenAI-compat providers */}
+      {needsBaseUrl && (
+        <div>
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-sm text-default-600">Base URL</span>
+            <OverrideDot active={llmBaseUrl !== null} onReset={() => setLlmBaseUrl(null)} />
+          </div>
+          <Input
+            placeholder={base.llm_base_url ? `${base.llm_base_url} (platform default)` : "http://localhost:11434/v1"}
+            value={llmBaseUrl ?? ""}
+            onValueChange={(v) => setLlmBaseUrl(v || null)}
+            aria-label="LLM base URL"
+            description="Endpoint the agent will use to reach this provider."
+          />
+        </div>
+      )}
 
       <Divider />
       <p className="font-semibold text-sm">LLM Parameters</p>
@@ -457,117 +477,192 @@ export default function AgentOverrideForm({
     </div>
   );
 
-  const renderMcpServersTab = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+  const renderMcpServersTab = () => {
+    const available = libraryMcps.filter(
+      (m) => !mcpServers.some((s) => s.name === m.name)
+    );
+    return (
+      <div className="space-y-4">
         <div>
           <p className="font-semibold text-sm">MCP Servers</p>
-          <p className="text-[11px] text-default-400">
-            Override the platform default MCP servers for this agent.
+          <p className="text-[11px] text-default-400 mt-0.5">
+            Attach MCP servers from your{" "}
+            <a
+              href="/library"
+              className="text-primary hover:underline"
+              onClick={(e) => { e.preventDefault(); window.location.href = "/library"; }}
+            >
+              workspace Library
+            </a>
+            . New servers can only be defined in the Library.
           </p>
         </div>
-        <Button size="sm" variant="bordered" onPress={addMcp}>+ Add Server</Button>
-      </div>
 
-      {mcpServers.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="text-sm text-default-400">Using platform default MCP servers</p>
-          <p className="text-xs text-default-300 mt-1">
-            Add a server to override the platform configuration.
-          </p>
-        </div>
-      )}
+        <Select
+          placeholder={
+            loadingLibrary
+              ? "Loading library…"
+              : libraryMcps.length === 0
+                ? "No MCP servers in the Library yet"
+                : available.length === 0
+                  ? "All library servers already attached"
+                  : "+ Add server from Library"
+          }
+          selectedKeys={[]}
+          isDisabled={loadingLibrary || available.length === 0}
+          onSelectionChange={(keys) => {
+            const id = Array.from(keys)[0] as string;
+            if (id) addMcpFromLibrary(id);
+          }}
+          aria-label="Add MCP server from library"
+        >
+          {available.map((m) => (
+            <SelectItem key={m.id} textValue={m.name}>
+              <div className="flex flex-col py-0.5">
+                <span className="text-sm font-medium">{m.name}</span>
+                <span className="text-[11px] text-default-400 truncate">
+                  {m.transport === "stdio"
+                    ? `stdio · ${m.command ?? ""}${m.args?.length ? " " + m.args.join(" ") : ""}`
+                    : `http · ${m.url ?? ""}`}
+                </span>
+              </div>
+            </SelectItem>
+          ))}
+        </Select>
 
-      {mcpServers.map((s, i) => (
-        <Card key={i} className="bg-default-50">
-          <CardBody className="space-y-2 py-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Input size="sm" label="Name" value={s.name} onValueChange={(v) => updateMcp(i, { name: v })} />
-              <Select
-                size="sm"
-                label="Transport"
-                selectedKeys={[s.transport]}
-                onSelectionChange={(keys) => updateMcp(i, { transport: Array.from(keys)[0] as McpServer["transport"] })}
+        {mcpServers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <p className="text-sm text-default-400">Using platform default MCP servers</p>
+            <p className="text-xs text-default-300 mt-1">
+              Attach a server from the Library to override the platform configuration.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {mcpServers.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-3 rounded-xl border border-divider bg-default-50 px-3 py-2.5"
               >
-                <SelectItem key="stdio">stdio (local process)</SelectItem>
-                <SelectItem key="streamable-http">Streamable HTTP (remote)</SelectItem>
-              </Select>
-            </div>
-            {s.transport === "streamable-http" ? (
-              <>
-                <Input size="sm" label="URL" placeholder="https://..." value={s.url ?? ""} onValueChange={(v) => updateMcp(i, { url: v })} />
-                <Input
-                  size="sm"
-                  label="Authorization Header"
-                  placeholder="Bearer <token>"
-                  value={s.headers?.["Authorization"] ?? ""}
-                  onValueChange={(v) => updateMcp(i, { headers: { ...s.headers, Authorization: v } })}
+                <i
+                  className={`fa-solid ${s.transport === "stdio" ? "fa-terminal" : "fa-globe"} text-primary mt-0.5`}
+                  aria-hidden="true"
                 />
-              </>
-            ) : (
-              <>
-                <Input size="sm" label="Command" placeholder="npx" value={s.command ?? ""} onValueChange={(v) => updateMcp(i, { command: v })} />
-                <Input
-                  size="sm"
-                  label="Args (space-separated)"
-                  placeholder="-y @modelcontextprotocol/server-filesystem /workspace"
-                  value={(s.args ?? []).join(" ")}
-                  onValueChange={(v) => updateMcp(i, { args: v.split(" ").filter(Boolean) })}
-                />
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-medium text-default-600">Environment Variables</p>
-                    <Button size="sm" variant="flat" onPress={() => addEnvEntry(i)} className="h-6 px-2 text-[10px]">+ Add Var</Button>
-                  </div>
-                  {(mcpEnvEntries[i] ?? []).map((entry, ei) => (
-                    <div key={ei} className="grid grid-cols-[1fr_1fr_28px] gap-1.5 items-center">
-                      <Input size="sm" placeholder="KEY" value={entry.key} onValueChange={(v) => updateEnvEntry(i, ei, { key: v })} aria-label="Env var key" />
-                      <Input size="sm" placeholder="value" value={entry.value} onValueChange={(v) => updateEnvEntry(i, ei, { value: v })} aria-label="Env var value" />
-                      <button type="button" onClick={() => removeEnvEntry(i, ei)} className="text-danger text-xs leading-none hover:opacity-70" aria-label="Remove env var"><i className="fa-solid fa-xmark" aria-hidden="true" /></button>
-                    </div>
-                  ))}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{s.name}</p>
+                  <p className="text-[11px] text-default-400 font-mono truncate">
+                    {s.transport === "stdio"
+                      ? `${s.command ?? ""}${s.args?.length ? " " + s.args.join(" ") : ""}`
+                      : (s.url ?? "")}
+                  </p>
                 </div>
-              </>
-            )}
-            <Divider className="my-1" />
-            <McpToolSelectorOverride server={s} index={i} updateMcp={updateMcp} />
-            <Button size="sm" variant="light" color="danger" onPress={() => removeMcp(i)}>Remove Server</Button>
-          </CardBody>
-        </Card>
-      ))}
-    </div>
-  );
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  color="danger"
+                  onPress={() => removeMcp(i)}
+                  aria-label={`Detach ${s.name}`}
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
-  const renderSkillsTab = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+  const renderSkillsTab = () => {
+    const available = librarySkills.filter(
+      (s) => !skills.some((existing) => existing.name === s.name)
+    );
+    return (
+      <div className="space-y-4">
         <div>
           <p className="font-semibold text-sm">Skills</p>
-          <p className="text-[11px] text-default-400">Override the platform default skills for this agent.</p>
+          <p className="text-[11px] text-default-400 mt-0.5">
+            Attach skills from your{" "}
+            <a
+              href="/library"
+              className="text-primary hover:underline"
+              onClick={(e) => { e.preventDefault(); window.location.href = "/library"; }}
+            >
+              workspace Library
+            </a>
+            . New skills can only be authored in the Library.
+          </p>
         </div>
-        <Button size="sm" variant="bordered" onPress={addSkill}>+ Add Skill</Button>
+
+        <Select
+          placeholder={
+            loadingLibrary
+              ? "Loading library…"
+              : librarySkills.length === 0
+                ? "No skills in the Library yet"
+                : available.length === 0
+                  ? "All library skills already attached"
+                  : "+ Add skill from Library"
+          }
+          selectedKeys={[]}
+          isDisabled={loadingLibrary || available.length === 0}
+          onSelectionChange={(keys) => {
+            const id = Array.from(keys)[0] as string;
+            if (id) addSkillFromLibrary(id);
+          }}
+          aria-label="Add skill from library"
+        >
+          {available.map((s) => (
+            <SelectItem key={s.id} textValue={s.name}>
+              <div className="flex flex-col py-0.5">
+                <span className="text-sm font-medium">{s.name}</span>
+                {s.description && (
+                  <span className="text-[11px] text-default-400 truncate">{s.description}</span>
+                )}
+              </div>
+            </SelectItem>
+          ))}
+        </Select>
+
+        {skills.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <p className="text-sm text-default-400">Using platform default skills</p>
+            <p className="text-xs text-default-300 mt-1">
+              Attach a skill from the Library to override the platform configuration.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {skills.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-3 rounded-xl border border-divider bg-default-50 px-3 py-2.5"
+              >
+                <i className="fa-solid fa-bolt text-primary mt-0.5" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{s.name}</p>
+                  {s.description && (
+                    <p className="text-[11px] text-default-400 truncate">{s.description}</p>
+                  )}
+                </div>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  color="danger"
+                  onPress={() => removeSkill(i)}
+                  aria-label={`Detach ${s.name}`}
+                >
+                  <i className="fa-solid fa-xmark" aria-hidden="true" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {skills.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <p className="text-sm text-default-400">Using platform default skills</p>
-          <p className="text-xs text-default-300 mt-1">Add a skill to override the platform configuration.</p>
-        </div>
-      )}
-
-      {skills.map((s, i) => (
-        <Card key={i} className="bg-default-50">
-          <CardBody className="space-y-3 py-3">
-            <div className="grid grid-cols-2 gap-2">
-              <Input size="sm" label="Tool Name (snake_case)" placeholder="run_tests" value={s.name} onValueChange={(v) => updateSkill(i, { name: v })} />
-            </div>
-            <Input size="sm" label="Description" value={s.description} onValueChange={(v) => updateSkill(i, { description: v })} />
-            <Button size="sm" variant="light" color="danger" onPress={() => removeSkill(i)}>Remove Skill</Button>
-          </CardBody>
-        </Card>
-      ))}
-    </div>
-  );
+    );
+  };
 
   function tabTitle(label: string, count?: number) {
     return (
@@ -581,7 +676,7 @@ export default function AgentOverrideForm({
   }
 
   const hasAnyOverride = Boolean(
-    llmProvider || llmModel || temperature !== null ||
+    llmProvider || llmModel || llmBaseUrl || temperature !== null ||
     maxTokens || topP || freqPenalty || presPenalty ||
     systemPrompt || systemPromptMode ||
     mcpServers.length > 0 || skills.length > 0
@@ -609,8 +704,7 @@ export default function AgentOverrideForm({
         {activeTab === "skills" && renderSkillsTab()}
       </div>
 
-      <Divider />
-      <div className="flex items-center justify-between pb-2">
+      <div className="modal-actions" data-align="between">
         <div className="flex gap-2">
           <Button color="primary" isLoading={saving} onPress={handleSave}>
             Save Changes
@@ -622,135 +716,6 @@ export default function AgentOverrideForm({
             Reset all overrides
           </Button>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── Minimal MCP tool selector (reused from AgentProfileForm pattern) ──────────
-
-const PERMISSION_OPTIONS: { value: McpToolPermission; label: string }[] = [
-  { value: "read", label: "read" },
-  { value: "write", label: "write" },
-  { value: "execute", label: "execute" },
-  { value: "require-confirmation", label: "confirm" },
-];
-
-function McpToolSelectorOverride({
-  server,
-  index,
-  updateMcp,
-}: {
-  server: McpServer;
-  index: number;
-  updateMcp: (i: number, update: Partial<McpServer>) => void;
-}) {
-  const [discovering, setDiscovering] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [newToolName, setNewToolName] = useState("");
-
-  const tools = server.tools ?? [];
-  const setTools = (next: McpToolConfig[]) => updateMcp(index, { tools: next });
-
-  const handleDiscover = async () => {
-    setDiscovering(true);
-    setError(null);
-    try {
-      const discovered = await discoverMcpTools({
-        transport: server.transport,
-        url: server.url,
-        headers: server.headers,
-        command: server.transport === "stdio" ? server.command : undefined,
-        args: server.transport === "stdio" ? server.args : undefined,
-        env: server.transport === "stdio" ? server.env : undefined,
-      });
-      if (discovered.length === 0) { setError("The server returned an empty tools list."); return; }
-      const existingMap = new Map(tools.map((t) => [t.name, t]));
-      setTools(discovered.map((d) => {
-        const ex = existingMap.get(d.name);
-        return ex
-          ? { ...ex, description: d.description, inputSchema: d.inputSchema, annotations: d.annotations }
-          : { name: d.name, description: d.description, inputSchema: d.inputSchema, annotations: d.annotations, allowed: true };
-      }));
-    } catch {
-      setError("Could not discover tools. Check the server URL and connectivity.");
-    } finally {
-      setDiscovering(false);
-    }
-  };
-
-  const addManual = () => {
-    const trimmed = newToolName.trim();
-    if (!trimmed || tools.some((t) => t.name === trimmed)) return;
-    setTools([...tools, { name: trimmed, allowed: true }]);
-    setNewToolName("");
-  };
-
-  const updateTool = (i: number, patch: Partial<McpToolConfig>) =>
-    setTools(tools.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
-
-  const removeTool = (i: number) => setTools(tools.filter((_, idx) => idx !== i));
-
-  const togglePermission = (toolIdx: number, perm: McpToolPermission) => {
-    const current = tools[toolIdx].permissions ?? [];
-    updateTool(toolIdx, {
-      permissions: current.includes(perm) ? current.filter((p) => p !== perm) : [...current, perm],
-    });
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-medium text-default-600">
-          Tool Access
-          {tools.length > 0 ? ` (${tools.filter((t) => t.allowed).length}/${tools.length} allowed)` : " (all tools)"}
-        </p>
-        <div className="flex items-center gap-1.5">
-          {tools.length > 0 && (
-            <Button size="sm" variant="flat" onPress={() => setTools([])} color="danger" className="h-6 px-2 text-[10px]">Clear</Button>
-          )}
-          <Button
-            size="sm" variant="flat" onPress={handleDiscover} isLoading={discovering}
-            isDisabled={server.transport === "streamable-http" ? !server.url : !server.command}
-            className="h-6 px-2 text-[10px]"
-          >
-            {discovering ? "Discovering…" : "Fetch tools"}
-          </Button>
-        </div>
-      </div>
-      {error && <p className="text-[11px] text-danger">{error}</p>}
-      {tools.length > 0 && (
-        <div className="max-h-[32rem] overflow-y-auto space-y-2 pr-0.5">
-          {tools.map((tool, ti) => (
-            <div key={ti} className="rounded-xl border border-divider bg-background/40 p-3 space-y-3">
-              <div className="flex items-center gap-2">
-                <Switch size="sm" isSelected={tool.allowed} onValueChange={(v) => updateTool(ti, { allowed: v })} color={tool.allowed ? "success" : "danger"} aria-label={`${tool.allowed ? "Allow" : "Deny"} ${tool.name}`} />
-                <span className="font-mono text-xs font-semibold flex-1 truncate">{tool.name}</span>
-                <Chip size="sm" variant="flat" color={tool.allowed ? "success" : "danger"} className="shrink-0 h-5 text-[10px]">{tool.allowed ? "allowed" : "blocked"}</Chip>
-                <button type="button" onClick={() => removeTool(ti)} className="text-default-400 hover:text-danger transition-colors" aria-label="Remove tool">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              </div>
-              <McpToolBody tool={tool} />
-              <div className="flex flex-wrap gap-1 pt-1 border-t border-divider">
-                {PERMISSION_OPTIONS.map(({ value, label }) => {
-                  const active = (tool.permissions ?? []).includes(value);
-                  return (
-                    <Chip key={value} size="sm" variant={active ? "solid" : "bordered"} color={active ? "primary" : "default"} className="cursor-pointer select-none" onClick={() => togglePermission(ti, value)}>{label}</Chip>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-1.5">
-        <Input
-          size="sm" placeholder="Tool name (e.g. read_file)" value={newToolName} onValueChange={setNewToolName}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManual(); } }}
-          aria-label="Add tool name manually" className="flex-1"
-        />
-        <Button size="sm" variant="flat" onPress={addManual} className="h-8 px-2 text-[11px]" isDisabled={!newToolName.trim()}>Add</Button>
       </div>
     </div>
   );

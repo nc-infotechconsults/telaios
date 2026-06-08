@@ -67,6 +67,7 @@ const STATUS_COLOR: Record<string, "warning" | "success" | "primary" | "default"
 const ROLE_OPTIONS: AgentRole[] = ["planner", "coder", "reviewer", "tester", "infra", "knowledge", "custom", "designer"];
 
 const ROLE_COLOR: Record<AgentRole, "warning" | "success" | "primary" | "secondary" | "danger" | "default"> = {
+  orchestrator: "warning",
   planner: "primary",
   coder: "success",
   reviewer: "warning",

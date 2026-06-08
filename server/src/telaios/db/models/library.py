@@ -37,6 +37,7 @@ class LibraryAgent(Base, SoftDeleteAuditMixin):
 
     llm_provider: Mapped[str | None] = mapped_column(String, nullable=True)
     llm_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    llm_base_url: Mapped[str | None] = mapped_column(String, nullable=True)
     llm_temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
     llm_max_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     llm_top_p: Mapped[float | None] = mapped_column(Float, nullable=True)

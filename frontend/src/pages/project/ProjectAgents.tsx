@@ -112,6 +112,7 @@ const MOCK_AGENTS: Agent[] = [
 // ─── Role → icon / gradient mapping ──────────────────────────────────────────
 
 const ROLE_ICON: Record<string, string> = {
+  orchestrator:    "sparkle",
   planner:         "workflow",
   coder:           "git",
   reviewer:        "eye",
@@ -125,6 +126,7 @@ const ROLE_ICON: Record<string, string> = {
 };
 
 const ROLE_BG: Record<string, string> = {
+  orchestrator:    "linear-gradient(135deg,#ffd60a,#ff9f0a)",
   planner:         "linear-gradient(135deg,#30d158,#0a84ff)",
   coder:           "linear-gradient(135deg,#0a84ff,#64d2ff)",
   reviewer:        "linear-gradient(135deg,#ff9f0a,#ff375f)",

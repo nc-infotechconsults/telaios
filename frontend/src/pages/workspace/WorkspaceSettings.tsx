@@ -264,11 +264,29 @@ function AppearanceSection() {
 function AiSection() {
   const [autoRoute, setAutoRoute] = useState(true);
   const [defaultVis, setDefaultVis] = useState("team");
-  const [model, setModel] = useState("claude-sonnet-4.5");
   const [cite, setCite] = useState(true);
 
   return (
     <>
+      <div
+        className="set-readonly-note"
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 12px", marginBottom: 12,
+          color: "var(--fg-2)", fontSize: 12.5,
+          background: "var(--surface-secondary)",
+          border: "0.5px solid var(--hairline)",
+          borderRadius: 10,
+        }}
+      >
+        <Icon name="sparkle" size="sm" />
+        <span>
+          Model, temperature, and other LLM settings for TEOS now live with the other agents.
+          Open the <a href="/agents" style={{ color: "var(--accent-1)", textDecoration: "underline" }}>Agents</a>{" "}
+          page and customise the <b>TEOS</b> profile.
+        </span>
+      </div>
+
       <SetGroup title="Routing" desc="How TEOS decides which specialist handles each message.">
         <SetRow label="Auto-route to specialist" hint="TEOS routes silently based on what is asked.">
           <SetToggle value={autoRoute} onChange={setAutoRoute} />
@@ -277,7 +295,7 @@ function AiSection() {
           <SetToggle value={true} onChange={() => {}} />
         </SetRow>
         <SetRow label="Preferred specialist for ambiguous prompts">
-          <SetSelect value="qa" options={["qa", "explorer", "planner", "designer", "coder", "reviewer"]} onChange={() => {}} />
+          <SetSelect value="oracle" options={["oracle", "atlas", "forma", "forge", "argus"]} onChange={() => {}} />
         </SetRow>
       </SetGroup>
 
@@ -296,25 +314,6 @@ function AiSection() {
         </SetRow>
         <SetRow label="Cite sources in answers" hint="TEOS adds file / page references to grounded answers.">
           <SetToggle value={cite} onChange={setCite} />
-        </SetRow>
-      </SetGroup>
-
-      <SetGroup title="Model" desc="The underlying model TEOS uses across all projects.">
-        <SetRow label="Active model">
-          <SetSelect value={model}
-            options={[
-              { value: "claude-sonnet-4.5", label: "Claude Sonnet 4.5 (recommended)" },
-              { value: "claude-haiku-4.5",  label: "Claude Haiku 4.5 (fastest)"      },
-              { value: "claude-opus-4.1",   label: "Claude Opus 4.1 (deepest)"       },
-            ]}
-            onChange={setModel} />
-        </SetRow>
-        <SetRow label="Reasoning effort" hint="Higher effort = slower but more thorough multi-step answers.">
-          <div className="seg">
-            {["low", "balanced", "high"].map((v) => (
-              <button key={v} className="seg-btn" data-active={v === "balanced" ? "true" : undefined}>{v}</button>
-            ))}
-          </div>
         </SetRow>
       </SetGroup>
     </>

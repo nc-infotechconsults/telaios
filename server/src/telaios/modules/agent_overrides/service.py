@@ -23,6 +23,7 @@ _OVERRIDE_FIELDS = [
     "system_prompt_mode",
     "llm_provider",
     "llm_model",
+    "llm_base_url",
     "llm_temperature",
     "llm_max_tokens",
     "llm_top_p",

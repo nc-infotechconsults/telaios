@@ -7,10 +7,25 @@ interface AppModalProps {
   title: string;
   subtitle?: string;
   width?: number;
+  /**
+   * Optional footer rendered in a non-scrolling region pinned to the bottom of
+   * the modal card. When omitted, the modal body extends to the bottom and any
+   * action buttons placed inside `children` can use `position: sticky` (via the
+   * `modal-actions` class) to remain visible while the body scrolls.
+   */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function AppModal({ isOpen, onClose, title, subtitle, width = 440, children }: AppModalProps) {
+export function AppModal({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  width = 440,
+  footer,
+  children,
+}: AppModalProps) {
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -31,21 +46,42 @@ export function AppModal({ isOpen, onClose, title, subtitle, width = 440, childr
       onClick={onClose}
     >
       <div
-        className="card"
+        className="card app-modal-card"
         style={{
           width: "100%", maxWidth: width,
-          padding: 24,
+          padding: 0,
           boxShadow: "var(--shadow-sm)",
           maxHeight: "calc(100vh - 80px)",
-          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 4px", color: "var(--fg)" }}>{title}</h2>
-        {subtitle && (
-          <p style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 20 }}>{subtitle}</p>
+        <div style={{ padding: "20px 24px 12px", flexShrink: 0 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 4px", color: "var(--fg)" }}>{title}</h2>
+          {subtitle && (
+            <p style={{ fontSize: 12.5, color: "var(--fg-3)", margin: 0 }}>{subtitle}</p>
+          )}
+        </div>
+        <div className="app-modal-body" style={{ padding: "8px 24px 16px", overflowY: "auto", flex: 1, minHeight: 0 }}>
+          {children}
+        </div>
+        {footer && (
+          <div
+            style={{
+              padding: "12px 24px 16px",
+              flexShrink: 0,
+              borderTop: "0.5px solid var(--border)",
+              background: "var(--surface)",
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 8,
+            }}
+          >
+            {footer}
+          </div>
         )}
-        {children}
       </div>
     </div>,
     document.body

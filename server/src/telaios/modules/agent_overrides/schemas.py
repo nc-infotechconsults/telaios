@@ -20,6 +20,7 @@ class AgentBaseProfileRead(BaseModel):
     system_prompt_mode: str
     llm_provider: str | None
     llm_model: str | None
+    llm_base_url: str | None
     llm_temperature: float | None
     llm_max_tokens: int | None
     llm_top_p: float | None
@@ -39,6 +40,7 @@ class AgentOverrideRead(BaseModel):
     system_prompt_mode: str | None
     llm_provider: str | None
     llm_model: str | None
+    llm_base_url: str | None
     llm_temperature: float | None
     llm_max_tokens: int | None
     llm_top_p: float | None
@@ -55,6 +57,7 @@ class AgentOverrideUpsert(BaseModel):
     system_prompt_mode: str | None = None
     llm_provider: str | None = None
     llm_model: str | None = None
+    llm_base_url: str | None = None
     llm_temperature: float | None = None
     llm_max_tokens: int | None = None
     llm_top_p: float | None = None

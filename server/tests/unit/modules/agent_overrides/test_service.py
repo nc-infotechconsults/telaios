@@ -36,6 +36,7 @@ def _base(
         system_prompt_mode=system_prompt_mode,  # type: ignore[arg-type]
         llm_provider=llm_provider,
         llm_model=llm_model,
+        llm_base_url=None,
         llm_temperature=llm_temperature,
         llm_max_tokens=None,
         llm_top_p=None,
@@ -56,6 +57,7 @@ def _override(
         system_prompt_mode=None,
         llm_provider=None,
         llm_model=None,
+        llm_base_url=None,
         llm_temperature=None,
         llm_max_tokens=None,
         llm_top_p=None,

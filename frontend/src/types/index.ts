@@ -303,6 +303,7 @@ export type ChatItem = Message | PlanChatItem;
 // ── Project Agents ────────────────────────────────────────────────────────────
 
 export type AgentRole =
+  | "orchestrator"
   | "planner"
   | "coder"
   | "reviewer"
@@ -446,6 +447,7 @@ export interface AgentBaseProfile {
   system_prompt_mode: "override" | "extend" | "append";
   llm_provider: string | null;
   llm_model: string | null;
+  llm_base_url: string | null;
   llm_temperature: number | null;
   llm_max_tokens: number | null;
   llm_top_p: number | null;
@@ -464,6 +466,7 @@ export interface AgentOverride {
   system_prompt_mode: "override" | "extend" | null;
   llm_provider: string | null;
   llm_model: string | null;
+  llm_base_url: string | null;
   llm_temperature: number | null;
   llm_max_tokens: number | null;
   llm_top_p: number | null;
@@ -479,6 +482,7 @@ export interface AgentOverrideUpsert {
   system_prompt_mode?: "override" | "extend" | null;
   llm_provider?: string | null;
   llm_model?: string | null;
+  llm_base_url?: string | null;
   llm_temperature?: number | null;
   llm_max_tokens?: number | null;
   llm_top_p?: number | null;

@@ -396,7 +396,7 @@ export default function WorkspaceSecurity() {
           ))}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 22 }}>
+        <div className="modal-actions" data-align="end" style={{ marginTop: 22 }}>
           <button className="pill-btn" onClick={() => setShowSamlModal(false)}>Cancel</button>
           <button
             className="pill-btn"

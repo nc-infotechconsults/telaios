@@ -24,6 +24,7 @@ const ROLE_COLOR: Record<
   AgentRole,
   "warning" | "success" | "primary" | "secondary" | "danger" | "default"
 > = {
+  orchestrator: "warning",
   planner: "primary",
   coder: "success",
   reviewer: "warning",

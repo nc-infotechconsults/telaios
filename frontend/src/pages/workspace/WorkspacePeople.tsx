@@ -756,7 +756,7 @@ export default function WorkspacePeople() {
                 <strong>{targetUser?.display_name || targetUser?.email}</strong>?
                 This action cannot be undone.
               </p>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <div className="modal-actions" data-align="end">
                 <button className="pill-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
                 <button
                   className="pill-btn danger"
@@ -832,7 +832,7 @@ export default function WorkspacePeople() {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+        <div className="modal-actions" data-align="end" style={{ marginTop: 20 }}>
           <button className="pill-btn" onClick={closeAddUser} disabled={adding}>Cancel</button>
           <button
             className="pill-btn"

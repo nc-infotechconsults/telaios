@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Input, Select, SelectItem, Spinner, Textarea } from "../ui";
+import { Button, Input, Spinner, Textarea } from "../ui";
 import { createLibraryMCP, updateLibraryMCP } from "../../lib/api";
 import { toast } from "../../lib/toast";
 import type { LibraryMCP } from "../../types";
@@ -12,54 +12,180 @@ interface Props {
 
 type Transport = "stdio" | "streamable-http";
 
-/** Key-value pair editor for env / header fields */
-function KVEditor({
+// ─── Form section wrapper ────────────────────────────────────────────────────
+
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {description && (
+          <p className="text-[11px] text-default-400 mt-0.5">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// ─── Transport segmented picker ──────────────────────────────────────────────
+
+function TransportPicker({
   value,
   onChange,
-  placeholder,
+  disabled,
 }: {
-  value: Record<string, string>;
-  onChange: (v: Record<string, string>) => void;
-  placeholder?: string;
+  value: Transport;
+  onChange: (t: Transport) => void;
+  disabled?: boolean;
 }) {
-  const pairs = Object.entries(value);
-
-  const update = (index: number, key: string, val: string) => {
-    const next = [...pairs];
-    next[index] = [key, val];
-    onChange(Object.fromEntries(next));
-  };
-
-  const add = () => onChange({ ...value, "": "" });
-
-  const remove = (index: number) => {
-    const next = pairs.filter((_, i) => i !== index);
-    onChange(Object.fromEntries(next));
-  };
-
+  const options: { id: Transport; label: string; sub: string; icon: string }[] = [
+    { id: "stdio", label: "Local process", sub: "stdio", icon: "fa-terminal" },
+    { id: "streamable-http", label: "Remote URL", sub: "streamable-http", icon: "fa-globe" },
+  ];
   return (
-    <div className="flex flex-col gap-1.5">
-      {pairs.map(([k, v], i) => (
-        <div key={i} className="flex gap-1.5 items-center">
-          <Input size="sm" placeholder="KEY" value={k} onValueChange={(nk) => update(i, nk, v)} className="flex-1" />
-          <span className="text-default-400 text-xs">=</span>
-          <Input size="sm" placeholder={placeholder ?? "value"} value={v} onValueChange={(nv) => update(i, k, nv)} className="flex-1" />
-          <Button isIconOnly size="sm" variant="light" color="danger" aria-label="Remove" onPress={() => remove(i)}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-            </svg>
-          </Button>
-        </div>
-      ))}
-      <Button size="sm" variant="flat" onPress={add} className="self-start text-xs">+ Add</Button>
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((opt) => {
+        const active = value === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(opt.id)}
+            className={[
+              "rounded-xl border px-3 py-2.5 text-left transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              active
+                ? "border-primary bg-primary/10 text-foreground"
+                : "border-divider bg-default-50/50 hover:border-default-300 hover:bg-default-50",
+            ].join(" ")}
+            aria-pressed={active}
+          >
+            <div className="flex items-center gap-2">
+              <i
+                className={`fa-solid ${opt.icon} text-sm ${active ? "text-primary" : "text-default-400"}`}
+                aria-hidden="true"
+              />
+              <span className="text-sm font-medium">{opt.label}</span>
+            </div>
+            <p className="text-[11px] text-default-400 mt-0.5 font-mono">{opt.sub}</p>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-/**
- * Create / edit form for a LibraryMCP catalog entry.
- * Supports both stdio and streamable-http transports.
- */
+// ─── Key-value editor (env vars / headers) ───────────────────────────────────
+
+function KVEditor({
+  label,
+  description,
+  pairs,
+  onChange,
+  valuePlaceholder,
+  disabled,
+}: {
+  label: string;
+  description?: string;
+  pairs: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+  valuePlaceholder?: string;
+  disabled?: boolean;
+}) {
+  const entries = Object.entries(pairs);
+
+  const update = (index: number, key: string, val: string) => {
+    const next = [...entries];
+    next[index] = [key, val];
+    onChange(Object.fromEntries(next));
+  };
+
+  const add = () => onChange({ ...pairs, "": "" });
+
+  const remove = (index: number) => {
+    const next = entries.filter((_, i) => i !== index);
+    onChange(Object.fromEntries(next));
+  };
+
+  return (
+    <div className="rounded-xl border border-divider bg-default-50/50 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-foreground">{label}</p>
+          {description && (
+            <p className="text-[11px] text-default-400 mt-0.5">{description}</p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="flat"
+          onPress={add}
+          isDisabled={disabled}
+          className="h-7 px-2.5 text-[11px] shrink-0"
+        >
+          <i className="fa-solid fa-plus" aria-hidden="true" /> Add
+        </Button>
+      </div>
+
+      {entries.length === 0 ? (
+        <p className="text-[11px] text-default-400 italic px-1 py-1">
+          None — click <b>Add</b> to define one.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {entries.map(([k, v], i) => (
+            <div key={i} className="grid grid-cols-[1fr_auto_1fr_28px] gap-1.5 items-center">
+              <Input
+                size="sm"
+                placeholder="KEY"
+                value={k}
+                onValueChange={(nk) => update(i, nk, v)}
+                isDisabled={disabled}
+                classNames={{ input: "font-mono text-xs" }}
+                aria-label="Key"
+              />
+              <span className="text-default-300 text-xs">=</span>
+              <Input
+                size="sm"
+                placeholder={valuePlaceholder ?? "value"}
+                value={v}
+                onValueChange={(nv) => update(i, k, nv)}
+                isDisabled={disabled}
+                classNames={{ input: "font-mono text-xs" }}
+                aria-label="Value"
+              />
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                color="danger"
+                aria-label="Remove entry"
+                onPress={() => remove(i)}
+                isDisabled={disabled}
+                className="h-7 w-7 min-w-7"
+              >
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Form ─────────────────────────────────────────────────────────────────────
+
 export default function LibraryMCPForm({ initialData, onSaved, onCancel }: Props) {
   const isEdit = !!initialData;
 
@@ -127,105 +253,128 @@ export default function LibraryMCPForm({ initialData, onSaved, onCancel }: Props
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Input
-        autoFocus
-        isRequired
-        label="Name"
-        placeholder="e.g. Filesystem MCP"
-        value={name}
-        onValueChange={setName}
-        isDisabled={saving}
-      />
-
-      <Textarea
-        label="Description"
-        placeholder="What does this MCP server provide?"
-        value={description}
-        onValueChange={setDescription}
-        isDisabled={saving}
-        minRows={2}
-      />
-
-      <Select
-        label="Transport"
-        selectedKeys={Array.from(new Set([transport]))}
-        onSelectionChange={(keys) => {
-          const t = Array.from(keys)[0] as Transport;
-          setTransport(t);
-        }}
-        isDisabled={saving || isEdit}
-        description={isEdit ? "Transport cannot be changed after creation." : undefined}
+    <div className="flex flex-col gap-6">
+      {/* ── Identity ──────────────────────────────────────────────────────── */}
+      <FormSection
+        title="Identity"
+        description="How this server appears in the workspace library."
       >
-        <SelectItem key="stdio">stdio (local process)</SelectItem>
-        <SelectItem key="streamable-http">streamable-http (remote URL)</SelectItem>
-      </Select>
-
-      {isStdio ? (
-        <>
-          <Input
-            isRequired
-            label="Command"
-            placeholder="e.g. npx"
-            value={command}
-            onValueChange={setCommand}
-            isDisabled={saving}
-            classNames={{ input: "font-mono" }}
-          />
-
-          <Input
-            label="Args (space-separated)"
-            placeholder="e.g. -y @modelcontextprotocol/server-filesystem /tmp"
-            value={argsRaw}
-            onValueChange={setArgsRaw}
-            isDisabled={saving}
-            classNames={{ input: "font-mono" }}
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <p className="text-sm font-medium text-foreground">Env vars</p>
-            <KVEditor value={env} onChange={setEnv} />
-          </div>
-        </>
-      ) : (
-        <>
-          <Input
-            isRequired
-            label="URL"
-            placeholder="https://my-mcp-server.example.com/mcp"
-            value={url}
-            onValueChange={setUrl}
-            isDisabled={saving}
-            classNames={{ input: "font-mono" }}
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <p className="text-sm font-medium text-foreground">Headers</p>
-            <KVEditor value={headers} onChange={setHeaders} placeholder="header value" />
-          </div>
-        </>
-      )}
-
-      <div className="flex gap-3">
         <Input
-          label="Tags"
-          placeholder="Comma-separated, e.g. files, filesystem"
-          value={tagsRaw}
-          onValueChange={setTagsRaw}
+          autoFocus
+          isRequired
+          label="Name"
+          placeholder="e.g. Filesystem MCP"
+          value={name}
+          onValueChange={setName}
           isDisabled={saving}
-          className="flex-1"
         />
-        <Input
-          label="Version"
-          placeholder="1.0.0"
-          value={version}
-          onValueChange={setVersion}
+        <Textarea
+          label="Description"
+          placeholder="What does this MCP server provide?"
+          value={description}
+          onValueChange={setDescription}
           isDisabled={saving}
-          className="w-32"
+          minRows={2}
         />
-      </div>
+      </FormSection>
 
-      <div className="flex justify-end gap-2 pt-2">
+      {/* ── Connection ────────────────────────────────────────────────────── */}
+      <FormSection
+        title="Connection"
+        description={
+          isEdit
+            ? "Transport cannot be changed after creation."
+            : "How agents will reach this server at runtime."
+        }
+      >
+        <div>
+          <p className="text-xs text-default-600 mb-1.5">Transport</p>
+          <TransportPicker
+            value={transport}
+            onChange={setTransport}
+            disabled={saving || isEdit}
+          />
+        </div>
+
+        {isStdio ? (
+          <>
+            <Input
+              isRequired
+              label="Command"
+              placeholder="e.g. npx"
+              value={command}
+              onValueChange={setCommand}
+              isDisabled={saving}
+              classNames={{ input: "font-mono" }}
+              description="Executable spawned for this server."
+            />
+            <Input
+              label="Arguments"
+              placeholder="-y @modelcontextprotocol/server-filesystem /tmp"
+              value={argsRaw}
+              onValueChange={setArgsRaw}
+              isDisabled={saving}
+              classNames={{ input: "font-mono" }}
+              description="Space-separated arguments appended to the command."
+            />
+            <KVEditor
+              label="Environment variables"
+              description="Passed to the spawned process."
+              pairs={env}
+              onChange={setEnv}
+              disabled={saving}
+            />
+          </>
+        ) : (
+          <>
+            <Input
+              isRequired
+              label="URL"
+              placeholder="https://my-mcp-server.example.com/mcp"
+              value={url}
+              onValueChange={setUrl}
+              isDisabled={saving}
+              classNames={{ input: "font-mono" }}
+              description="HTTPS endpoint exposing the MCP streamable-http transport."
+            />
+            <KVEditor
+              label="HTTP headers"
+              description="Sent with every request (e.g. Authorization: Bearer …)."
+              pairs={headers}
+              onChange={setHeaders}
+              valuePlaceholder="header value"
+              disabled={saving}
+            />
+          </>
+        )}
+      </FormSection>
+
+      {/* ── Metadata ──────────────────────────────────────────────────────── */}
+      <FormSection
+        title="Catalog metadata"
+        description="Helps people find and version this entry in the library."
+      >
+        <div className="grid grid-cols-[1fr_8rem] gap-3">
+          <Input
+            label="Tags"
+            placeholder="files, filesystem, local"
+            value={tagsRaw}
+            onValueChange={setTagsRaw}
+            isDisabled={saving}
+            description="Comma-separated."
+          />
+          <Input
+            label="Version"
+            placeholder="1.0.0"
+            value={version}
+            onValueChange={setVersion}
+            isDisabled={saving}
+          />
+        </div>
+      </FormSection>
+
+      {/* ── Actions ──────────────────────────────────────────────────────── */}
+      <div className="modal-actions" data-align="end">
         <Button variant="light" onPress={onCancel} isDisabled={saving}>
           Cancel
         </Button>
