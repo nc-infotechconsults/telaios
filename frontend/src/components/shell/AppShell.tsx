@@ -1,15 +1,72 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@heroui/react";
 import { useAppSettings } from "../../context/AppSettingsContext";
-import { getProjects, sendConversationMessage } from "../../lib/api";
-import type { Project } from "../../types";
+import {
+  getConversationHistory,
+  getProjects,
+  listProjectMembers,
+  sendConversationMessage,
+} from "../../lib/api";
+import type { ConversationMessage, Project, ProjectMember } from "../../types";
 import { Icon } from "../Icon";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { CommandPalette } from "./CommandPalette";
 
 const DEMO = import.meta.env.VITE_DEMO_MODE === "true";
+const SESSION_GAP_MS = 2 * 60 * 60 * 1000; // 2-hour gap separates sessions
+
+interface TeosMessage {
+  id: string;
+  sender_type: "user" | "agent";
+  specialist: string | null;
+  content: string;
+  created_at: string;
+}
+
+interface TeosSession {
+  id: string;
+  title: string;
+  time: string;
+  specs: string[];
+  startIndex: number;
+  endIndex: number;
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60_000) return "now";
+  if (diff < 3_600_000) return `${Math.round(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.round(diff / 3_600_000)}h ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function toTeosMessage(m: ConversationMessage): TeosMessage {
+  return {
+    id: m.id,
+    sender_type: m.sender_type,
+    specialist: m.specialist,
+    content: m.content,
+    created_at: m.created_at,
+  };
+}
+
+function memberInitials(m: ProjectMember): string {
+  const name = m.user.display_name?.trim() || m.user.email || "";
+  if (!name) return "?";
+  const parts = name.split(/[\s@.]+/).filter(Boolean);
+  if (parts.length === 0) return name.slice(0, 2).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+const MEMBER_PILL_COLORS = [
+  { bg: "var(--success, #30d158)", fg: "var(--success-foreground, #fff)" },
+  { bg: "var(--accent, #0a84ff)", fg: "var(--accent-foreground, #fff)" },
+  { bg: "var(--warning, #ff9f0a)", fg: "var(--warning-foreground, #1a1a1a)" },
+  { bg: "var(--danger, #ff375f)", fg: "var(--danger-foreground, #fff)" },
+];
 
 // Project view components
 import ProjectDashboard from "../../pages/project/ProjectDashboard";
@@ -89,11 +146,14 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
   const [cmdOpen, setCmdOpen] = useState(false);
 
   // TEOS sidebar state
-  const [teosMessages, setTeosMessages] = useState<Array<{ role: string; text: string; specialist?: string }>>([]);
+  const [teosMessages, setTeosMessages] = useState<TeosMessage[]>([]);
   const [teosBusy, setTeosBusy] = useState(false);
   const [teosDraft, setTeosDraft] = useState("");
   const [teosStreamContent, setTeosStreamContent] = useState("");
   const [showSessions, setShowSessions] = useState(false);
+  // null = view latest session; "new" = empty new session view; sessionId = view that slice
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const threadRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const teosStreamRef = useRef("");
@@ -114,6 +174,23 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
     }).catch(() => {});
   }, [projectId]);
 
+  // Load conversation history + members when project changes
+  useEffect(() => {
+    if (!projectId || wsView || DEMO) {
+      setTeosMessages([]);
+      setMembers([]);
+      return;
+    }
+    getConversationHistory(projectId, { limit: 200 })
+      .then(({ messages }) => {
+        setTeosMessages(messages.map(toTeosMessage));
+      })
+      .catch(() => {});
+    listProjectMembers(projectId)
+      .then(setMembers)
+      .catch(() => setMembers([]));
+  }, [projectId, wsView]);
+
   // AI sidebar SSE connection (project mode only)
   useEffect(() => {
     if (!projectId || wsView || DEMO) return;
@@ -129,12 +206,16 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
           setTeosStreamContent(teosStreamRef.current);
           setTeosBusy(true);
         } else if (data.type === "message") {
-          const msg = data.message as { sender_type: string; content: string; specialist?: string } | undefined;
-          if (msg?.sender_type === "agent") {
-            setTeosMessages((m) => [...m, { role: "assistant", specialist: msg.specialist, text: msg.content }]);
-            teosStreamRef.current = "";
-            setTeosStreamContent("");
-            setTeosBusy(false);
+          const msg = data.message as ConversationMessage | undefined;
+          if (msg) {
+            setTeosMessages((prev) =>
+              prev.some((m) => m.id === msg.id) ? prev : [...prev, toTeosMessage(msg)]
+            );
+            if (msg.sender_type === "agent") {
+              teosStreamRef.current = "";
+              setTeosStreamContent("");
+              setTeosBusy(false);
+            }
           }
         } else if (data.type === "agent_start") {
           teosStreamRef.current = "";
@@ -150,7 +231,7 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
       es.close();
       sidebarEsRef.current = null;
     };
-  }, [projectId]);
+  }, [projectId, wsView]);
 
   // ⌘K
   useEffect(() => {
@@ -166,11 +247,6 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
     if (view === "conversation") setAiCollapsed(true);
   }, [view]);
 
-  // Scroll TEOS thread to bottom
-  useEffect(() => {
-    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
-  }, [teosMessages, teosBusy]);
-
   // Auto-resize TEOS textarea
   useEffect(() => {
     if (taRef.current) {
@@ -182,17 +258,28 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
   const sendTeosMessage = (text: string) => {
     if (!text.trim() || teosBusy) return;
     const trimmed = text.trim();
-    setTeosMessages((m) => [...m, { role: "user", text: trimmed }]);
     setTeosBusy(true);
     setTeosDraft("");
+    // Snap the view back to "latest" so the user sees their just-sent message land.
+    setActiveSessionId(null);
 
     if (DEMO) {
+      const now = new Date().toISOString();
+      setTeosMessages((m) => [
+        ...m,
+        { id: `local-${Date.now()}`, sender_type: "user", specialist: null, content: trimmed, created_at: now },
+      ]);
       setTimeout(() => {
-        setTeosMessages((m) => [...m, {
-          role: "assistant",
-          specialist: "qa",
-          text: "I've analyzed your indexed repositories and documents. Based on the codebase structure, here's what I found.",
-        }]);
+        setTeosMessages((m) => [
+          ...m,
+          {
+            id: `demo-${Date.now()}`,
+            sender_type: "agent",
+            specialist: "qa",
+            content: "I've analyzed your indexed repositories and documents. Based on the codebase structure, here's what I found.",
+            created_at: new Date().toISOString(),
+          },
+        ]);
         setTeosBusy(false);
       }, 1800);
       return;
@@ -201,9 +288,53 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
     sendConversationMessage(projectId!, trimmed).catch(() => {
       setTeosBusy(false);
     });
-    // Response arrives via the sidebar SSE connection
+    // User + agent messages arrive via the sidebar SSE connection
   };
 
+  // Group messages into sessions by 2-hour gap (mirrors ProjectConversation).
+  const teosSessions = useMemo<TeosSession[]>(() => {
+    if (teosMessages.length === 0) return [];
+    const result: TeosSession[] = [];
+    let start = 0;
+    for (let i = 1; i <= teosMessages.length; i++) {
+      const isLast = i === teosMessages.length;
+      const bigGap = !isLast && (
+        new Date(teosMessages[i].created_at).getTime()
+        - new Date(teosMessages[i - 1].created_at).getTime() > SESSION_GAP_MS
+      );
+      if (bigGap || isLast) {
+        const slice = teosMessages.slice(start, i);
+        const firstUser = slice.find((m) => m.sender_type === "user");
+        const specs = [...new Set(slice.map((m) => m.specialist).filter((s): s is string => !!s))];
+        result.push({
+          id: `session-${start}`,
+          title: firstUser?.content.slice(0, 60) ?? "Conversation",
+          time: formatRelativeTime(slice[0].created_at),
+          specs,
+          startIndex: start,
+          endIndex: i,
+        });
+        start = i;
+      }
+    }
+    return result;
+  }, [teosMessages]);
+
+  // Default to latest session (activeSessionId null), explicit "new" = empty.
+  const isNewSession = activeSessionId === "new";
+  const activeSession = isNewSession
+    ? null
+    : teosSessions.find((s) => s.id === activeSessionId) ?? teosSessions[teosSessions.length - 1] ?? null;
+  const visibleMessages = activeSession
+    ? teosMessages.slice(activeSession.startIndex, activeSession.endIndex)
+    : [];
+  // Only show the live stream bubble when the user is on the latest session (where new messages land).
+  const showLiveStream = !isNewSession && activeSession === (teosSessions[teosSessions.length - 1] ?? null);
+
+  // Scroll TEOS thread to bottom on visible-message updates
+  useEffect(() => {
+    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [visibleMessages, teosBusy, teosStreamContent]);
 
   const renderView = () => {
     // Workspace mode
@@ -305,7 +436,7 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
               <Button isIconOnly size="sm" variant="tertiary" aria-label="Sessions" onPress={() => setShowSessions(true)}>
                 <Icon name="inbox" size="sm" />
               </Button>
-              <Button isIconOnly size="sm" variant="tertiary" aria-label="New session" onPress={() => setTeosMessages([])}>
+              <Button isIconOnly size="sm" variant="tertiary" aria-label="New session" onPress={() => setActiveSessionId("new")}>
                 <Icon name="plus" size="sm" />
               </Button>
               <Button isIconOnly size="sm" variant="tertiary" aria-label="Hide sidebar" onPress={() => setAiCollapsed(true)}>
@@ -314,23 +445,34 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
             </div>
           </header>
 
-          {/* Session meta */}
-          <div className="flex items-center gap-2 border-b border-separator px-4 py-2 text-[11.5px] text-muted">
-            <Button size="sm" variant="tertiary" className="h-7 gap-1.5 px-2 text-[11.5px]" aria-label="Visibility">
-              <Icon name="users" size="sm" />
-              <span>Team</span>
-              <Icon name="chevd" size="sm" className="opacity-60" />
-            </Button>
-            <div className="flex items-center">
-              <span className="-me-1.5 inline-flex size-5 items-center justify-center rounded-full bg-success text-[9px] font-semibold text-success-foreground ring-2 ring-surface">EN</span>
-              <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent text-[9px] font-semibold text-accent-foreground ring-2 ring-surface">SO</span>
+          {/* Session meta — project members */}
+          {members.length > 0 && (
+            <div className="flex items-center gap-2 border-b border-separator px-4 py-2 text-[11.5px] text-muted">
+              <Icon name="users" size="sm" className="opacity-70" />
+              <div className="flex items-center">
+                {members.slice(0, 3).map((m, i) => {
+                  const palette = MEMBER_PILL_COLORS[i % MEMBER_PILL_COLORS.length];
+                  return (
+                    <span
+                      key={m.user_id}
+                      title={m.user.display_name || m.user.email}
+                      className={`inline-flex size-5 items-center justify-center rounded-full text-[9px] font-semibold ring-2 ring-surface ${i > 0 ? "-ms-1.5" : ""}`}
+                      style={{ background: palette.bg, color: palette.fg }}
+                    >
+                      {memberInitials(m)}
+                    </span>
+                  );
+                })}
+              </div>
+              <span>
+                {members.length} {members.length === 1 ? "member" : "members"}
+              </span>
             </div>
-            <span>2 active</span>
-          </div>
+          )}
 
           {/* Thread */}
           <div ref={threadRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
-            {teosMessages.length === 0 && (
+            {visibleMessages.length === 0 && !teosBusy && (
               <div className="flex flex-col items-center gap-2 py-8 text-center text-muted">
                 <span
                   aria-hidden
@@ -346,11 +488,11 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
                 </p>
               </div>
             )}
-            {teosMessages.map((m, i) => {
+            {visibleMessages.map((m) => {
               const spec = m.specialist ? SPECIALISTS[m.specialist] : null;
-              const isUser = m.role === "user";
+              const isUser = m.sender_type === "user";
               return (
-                <div key={i} className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+                <div key={m.id} className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
                   <div className="flex items-center gap-1.5 px-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
                     {isUser ? "You" : "TEOS"}
                     {!isUser && spec && (
@@ -367,12 +509,12 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
                         : "max-w-[85%] rounded-2xl rounded-tl-sm bg-surface-secondary px-3.5 py-2 text-sm text-foreground"
                     }
                   >
-                    {m.text}
+                    {m.content}
                   </div>
                 </div>
               );
             })}
-            {teosBusy && (
+            {teosBusy && showLiveStream && (
               <div className="flex flex-col items-start gap-1">
                 <div className="px-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted">TEOS</div>
                 <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-surface-secondary px-3.5 py-2 text-sm text-foreground">
@@ -446,39 +588,56 @@ export default function AppShell({ wsView }: { wsView?: WsView } = {}) {
                 </Button>
               </header>
               <div className="flex-1 overflow-y-auto p-3">
-                {[
-                  { id: "s-1", title: "Ship SSO via Okta — end-to-end",      time: "now",     visibility: "team",    specs: ["explorer", "planner"] },
-                  { id: "s-2", title: "Redesign the billing dashboard",       time: "1h ago",  visibility: "team",    specs: ["designer"] },
-                  { id: "s-3", title: "How does our refresh-token flow work?", time: "2d ago", visibility: "private", specs: ["qa"] },
-                ].map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => { setTeosMessages([]); setShowSessions(false); }}
-                    className="mb-1.5 flex w-full flex-col gap-1.5 rounded-xl border border-border bg-surface-secondary px-3 py-2.5 text-start hover:border-accent"
-                  >
-                    <div className="flex items-baseline gap-2">
-                      <span className="flex-1 truncate text-[13px] font-medium text-foreground">{s.title}</span>
-                      <span className="text-[10.5px] text-muted">{s.time}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {s.specs.map((sp) => {
-                        const specialist = SPECIALISTS[sp];
-                        if (!specialist) return null;
-                        return (
-                          <span
-                            key={sp}
-                            className="inline-flex items-center gap-1 rounded-md bg-default px-1.5 py-0.5 text-[10.5px]"
-                            style={{ color: specialist.color }}
-                          >
-                            <Icon name={specialist.icon} size="sm" />
-                            {specialist.name}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => { setActiveSessionId("new"); setShowSessions(false); }}
+                  data-active={isNewSession || undefined}
+                  className="mb-2 flex w-full items-center gap-2 rounded-xl border border-border bg-surface-secondary px-3 py-2 text-start text-[12.5px] font-medium text-muted hover:border-accent hover:text-foreground data-[active=true]:border-accent data-[active=true]:text-foreground"
+                >
+                  <Icon name="plus" size="sm" />
+                  <span>New session</span>
+                </button>
+                {teosSessions.length === 0 ? (
+                  <div className="px-2 py-6 text-center text-[12px] text-muted">
+                    No sessions yet. Start a conversation to create one.
+                  </div>
+                ) : (
+                  [...teosSessions].reverse().map((s) => {
+                    const isActive = !isNewSession && activeSession?.id === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { setActiveSessionId(s.id); setShowSessions(false); }}
+                        data-active={isActive || undefined}
+                        className="mb-1.5 flex w-full flex-col gap-1.5 rounded-xl border border-border bg-surface-secondary px-3 py-2.5 text-start hover:border-accent data-[active=true]:border-accent"
+                      >
+                        <div className="flex items-baseline gap-2">
+                          <span className="flex-1 truncate text-[13px] font-medium text-foreground">{s.title}</span>
+                          <span className="text-[10.5px] text-muted">{s.time}</span>
+                        </div>
+                        {s.specs.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {s.specs.map((sp) => {
+                              const specialist = SPECIALISTS[sp];
+                              if (!specialist) return null;
+                              return (
+                                <span
+                                  key={sp}
+                                  className="inline-flex items-center gap-1 rounded-md bg-default px-1.5 py-0.5 text-[10.5px]"
+                                  style={{ color: specialist.color }}
+                                >
+                                  <Icon name={specialist.icon} size="sm" />
+                                  {specialist.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
